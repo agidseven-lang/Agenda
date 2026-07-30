@@ -1,0 +1,1062 @@
+{
+  "geradoEm": "F3.5.4B (working tree local — sem commit)",
+  "resolucoes": {
+    "r1350": [
+      1350,
+      689
+    ],
+    "r1366": [
+      1366,
+      768
+    ],
+    "r1600": [
+      1600,
+      900
+    ],
+    "r1920": [
+      1920,
+      1080
+    ]
+  },
+  "cenas": {
+    "01-quadro-completo-1350x689": {
+      "cards": [
+        {
+          "id": "RT1",
+          "cardHeight": 387,
+          "themesTotal": 1,
+          "themesVisible": 1,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "12.5px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "CR12",
+          "cardHeight": 748,
+          "themesTotal": 12,
+          "themesVisible": 12,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "12.5px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "HV1",
+          "cardHeight": 497,
+          "themesTotal": 4,
+          "themesVisible": 4,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "12.5px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "VC1",
+          "cardHeight": 372,
+          "themesTotal": 1,
+          "themesVisible": 1,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "12.5px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "RB1",
+          "cardHeight": 380,
+          "themesTotal": 0,
+          "themesVisible": 0,
+          "listInternalScroll": false,
+          "listOverflowY": null,
+          "themeFontSize": null,
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "PL1",
+          "cardHeight": 429,
+          "themesTotal": 2,
+          "themesVisible": 2,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "12.5px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "OK1",
+          "cardHeight": 397,
+          "themesTotal": 0,
+          "themesVisible": 0,
+          "listInternalScroll": false,
+          "listOverflowY": null,
+          "themeFontSize": null,
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        }
+      ],
+      "colScroll": [
+        {
+          "col": 0,
+          "scrollHeight": 1151,
+          "clientHeight": 556,
+          "colScrolls": true
+        },
+        {
+          "col": 1,
+          "scrollHeight": 1273,
+          "clientHeight": 556,
+          "colScrolls": true
+        },
+        {
+          "col": 2,
+          "scrollHeight": 842,
+          "clientHeight": 556,
+          "colScrolls": true
+        }
+      ]
+    },
+    "01-quadro-completo-1366x768": {
+      "cards": [
+        {
+          "id": "RT1",
+          "cardHeight": 410,
+          "themesTotal": 1,
+          "themesVisible": 1,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "CR12",
+          "cardHeight": 791,
+          "themesTotal": 12,
+          "themesVisible": 12,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "HV1",
+          "cardHeight": 525,
+          "themesTotal": 4,
+          "themesVisible": 4,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "VC1",
+          "cardHeight": 393,
+          "themesTotal": 1,
+          "themesVisible": 1,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "RB1",
+          "cardHeight": 397,
+          "themesTotal": 0,
+          "themesVisible": 0,
+          "listInternalScroll": false,
+          "listOverflowY": null,
+          "themeFontSize": null,
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "PL1",
+          "cardHeight": 453,
+          "themesTotal": 2,
+          "themesVisible": 2,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "OK1",
+          "cardHeight": 414,
+          "themesTotal": 0,
+          "themesVisible": 0,
+          "listInternalScroll": false,
+          "listOverflowY": null,
+          "themeFontSize": null,
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        }
+      ],
+      "colScroll": [
+        {
+          "col": 0,
+          "scrollHeight": 1220,
+          "clientHeight": 618,
+          "colScrolls": true
+        },
+        {
+          "col": 1,
+          "scrollHeight": 1343,
+          "clientHeight": 618,
+          "colScrolls": true
+        },
+        {
+          "col": 2,
+          "scrollHeight": 886,
+          "clientHeight": 618,
+          "colScrolls": true
+        }
+      ]
+    },
+    "01-quadro-completo-1600x900": {
+      "cards": [
+        {
+          "id": "RT1",
+          "cardHeight": 430,
+          "themesTotal": 1,
+          "themesVisible": 1,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "CR12",
+          "cardHeight": 833,
+          "themesTotal": 12,
+          "themesVisible": 12,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "HV1",
+          "cardHeight": 552,
+          "themesTotal": 4,
+          "themesVisible": 4,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "VC1",
+          "cardHeight": 413,
+          "themesTotal": 1,
+          "themesVisible": 1,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "RB1",
+          "cardHeight": 413,
+          "themesTotal": 0,
+          "themesVisible": 0,
+          "listInternalScroll": false,
+          "listOverflowY": null,
+          "themeFontSize": null,
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "PL1",
+          "cardHeight": 476,
+          "themesTotal": 2,
+          "themesVisible": 2,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "OK1",
+          "cardHeight": 430,
+          "themesTotal": 0,
+          "themesVisible": 0,
+          "listInternalScroll": false,
+          "listOverflowY": null,
+          "themeFontSize": null,
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        }
+      ],
+      "colScroll": [
+        {
+          "col": 0,
+          "scrollHeight": 1291,
+          "clientHeight": 719,
+          "colScrolls": true
+        },
+        {
+          "col": 1,
+          "scrollHeight": 1418,
+          "clientHeight": 719,
+          "colScrolls": true
+        },
+        {
+          "col": 2,
+          "scrollHeight": 934,
+          "clientHeight": 719,
+          "colScrolls": true
+        }
+      ]
+    },
+    "01-quadro-completo-1920x1080": {
+      "cards": [
+        {
+          "id": "RT1",
+          "cardHeight": 437,
+          "themesTotal": 1,
+          "themesVisible": 1,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "CR12",
+          "cardHeight": 841,
+          "themesTotal": 12,
+          "themesVisible": 12,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "HV1",
+          "cardHeight": 561,
+          "themesTotal": 4,
+          "themesVisible": 4,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "VC1",
+          "cardHeight": 421,
+          "themesTotal": 1,
+          "themesVisible": 1,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "RB1",
+          "cardHeight": 420,
+          "themesTotal": 0,
+          "themesVisible": 0,
+          "listInternalScroll": false,
+          "listOverflowY": null,
+          "themeFontSize": null,
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "PL1",
+          "cardHeight": 485,
+          "themesTotal": 2,
+          "themesVisible": 2,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "OK1",
+          "cardHeight": 437,
+          "themesTotal": 0,
+          "themesVisible": 0,
+          "listInternalScroll": false,
+          "listOverflowY": null,
+          "themeFontSize": null,
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        }
+      ],
+      "colScroll": [
+        {
+          "col": 0,
+          "scrollHeight": 1308,
+          "clientHeight": 867,
+          "colScrolls": true
+        },
+        {
+          "col": 1,
+          "scrollHeight": 1446,
+          "clientHeight": 867,
+          "colScrolls": true
+        },
+        {
+          "col": 2,
+          "scrollHeight": 952,
+          "clientHeight": 867,
+          "colScrolls": true
+        }
+      ]
+    },
+    "03-card-1-tema": {
+      "cards": [
+        {
+          "id": "RT1",
+          "cardHeight": 411,
+          "themesTotal": 1,
+          "themesVisible": 1,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        }
+      ],
+      "colScroll": [
+        {
+          "col": 0,
+          "scrollHeight": 741,
+          "clientHeight": 741,
+          "colScrolls": false
+        }
+      ]
+    },
+    "04-card-4-temas": {
+      "cards": [
+        {
+          "id": "HV1",
+          "cardHeight": 559,
+          "themesTotal": 4,
+          "themesVisible": 4,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        }
+      ],
+      "colScroll": [
+        {
+          "col": 0,
+          "scrollHeight": 809,
+          "clientHeight": 809,
+          "colScrolls": false
+        }
+      ]
+    },
+    "05-card-8-temas": {
+      "cards": [
+        {
+          "id": "CR8",
+          "cardHeight": 687,
+          "themesTotal": 8,
+          "themesVisible": 8,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        }
+      ],
+      "colScroll": [
+        {
+          "col": 0,
+          "scrollHeight": 989,
+          "clientHeight": 989,
+          "colScrolls": false
+        }
+      ]
+    },
+    "06-card-12-temas": {
+      "cards": [
+        {
+          "id": "CR12",
+          "cardHeight": 839,
+          "themesTotal": 12,
+          "themesVisible": 12,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        }
+      ],
+      "colScroll": [
+        {
+          "col": 0,
+          "scrollHeight": 1309,
+          "clientHeight": 1309,
+          "colScrolls": false
+        }
+      ]
+    },
+    "07-nome-longo": {
+      "cards": [
+        {
+          "id": "NL1",
+          "cardHeight": 336,
+          "themesTotal": 0,
+          "themesVisible": 0,
+          "listInternalScroll": false,
+          "listOverflowY": null,
+          "themeFontSize": null,
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        }
+      ],
+      "colScroll": [
+        {
+          "col": 0,
+          "scrollHeight": 741,
+          "clientHeight": 741,
+          "colScrolls": false
+        }
+      ]
+    },
+    "08-titulo-longo": {
+      "cards": [
+        {
+          "id": "TL1",
+          "cardHeight": 478,
+          "themesTotal": 2,
+          "themesVisible": 2,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        }
+      ],
+      "colScroll": [
+        {
+          "col": 0,
+          "scrollHeight": 789,
+          "clientHeight": 789,
+          "colScrolls": false
+        }
+      ]
+    },
+    "09-proxima-acao-longa": {
+      "cards": [
+        {
+          "id": "PL1",
+          "cardHeight": 483,
+          "themesTotal": 2,
+          "themesVisible": 2,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        }
+      ],
+      "colScroll": [
+        {
+          "col": 0,
+          "scrollHeight": 809,
+          "clientHeight": 809,
+          "colScrolls": false
+        }
+      ]
+    },
+    "10-coluna-uma-tarefa": {
+      "cards": [
+        {
+          "id": "HV1",
+          "cardHeight": 523,
+          "themesTotal": 4,
+          "themesVisible": 4,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        }
+      ],
+      "colScroll": [
+        {
+          "col": 0,
+          "scrollHeight": 618,
+          "clientHeight": 618,
+          "colScrolls": false
+        }
+      ]
+    },
+    "11-coluna-varias-tarefas": {
+      "cards": [
+        {
+          "id": "HV1",
+          "cardHeight": 525,
+          "themesTotal": 4,
+          "themesVisible": 4,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "CR8",
+          "cardHeight": 647,
+          "themesTotal": 8,
+          "themesVisible": 8,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "VC1",
+          "cardHeight": 393,
+          "themesTotal": 1,
+          "themesVisible": 1,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "RB1",
+          "cardHeight": 397,
+          "themesTotal": 0,
+          "themesVisible": 0,
+          "listInternalScroll": false,
+          "listOverflowY": null,
+          "themeFontSize": null,
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "NL1",
+          "cardHeight": 322,
+          "themesTotal": 0,
+          "themesVisible": 0,
+          "listInternalScroll": false,
+          "listOverflowY": null,
+          "themeFontSize": null,
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        }
+      ],
+      "colScroll": [
+        {
+          "col": 0,
+          "scrollHeight": 2330,
+          "clientHeight": 618,
+          "colScrolls": true
+        }
+      ]
+    },
+    "16-primeiro-card-sem-corte": {
+      "cards": [
+        {
+          "id": "HV1",
+          "cardHeight": 525,
+          "themesTotal": 4,
+          "themesVisible": 4,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "CR8",
+          "cardHeight": 647,
+          "themesTotal": 8,
+          "themesVisible": 8,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "VC1",
+          "cardHeight": 393,
+          "themesTotal": 1,
+          "themesVisible": 1,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "RB1",
+          "cardHeight": 397,
+          "themesTotal": 0,
+          "themesVisible": 0,
+          "listInternalScroll": false,
+          "listOverflowY": null,
+          "themeFontSize": null,
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "NL1",
+          "cardHeight": 322,
+          "themesTotal": 0,
+          "themesVisible": 0,
+          "listInternalScroll": false,
+          "listOverflowY": null,
+          "themeFontSize": null,
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        }
+      ],
+      "colScroll": [
+        {
+          "col": 0,
+          "scrollHeight": 2330,
+          "clientHeight": 618,
+          "colScrolls": true
+        }
+      ]
+    },
+    "17-ultimo-card-sem-corte": {
+      "cards": [
+        {
+          "id": "HV1",
+          "cardHeight": 525,
+          "themesTotal": 4,
+          "themesVisible": 4,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "CR8",
+          "cardHeight": 647,
+          "themesTotal": 8,
+          "themesVisible": 8,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "VC1",
+          "cardHeight": 393,
+          "themesTotal": 1,
+          "themesVisible": 1,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "RB1",
+          "cardHeight": 397,
+          "themesTotal": 0,
+          "themesVisible": 0,
+          "listInternalScroll": false,
+          "listOverflowY": null,
+          "themeFontSize": null,
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "NL1",
+          "cardHeight": 322,
+          "themesTotal": 0,
+          "themesVisible": 0,
+          "listInternalScroll": false,
+          "listOverflowY": null,
+          "themeFontSize": null,
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        }
+      ],
+      "colScroll": [
+        {
+          "col": 0,
+          "scrollHeight": 2330,
+          "clientHeight": 618,
+          "colScrolls": true
+        }
+      ]
+    },
+    "13-closeup-temas": {
+      "cards": [
+        {
+          "id": "CR8",
+          "cardHeight": 687,
+          "themesTotal": 8,
+          "themesVisible": 8,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        }
+      ],
+      "colScroll": [
+        {
+          "col": 0,
+          "scrollHeight": 989,
+          "clientHeight": 989,
+          "colScrolls": false
+        }
+      ]
+    },
+    "14-closeup-por-primeiro-nome": {
+      "cards": [
+        {
+          "id": "HV1",
+          "cardHeight": 559,
+          "themesTotal": 4,
+          "themesVisible": 4,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        }
+      ],
+      "colScroll": [
+        {
+          "col": 0,
+          "scrollHeight": 809,
+          "clientHeight": 809,
+          "colScrolls": false
+        }
+      ]
+    },
+    "15-menu-acoes-aberto": {
+      "cards": [
+        {
+          "id": "HV1",
+          "cardHeight": 550,
+          "themesTotal": 4,
+          "themesVisible": 4,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        }
+      ],
+      "colScroll": [
+        {
+          "col": 0,
+          "scrollHeight": 719,
+          "clientHeight": 719,
+          "colScrolls": false
+        }
+      ]
+    },
+    "18-escala-125": {
+      "cards": [
+        {
+          "id": "RT1",
+          "cardHeight": 410,
+          "themesTotal": 1,
+          "themesVisible": 1,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "CR12",
+          "cardHeight": 791,
+          "themesTotal": 12,
+          "themesVisible": 12,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "HV1",
+          "cardHeight": 525,
+          "themesTotal": 4,
+          "themesVisible": 4,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "VC1",
+          "cardHeight": 393,
+          "themesTotal": 1,
+          "themesVisible": 1,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "RB1",
+          "cardHeight": 397,
+          "themesTotal": 0,
+          "themesVisible": 0,
+          "listInternalScroll": false,
+          "listOverflowY": null,
+          "themeFontSize": null,
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "PL1",
+          "cardHeight": 453,
+          "themesTotal": 2,
+          "themesVisible": 2,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "OK1",
+          "cardHeight": 414,
+          "themesTotal": 0,
+          "themesVisible": 0,
+          "listInternalScroll": false,
+          "listOverflowY": null,
+          "themeFontSize": null,
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        }
+      ],
+      "colScroll": [
+        {
+          "col": 0,
+          "scrollHeight": 1220,
+          "clientHeight": 618,
+          "colScrolls": true
+        },
+        {
+          "col": 1,
+          "scrollHeight": 1343,
+          "clientHeight": 618,
+          "colScrolls": true
+        },
+        {
+          "col": 2,
+          "scrollHeight": 886,
+          "clientHeight": 618,
+          "colScrolls": true
+        }
+      ]
+    },
+    "12-antes": {
+      "cards": [
+        {
+          "id": "HV1",
+          "cardHeight": 479,
+          "themesTotal": 4,
+          "themesVisible": 2,
+          "listInternalScroll": false,
+          "listOverflowY": "auto",
+          "themeFontSize": "12px",
+          "hasMaisN": true,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "CR12",
+          "cardHeight": 456,
+          "themesTotal": 12,
+          "themesVisible": 2,
+          "listInternalScroll": false,
+          "listOverflowY": "auto",
+          "themeFontSize": "12px",
+          "hasMaisN": true,
+          "contentOverflowsRight": false
+        }
+      ],
+      "colScroll": [
+        {
+          "col": 0,
+          "scrollHeight": 1059,
+          "clientHeight": 1059,
+          "colScrolls": false
+        },
+        {
+          "col": 1,
+          "scrollHeight": 1059,
+          "clientHeight": 1059,
+          "colScrolls": false
+        }
+      ]
+    },
+    "12-depois": {
+      "cards": [
+        {
+          "id": "HV1",
+          "cardHeight": 605,
+          "themesTotal": 4,
+          "themesVisible": 4,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        },
+        {
+          "id": "CR12",
+          "cardHeight": 839,
+          "themesTotal": 12,
+          "themesVisible": 12,
+          "listInternalScroll": false,
+          "listOverflowY": "visible",
+          "themeFontSize": "13px",
+          "hasMaisN": false,
+          "contentOverflowsRight": false
+        }
+      ],
+      "colScroll": [
+        {
+          "col": 0,
+          "scrollHeight": 1059,
+          "clientHeight": 1059,
+          "colScrolls": false
+        },
+        {
+          "col": 1,
+          "scrollHeight": 1059,
+          "clientHeight": 1059,
+          "colScrolls": false
+        }
+      ]
+    }
+  }
+}

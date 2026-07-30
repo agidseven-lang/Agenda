@@ -5,7 +5,10 @@
  *   U) UM esqueleto para TODOS os setores (root uniforme, sem classe por setor,
  *      mesma ordem de blocos, rodapé/botões idênticos, trilho/etapa/próxima em todos);
  *   S) slots específicos: Edição de Cards (Legenda/Obs ≤2 linhas c/ rótulo iconográfico),
- *      cron (Temas com "+N · ver em Detalhes" quando >2), checklist iconográfico;
+ *      cron (F3.5.4B: TODOS os temas no card — 1→1, 4→4, 12→12; SEM "+N temas", SEM cap CSS,
+ *      SEM rolagem interna; card de altura natural, rolagem só na coluna), checklist iconográfico;
+ *   N) F3.5.4B: campo "por" exibe SÓ o primeiro nome (helper kbv2FirstName; tooltip completo);
+ *      cabeçalho Temas com contagem; tipografia dos temas ampliada (13px);
  *   C) compactação: medidas-chave reduzidas (gap/padding/avatar/título/botões/origem
  *      em linha única) com redução da altura fixa estimada entre 20% e 35%;
  *   E) esticamento PROD1.6 NEUTRALIZADO (card único = altura natural, todos os setores);
@@ -29,7 +32,7 @@ let pass = 0, fail = 0;
 function ok(cond, msg) { if (cond) { pass++; console.log('  PASS — ' + msg); } else { fail++; console.log('  FAIL — ' + msg); } }
 
 /* ── monta o kbv2Card REAL (mesmo harness aprovado do f3370-d3r10b) ── */
-const NAMES = ['SECTORS', 'SECTOR_ALIAS', 'secOf', 'isClientSector', 'STATUS', 'stOf', 'dtMs', 'humanDur', 'todayStr', 'taskDeadline', 'esc', 'withAlpha', 'fmtDateTimeBR', 'cronOf', 'kbv2NextForStatus', 'opOwnerLabel', 'deriveOperationalCardPresentation', 'kbv2DeriveStatus', 'kbv2Card', 'kbv2Empty', 'kbv2BoardHtml'];
+const NAMES = ['SECTORS', 'SECTOR_ALIAS', 'secOf', 'isClientSector', 'STATUS', 'stOf', 'dtMs', 'humanDur', 'todayStr', 'taskDeadline', 'esc', 'withAlpha', 'fmtDateTimeBR', 'cronOf', 'kbv2NextForStatus', 'opOwnerLabel', 'deriveOperationalCardPresentation', 'kbv2DeriveStatus', 'kbv2FirstName', 'kbv2Card', 'kbv2Empty', 'kbv2BoardHtml'];
 let SRC = ''; for (const n of NAMES) SRC += grab(n) + '\n';
 const PRELUDE =
   'var state={user:{id:"u1"},users:[{id:"u1",name:"Marina Souza",role:"Social Media"}]};\n' +
@@ -53,13 +56,15 @@ const PRELUDE =
   'function kbv2SlaLocal(t){return {sev:"neutro",label:""};}\n' +
   'function canDelTask(t){return false;}\n' +
   'function cardsFieldOf(t,k){return k==="legenda"?String(t.cardLegenda||""):String(t.cardObs||"");}\n';
-const M = new Function(PRELUDE + SRC + '\nreturn {kbv2Card,kbv2BoardHtml};')();
+const M = new Function(PRELUDE + SRC + '\nreturn {kbv2Card,kbv2BoardHtml,kbv2FirstName};')();
 
 const base = { id: 'T1', title: 'Tarefa de teste com um título razoavelmente longo para o clamp', client: 'Cliente X', status: 'andamento', by: 'u1', createdAt: 1751900000000, dueDate: '2026-08-01', dueTime: '18:00', checklist: [{ d: true }, { d: false }, { d: false }] };
 const cards = {
   copy:    M.kbv2Card(Object.assign({}, base, { sector: 'copywriting' })),
   cron:    M.kbv2Card(Object.assign({}, base, { id: 'T2', sector: 'cronograma', cronContents: [{ tema: 'Tema A' }, { tema: 'Tema B' }, { tema: 'Tema C' }, { tema: 'Tema D' }] })),
   cron2:   M.kbv2Card(Object.assign({}, base, { id: 'T3', sector: 'cronograma', cronContents: [{ tema: 'Só um' }, { tema: 'E dois' }] })),
+  cron12:  M.kbv2Card(Object.assign({}, base, { id: 'T12', sector: 'cronograma', cronContents: Array.from({ length: 12 }, (_, i) => ({ tema: 'Pauta ' + (i + 1) + ' — conteúdo editorial' })) })),
+  videos8: M.kbv2Card(Object.assign({}, base, { id: 'T8', sector: 'edicao_midia', videos: Array.from({ length: 8 }, (_, i) => ({ id: 'v' + i, n: i + 1, tema: 'VÍDEO HV ' + (i + 1) + ' - Dr. Fernando Gadelha' })) })),
   cards:   M.kbv2Card(Object.assign({}, base, { id: 'T4', sector: 'edicao_cards', cardLegenda: 'Legenda com emojis 🚀 e acentos çãé', cardObs: 'Observação relevante' })),
   cardsSem:M.kbv2Card(Object.assign({}, base, { id: 'T5', sector: 'edicao_cards' })),
   roteiro: M.kbv2Card(Object.assign({}, base, { id: 'T6', sector: 'roteiro' })),
@@ -87,10 +92,22 @@ ok(slotBetween(cards.cards, 'kbv2-card-notes') && slotBetween(cards.cron, 'kbv2-
 console.log('\n-- S: slots por setor (conteúdo varia; estrutura não) --');
 ok(cards.cards.includes('kbv2-card-notes') && cards.cards.includes('<span>Legenda</span>') && cards.cards.includes('data-ic="description"') && cards.cards.includes('<span>Observações</span>') && cards.cards.includes('data-ic="notes"'), 'S1 Edição de Cards: Legenda/Observações com rótulos ICONOGRÁFICOS');
 ok(!cards.cardsSem.includes('kbv2-card-notes'), 'S2 campos vazios NÃO reservam bloco');
-ok(cards.cron.includes('kbv2-themes-more') && cards.cron.includes('+2 temas') && cards.cron.includes('ver em Detalhes'), 'S3 cron >2 temas: "+N temas · ver em Detalhes" (sem rolagem interna)');
-ok(!cards.cron2.includes('kbv2-themes-more'), 'S4 cron ≤2 temas: sem chip "+N"');
-ok(/\.kbv2-themes-list \.kbv2-theme:nth-child\(n\+3\)\{ display:none; \}/.test(HTML), 'S5 CSS capa a prévia em 2 itens (mini-lista nunca rola)');
+/* F3.5.4B — substituição funcional EXPLÍCITA de S3/S4/S5 (contrato antigo de prévia ≤2 + "+N"
+   REPROVADO fisicamente pelo owner). Novo contrato: TODOS os temas, sem ocultação, sem cap. */
+ok(['Tema A', 'Tema B', 'Tema C', 'Tema D'].every(x => cards.cron.includes(x)) && !cards.cron.includes('kbv2-themes-more') && !cards.cron.includes('ver em Detalhes'), 'S3 cron 4 temas: TODOS no card; "+N temas · ver em Detalhes" EXTINTO');
+ok((cards.cron12.match(/class="kbv2-theme"/g) || []).length === 12 && cards.cron12.includes('Pauta 12') && (cards.videos8.match(/class="kbv2-theme"/g) || []).length === 8 && cards.videos8.includes('VÍDEO HV 8'), 'S4 12 temas → 12 linhas; 8 vídeos → 8 linhas (nenhum tema some, em nenhum setor)');
+ok(!/nth-child\(n\+3\)\{ display:none/.test(HTML) && !HTML.includes('kbv2-themes-more{') && !/kbv2-themes-more/.test(cards.cron12), 'S5 cap CSS e estilo "+N" REMOVIDOS (nenhuma regra esconde tema)');
 ok(ALL.every(h => !h.includes('checklist') || h.includes('data-ic="check"')), 'S6 checklist iconográfico');
+ok(/body\.desktop \.kbv2-column-body>\.kbv2-card\{ max-height:none; \}/.test(HTML) && /body\.desktop \.kbv2-card-themes>\.kbv2-themes-list\{ overflow-y:visible; min-height:auto; \}/.test(HTML) && /body\.desktop \.kbv2-card>\.kbv2-card-notes\{ overflow-y:visible; min-height:auto; \}/.test(HTML), 'S7 altura NATURAL por cascata (sem teto, sem scroll interno em temas/notas; literais CARD-FIT preservados)');
+ok(HTML.indexOf('id="f354b-card-styles"') > HTML.indexOf('body.desktop .kbv2-card-themes>.kbv2-themes-list{ flex:1 1 auto; min-height:0; overflow-y:auto;'), 'S8 bloco f354b vem DEPOIS do CARD-FIT (cascata vence; texto pinado intacto)');
+
+console.log('\n-- N: F3.5.4B — primeiro nome + temas ampliados --');
+ok(cards.copy.includes('por <b>Marina</b>') && !/por <b>Marina Souza<\/b>/.test(cards.copy), 'N1 campo "por" exibe SÓ o primeiro nome (por Marina)');
+ok(/title="Enviado por Marina Souza em /.test(cards.copy), 'N2 tooltip da origem preserva o nome COMPLETO');
+ok(M.kbv2FirstName('  Miercohévisk   Niheb  Ferreira Nascimento Carlôto ') === 'Miercohévisk' && M.kbv2FirstName('') === '' && M.kbv2FirstName(null) === '' && M.kbv2FirstName('Ana') === 'Ana', 'N3 helper kbv2FirstName: colapsa espaços, trata vazio/null, sem substring fixa');
+ok(cards.cron12.includes('kbv2-themes-count">12<') && cards.videos8.includes('kbv2-themes-count">8<') && !cards.cron2.includes('kbv2-themes-count">1<'), 'N4 cabeçalho Temas com CONTAGEM real');
+ok(/body\.desktop \.kbv2-theme\{ padding:8px 12px; font-size:13px;/.test(HTML) && /body\.desktop \.kbv2-theme-n\{ width:20px; height:20px;/.test(HTML), 'N5 tipografia dos temas ampliada (13px; badge 20px; espaçamento maior)');
+ok(/body\.desktop \.kbv2-theme-t\{ overflow-wrap:break-word; word-break:break-word; white-space:normal;/.test(HTML) && !/\.kbv2-theme-t\{[^}]*line-clamp/.test(HTML) && !/\.kbv2-theme\{[^}]*text-overflow/.test(HTML), 'N6 tema quebra naturalmente (sem clamp, sem ellipsis, sem corte à direita)');
 
 console.log('\n-- C: compactação (20–30%) --');
 ok(/\.kbv2-card\{[\s\S]{0,200}gap:9px;/.test(HTML) && /padding:13px; border-radius:14px; background:linear-gradient\(180deg,#161d2e,#121726\)/.test(HTML), 'C1 card: gap 13→9, padding 16→13');

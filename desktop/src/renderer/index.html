@@ -2119,10 +2119,8 @@ body.desktop .kbv2-theme-n{ flex:0 0 auto; width:16px; height:16px; border-radiu
 body.desktop .kbv2-theme-t{ flex:1 1 auto; min-width:0; }
 body.desktop .kbv2-card-chk{ font-size:11.5px; color:#8b94a6; display:flex; align-items:center; gap:6px; }
 body.desktop .kbv2-card-chk svg{ width:12px; height:12px; color:#6f7889; flex:0 0 auto; }
-/* F3.5.4 — prévia canônica: mini-listas mostram até 2 itens (sem rolagem interna); o excedente
-   vira "+N temas" e o conteúdo COMPLETO permanece no Detalhes (contrato de compactação). */
-body.desktop .kbv2-themes-list .kbv2-theme:nth-child(n+3){ display:none; }
-body.desktop .kbv2-themes-more{ padding:5px 10px; border-top:1px solid rgba(255,255,255,.06); font-size:10.5px; font-weight:800; color:#9d8bff; letter-spacing:.04em; }
+/* F3.5.4B — a prévia capada de 2 itens e a linha "+N temas · ver em Detalhes" foram REMOVIDAS
+   por reprovação física do owner: TODOS os temas aparecem no card (regras no bloco f354b). */
 body.desktop .kbv2-card-date{ display:flex; align-items:center; gap:6px; font-size:12px; color:var(--kbv2-ink); font-weight:600; }
 body.desktop .kbv2-card-date svg{ width:13px; height:13px; color:#6f7889; }
 body.desktop .kbv2-card-footer{ display:flex; gap:8px; margin-top:2px; }
@@ -2289,6 +2287,68 @@ body.desktop .kbv2-themes-list::-webkit-scrollbar-thumb:hover{ background:rgba(2
   body.desktop .kbv2-st2-row{ gap:8px }
   body.desktop .kbv2-btn{ height:31px; font-size:12.5px }
   body.desktop .kbv2-card-date{ font-size:12px }
+}
+</style>
+<style id="f354b-card-styles">
+/* ════════ F3.5.4B — CARD SaaS PREMIUM (reformulação de APRESENTAÇÃO; DOM/handlers intactos) ════════
+   Motivo: reprovação física do card na 1.0.194 (poluído, temas espremidos/ocultos, hierarquia fraca).
+   Técnica: bloco POSTERIOR de mesma especificidade — vence a cascata SEM tocar nos literais pinados
+   pelas suítes (PROD1.6, CARD-FIT-NOTEBOOK, max-height:100%, lista elástica, medidas C1-C7).
+   Contrato novo: card de ALTURA NATURAL; TODOS os temas visíveis; rolagem SÓ na coluna. */
+
+/* ── ALTURA NATURAL — neutraliza (por cascata) o teto e os scrolls internos do CARD-FIT ── */
+body.desktop .kbv2-column-body>.kbv2-card{ max-height:none; }
+body.desktop .kbv2-card-themes>.kbv2-themes-list{ overflow-y:visible; min-height:auto; }
+body.desktop .kbv2-card>.kbv2-card-notes{ overflow-y:visible; min-height:auto; }
+body.desktop .kbv2-card-themes{ overflow:visible; }
+body.desktop .kbv2-card>.kbv2-card-themes{ flex:0 0 auto; }
+
+/* ── NÍVEL 1 — identificação (responsável · origem · cliente · título) ── */
+body.desktop .kbv2-name{ font-size:14px; }
+body.desktop .kbv2-role{ font-size:10.5px; font-weight:600; letter-spacing:.02em; color:#94A0B5; }
+body.desktop .kbv2-card-origin{ font-size:12px; color:#98A2B5; }
+body.desktop .kbv2-origin-tx b{ font-weight:700; }
+body.desktop .kbv2-tier{ font-size:10.5px; letter-spacing:.11em; }
+body.desktop .kbv2-title{ margin-top:2px; }
+
+/* ── NÍVEL 2 — situação operacional: 3 chips CONSISTENTES (mesma altura/raio/fonte, sem pill) ── */
+body.desktop .kbv2-status,body.desktop .kbv2-due,body.desktop .kbv2-sla{
+  font-size:11px; font-weight:700; padding:0 9px; height:24px; line-height:22px;
+  border-radius:7px; display:inline-flex; align-items:center; white-space:nowrap; }
+body.desktop .kbv2-card-chips{ gap:6px; }
+body.desktop .kbv2-chip{ font-size:11px; padding:0 9px; height:23px; border-radius:7px; display:inline-flex; align-items:center; }
+
+/* ── NÍVEL 3 — TEMAS = área CENTRAL: mais amplo, fonte maior, contraste, sem corte/ocultação ── */
+body.desktop .kbv2-card-themes{ border-radius:11px; background:rgba(255,255,255,.03); margin:1px 0; }
+body.desktop .kbv2-themes-h{ font-size:10px; padding:7px 12px; border-radius:10px 10px 0 0;
+  display:flex; align-items:center; justify-content:space-between; gap:8px; }
+body.desktop .kbv2-themes-count{ font-style:normal; font-size:10px; font-weight:800; min-width:20px;
+  padding:1px 7px; border-radius:999px; background:rgba(124,108,255,.20); color:#C4B7FF; text-align:center; }
+body.desktop .kbv2-theme{ padding:8px 12px; font-size:13px; line-height:1.45; color:#DBE2EE; gap:9px; }
+body.desktop .kbv2-theme-t{ overflow-wrap:break-word; word-break:break-word; white-space:normal; padding-right:2px; }
+body.desktop .kbv2-theme-n{ width:20px; height:20px; border-radius:6px; font-size:11px; margin-top:1px; }
+body.desktop .kbv2-card-note .kbv2-note-v{ font-size:12.5px; color:#D5DCE8; }
+
+/* ── NÍVEL 4 — progresso (checklist · trilho · etapa · próxima · prazo): agrupado, menos ruído ── */
+body.desktop .kbv2-card-chk{ font-size:12px; color:#95A0B4; }
+body.desktop .kbv2-card-chk svg{ width:13px; height:13px; }
+body.desktop .kbv2-card-rail{ padding:3px 2px 1px; }
+body.desktop .kbv2-st2-k{ font-size:10px; }
+body.desktop .kbv2-st2-pill{ font-size:12px; padding:2px 9px; }
+body.desktop .kbv2-st2-next{ font-size:12.5px; }
+body.desktop .kbv2-card-date{ font-size:12.5px; }
+
+/* ── NÍVEL 5 — ações: inalteradas (34px, mesmos handlers); só respiro superior sutil ── */
+body.desktop .kbv2-card-footer{ margin-top:3px; }
+
+/* ── notebook: mantém leitura ≥12.5px nos temas (as bandas antigas não podem re-espremer) ── */
+@media (max-height:820px){
+  body.desktop .kbv2-theme{ padding:7px 12px; font-size:13px }
+  body.desktop .kbv2-themes-h{ padding:6px 12px; font-size:10px }
+}
+@media (max-height:720px){
+  body.desktop .kbv2-theme{ padding:6px 11px; font-size:12.5px }
+  body.desktop .kbv2-themes-h{ padding:5px 11px; font-size:10px }
 }
 </style>
 </head>
@@ -5950,6 +6010,10 @@ function cardsFieldOf(t, which){
   }catch(_){}
   return '';
 }
+/* F3.5.4B — helper seguro de PRIMEIRO NOME: apresentação do campo "por" no card, e SÓ dele.
+   Não altera o dado armazenado, schema nem telas que exigem o nome completo (Detalhes/tooltip
+   seguem completos). Colapsa espaços duplicados, trata vazio/null, sem substring fixa. */
+function kbv2FirstName(n){const s=String(n==null?'':n).replace(/\s+/g,' ').trim();return s?s.split(' ')[0]:'';}
 function kbv2Card(t, persp){
   const designerView = persp==='designer' && isClientSector(secOf(t.sector).key) && hasDesigner(t);
   const clientView = persp==='client' && isClientSector(secOf(t.sector).key);
@@ -6010,7 +6074,9 @@ function kbv2Card(t, persp){
          '<div class="kbv2-role">'+esc(asg&&asg.role?asg.role:'Responsável')+'</div></div>'+
      '</div>';
   // 3) ORIGEM — linha compacta única (ícone + quem enviou + data/hora; tooltip com a frase completa)
-  if(reqName)h+='<div class="kbv2-card-origin" title="'+esc('Enviado por '+reqName+(t.createdAt?(' em '+fmtDateTimeBR(t.createdAt)):''))+'">'+svg('person')+'<span class="kbv2-origin-tx">por <b>'+esc(reqName)+'</b>'+(t.createdAt?(' · '+esc(fmtDateTimeBR(t.createdAt))):'')+'</span></div>';
+  // F3.5.4B — apresentação exibe SÓ o primeiro nome ("por Miercohévisk"); o tooltip preserva o
+  // nome COMPLETO + data. Dado armazenado/Detalhes intocados.
+  if(reqName)h+='<div class="kbv2-card-origin" title="'+esc('Enviado por '+reqName+(t.createdAt?(' em '+fmtDateTimeBR(t.createdAt)):''))+'">'+svg('person')+'<span class="kbv2-origin-tx">por <b>'+esc(kbv2FirstName(reqName))+'</b>'+(t.createdAt?(' · '+esc(fmtDateTimeBR(t.createdAt))):'')+'</span></div>';
   // 4-5) tier (cliente) + título
   h+='<div class="kbv2-card-main">'+
        (t.client?'<div class="kbv2-tier">'+esc(t.client)+'</div>':'')+
@@ -6040,15 +6106,14 @@ function kbv2Card(t, persp){
        '</div>';
     }
   }
-  // 6) SLOT ESPECÍFICO (cron): TEMAS — prévia ≤2 + "+N · ver em Detalhes" (.kbv2-themes-list)
-  // INTERNA quando o card seria mais alto que a coluna (CARD-FIT-NOTEBOOK). Cabeçalho "Temas"
-  // fica fixo; só a lista rola. Cards com 1–3 temas que cabem mostram tudo, sem rolagem.
+  // 6) SLOT ESPECÍFICO (cron): TEMAS — F3.5.4B: área CENTRAL do card. TODOS os temas aparecem
+  // (1→1, 4→4, 8→8, 12→12); SEM "+N temas", SEM rolagem interna, SEM altura fixa: o card cresce
+  // naturalmente e quem rola é a COLUNA. Cabeçalho traz a contagem; texto quebra sem cortar.
   if(cron&&cron.list.length){
-    h+='<div class="kbv2-card-themes"><div class="kbv2-themes-h">'+(cron.list.length>1?'Temas':'Tema')+'</div>'+
+    h+='<div class="kbv2-card-themes"><div class="kbv2-themes-h"><span>'+(cron.list.length>1?'Temas':'Tema')+'</span>'+(cron.list.length>1?'<i class="kbv2-themes-count">'+cron.list.length+'</i>':'')+'</div>'+
        '<div class="kbv2-themes-list">'+
        cron.list.map(c=>'<div class="kbv2-theme"><span class="kbv2-theme-n">'+(c._i+1)+'</span><span class="kbv2-theme-t">'+esc(c.tema||'(sem tema)')+'</span></div>').join('')+
        '</div>'+
-       (cron.list.length>2?'<div class="kbv2-themes-more" title="Conteúdo completo em Detalhes">+'+(cron.list.length-2)+' tema'+(cron.list.length-2===1?'':'s')+' · ver em Detalhes</div>':'')+
      '</div>';
   }
   else if(!clientView&&isCron&&(!cron||!cron.list.length)){
