@@ -656,7 +656,10 @@ jobs:
           grep -qF 'ensureTray' "$DM/main.js" || { echo "::error:: (19) ensureTray ausente"; exit 1; }
           grep -qF 'startSlaScheduler' "$DM/main.js" || { echo "::error:: (19) produtor autoritativo (scheduler) nao ligado no main"; exit 1; }
           # 20 — LAYOUT 1.0.198 preservado: index.html EMPACOTADO diff vs 1.0.198 SO nos 3 pontos autorizados
-          DIFF=$(git diff -U0 "$BASE_198_SHA" HEAD -- desktop/src/renderer/index.html | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' || true)
+          # (este passo roda com working-directory=desktop; o pathspec do git e relativo ao CWD, entao
+          #  usamos `git -C "$GITHUB_WORKSPACE"` p/ ancorar na RAIZ do repo. O passo 12 ja provou que o
+          #  index.html EMPACOTADO no app.asar == fonte, logo diffar a fonte aqui e equivalente.)
+          DIFF=$(git -C "$GITHUB_WORKSPACE" diff -U0 "$BASE_198_SHA" HEAD -- desktop/src/renderer/index.html | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' || true)
           if printf '%s\n' "$DIFF" | grep -qE 'kbv2-sla-live|sla-monitor|f354g-|slaib|f354b-card-styles|f354e-card-styles|kbv2-card-notes|line-clamp|kbv2-theme'; then echo "::error:: (20) diff empacotado toca LAYOUT congelado"; exit 1; fi
           printf '%s\n' "$DIFF" | grep -qF 'var due=Number(t.dueAt)||0;' || { echo "::error:: (20) index empacotado nao prioriza dueAt"; exit 1; }
           echo "GATE F3.5.4H EMPACOTADO (20 gates): VERIFIED"
