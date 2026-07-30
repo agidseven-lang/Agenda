@@ -1,0 +1,758 @@
+{
+  "cenas": {
+    "01-alerta-amarelo-foto-nome-contador": [
+      {
+        "w": 382,
+        "h": 489,
+        "pad": "12px",
+        "radius": "14px",
+        "hscroll": false,
+        "offProfile": 103,
+        "offTitle": 184,
+        "band": {
+          "hidden": false,
+          "cls": "kbv2-sla-live amber",
+          "box": {
+            "t": 46,
+            "l": 13,
+            "w": 356,
+            "h": 48
+          },
+          "count": {
+            "text": "Faltam 29m 43s",
+            "box": {
+              "t": 70,
+              "l": 55,
+              "w": 303,
+              "h": 16
+            },
+            "clipped": false
+          },
+          "name": {
+            "text": "Boaz Macêdo",
+            "box": {
+              "t": 54,
+              "l": 55,
+              "w": 303,
+              "h": 15
+            }
+          },
+          "avatar": {
+            "t": 59,
+            "l": 24,
+            "w": 22,
+            "h": 22
+          },
+          "inside": true
+        },
+        "panelScroll": false
+      }
+    ],
+    "02-alerta-vermelho-foto-nome-contador": [
+      {
+        "w": 382,
+        "h": 489,
+        "pad": "12px",
+        "radius": "14px",
+        "hscroll": false,
+        "offProfile": 103,
+        "offTitle": 184,
+        "band": {
+          "hidden": false,
+          "cls": "kbv2-sla-live red",
+          "box": {
+            "t": 46,
+            "l": 13,
+            "w": 356,
+            "h": 48
+          },
+          "count": {
+            "text": "Faltam 09m 18s",
+            "box": {
+              "t": 70,
+              "l": 55,
+              "w": 303,
+              "h": 16
+            },
+            "clipped": false
+          },
+          "name": {
+            "text": "Boaz Macêdo",
+            "box": {
+              "t": 54,
+              "l": 55,
+              "w": 303,
+              "h": 15
+            }
+          },
+          "avatar": {
+            "t": 59,
+            "l": 24,
+            "w": 22,
+            "h": 22
+          },
+          "inside": true
+        },
+        "panelScroll": false
+      }
+    ],
+    "03-aba-designer-A-com-cobranca": [
+      {
+        "w": 384,
+        "h": 499,
+        "pad": "13px",
+        "radius": "14px",
+        "hscroll": false,
+        "offProfile": 106,
+        "offTitle": 189,
+        "band": {
+          "hidden": false,
+          "cls": "kbv2-sla-live amber",
+          "box": {
+            "t": 48,
+            "l": 14,
+            "w": 356,
+            "h": 48
+          },
+          "count": {
+            "text": "Faltam 29m 43s",
+            "box": {
+              "t": 72,
+              "l": 56,
+              "w": 303,
+              "h": 16
+            },
+            "clipped": false
+          },
+          "name": {
+            "text": "Boaz Macêdo",
+            "box": {
+              "t": 56,
+              "l": 56,
+              "w": 303,
+              "h": 15
+            }
+          },
+          "avatar": {
+            "t": 61,
+            "l": 25,
+            "w": 22,
+            "h": 22
+          },
+          "inside": true
+        },
+        "panelScroll": false
+      }
+    ],
+    "04-aba-designer-B-sem-cobranca": [
+      {
+        "w": 384,
+        "h": 440,
+        "pad": "13px",
+        "radius": "14px",
+        "hscroll": false,
+        "offProfile": 47,
+        "offTitle": 130,
+        "band": {
+          "hidden": true,
+          "cls": "kbv2-sla-live",
+          "box": {
+            "t": -162,
+            "l": -118,
+            "w": 0,
+            "h": 0
+          },
+          "count": {
+            "text": "",
+            "box": {
+              "t": -162,
+              "l": -118,
+              "w": 0,
+              "h": 0
+            },
+            "clipped": false
+          },
+          "name": {
+            "text": "João Pedro Albuquerque",
+            "box": {
+              "t": -162,
+              "l": -118,
+              "w": 0,
+              "h": 0
+            }
+          },
+          "avatar": {
+            "t": -162,
+            "l": -118,
+            "w": 0,
+            "h": 0
+          },
+          "inside": true
+        },
+        "panelScroll": false
+      }
+    ],
+    "05-reatribuicao-A-para-B": [
+      {
+        "w": 324,
+        "h": 532,
+        "pad": "13px",
+        "radius": "14px",
+        "hscroll": false,
+        "offProfile": 106,
+        "offTitle": 189,
+        "band": {
+          "hidden": false,
+          "cls": "kbv2-sla-live amber",
+          "box": {
+            "t": 48,
+            "l": 14,
+            "w": 296,
+            "h": 48
+          },
+          "count": {
+            "text": "Faltam 29m 43s",
+            "box": {
+              "t": 72,
+              "l": 56,
+              "w": 243,
+              "h": 16
+            },
+            "clipped": false
+          },
+          "name": {
+            "text": "João Pedro Albuquerque",
+            "box": {
+              "t": 56,
+              "l": 56,
+              "w": 243,
+              "h": 15
+            }
+          },
+          "avatar": {
+            "t": 61,
+            "l": 25,
+            "w": 22,
+            "h": 22
+          },
+          "inside": true
+        },
+        "panelScroll": false
+      }
+    ],
+    "06-contador-dois-momentos": [
+      {
+        "w": 382,
+        "h": 489,
+        "pad": "12px",
+        "radius": "14px",
+        "hscroll": false,
+        "offProfile": 103,
+        "offTitle": 184,
+        "band": {
+          "hidden": false,
+          "cls": "kbv2-sla-live amber",
+          "box": {
+            "t": 46,
+            "l": 13,
+            "w": 356,
+            "h": 48
+          },
+          "count": {
+            "text": "Faltam 29m 43s",
+            "box": {
+              "t": 70,
+              "l": 55,
+              "w": 303,
+              "h": 16
+            },
+            "clipped": false
+          },
+          "name": {
+            "text": "Boaz Macêdo",
+            "box": {
+              "t": 54,
+              "l": 55,
+              "w": 303,
+              "h": 15
+            }
+          },
+          "avatar": {
+            "t": 59,
+            "l": 24,
+            "w": 22,
+            "h": 22
+          },
+          "inside": true
+        },
+        "panelScroll": false
+      },
+      {
+        "w": 382,
+        "h": 489,
+        "pad": "12px",
+        "radius": "14px",
+        "hscroll": false,
+        "offProfile": 103,
+        "offTitle": 184,
+        "band": {
+          "hidden": false,
+          "cls": "kbv2-sla-live amber",
+          "box": {
+            "t": 46,
+            "l": 13,
+            "w": 356,
+            "h": 48
+          },
+          "count": {
+            "text": "Faltam 28m 42s",
+            "box": {
+              "t": 70,
+              "l": 55,
+              "w": 303,
+              "h": 16
+            },
+            "clipped": false
+          },
+          "name": {
+            "text": "Boaz Macêdo",
+            "box": {
+              "t": 54,
+              "l": 55,
+              "w": 303,
+              "h": 15
+            }
+          },
+          "avatar": {
+            "t": 59,
+            "l": 24,
+            "w": 22,
+            "h": 22
+          },
+          "inside": true
+        },
+        "panelScroll": false
+      }
+    ],
+    "07-formulario-edicao-reaberto": 1,
+    "08-prazo-sendo-alterado": 1,
+    "09-card-depois-da-atualizacao": [
+      {
+        "w": 382,
+        "h": 489,
+        "pad": "12px",
+        "radius": "14px",
+        "hscroll": false,
+        "offProfile": 103,
+        "offTitle": 184,
+        "band": {
+          "hidden": false,
+          "cls": "kbv2-sla-live amber",
+          "box": {
+            "t": 46,
+            "l": 13,
+            "w": 356,
+            "h": 48
+          },
+          "count": {
+            "text": "Faltam 29m 00s",
+            "box": {
+              "t": 70,
+              "l": 55,
+              "w": 303,
+              "h": 16
+            },
+            "clipped": false
+          },
+          "name": {
+            "text": "Boaz Macêdo",
+            "box": {
+              "t": 54,
+              "l": 55,
+              "w": 303,
+              "h": 15
+            }
+          },
+          "avatar": {
+            "t": 59,
+            "l": 24,
+            "w": 22,
+            "h": 22
+          },
+          "inside": true
+        },
+        "panelScroll": false
+      }
+    ],
+    "10-toast-tarefa-atualizada": {
+      "toast": true,
+      "w": 420,
+      "body": "Tarefa atualizada11:54Arydyjany Nascimento · Qualidade de vida começa aquiArydyjany Nascimento atualizou ‘Qualidade de vida começa aqui’.Responsável: Boaz MacêdoTarefa atualizada×",
+      "err": ""
+    },
+    "11-toast-prazo-anterior-novo": {
+      "toast": true,
+      "w": 420,
+      "body": "Tarefa atualizada11:54Arydyjany Nascimento · Qualidade de vida começa aquiArydyjany Nascimento atualizou o prazo: 30/07/2026 às 17:59 → 30/07/2026 às 19:30Responsável: Boaz MacêdoPrazo: 30/07/2026 às 17:59 → 30/07/2026 às 19:30×",
+      "err": ""
+    },
+    "12-minimizado-bgwindow": {
+      "rendered": {
+        "dedupKey": "task_updated:T1:1785432557000:sm1",
+        "severity": "info",
+        "eventType": "task_updated",
+        "isAttr": false,
+        "count": 1
+      },
+      "text": "ANTarefa atualizada11:54Qualidade de vida começa aquiArydyjany Nascimento atualizou o prazo: 30/07/2026 às 17:59 → 30/07/2026 às 19:30BMResponsável: Boaz MacêdoPrazo: 30/07/2026 às 17:59 → 30/07/2026 às 19:30Abrir tarefai×"
+    },
+    "13-fechado-no-X-tray": {
+      "rendered": {
+        "dedupKey": "task_updated:T1:1785432557000:sm1",
+        "severity": "info",
+        "eventType": "task_updated",
+        "isAttr": false,
+        "count": 1
+      },
+      "text": "ANTarefa atualizada11:54Qualidade de vida começa aquiArydyjany Nascimento atualizou o prazo: 30/07/2026 às 17:59 → 30/07/2026 às 19:30BMResponsável: Boaz MacêdoPrazo: 30/07/2026 às 17:59 → 30/07/2026 às 19:30Abrir tarefai×"
+    },
+    "14-clique-abre-tarefa": {
+      "opened": "detail/T1"
+    },
+    "15-escala-100": [
+      {
+        "w": 382,
+        "h": 431,
+        "pad": "12px",
+        "radius": "14px",
+        "hscroll": false,
+        "offProfile": 45,
+        "offTitle": 126,
+        "band": {
+          "hidden": true,
+          "cls": "kbv2-sla-live",
+          "box": {
+            "t": -106,
+            "l": -186,
+            "w": 0,
+            "h": 0
+          },
+          "count": {
+            "text": "",
+            "box": {
+              "t": -106,
+              "l": -186,
+              "w": 0,
+              "h": 0
+            },
+            "clipped": false
+          },
+          "name": {
+            "text": "João Pedro Albuquerque",
+            "box": {
+              "t": -106,
+              "l": -186,
+              "w": 0,
+              "h": 0
+            }
+          },
+          "avatar": {
+            "t": -106,
+            "l": -186,
+            "w": 0,
+            "h": 0
+          },
+          "inside": true
+        },
+        "panelScroll": false
+      },
+      {
+        "w": 382,
+        "h": 489,
+        "pad": "12px",
+        "radius": "14px",
+        "hscroll": false,
+        "offProfile": 103,
+        "offTitle": 184,
+        "band": {
+          "hidden": false,
+          "cls": "kbv2-sla-live amber",
+          "box": {
+            "t": 46,
+            "l": 13,
+            "w": 356,
+            "h": 48
+          },
+          "count": {
+            "text": "Faltam 29m 43s",
+            "box": {
+              "t": 70,
+              "l": 55,
+              "w": 303,
+              "h": 16
+            },
+            "clipped": false
+          },
+          "name": {
+            "text": "Boaz Macêdo",
+            "box": {
+              "t": 54,
+              "l": 55,
+              "w": 303,
+              "h": 15
+            }
+          },
+          "avatar": {
+            "t": 59,
+            "l": 24,
+            "w": 22,
+            "h": 22
+          },
+          "inside": true
+        },
+        "panelScroll": false
+      }
+    ],
+    "16-escala-125": [
+      {
+        "w": 382,
+        "h": 431,
+        "pad": "12px",
+        "radius": "14px",
+        "hscroll": false,
+        "offProfile": 45,
+        "offTitle": 126,
+        "band": {
+          "hidden": true,
+          "cls": "kbv2-sla-live",
+          "box": {
+            "t": -106,
+            "l": -186,
+            "w": 0,
+            "h": 0
+          },
+          "count": {
+            "text": "",
+            "box": {
+              "t": -106,
+              "l": -186,
+              "w": 0,
+              "h": 0
+            },
+            "clipped": false
+          },
+          "name": {
+            "text": "João Pedro Albuquerque",
+            "box": {
+              "t": -106,
+              "l": -186,
+              "w": 0,
+              "h": 0
+            }
+          },
+          "avatar": {
+            "t": -106,
+            "l": -186,
+            "w": 0,
+            "h": 0
+          },
+          "inside": true
+        },
+        "panelScroll": false
+      },
+      {
+        "w": 382,
+        "h": 489,
+        "pad": "12px",
+        "radius": "14px",
+        "hscroll": false,
+        "offProfile": 103,
+        "offTitle": 184,
+        "band": {
+          "hidden": false,
+          "cls": "kbv2-sla-live amber",
+          "box": {
+            "t": 46,
+            "l": 13,
+            "w": 356,
+            "h": 48
+          },
+          "count": {
+            "text": "Faltam 29m 43s",
+            "box": {
+              "t": 70,
+              "l": 55,
+              "w": 303,
+              "h": 16
+            },
+            "clipped": false
+          },
+          "name": {
+            "text": "Boaz Macêdo",
+            "box": {
+              "t": 54,
+              "l": 55,
+              "w": 303,
+              "h": 15
+            }
+          },
+          "avatar": {
+            "t": 59,
+            "l": 24,
+            "w": 22,
+            "h": 22
+          },
+          "inside": true
+        },
+        "panelScroll": false
+      }
+    ],
+    "extra-depois-banda-oculta": [
+      {
+        "w": 382,
+        "h": 431,
+        "pad": "12px",
+        "radius": "14px",
+        "hscroll": false,
+        "offProfile": 45,
+        "offTitle": 126,
+        "band": {
+          "hidden": true,
+          "cls": "kbv2-sla-live",
+          "box": {
+            "t": -106,
+            "l": -119,
+            "w": 0,
+            "h": 0
+          },
+          "count": {
+            "text": "",
+            "box": {
+              "t": -106,
+              "l": -119,
+              "w": 0,
+              "h": 0
+            },
+            "clipped": false
+          },
+          "name": {
+            "text": "Boaz Macêdo",
+            "box": {
+              "t": -106,
+              "l": -119,
+              "w": 0,
+              "h": 0
+            }
+          },
+          "avatar": {
+            "t": -106,
+            "l": -119,
+            "w": 0,
+            "h": 0
+          },
+          "inside": true
+        },
+        "panelScroll": false
+      }
+    ],
+    "extra-antes-1.0.196": [
+      {
+        "w": 382,
+        "h": 431,
+        "pad": "12px",
+        "radius": "14px",
+        "hscroll": false,
+        "offProfile": 45,
+        "offTitle": 126,
+        "band": null,
+        "panelScroll": false
+      }
+    ]
+  },
+  "gates": {
+    "amarelo-correto": {
+      "ok": true,
+      "detail": "{\"text\":\"Faltam 29m 43s\",\"box\":{\"t\":70,\"l\":55,\"w\":303,\"h\":16},\"clipped\":false}"
+    },
+    "vermelho-correto": {
+      "ok": true,
+      "detail": "{\"text\":\"Faltam 09m 18s\",\"box\":{\"t\":70,\"l\":55,\"w\":303,\"h\":16},\"clipped\":false}"
+    },
+    "contador-sem-corte": {
+      "ok": true,
+      "detail": ""
+    },
+    "nome-nao-sobrepoe-contador": {
+      "ok": true,
+      "detail": ""
+    },
+    "avatar-nao-sobrepoe-contador": {
+      "ok": true,
+      "detail": ""
+    },
+    "banda-dentro-do-card": {
+      "ok": true,
+      "detail": ""
+    },
+    "mesmo-componente-amarelo-vermelho": {
+      "ok": true,
+      "detail": "48x48"
+    },
+    "isolamento-aba": {
+      "ok": true,
+      "detail": "aba A tem banda ativa; aba B não tem a cobrança de A"
+    },
+    "reatribuicao": {
+      "ok": true,
+      "detail": "[{\"text\":\"João Pedro Albuquerque\",\"box\":{\"t\":56,\"l\":56,\"w\":243,\"h\":15}}]"
+    },
+    "ticker-decrementa": {
+      "ok": true,
+      "detail": "Faltam 29m 43s → Faltam 28m 42s"
+    },
+    "form-edicao-real": {
+      "ok": true,
+      "detail": "modos=renderForm/renderForm stubs: "
+    },
+    "form-prazo-alterado": {
+      "ok": true,
+      "detail": ""
+    },
+    "card-pos-edicao": {
+      "ok": true,
+      "detail": "{\"text\":\"Faltam 29m 00s\",\"box\":{\"t\":70,\"l\":55,\"w\":303,\"h\":16},\"clipped\":false}"
+    },
+    "toast-real": {
+      "ok": true,
+      "detail": "{\"toast\":true,\"w\":420,\"body\":\"Tarefa atualizada11:54Arydyjany Nascimento · Qualidade de vida começa aquiArydyjany Nascimento atualizou ‘Qualidade de vida começa"
+    },
+    "toast-prazo": {
+      "ok": true,
+      "detail": "Tarefa atualizada11:54Arydyjany Nascimento · Qualidade de vida começa aquiArydyjany Nascimento atualizou o prazo: 30/07/2026 às 17:59 → 30/07/2026 às 19:30Responsável: Boaz MacêdoPrazo: 30/07/2026 às "
+    },
+    "bg-render-ack": {
+      "ok": true,
+      "detail": "ANTarefa atualizada11:54Qualidade de vida começa aquiArydyjany Nascimento atualizou o prazo: 30/07/2026 às 17:59 → 30/07"
+    },
+    "clique-deeplink": {
+      "ok": true,
+      "detail": "detail/T1"
+    },
+    "escala-125-sem-quebra": {
+      "ok": true,
+      "detail": ""
+    },
+    "shell-congelado-Δ0": {
+      "ok": true,
+      "detail": "w 382=382 h 431~431 pad 12px=12px r 14px=14px offP 45=45"
+    },
+    "sem-scroll-interno-novo": {
+      "ok": true,
+      "detail": ""
+    },
+    "altura-so-natural": {
+      "ok": true,
+      "detail": "com banda 489 > sem banda 431, mesma largura"
+    }
+  }
+}

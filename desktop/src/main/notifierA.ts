@@ -87,6 +87,11 @@ export function startNotifierA(uid: string, deliver: Deliver, opts?: NotifierAOp
         if (!ev || !ev.eventId || !ev.at) continue;
         if (ev.at <= floor) continue;                          // atrás da janela de tolerância
         if (store.receiptHas(uid, ev.eventId)) continue;       // já entregue neste user+device
+        // F3.5.4F — task_updated é PESSOAL: entrega SOMENTE ao designer que estava atribuído
+        // no momento da edição (recipientId gravado na própria entrada do doc). Nunca todos os
+        // Designers; nunca o antigo após reatribuição; inativo não recebe (sem sessão). Os
+        // eventos existentes (all_active_users) seguem byte-idênticos.
+        if ((ev as any).recipientMode === "assigned_designer" && String((ev as any).recipientId || "") !== String(uid)) continue;
         out.push(ev);
       }
     });

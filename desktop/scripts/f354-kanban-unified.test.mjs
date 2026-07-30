@@ -54,6 +54,11 @@ const PRELUDE =
   'function deriveCanonicalPerspective(t,p){return {key:"andamento",label:"Em produção",color:"#F59E0B",next:"Enviar ao cliente"};}\n' +
   'function isTaskCompleted(t){return (t&&t.status)==="concluido";}\n' +
   'function kbv2SlaLocal(t){return {sev:"neutro",label:""};}\n' +
+  /* F3.5.4F — banda de cobrança AO VIVO é bloco OPCIONAL SANCIONADO (só aparece na janela
+     amarela/vermelha). Este gate continua provando o SHELL congelado SEM a banda (null ⇒
+     kbv2Card rende byte-equivalente à 1.0.196); o comportamento da banda tem suíte própria
+     (f354f-sla-designer-live-timer). Gate ATUALIZADO cirurgicamente — não removido. */
+  'function kbv2SlaLiveData(t){return null;}\n' +
   'function canDelTask(t){return false;}\n' +
   'function cardsFieldOf(t,k){return k==="legenda"?String(t.cardLegenda||""):String(t.cardObs||"");}\n';
 const M = new Function(PRELUDE + SRC + '\nreturn {kbv2Card,kbv2BoardHtml,kbv2FirstName};')();

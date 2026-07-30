@@ -83,6 +83,38 @@ function deriveTaskEvents(t, o) {
     });
   }
 
+  // 1b) F3.5.4F — EDIÇÃO DE TAREFA (task_updated): derivada das entradas history[]
+  // {kind:'edited', at, byId, by, fields[], forId, forName, prevDue*/newDue*} gravadas pelo
+  // PRÓPRIO escritor da edição (saveCardsEdit no renderer). Level-based e RECUPERÁVEL como
+  // os demais (backlog pós-desligamento re-deriva do doc). DESTINATÁRIO: SOMENTE o designer
+  // atribuído NO MOMENTO da edição (forId) — recipientMode 'assigned_designer' (o notifierA
+  // filtra por uid): nunca todos, nunca o designer antigo pós-reatribuição, nunca inativo
+  // (sem sessão ⇒ sem entrega, contrato F3.5.3).
+  for (var j = 0; j < hs.length; j++) {
+    var ee = hs[j] || {};
+    if (str(ee.kind) !== 'edited') continue;
+    var eat = num(ee.at) || num(ee.atMs);
+    if (!eat || (minAt && eat < minAt)) continue;
+    var ebyId = str(ee.byId || ee.byUid);
+    var prevD = str(ee.prevDueDate), prevT = str(ee.prevDueTime);
+    var newD = str(ee.newDueDate), newT = str(ee.newDueTime);
+    var dueChanged = ((prevD + '|' + prevT) !== (newD + '|' + newT));
+    out.push({
+      eventId: 'task_updated:' + taskId + ':' + eat + ':' + ebyId,
+      type: 'task_updated', recipientMode: 'assigned_designer',
+      recipientId: str(ee.forId),
+      taskId: taskId, taskTitle: title, sector: sector,
+      actorId: ebyId, actorNameDenorm: (typeof ee.by === 'string' ? ee.by : ''),
+      actorPhotoDenorm: '',
+      assignedDesignerId: str(ee.forId), assignedDesignerNameDenorm: str(ee.forName),
+      assignedDesignerPhotoDenorm: '',
+      fromStatus: '', toStatus: '', at: eat,
+      changedFields: Array.isArray(ee.fields) ? ee.fields.slice(0, 12) : [],
+      dueChanged: dueChanged,
+      prevDueDate: prevD, prevDueTime: prevT, newDueDate: newD, newDueTime: newT
+    });
+  }
+
   // 2) ATRIBUIÇÃO (cronograma/designer) — designerAssignment do próprio doc (assignedAt carimba).
   var da = (t.designerAssignment && typeof t.designerAssignment === 'object') ? t.designerAssignment : null;
   if (da && da.designerId && num(da.assignedAt) && (!minAt || num(da.assignedAt) >= minAt)) {
@@ -119,11 +151,20 @@ function deriveTaskEvents(t, o) {
 }
 
 /* ---- CONTEÚDO OFICIAL (contrato F3.5.3 — títulos/corpos verbatim) ---- */
+/* F3.5.4F — 'YYYY-MM-DD','HH:MM' → 'DD/MM/YYYY às HH:MM' (transformação PURA de string;
+   nenhum parse de Date, nenhum fuso). Campos incompletos degradam com segurança. */
+function fmtBRDT(d, t) {
+  d = str(d); t = str(t);
+  var m = d.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  var dd = m ? (m[3] + '/' + m[2] + '/' + m[1]) : d;
+  return t ? (dd + ' às ' + t) : dd;
+}
 function evTitle(type) {
   if (type === 'task_assigned' || type === 'task_reassigned') return 'Tarefa atribuída';
   if (type === 'task_moved') return 'Tarefa movimentada';
   if (type === 'task_completed') return 'Tarefa concluída';
   if (type === 'task_reopened') return 'Tarefa reaberta';
+  if (type === 'task_updated') return 'Tarefa atualizada';   // F3.5.4F
   return 'Agenda ID Seven';
 }
 function evBody(ev, ator, designer) {
@@ -137,6 +178,11 @@ function evBody(ev, ator, designer) {
   }
   if (ev.type === 'task_completed') return A + ' concluiu ' + T + '.';
   if (ev.type === 'task_reopened') return A + ' reabriu ' + T + ' em ' + columnLabel(ev.toStatus) + '.';
+  // F3.5.4F — task_updated: corpo padrão do owner; com PRAZO alterado mostra anterior → novo.
+  if (ev.type === 'task_updated') {
+    if (ev.dueChanged) return A + ' atualizou o prazo: ' + fmtBRDT(ev.prevDueDate, ev.prevDueTime) + ' → ' + fmtBRDT(ev.newDueDate, ev.newDueTime);
+    return A + ' atualizou ' + T + '.';
+  }
   return T;
 }
 function evSeverity(type) {
@@ -165,15 +211,18 @@ function buildCategoryAPayload(ev, uid, resolveProfile) {
   var respP = AP.resolveNotificationActorProfile({ actorId: ev.assignedDesignerId, nameDenorm: ev.assignedDesignerNameDenorm, photoDenorm: ev.assignedDesignerPhotoDenorm }, look);
   var ator = atorP.name || '';
   var designer = respP.name || '';
+  // F3.5.4F — contexto do task_updated: prazo anterior → novo quando o prazo mudou.
+  var ctx = ev.fromStatus ? (columnLabel(ev.fromStatus) + ' → ' + columnLabel(ev.toStatus)) : 'Tarefas';
+  if (ev.type === 'task_updated') ctx = ev.dueChanged ? ('Prazo: ' + fmtBRDT(ev.prevDueDate, ev.prevDueTime) + ' → ' + fmtBRDT(ev.newDueDate, ev.newDueTime)) : 'Tarefa atualizada';
   return {
     eventId: ev.eventId, dedupKey: ev.eventId,
-    eventType: ev.type, notificationType: 'all_active_users',
+    eventType: ev.type, notificationType: (ev.recipientMode === 'assigned_designer' ? 'assigned_designer' : 'all_active_users'),
     taskId: ev.taskId, taskTitle: ev.taskTitle, clientName: '',
     actorId: ev.actorId || '', actorName: ator, actorAvatar: atorP.photo,
     responsibleId: ev.assignedDesignerId || '', responsibleName: designer, responsibleAvatar: respP.photo,
     targetUserId: uid, createdAt: ev.at,
     title: evTitle(ev.type), body: evBody(ev, ator, designer),
-    context: ev.fromStatus ? (columnLabel(ev.fromStatus) + ' → ' + columnLabel(ev.toStatus)) : 'Tarefas',
+    context: ctx,
     severity: evSeverity(ev.type), sound: true,
     action: { type: 'detail', deep: 'detail/' + ev.taskId },
     source: 'notifierA', providerCalled: false
@@ -184,6 +233,6 @@ module.exports = {
   RETENTION_MS_DEFAULT: RETENTION_MS_DEFAULT,
   COLUMN_LABEL: COLUMN_LABEL, columnLabel: columnLabel,
   classifyMove: classifyMove, deriveTaskEvents: deriveTaskEvents,
-  evTitle: evTitle, evBody: evBody, evSeverity: evSeverity,
+  evTitle: evTitle, evBody: evBody, evSeverity: evSeverity, fmtBRDT: fmtBRDT,
   buildCategoryAPayload: buildCategoryAPayload
 };

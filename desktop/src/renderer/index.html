@@ -2390,6 +2390,26 @@ body.desktop .kbv2-name{ white-space:normal; display:-webkit-box; -webkit-box-or
   body.desktop .kbv2-card-note .kbv2-note-k{ padding:5px 11px }
 }
 </style>
+<style id="f354f-sla-live-styles">
+/* ══ F3.5.4F — COBRANÇA SLA AO VIVO (banda ADITIVA no card aprovado 1.0.196) ══
+   Elemento OPCIONAL logo abaixo do topo do card: [avatar do Designer] [nome até 2
+   linhas] [cronômetro tabular]. Só EXISTE em tarefa SLA-elegível e só fica VISÍVEL
+   dentro da janela amarela/vermelha — fora dela permanece hidden e o shell aprovado
+   fica byte-idêntico em composição. O contador é atualizado APENAS por textContent/
+   classe pelo ticker global de 1s (nenhum re-render de card, nenhum timer por card). */
+body.desktop .kbv2-sla-live{ display:flex; align-items:center; gap:9px; margin:1px 0; padding:7px 10px; border-radius:11px; border:1px solid transparent; }
+body.desktop .kbv2-sla-live[hidden]{ display:none !important; }
+body.desktop .kbv2-sla-live .av{ flex:0 0 auto; border-radius:50%; background-size:cover; background-position:center; display:flex; align-items:center; justify-content:center; font-weight:800; color:#fff; }
+body.desktop .kbv2-sla-live-tx{ flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+body.desktop .kbv2-sla-live-n{ font-size:12px; font-weight:800; line-height:1.25; color:inherit; overflow-wrap:anywhere; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
+body.desktop .kbv2-sla-live-c{ font-size:13.5px; font-weight:800; font-variant-numeric:tabular-nums; letter-spacing:.01em; line-height:1.2; white-space:nowrap; color:inherit; }
+body.desktop .kbv2-sla-live.amber{ color:#f2a93b; background:rgba(242,169,59,.12); border-color:rgba(242,169,59,.34); }
+body.desktop .kbv2-sla-live.red{ color:#ff6b61; background:rgba(239,68,68,.12); border-color:rgba(239,68,68,.38); }
+/* Identidade do Designer nas linhas do Monitor de prazos (aditivo — mesma avatar()/iniciais/cor) */
+#sla-monitor .slaop-av{ flex:0 0 auto; margin:2px 8px 0 0; display:inline-flex; }
+@media (max-height:820px){ body.desktop .kbv2-sla-live{ padding:6px 9px } body.desktop .kbv2-sla-live-c{ font-size:13px } }
+@media (max-height:720px){ body.desktop .kbv2-sla-live{ padding:5px 8px } body.desktop .kbv2-sla-live-c{ font-size:12.5px } }
+</style>
 </head>
 <body>
 
@@ -3409,7 +3429,12 @@ function slaOpRowHtml(x){
     rule = '<div class="slaop-rule ambermsg">Você tem 30 minutos para concluir esta tarefa.</div>';
   }
   var prog='<div class="slaop-prog"><span style="width:'+slaOpRowPct(x)+'%"></span></div>';
-  return '<div class="slaop-it '+cls+'" data-row="'+slaibEsc(x.taskId)+'"><span class="bar"></span>'
+  /* F3.5.4F — identificação do Designer na cobrança do Monitor: avatar REAL (foto ou
+     iniciais+cor do usuário via avatar()) resolvido pelo UID (x.designerId), com o
+     nome completo no tooltip. Aditivo — textos/contadores/regras intocados. */
+  var _f354fU=(state.users||[]).find(function(u){return u&&u.id===x.designerId;})||{id:x.designerId,name:''};
+  var _f354fAv='<span class="slaop-av" title="'+slaibEsc((_f354fU&&_f354fU.name)||'Designer')+'">'+avatar(_f354fU,26)+'</span>';
+  return '<div class="slaop-it '+cls+'" data-row="'+slaibEsc(x.taskId)+'"><span class="bar"></span>'+_f354fAv
     +'<div class="tx"><div class="slaop-t">'+slaibEsc(x.title||x.taskId)+'</div><div class="slaop-meta">'+meta+'</div>'
     +'<div class="slaop-time" data-time>'+slaOpRowTime(x)+'</div>'+prog+rule+'</div>'
     +'<button class="slaop-open" data-sla-open="'+slaibEsc(x.taskId)+'">Abrir tarefa</button></div>';
@@ -3735,8 +3760,37 @@ try{ setInterval(slaibRefresh,30000); }catch(_){}                 /* tempo real 
 /* F3.3.2 (precisão do contador): tick de 1s SÓ quando há contador ATIVO (laranja/vermelho/crítico
    na visão) — mantém "Vence em X"/tolerância exatos com o relógio real, sem custo quando calmo. */
 function slaMonHasActive(){ try{ var d=slaMonData(); return !!(d&&d.total); }catch(_){ return false; } }
-function slaTick(){ try{ slaibRender(); }catch(_){} try{ slaMonRender(); }catch(_){} try{ slaBlockRender(); }catch(_){} }
-try{ setInterval(function(){ if(slaMonHasActive()) slaTick(); },1000); }catch(_){}
+/* ══ F3.5.4F — atualização AO VIVO das bandas de cobrança dos cards ══
+   Consumidor NOVO do MESMO ticker global de 1s (nenhum interval adicional, nenhum
+   timer por card). Percorre as bandas presentes no DOM e ajusta SÓ textContent e
+   classe quando mudam (padrão anti-flicker do Monitor): zero re-render do quadro,
+   zero reinício de listener/animação, cleanup natural (o elemento sai no re-render
+   e NADA fica retido — a varredura é por querySelectorAll a cada tick). */
+function f354fLiveEls(){ try{ return document.querySelectorAll('.kbv2-sla-live[data-sla-live]'); }catch(_){ return []; } }
+function f354fSlaLiveUpdate(){
+  var els=f354fLiveEls(); if(!els||!els.length) return;
+  var now=canonicalNowMs();
+  for(var i=0;i<els.length;i++){ var el=els[i];
+    var marks={ dueMs:Number(el.getAttribute('data-due-ms'))||0, warnMs:Number(el.getAttribute('data-warn-ms'))||0,
+                redMs:Number(el.getAttribute('data-red-ms'))||0, critMs:Number(el.getAttribute('data-crit-ms'))||0 };
+    var st=f354fSlaLiveState(marks,now);
+    if(!st.vis){ if(!el.hidden) el.hidden=true; continue; }
+    if(el.hidden) el.hidden=false;
+    var want='kbv2-sla-live '+st.lvl;
+    if(el.className!==want) el.className=want;                       // classe SÓ quando muda de nível
+    var c=el.querySelector('[data-sla-live-count]');
+    if(c && c.textContent!==st.text) c.textContent=st.text;          // textContent apenas
+  }
+}
+function slaTick(){ try{ slaibRender(); }catch(_){} try{ slaMonRender(); }catch(_){} try{ slaBlockRender(); }catch(_){} try{ f354fSlaLiveUpdate(); }catch(_){} }
+/* F3.5.4F — o gate do tick passa a considerar TAMBÉM as bandas dos cards (inclui
+   Edição de Cards, que não entra em slaMonData por não ter designerSla). Calmo
+   (sem banda e sem Monitor ativo) segue sem custo. */
+try{ setInterval(function(){ if(slaMonHasActive()||f354fLiveEls().length) slaTick(); },1000); }catch(_){}
+/* F3.5.4F — retorno da bandeja/minimizado: corrige o contador IMEDIATAMENTE (sem
+   esperar o próximo tick). Timers já rodam em background (backgroundThrottling off),
+   isto cobre o caso de restauração com paint pendente. */
+try{ document.addEventListener('visibilitychange',function(){ try{ f354fSlaLiveUpdate(); }catch(_){} }); }catch(_){}
 try{ window.addEventListener('resize',function(){ slaHeaderAlign(); }); }catch(_){}
 try{ setTimeout(slaibRefresh,0); }catch(_){}
 
@@ -6064,6 +6118,55 @@ function cardsFieldOf(t, which){
    Não altera o dado armazenado, schema nem telas que exigem o nome completo (Detalhes/tooltip
    seguem completos). Colapsa espaços duplicados, trata vazio/null, sem substring fixa. */
 function kbv2FirstName(n){const s=String(n==null?'':n).replace(/\s+/g,' ').trim();return s?s.split(' ')[0]:'';}
+/* ══ F3.5.4F — COBRANÇA SLA AO VIVO: dados puros da banda do card ══
+   Fonte temporal ÚNICA: marcos absolutos (ms epoch) calculados UMA vez no render a
+   partir do prazo CANÔNICO (resolveCanonicalSlaTimeline p/ SLA de designer;
+   dueDate/dueTime — o MESMO canônico de cardsRules — p/ Edição de Cards). O ticker
+   global compara os marcos com canonicalNowMs() (offset do clockSync R4B) e atualiza
+   SÓ textContent/classe. Nenhum parse de data BR, nenhum relógio por máquina p/
+   decidir estado, nenhum setInterval por card. */
+var F354F_CARDS_WARN_MS=30*60000, F354F_CARDS_RED_MS=10*60000;   // espelho literal de cardsRules.js
+function f354fPad2(n){n=Math.max(0,Math.floor(n||0));return (n<10?'0':'')+n;}
+/* mm ss no padrão do owner ("29m 43s"); acima de 99min vira "Xh MMm".
+   mode 'down' = restante (ceil — "30m 00s" no instante exato do marco);
+   mode 'up'   = decorrido (floor — "00m 00s" no instante do prazo). */
+function f354fSpan(ms,mode){
+  ms=Math.max(0,ms||0);
+  var s=(mode==='up')?Math.floor(ms/1000):Math.ceil(ms/1000);
+  var m=Math.floor(s/60), ss=s%60;
+  if(m<100) return f354fPad2(m)+'m '+f354fPad2(ss)+'s';
+  var h=Math.floor(m/60), mm=m%60; return h+'h '+f354fPad2(mm)+'m';
+}
+/* Marcos canônicos da banda p/ UMA tarefa (ou null se não SLA-elegível).
+   - edicao_cards: amarela em due−30, vermelha em due−10 (persiste após o prazo) —
+     MESMOS limiares de cardsRules.js (T-30/T-10 preservadas).
+   - designerSla: janela amarela/vermelha da LINHA DO TEMPO CANÔNICA (warningAt/
+     overdueAt/criticalAt — 30/10 default, 40/20 edição de mídia, clamp do início). */
+function kbv2SlaLiveData(t){
+  try{
+    if(!t) return null;
+    var f=(typeof dtMs==='function'?dtMs:null);
+    if(String(t.sector||'')==='edicao_cards'){
+      if(slaPanelDelivered(t)) return null;
+      var dd=t.dueDate||t.due; if(!dd) return null;
+      var due=Number(f?f(dd,t.dueTime||'23:59'):0)||0; if(!(due>0)) return null;
+      return {mode:'cards', dueMs:due, warnMs:due-F354F_CARDS_WARN_MS, redMs:due-F354F_CARDS_RED_MS, critMs:0};
+    }
+    if(!t.designerSla) return null;
+    if(secOf(t.sector).key==='roteiro') return null;              // roteiro não tem SLA de designer
+    if(slaPanelDelivered(t)) return null;
+    var tl=resolveCanonicalSlaTimeline(t,f); if(!tl||!(tl.dueAtMs>0)) return null;
+    return {mode:'designer', dueMs:tl.overdueAtMs||tl.dueAtMs, warnMs:tl.warningAtMs||0, redMs:tl.overdueAtMs||tl.dueAtMs, critMs:tl.criticalAtMs||0};
+  }catch(_e){ return null; }
+}
+/* Estado PURO da banda num instante — usado pelo render inicial E pelo ticker (1 fonte). */
+function f354fSlaLiveState(marks,now){
+  if(!marks||!(marks.dueMs>0)) return {vis:false,lvl:'',text:''};
+  if(now<marks.warnMs) return {vis:false,lvl:'',text:''};
+  var red=(now>=marks.redMs);
+  if(now<marks.dueMs) return {vis:true, lvl:(red?'red':'amber'), text:'Faltam '+f354fSpan(marks.dueMs-now,'down')};
+  return {vis:true, lvl:'red', text:f354fSpan(now-marks.dueMs,'up')+' em atraso'};
+}
 function kbv2Card(t, persp){
   const designerView = persp==='designer' && isClientSector(secOf(t.sector).key) && hasDesigner(t);
   const clientView = persp==='client' && isClientSector(secOf(t.sector).key);
@@ -6117,6 +6220,25 @@ function kbv2Card(t, persp){
          (d?'<span class="kbv2-due" style="color:'+d.color+';background:'+withAlpha(d.color,.18)+';border-color:'+withAlpha(d.color,.48)+'">'+esc(dShort)+'</span>':'')+
        '</div>'+
      '</div>';
+  /* F3.5.4F — COBRANÇA SLA AO VIVO (aditiva; shell 1.0.196 intocado). A banda só EXISTE
+     em tarefa SLA-elegível e nasce hidden fora da janela amarela/vermelha. Identificação
+     SEMPRE pelo UID do designer (designerOf) — nunca por nome. O texto inicial é
+     calculado AQUI (correto já no primeiro paint); o ticker global de 1s mantém vivo. */
+  {
+    const _lv=kbv2SlaLiveData(t);
+    if(_lv){
+      const _lvSt=f354fSlaLiveState(_lv,canonicalNowMs());
+      const _rid=designerOf(t)||'';
+      const _resp2=respOf(t)||{id:_rid,name:(t.designerAssignment&&t.designerAssignment.designerName)||t.assignee||'Designer'};
+      const _rname=(_resp2&&_resp2.name)||'Designer';
+      h+='<div class="kbv2-sla-live'+(_lvSt.vis?(' '+_lvSt.lvl):'')+'"'+(_lvSt.vis?'':' hidden')+
+         ' data-sla-live="1" data-due-ms="'+_lv.dueMs+'" data-warn-ms="'+_lv.warnMs+'" data-red-ms="'+_lv.redMs+'" data-crit-ms="'+(_lv.critMs||0)+'" data-sla-mode="'+_lv.mode+'" data-resp-id="'+esc(String(_rid))+'"'+
+         ' title="'+esc('Cobrança de prazo — '+_rname)+'">'+
+         avatar(_resp2,22)+
+         '<div class="kbv2-sla-live-tx"><div class="kbv2-sla-live-n" title="'+esc(_rname)+'">'+esc(_rname)+'</div>'+
+         '<div class="kbv2-sla-live-c" data-sla-live-count>'+esc(_lvSt.text||'')+'</div></div></div>';
+    }
+  }
   // 2) perfil
   h+='<div class="kbv2-card-profile">'+
        '<span class="kbv2-av">'+(asgName?avatar(asg||{name:asgName,id:t.assigneeId},34):'<div class="av" style="width:34px;height:34px">'+svg('person')+'</div>')+'<i class="kbv2-presence"></i></span>'+
@@ -6224,6 +6346,10 @@ function kbv2Card(t, persp){
        '<button class="kbv2-btn" data-move="'+t.id+'">'+svg('swap')+'<span>Mover</span></button>'+
        ((canDelTask(t)||hasDesigner(t))?'<span class="kbv2-more"><button class="kbv2-btn kbv2-btn-dots" data-cardmenu="'+t.id+'" title="Mais ações">⋯</button>'+
          '<span class="kbv2-menu" data-menu-of="'+t.id+'">'+
+           /* F3.5.4F — EDITAR TAREFA (Edição de Cards): Social Media/Admin (canSeeAll) podem
+              reabrir e atualizar a tarefa (dados + prazo) depois da atribuição. Padrão do menu
+              aprovado; setores com designerSla continuam usando "Editar prazo" no Detalhe. */
+           (s.key==='edicao_cards'&&typeof canSeeAll==='function'&&state.user&&canSeeAll(state.user)?'<button class="kbv2-menu-it" data-cardedit="'+t.id+'">'+svg('editnote')+'Editar tarefa</button>':'')+
            (hasDesigner(t)?'<button class="kbv2-menu-it" data-resend="'+t.id+'">'+svg('send')+'Reenviar notificação</button>':'')+
            (canDelTask(t)?'<button class="kbv2-menu-it kbv2-menu-del" data-del="'+t.id+'">'+svg('trash')+'Excluir tarefa</button>':'')+
          '</span></span>':'')+
@@ -6802,6 +6928,8 @@ function detFooter(t,cron){
   // detail-hierarchy-v2: ações de FASE moram no hero (detailHeroBlock). O rodapé fica só
   // com utilidades da tarefa — sem grupos "Ações do cliente"/"Ações da tarefa" concorrentes.
   const taskBtns=
+    /* F3.5.4F — EDITAR TAREFA no Detalhe (Edição de Cards; SM/Admin) — mesmo gate do menu ⋯. */
+    (String(t.sector||'')==='edicao_cards'&&typeof canSeeAll==='function'&&state.user&&canSeeAll(state.user)?'<button class="btn ghost" data-cardedit="'+t.id+'">'+svg('editnote')+'Editar tarefa</button>':'')+
     '<button class="btn ghost" data-move="'+t.id+'">'+svg('swap')+'Mover status</button>'+
     (canDelTask(t)?'<button class="btn btn-danger" data-del="'+t.id+'">'+svg('trash')+'Remover</button>':'')+
     '<button class="btn det-close" data-modalclose="1">'+svg('close')+'Fechar</button>';
@@ -8152,7 +8280,7 @@ function renderForm(){
   if(f.step===0)h+=stepSector();else if(f.step===1)h+=stepDados();else if(f.step===2)h+=stepBriefing();else h+=stepReview();
   // F3.5.2 — botão final "Criar N tarefas" p/ Edição de Cards (lote); demais setores inalterados.
   const _isCardsF=!!(f.sector&&secOf(f.sector).key==='edicao_cards');
-  const _saveLbl=_isCardsF?('Criar '+cardsQtyOf(f)+(cardsQtyOf(f)===1?' tarefa':' tarefas')):(f.id?'Salvar alterações':'Salvar tarefa');
+  const _saveLbl=_isCardsF?(f.id?'Salvar alterações':('Criar '+cardsQtyOf(f)+(cardsQtyOf(f)===1?' tarefa':' tarefas'))):(f.id?'Salvar alterações':'Salvar tarefa');   /* F3.5.4F — modo edição */
   h+='</div><div class="footer-nav">'+(f.step>0?'<button class="btn ghost" data-form="back">Voltar</button>':'')+(f.step<3?'<button class="btn" data-form="next">Próximo</button>':'<button class="btn" data-form="save">'+_saveLbl+'</button>')+'</div>';
   return '<div class="form-wrap">'+h+'</div>';
 }
@@ -8179,7 +8307,8 @@ function stepDados(){const f=state.form;const t=tpl();
     '<div class="fgroup"><div class="fgroup-h">Identificação</div>'+
       '<div class="lbl">Cliente / Empresa <span class="req">obrigatório</span></div><input class="inp" id="fClient" placeholder="Ex.: Hospital Visão" value="'+esc(f.client)+'">'+
       '<div style="height:14px"></div><div class="lbl">Quantidade de tarefas <span class="req">obrigatório</span></div>'+
-      '<input class="inp" id="fCardsQty" type="number" min="1" max="'+CARDS_MAX_BATCH+'" step="1" inputmode="numeric" placeholder="Ex.: 5" value="'+esc(f.cardsQty||'')+'">'+
+      /* F3.5.4F — em EDIÇÃO (f.id) a quantidade fica TRAVADA em 1 (edita-se UMA tarefa existente). */
+      (f.id?'<input class="inp" id="fCardsQty" type="number" value="1" disabled title="Edição de tarefa existente — quantidade fixa">':'<input class="inp" id="fCardsQty" type="number" min="1" max="'+CARDS_MAX_BATCH+'" step="1" inputmode="numeric" placeholder="Ex.: 5" value="'+esc(f.cardsQty||'')+'">')+
       '<div style="font-size:11.5px;color:var(--faint);margin-top:6px;line-height:1.45">Cada tarefa vira um <b style="color:var(--soft)">card individual</b> (tema, legenda, observações e <b style="color:var(--soft)">prazo próprios</b>), atribuído ao mesmo designer. Máx. '+CARDS_MAX_BATCH+' por lote.</div>'+
     '</div>'+
     '<div class="fgroup"><div class="fgroup-h">Atribuição</div>'+
@@ -8548,6 +8677,8 @@ async function saveTask(){const f=state.form;
    chama token/Card Premium/Worker/portal, nunca mostra "Enviar ao cliente". */
 async function saveCardsBatch(){
   const f=state.form; if(!f){return;}
+  /* F3.5.4F — MODO EDIÇÃO (f.id): atualiza a tarefa EXISTENTE (1 card) em vez de criar. */
+  if(f.id){ return saveCardsEdit(); }
   if(!f.client.trim()){f._saving=false;alert('Informe o cliente.');f.step=1;render();return;}
   if(!f.assigneeId){f._saving=false;alert('Escolha o Designer responsável.');f.step=1;render();return;}
   const n=cardsQtyOf(f);
@@ -8590,6 +8721,99 @@ async function saveCardsBatch(){
   }catch(e){f._saving=false;console.warn('saveCardsBatch',e);alert('Não foi possível criar as tarefas. Verifique a conexão e tente novamente (nada foi criado).');render();return;}
   state.form=null;
   state.tab='tarefas';state.boardSector='edicao_cards';boardCol=0;render();
+}
+/* ══ F3.5.4F — EDITAR TAREFA/PRAZO (Edição de Cards) ══
+   Reabre o wizard aprovado com os dados REAIS da tarefa (1 card, quantidade travada). */
+function openCardsEdit(taskId){
+  try{
+    if(!(typeof canSeeAll==='function'&&state.user&&canSeeAll(state.user))){ if(typeof flashToast==='function')flashToast('Sem permissão para editar esta tarefa.'); return; }
+    var t=(state.tasks||[]).find(function(x){return x&&x.id===taskId;});
+    if(!t||String(t.sector||'')!=='edicao_cards'){ if(typeof flashToast==='function')flashToast('Tarefa indisponível para edição.'); return; }
+    closeModal(); if(typeof closeCardMenus==='function')closeCardMenus();
+    /* Contrato F3.4.3D/E (4.1): state.form SÓ recebe newForm(...) ou null — a edição parte
+       de um form FACTORY-FRESH e os campos são preenchidos em seguida (nunca objeto avulso). */
+    state.form=newForm('edicao_cards');
+    var f=state.form;
+    f.id=t.id; f.step=1;
+    f.client=t.client||'';
+    f.assigneeId=t.assigneeId||((t.designerAssignment||{}).designerId)||null;
+    var _au=(state.users||[]).find(function(u){return u&&u.id===f.assigneeId;});
+    f.assignee=_au?(_au.name||''):(t.assignee||'');
+    f.cardsQty=1;
+    f.cards=[{ tema:t.cardTema||t.title||'', legenda:cardsFieldOf(t,'legenda')||'', obs:cardsFieldOf(t,'obs')||'',
+      startDate:t.startDate||'', startTime:t.startTime||'',
+      endDate:t.endDate||t.dueDate||'', endTime:t.endTime||t.dueTime||'' }];
+    /* congelado p/ auditoria da gravação: prazo/responsável ANTERIORES (histórico + task_updated) */
+    f._editPrev={ dueDate:t.dueDate||'', dueTime:t.dueTime||'', assigneeId:(t.assigneeId||((t.designerAssignment||{}).designerId)||null) };
+    render();
+  }catch(_e){ if(typeof flashToast==='function')flashToast('Não foi possível abrir a edição.'); }
+}
+/* Gravação da EDIÇÃO: patch SOMENTE dos campos do formulário + updatedAt/updatedBy +
+   history[] ADITIVO (kind:'edited', com prazo anterior/novo e o designer atribuído no
+   momento — forId — que é o DESTINATÁRIO do task_updated derivado no main). NUNCA toca
+   status/checklist/by/createdAt/histórico anterior/fluxo. Prazo novo ⇒ cardDeadlineRev+1
+   (invalida dedupes T-30/T-10 antigos e re-arma os agendamentos por construção). */
+async function saveCardsEdit(){
+  const f=state.form; if(!f||!f.id){return;}
+  if(!(typeof canSeeAll==='function'&&state.user&&canSeeAll(state.user))){f._saving=false;alert('Sem permissão para editar esta tarefa.');return;}
+  const t=(state.tasks||[]).find(function(x){return x&&x.id===f.id;});
+  if(!t||String(t.sector||'')!=='edicao_cards'){f._saving=false;alert('Tarefa indisponível para edição.');state.form=null;render();return;}
+  if(!f.client.trim()){f._saving=false;alert('Informe o cliente.');f.step=1;render();return;}
+  if(!f.assigneeId){f._saving=false;alert('Escolha o Designer responsável.');f.step=1;render();return;}
+  const c=f.cards[0]||{}; const tema=String(c.tema||'').trim();
+  if(!tema){f._saving=false;alert('Informe o tema (obrigatório).');f.step=2;render();return;}
+  if(!c.startDate||!c.startTime){f._saving=false;alert('Informe a data e a hora de início (obrigatório).');f.step=2;render();return;}
+  if(!c.endDate||!c.endTime){f._saving=false;alert('Informe a data e a hora de término (obrigatório).');f.step=2;render();return;}
+  if(!(String(c.endDate)+'T'+String(c.endTime) > String(c.startDate)+'T'+String(c.startTime))){f._saving=false;alert('O término da tarefa deve ser posterior ao início.');f.step=2;render();return;}
+  const _now=Date.now(); const _soc=state.user||{};
+  const prev=f._editPrev||{dueDate:t.dueDate||'',dueTime:t.dueTime||'',assigneeId:t.assigneeId||null};
+  const legenda=String(c.legenda||'').trim(), obs=String(c.obs||'').trim();
+  const descParts=[]; if(legenda)descParts.push('Legenda: '+legenda); if(obs)descParts.push('Obs.: '+obs);
+  const dueChanged=(String(prev.dueDate)!==String(c.endDate))||(String(prev.dueTime)!==String(c.endTime));
+  const respChanged=String(prev.assigneeId||'')!==String(f.assigneeId||'');
+  const u=(state.users||[]).find(function(x){return x&&x.id===f.assigneeId;})||{};
+  /* campos alterados (auditoria legível; comparação com o doc atual) */
+  const fields=[];
+  if(String(t.cardTema||t.title||'')!==tema)fields.push('titulo');
+  if(String(t.client||'')!==f.client.trim())fields.push('cliente');
+  if(String(cardsFieldOf(t,'legenda')||'')!==legenda)fields.push('legenda');
+  if(String(cardsFieldOf(t,'obs')||'')!==obs)fields.push('observacoes');
+  if(respChanged)fields.push('responsavel');
+  if(String(t.startDate||'')!==String(c.startDate)||String(t.startTime||'')!==String(c.startTime))fields.push('inicio');
+  if(dueChanged)fields.push('prazo');
+  const patch={ title:tema, client:f.client.trim(), desc:descParts.join('\n'),
+    cardTema:tema, cardLegenda:legenda, cardObs:obs,
+    startDate:c.startDate, startTime:c.startTime, endDate:c.endDate, endTime:c.endTime,
+    dueDate:c.endDate, dueTime:c.endTime, due:c.endDate,
+    updatedAt:_now, updatedBy:_soc.id||null, updatedByName:_soc.name||'',
+    /* designerAssignment: preserva o objeto e ATUALIZA intervalo/obs; identidade do designer
+       (e assignedAt/assignedBy*) SÓ muda quando o responsável muda — reatribuição real gera o
+       task_assigned azul p/ o novo designer pelo caminho JÁ aprovado (notifierA level-based). */
+    designerAssignment:Object.assign({}, t.designerAssignment||{},
+      { startDate:c.startDate, startTime:c.startTime, endDate:c.endDate, endTime:c.endTime, obs:obs },
+      respChanged?{ designerId:f.assigneeId, designerName:u.name||'', designerAvatar:photoOf(u)||'', designerPhoto:photoOf(u)||'',
+        assignedAt:_now, assignedBy:_soc.id||null, assignedById:_soc.id||null, assignedByName:_soc.name||'', assignedByAvatar:photoOf(_soc)||'', assignedByPhoto:photoOf(_soc)||'', status:'sent' }:{}),
+    assignee:(respChanged?(u.name||''):(t.assignee||f.assignee||'')), assigneeId:f.assigneeId,
+    designerResponsibleId:f.assigneeId, designerResponsibleName:(respChanged?(u.name||''):(t.designerResponsibleName||u.name||'')),
+    history:firebase.firestore.FieldValue.arrayUnion({ kind:'edited', at:_now, atMs:_now,
+      byId:_soc.id||null, byUid:_soc.id||null, by:_soc.name||'', source:'desktop',
+      fields:fields, forId:f.assigneeId||null, forName:(respChanged?(u.name||''):(t.assignee||u.name||'')),
+      prevDueDate:prev.dueDate||'', prevDueTime:prev.dueTime||'', newDueDate:c.endDate, newDueTime:c.endTime }) };
+  if(dueChanged) patch.cardDeadlineRev=(Number(t.cardDeadlineRev)||1)+1;
+  if(f._saving)return; f._saving=true;
+  try{
+    await db.collection('tasks').doc(f.id).update(patch);
+    /* READ-BACK do PRAZO (padrão slaedit): confirma o que ficou gravado antes de declarar sucesso. */
+    const snap=await db.collection('tasks').doc(f.id).get();
+    const fresh=(snap&&typeof snap.data==='function')?snap.data():null;
+    const okDue=fresh&&String(fresh.dueDate||'')===String(c.endDate)&&String(fresh.dueTime||'')===String(c.endTime);
+    const okRev=fresh&&(!dueChanged||Number(fresh.cardDeadlineRev)===Number(patch.cardDeadlineRev));
+    if(!okDue||!okRev){ f._saving=false; alert('Não foi possível confirmar o prazo no servidor — verifique e tente novamente.'); render(); return; }
+    Object.assign(t,fresh,{id:t.id});   // reflete o REAL do servidor no estado local
+  }catch(e){ f._saving=false; console.warn('saveCardsEdit',e); alert('Não foi possível salvar as alterações. Verifique a conexão e tente novamente (nada foi alterado).'); render(); return; }
+  state.form=null;
+  state.tab='tarefas';state.boardSector='edicao_cards';boardCol=0;render();
+  if(typeof flashToast==='function')flashToast('Tarefa atualizada'+(dueChanged?' — prazo recalculado (T-30/T-10 re-agendadas)':'')+'.');
 }
 
 /* ---- EVENT DELEGATION ----
@@ -8669,6 +8893,7 @@ document.addEventListener('click',async e=>{
   if(el=g('[data-detail]')){openDetails(el.dataset.detail);return;}
   if(el=g('[data-move]')){openMove(el.dataset.move);return;}
   if(el=g('[data-domove]')){const parts=el.dataset.domove.split('|');await moveStatus(parts[0],parts[1]);return;}
+  if(el=g('[data-cardedit]')){openCardsEdit(el.dataset.cardedit);return;}   /* F3.5.4F — editar tarefa (Edição de Cards) */
   if(el=g('[data-resend]')){closeCardMenus();await resendDesignerNotify(el.dataset.resend);return;}
   if(el=g('[data-del]')){openDeleteConfirm(el.dataset.del);return;}
   if(el=g('[data-dodelete]')){await deleteTask(el.dataset.dodelete);return;}
