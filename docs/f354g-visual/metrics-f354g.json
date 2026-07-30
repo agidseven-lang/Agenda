@@ -1,0 +1,718 @@
+{
+ "cenas": {
+  "01-antes-sla-dentro-do-card-1.0.197": {
+   "w": 334,
+   "h": 458,
+   "band": true
+  },
+  "02-depois-card-limpo-f354g": {
+   "w": 334,
+   "h": 407,
+   "band": false
+  },
+  "03-monitor-tudo-em-dia": {
+   "alert": false,
+   "sev": "green",
+   "status": "Tudo em dia",
+   "name": null,
+   "count": null,
+   "avBox": null,
+   "nmBox": null,
+   "ctBox": null,
+   "chipBox": {
+    "l": 913,
+    "t": 14,
+    "r": 1110,
+    "b": 60,
+    "w": 197,
+    "h": 46
+   },
+   "monBox": {
+    "l": 913,
+    "t": 14,
+    "r": 1110,
+    "b": 60,
+    "w": 197,
+    "h": 46
+   },
+   "bellBox": {
+    "l": 1120,
+    "t": 18,
+    "r": 1160,
+    "b": 58,
+    "w": 40,
+    "h": 40
+   },
+   "headBox": {
+    "l": 18,
+    "t": 14,
+    "r": 1262,
+    "b": 60,
+    "w": 1244,
+    "h": 46
+   },
+   "nmClip": false,
+   "ctClip": false,
+   "overlapBell": false
+  },
+  "04-monitor-amarelo-foto-nome": {
+   "alert": true,
+   "sev": "amber",
+   "status": "Faltam 24m 42s",
+   "name": "Boaz Macêdo",
+   "count": "Faltam 24m 42s",
+   "avBox": {
+    "l": 924,
+    "t": 22,
+    "r": 954,
+    "b": 52,
+    "w": 30,
+    "h": 30
+   },
+   "nmBox": {
+    "l": 964,
+    "t": 28,
+    "r": 1094,
+    "b": 42,
+    "w": 130,
+    "h": 14
+   },
+   "ctBox": {
+    "l": 964,
+    "t": 45,
+    "r": 1094,
+    "b": 58,
+    "w": 130,
+    "h": 13
+   },
+   "chipBox": {
+    "l": 874,
+    "t": 10,
+    "r": 1110,
+    "b": 65,
+    "w": 236,
+    "h": 55
+   },
+   "monBox": {
+    "l": 874,
+    "t": 10,
+    "r": 1110,
+    "b": 65,
+    "w": 236,
+    "h": 55
+   },
+   "bellBox": {
+    "l": 1120,
+    "t": 18,
+    "r": 1160,
+    "b": 58,
+    "w": 40,
+    "h": 40
+   },
+   "headBox": {
+    "l": 18,
+    "t": 14,
+    "r": 1262,
+    "b": 60,
+    "w": 1244,
+    "h": 46
+   },
+   "nmClip": false,
+   "ctClip": false,
+   "overlapBell": false
+  },
+  "05-monitor-vermelho-foto-nome": {
+   "alert": true,
+   "sev": "red",
+   "status": "Faltam 07m 42s",
+   "name": "Boaz Macêdo",
+   "count": "Faltam 07m 42s",
+   "avBox": {
+    "l": 924,
+    "t": 22,
+    "r": 954,
+    "b": 52,
+    "w": 30,
+    "h": 30
+   },
+   "nmBox": {
+    "l": 964,
+    "t": 28,
+    "r": 1094,
+    "b": 42,
+    "w": 130,
+    "h": 14
+   },
+   "ctBox": {
+    "l": 964,
+    "t": 45,
+    "r": 1094,
+    "b": 58,
+    "w": 130,
+    "h": 13
+   },
+   "chipBox": {
+    "l": 874,
+    "t": 10,
+    "r": 1110,
+    "b": 65,
+    "w": 236,
+    "h": 55
+   },
+   "monBox": {
+    "l": 874,
+    "t": 10,
+    "r": 1110,
+    "b": 65,
+    "w": 236,
+    "h": 55
+   },
+   "bellBox": {
+    "l": 1120,
+    "t": 18,
+    "r": 1160,
+    "b": 58,
+    "w": 40,
+    "h": 40
+   },
+   "headBox": {
+    "l": 18,
+    "t": 14,
+    "r": 1262,
+    "b": 60,
+    "w": 1244,
+    "h": 46
+   },
+   "nmClip": false,
+   "ctClip": false,
+   "overlapBell": false
+  },
+  "06-monitor-em-atraso": {
+   "alert": true,
+   "sev": "red",
+   "status": "05m 19s em atraso",
+   "name": "Boaz Macêdo",
+   "count": "05m 19s em atraso",
+   "avBox": {
+    "l": 924,
+    "t": 22,
+    "r": 954,
+    "b": 52,
+    "w": 30,
+    "h": 30
+   },
+   "nmBox": {
+    "l": 964,
+    "t": 28,
+    "r": 1094,
+    "b": 42,
+    "w": 130,
+    "h": 14
+   },
+   "ctBox": {
+    "l": 964,
+    "t": 45,
+    "r": 1094,
+    "b": 58,
+    "w": 130,
+    "h": 13
+   },
+   "chipBox": {
+    "l": 874,
+    "t": 10,
+    "r": 1110,
+    "b": 65,
+    "w": 236,
+    "h": 55
+   },
+   "monBox": {
+    "l": 874,
+    "t": 10,
+    "r": 1110,
+    "b": 65,
+    "w": 236,
+    "h": 55
+   },
+   "bellBox": {
+    "l": 1120,
+    "t": 18,
+    "r": 1160,
+    "b": 58,
+    "w": 40,
+    "h": 40
+   },
+   "headBox": {
+    "l": 18,
+    "t": 14,
+    "r": 1262,
+    "b": 60,
+    "w": 1244,
+    "h": 46
+   },
+   "nmClip": false,
+   "ctClip": false,
+   "overlapBell": false
+  },
+  "07-aba-designer-A-com-cobranca": {
+   "alert": true,
+   "sev": "amber",
+   "status": "Faltam 24m 40s",
+   "name": "Boaz Macêdo",
+   "count": "Faltam 24m 40s",
+   "avBox": {
+    "l": 924,
+    "t": 22,
+    "r": 954,
+    "b": 52,
+    "w": 30,
+    "h": 30
+   },
+   "nmBox": {
+    "l": 964,
+    "t": 28,
+    "r": 1094,
+    "b": 42,
+    "w": 130,
+    "h": 14
+   },
+   "ctBox": {
+    "l": 964,
+    "t": 45,
+    "r": 1094,
+    "b": 58,
+    "w": 130,
+    "h": 13
+   },
+   "chipBox": {
+    "l": 874,
+    "t": 10,
+    "r": 1110,
+    "b": 65,
+    "w": 236,
+    "h": 55
+   },
+   "monBox": {
+    "l": 874,
+    "t": 10,
+    "r": 1110,
+    "b": 65,
+    "w": 236,
+    "h": 55
+   },
+   "bellBox": {
+    "l": 1120,
+    "t": 18,
+    "r": 1160,
+    "b": 58,
+    "w": 40,
+    "h": 40
+   },
+   "headBox": {
+    "l": 18,
+    "t": 14,
+    "r": 1262,
+    "b": 60,
+    "w": 1244,
+    "h": 46
+   },
+   "nmClip": false,
+   "ctClip": false,
+   "overlapBell": false
+  },
+  "08-aba-designer-B-sem-cobranca": {
+   "alert": false,
+   "sev": "green",
+   "status": "Tudo em dia",
+   "name": null,
+   "count": null,
+   "avBox": null,
+   "nmBox": null,
+   "ctBox": null,
+   "chipBox": {
+    "l": 913,
+    "t": 14,
+    "r": 1110,
+    "b": 60,
+    "w": 197,
+    "h": 46
+   },
+   "monBox": {
+    "l": 913,
+    "t": 14,
+    "r": 1110,
+    "b": 60,
+    "w": 197,
+    "h": 46
+   },
+   "bellBox": {
+    "l": 1120,
+    "t": 18,
+    "r": 1160,
+    "b": 58,
+    "w": 40,
+    "h": 40
+   },
+   "headBox": {
+    "l": 18,
+    "t": 14,
+    "r": 1262,
+    "b": 60,
+    "w": 1244,
+    "h": 46
+   },
+   "nmClip": false,
+   "ctClip": false,
+   "overlapBell": false
+  },
+  "09-aba-sem-alerta-tudo-em-dia": {
+   "alert": false,
+   "sev": "green",
+   "status": "Tudo em dia",
+   "name": null,
+   "count": null,
+   "avBox": null,
+   "nmBox": null,
+   "ctBox": null,
+   "chipBox": {
+    "l": 913,
+    "t": 14,
+    "r": 1110,
+    "b": 60,
+    "w": 197,
+    "h": 46
+   },
+   "monBox": {
+    "l": 913,
+    "t": 14,
+    "r": 1110,
+    "b": 60,
+    "w": 197,
+    "h": 46
+   },
+   "bellBox": {
+    "l": 1120,
+    "t": 18,
+    "r": 1160,
+    "b": 58,
+    "w": 40,
+    "h": 40
+   },
+   "headBox": {
+    "l": 18,
+    "t": 14,
+    "r": 1262,
+    "b": 60,
+    "w": 1244,
+    "h": 46
+   },
+   "nmClip": false,
+   "ctClip": false,
+   "overlapBell": false
+  },
+  "10-reatribuicao-para-B": {
+   "alert": true,
+   "sev": "amber",
+   "status": "Faltam 24m 37s",
+   "name": "João Pedro Albuquerque",
+   "count": "Faltam 24m 37s",
+   "avBox": {
+    "l": 909,
+    "t": 22,
+    "r": 939,
+    "b": 52,
+    "w": 30,
+    "h": 30
+   },
+   "nmBox": {
+    "l": 949,
+    "t": 28,
+    "r": 1094,
+    "b": 42,
+    "w": 145,
+    "h": 14
+   },
+   "ctBox": {
+    "l": 949,
+    "t": 45,
+    "r": 1094,
+    "b": 58,
+    "w": 145,
+    "h": 13
+   },
+   "chipBox": {
+    "l": 859,
+    "t": 10,
+    "r": 1110,
+    "b": 65,
+    "w": 251,
+    "h": 55
+   },
+   "monBox": {
+    "l": 859,
+    "t": 10,
+    "r": 1110,
+    "b": 65,
+    "w": 251,
+    "h": 55
+   },
+   "bellBox": {
+    "l": 1120,
+    "t": 18,
+    "r": 1160,
+    "b": 58,
+    "w": 40,
+    "h": 40
+   },
+   "headBox": {
+    "l": 18,
+    "t": 14,
+    "r": 1262,
+    "b": 60,
+    "w": 1244,
+    "h": 46
+   },
+   "nmClip": false,
+   "ctClip": false,
+   "overlapBell": false
+  },
+  "11-sino-fechado-badge": {
+   "badge": "1",
+   "badgeVis": true,
+   "hit": true
+  },
+  "12-sino-aberto-painel": {
+   "open": true,
+   "right": 16,
+   "top": 58,
+   "items": 1
+  },
+  "13-item-do-sino-clicavel": {
+   "opened": [
+    "D1"
+   ],
+   "closed": true
+  },
+  "14-escala-100": {
+   "alert": true,
+   "sev": "amber",
+   "status": "Faltam 24m 35s",
+   "name": "Boaz Macêdo",
+   "count": "Faltam 24m 35s",
+   "avBox": {
+    "l": 924,
+    "t": 22,
+    "r": 954,
+    "b": 52,
+    "w": 30,
+    "h": 30
+   },
+   "nmBox": {
+    "l": 964,
+    "t": 28,
+    "r": 1094,
+    "b": 42,
+    "w": 130,
+    "h": 14
+   },
+   "ctBox": {
+    "l": 964,
+    "t": 45,
+    "r": 1094,
+    "b": 58,
+    "w": 130,
+    "h": 13
+   },
+   "chipBox": {
+    "l": 874,
+    "t": 10,
+    "r": 1110,
+    "b": 65,
+    "w": 236,
+    "h": 55
+   },
+   "monBox": {
+    "l": 874,
+    "t": 10,
+    "r": 1110,
+    "b": 65,
+    "w": 236,
+    "h": 55
+   },
+   "bellBox": {
+    "l": 1120,
+    "t": 18,
+    "r": 1160,
+    "b": 58,
+    "w": 40,
+    "h": 40
+   },
+   "headBox": {
+    "l": 18,
+    "t": 14,
+    "r": 1262,
+    "b": 60,
+    "w": 1244,
+    "h": 46
+   },
+   "nmClip": false,
+   "ctClip": false,
+   "overlapBell": false
+  },
+  "15-escala-125": {
+   "alert": true,
+   "sev": "amber",
+   "status": "Faltam 24m 34s",
+   "name": "Boaz Macêdo",
+   "count": "Faltam 24m 34s",
+   "avBox": {
+    "l": 924,
+    "t": 22,
+    "r": 954,
+    "b": 52,
+    "w": 30,
+    "h": 30
+   },
+   "nmBox": {
+    "l": 964,
+    "t": 28,
+    "r": 1094,
+    "b": 42,
+    "w": 130,
+    "h": 14
+   },
+   "ctBox": {
+    "l": 964,
+    "t": 45,
+    "r": 1094,
+    "b": 58,
+    "w": 130,
+    "h": 13
+   },
+   "chipBox": {
+    "l": 874,
+    "t": 10,
+    "r": 1110,
+    "b": 65,
+    "w": 236,
+    "h": 55
+   },
+   "monBox": {
+    "l": 874,
+    "t": 10,
+    "r": 1110,
+    "b": 65,
+    "w": 236,
+    "h": 55
+   },
+   "bellBox": {
+    "l": 1120,
+    "t": 18,
+    "r": 1160,
+    "b": 58,
+    "w": 40,
+    "h": 40
+   },
+   "headBox": {
+    "l": 18,
+    "t": 14,
+    "r": 1262,
+    "b": 60,
+    "w": 1244,
+    "h": 46
+   },
+   "nmClip": false,
+   "ctClip": false,
+   "overlapBell": false
+  }
+ },
+ "gates": {
+  "antes-tem-banda-197": {
+   "ok": true,
+   "detail": "prova do estado reprovado"
+  },
+  "card-sem-banda-sla": {
+   "ok": true,
+   "detail": "card limpo (zero banda no DOM)"
+  },
+  "tudo-em-dia-sem-ruido": {
+   "ok": true,
+   "detail": "\"Tudo em dia\" sem contador"
+  },
+  "amarelo-foto-nome-contador": {
+   "ok": true,
+   "detail": "\"Faltam 24m 42s\""
+  },
+  "vermelho-foto-nome-contador": {
+   "ok": true,
+   "detail": "\"Faltam 07m 42s\""
+  },
+  "atraso-conta-pra-cima": {
+   "ok": true,
+   "detail": "\"05m 19s em atraso\""
+  },
+  "avatar-30px-maior-que-22": {
+   "ok": true,
+   "detail": "30px vs 22px reprovado"
+  },
+  "nome-sem-corte-inadequado": {
+   "ok": true,
+   "detail": "\"Boaz Macêdo\""
+  },
+  "contador-sem-corte": {
+   "ok": true,
+   "detail": ""
+  },
+  "mesmo-componente-amarelo-vermelho": {
+   "ok": true,
+   "detail": "só cor muda (avatar/altura idênticos)"
+  },
+  "monitor-alinhado-ao-topo": {
+   "ok": true,
+   "detail": "Δcentro ≤8px do header"
+  },
+  "sem-sobreposicao-sino-tabs": {
+   "ok": true,
+   "detail": "monitor não cobre o sino nem desce sobre as tabs"
+  },
+  "isolamento-aba-A-mostra": {
+   "ok": true,
+   "detail": ""
+  },
+  "isolamento-aba-B-limpa": {
+   "ok": true,
+   "detail": "B sem a cobrança de A"
+  },
+  "reatribuicao-migra": {
+   "ok": true,
+   "detail": "cobrança migrou p/ a aba B com o NOVO Designer (nome resolvido pelo uid)"
+  },
+  "sino-clicavel-badge": {
+   "ok": true,
+   "detail": "badge \"1\" e hit-test no sino"
+  },
+  "painel-do-sino-alinhado": {
+   "ok": true,
+   "detail": "ancorado à direita, dentro da tela"
+  },
+  "clique-item-abre-tarefa": {
+   "ok": true,
+   "detail": "openDetails(D1)"
+  },
+  "escala-100-ok": {
+   "ok": true,
+   "detail": ""
+  },
+  "escala-125-ok": {
+   "ok": true,
+   "detail": "dsf 1.25 sem quebra"
+  },
+  "zero-erro-console": {
+   "ok": true,
+   "detail": "limpo"
+  },
+  "zero-regressao-card": {
+   "ok": true,
+   "detail": "mesma largura de card; sem banda"
+  }
+ }
+}

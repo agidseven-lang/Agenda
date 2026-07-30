@@ -2,9 +2,16 @@
  * F3.5.4F — f354f-sla-designer-live-timer.test.mjs
  * =====================================================================================
  * CRONÔMETRO SLA EM TEMPO REAL POR DESIGNER — 26 asserts obrigatórios da fase.
+ *
+ * EMENDA F3.5.4G (regra de substituição da F3.5.4C — gates nunca são apagados, são
+ * substituídos cirurgicamente): o owner REPROVOU a banda DENTRO do card e determinou
+ * que o SLA vivo mora no MONITOR SUPERIOR (#sla-monitor). Os asserts de "banda no
+ * card" viram asserts de REMOÇÃO da banda + presença do consumidor novo do monitor
+ * (f354gMon*). A FONTE CANÔNICA (kbv2SlaLiveData/f354fSlaLiveState/f354fSpan), as
+ * regras T-30/T-10, a identidade por uid, o scheduler único e os canais main
+ * permanecem OS MESMOS — e seguem cobertos aqui 1:1.
  * Extrai as funções REAIS do renderer (index.html) e dos módulos CJS do main
- * (slaRules/cardsRules) — nenhuma reimplementação. Asserts de arquitetura (scheduler
- * único, zero timer por card, cleanup) são feitos sobre o CÓDIGO-FONTE REAL.
+ * (slaRules/cardsRules) — nenhuma reimplementação.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -43,6 +50,7 @@ const ctx = {
   dtMs: S.dtMs, secOf: S.secOf, slaPanelDelivered: S.slaPanelDelivered,
   resolveCanonicalSlaTimeline: S.resolveCanonicalSlaTimeline,
   canonicalNowMs: () => Date.now(),
+  isTaskCompleted: undefined, CSS: undefined, document: undefined, window: undefined,
 };
 vm.createContext(ctx);
 const PIECES = [
@@ -50,7 +58,8 @@ const PIECES = [
   grabVar("const UCOLORS=['#F87171'"),
   grab('f354fPad2'), grab('f354fSpan'), grab('kbv2SlaLiveData'), grab('f354fSlaLiveState'),
   grab('esc'), grab('initials'), grab('userColor'), grab('photoOf'), grab('avatar'),
-  grab('isDesignerFlow'), grab('designerOf'), grab('hasDesigner'),
+  grab('isDesignerFlow'), grab('designerOf'), grab('hasDesigner'), grab('isTaskCompleted'),
+  grab('f354gMonCtxUid'), grab('f354gMonAlerts'), grab('f354gMonTop'), grab('f354gMonHasActive'), grab('f354gMonSig'),
 ];
 vm.runInContext(PIECES.join('\n'), ctx);
 
@@ -89,72 +98,87 @@ ok(r1 === 'Faltam 09m 18s' && r2 === '04m 51s em atraso', `contador vermelho: "$
 ok(mkCards.dueMs === DUE && mkDes.dueMs === S.resolveCanonicalSlaTimeline(desTask, S.dtMs).overdueAtMs
   && mkDes.warnMs === S.resolveCanonicalSlaTimeline(desTask, S.dtMs).warningAtMs,
   'contador usa o PRAZO CANÔNICO (dueDate/dueTime dos cards; timeline canônica do designer)');
-/* 6. não depende de snapshot: updater lê SÓ atributos + canonicalNowMs */
-const updSrc = grab('f354fSlaLiveUpdate');
-ok(/canonicalNowMs\(\)/.test(updSrc) && /getAttribute\('data-due-ms'\)/.test(updSrc)
-  && !/state\.tasks/.test(updSrc) && !/firestore|snapshot/i.test(updSrc),
-  'tick NÃO depende de snapshot (lê marcos data-* + relógio canônico; nunca state.tasks/Firestore)');
-/* 7. não recria o card (textContent/className/hidden apenas) */
+/* 6. [F3.5.4G] consumidor vivo = MONITOR; deriva do state carregado + relógio canônico (sem snapshot novo) */
+const alertsSrc = grab('f354gMonAlerts'), updSrc = grab('f354gMonLiveUpdate');
+ok(/canonicalNowMs\(\)/.test(alertsSrc) && /kbv2SlaLiveData\(t\)/.test(alertsSrc) && /f354fSlaLiveState\(marks,now\)/.test(alertsSrc)
+  && !/firestore|snapshot|\.get\(\)/i.test(alertsSrc + updSrc),
+  'monitor deriva de state.tasks já carregado + relógio canônico + MESMOS helpers F3.5.4F (sem snapshot novo/Firestore)');
+/* 7. [F3.5.4G] tick NÃO reconstrói (textContent dirigido; zero innerHTML/render) */
 ok(!/innerHTML|outerHTML|insertAdjacentHTML|render\(/.test(updSrc) && /textContent/.test(updSrc),
-  'tick NÃO recria o card (somente textContent/className/hidden — zero innerHTML/render)');
-/* 8. não reinicia animação (classe atribuída SÓ quando muda) */
-ok(/el\.className!==want/.test(updSrc) && /c\.textContent!==st\.text/.test(updSrc),
-  'sem restart de animação/estilo: classe e texto atribuídos SÓ quando mudam');
-/* 9. um único scheduler global de 1s */
+  'tick do monitor NÃO reconstrói nada (somente textContent em [data-f354g-count]/[data-f354g-time])');
+/* 8. [F3.5.4G] texto atribuído SÓ quando muda (anti-flicker preservado) */
+ok(/c\.textContent!==ga\[0\]\.text/.test(updSrc) && /tm\.textContent!==a\.text/.test(updSrc),
+  'sem restart de animação/estilo: textos atribuídos SÓ quando mudam');
+/* 9. [F3.5.4G] um único scheduler global de 1s com gate por DADOS (correção do sino) */
 const ivals = HTML.match(/setInterval\(function\(\)\{[^\n]*?\},\s*1000\)/g) || [];
-ok(ivals.length === 1 && /slaMonHasActive\(\)\|\|f354fLiveEls\(\)\.length/.test(ivals[0] || ''),
-  `um ÚNICO interval global de 1s (encontrados: ${ivals.length}) com gate ampliado p/ as bandas`);
+ok(ivals.length === 1 && /slaMonHasActive\(\)\|\|f354gMonHasActive\(\)/.test(ivals[0] || '') && !/f354fLiveEls/.test(HTML),
+  `um ÚNICO interval global de 1s (encontrados: ${ivals.length}) com gate por DADOS (nunca por DOM)`);
 /* 10. nenhum timer por card */
 const cardSrc = grab('kbv2Card');
 ok(!/setInterval|setTimeout/.test(cardSrc), 'NENHUM setInterval/setTimeout dentro de kbv2Card (zero timer por card)');
-/* 11. cleanup correto (sem registro retido; varredura por querySelectorAll a cada tick) */
-ok(/querySelectorAll\('\.kbv2-sla-live\[data-sla-live\]'\)/.test(HTML) && !/f354fRegistry|__f354fEls/.test(HTML),
-  'cleanup por construção: consulta o DOM a cada tick, nenhum cache/registro de elementos');
+/* 11. [F3.5.4G] banda REMOVIDA do card por determinação do owner (card 1.0.196 limpo) */
+ok(!/kbv2-sla-live/.test(HTML) && !/data-sla-live\b/.test(HTML) && !/f354fSlaLiveUpdate|f354fLiveEls/.test(HTML)
+  && !/f354fRegistry|__f354fEls/.test(HTML),
+  'banda SLA REMOVIDA do card (zero .kbv2-sla-live/data-sla-live no renderer; zero cache/registro)');
 
 console.log('\n══ P2 — identidade do Designer + isolamento por aba (uid, nunca nome) ══');
-/* 12. designer identificado por uid */
-ok(/data-resp-id="'\+esc\(String\(_rid\)\)/.test(HTML) && /const _rid=designerOf\(t\)\|\|''/.test(cardSrc),
-  'banda identifica o Designer pelo UID (designerOf → designerAssignment.designerId||assigneeId)');
-/* 13. avatar correto (foto real quando existe) */
+/* 12. [F3.5.4G] designer identificado por uid no MONITOR (nunca nome) */
+ok(/designerOf\(t\)/.test(alertsSrc) && /rid!==ctx/.test(alertsSrc) && !/\.name\s*===|\.name\s*==[^=]|designerName\s*===/.test(alertsSrc),
+  'monitor identifica e ISOLA o Designer pelo UID (designerOf → uid canônico; nunca comparação por nome)');
+/* 13. [F3.5.4G] avatar REAL no monitor (30px — MAIOR que os 22px reprovados no card) */
 const avatarFn = vm.runInContext('avatar', ctx);
-const withPhoto = avatarFn({ id: 'u9', name: 'Boaz Macêdo', photo: 'https://x/p.jpg' }, 22);
-ok(/background-image:url\('https:\/\/x\/p\.jpg'\)/.test(withPhoto) && /kbv2SlaLiveData\(t\)/.test(cardSrc) && /avatar\(_resp2,22\)/.test(cardSrc),
-  'avatar REAL do Designer na banda (foto quando existe; mesma avatar() aprovada)');
-/* 14. nome correto (completo, tooltip, sem corte grosseiro) */
-ok(/kbv2-sla-live-n" title="'\+esc\(_rname\)\+'">'\+esc\(_rname\)/.test(HTML) && /-webkit-line-clamp:2/.test(HTML.slice(HTML.indexOf('kbv2-sla-live-n{'), HTML.indexOf('kbv2-sla-live-n{') + 400)),
-  'nome do Designer completo com tooltip e quebra controlada em até 2 linhas');
+const withPhoto = avatarFn({ id: 'u9', name: 'Boaz Macêdo', photo: 'https://x/p.jpg' }, 30);
+const monSrc = grab('slaMonRender');
+ok(/background-image:url\('https:\/\/x\/p\.jpg'\)/.test(withPhoto) && /avatar\(top\.userRef,30\)/.test(monSrc)
+  && !/avatar\(_resp2,22\)/.test(HTML),
+  'avatar REAL do Designer no monitor (30px; mesma avatar() aprovada; o de 22px do card foi removido)');
+/* 14. [F3.5.4G] nome correto no monitor (tooltip + clamp de 2 linhas controlado) */
+ok(/f354g-nm" title="'\+slaibEsc\(top\.name\)\+'">'\+slaibEsc\(top\.name\)/.test(monSrc)
+  && /-webkit-line-clamp:2/.test(HTML.slice(HTML.indexOf('.f354g-nm{'), HTML.indexOf('.f354g-nm{') + 400)),
+  'nome do Designer no monitor com tooltip e quebra controlada em até 2 linhas');
 /* 15. fallback de iniciais (sem foto: iniciais + cor do usuário; nunca imagem quebrada) */
-const noPhoto = avatarFn({ id: 'u7', name: 'Boaz Macêdo' }, 22);
+const noPhoto = avatarFn({ id: 'u7', name: 'Boaz Macêdo' }, 30);
 ok(/>BM<\/div>$/.test(noPhoto) && /background:#/.test(noPhoto) && !/img /.test(noPhoto),
   `fallback: iniciais "BM" + cor do usuário (sem <img> quebrável)`);
-/* 16-18. isolamento por aba via filtro REAL do quadro do designer */
-const filterList = (tasks, id) => tasks.filter(t => vm.runInContext('isDesignerFlow', ctx)(t) && vm.runInContext('designerOf', ctx)(t) === id);
+/* 16-18. isolamento por aba via CONTEXTO REAL do monitor (f354gMonAlerts + designerBoard) */
+function alertsWith(tasks, board) {
+  ctx.state = { user: { id: 'sm1', role: 'Social Media' }, users: [{ id: 'desA', name: 'Boaz Macêdo' }, { id: 'desB', name: 'João Pedro' }], tasks, designerBoard: board || null, personBoard: null };
+  ctx.canSeeAll = () => true;
+  return vm.runInContext('f354gMonAlerts', ctx)();
+}
+const NOWIN = DUE - 20 * 60000;                    // dentro da janela amarela
+ctx.canonicalNowMs = () => NOWIN;
+vm.runInContext('canonicalNowMs=function(){return ' + NOWIN + ';}', ctx);
 const tA = JSON.parse(JSON.stringify(cardsTask));
-const outros = [{ id: 'X1', sector: 'cronograma', designerAssignment: { designerId: 'desB', designerName: 'João' }, designerSla: { planDueAt: DUE } }];
-ok(filterList([tA, ...outros], 'desA').length === 1 && filterList([tA, ...outros], 'desA')[0].id === 'C1'
-  && filterList([tA, ...outros], 'desB').every(t => t.id !== 'C1'),
-  'cobrança SÓ na aba do Designer correto (filtro real por uid: aba A mostra, aba B não)');
-ok(filterList([tA], 'desB').length === 0 && filterList([tA], 'desC').length === 0,
-  'troca de aba NÃO vaza a cobrança (aba de outro Designer fica limpa)');
+const outros = [{ id: 'X1', sector: 'cronograma', designerAssignment: { designerId: 'desB', designerName: 'João' }, designerSla: { planDueAt: DUE + 9 * 3600000 } }];
+ok(alertsWith([tA, ...outros], 'desA').length === 1 && alertsWith([tA, ...outros], 'desA')[0].taskId === 'C1'
+  && alertsWith([tA, ...outros], 'desA')[0].uid === 'desA',
+  'cobrança SÓ na aba do Designer correto (contexto real: aba A mostra a cobrança de A)');
+ok(alertsWith([tA, ...outros], 'desB').length === 0 && alertsWith([tA], 'desC').length === 0,
+  'troca de aba NÃO vaza a cobrança (aba de outro Designer fica limpa / "Tudo em dia")');
 const tReassigned = JSON.parse(JSON.stringify(tA)); tReassigned.designerAssignment.designerId = 'desB'; tReassigned.designerAssignment.designerName = 'João'; tReassigned.assigneeId = 'desB';
-ok(filterList([tReassigned], 'desA').length === 0 && filterList([tReassigned], 'desB').length === 1
-  && vm.runInContext('kbv2SlaLiveData', ctx)(tReassigned) !== null,
-  'reatribuição: some da aba A, aparece na aba B (sem duplicação — mesmo doc, novo uid)');
+ok(alertsWith([tReassigned], 'desA').length === 0 && alertsWith([tReassigned], 'desB').length === 1
+  && alertsWith([tReassigned], 'desB')[0].name === 'João Pedro',
+  'reatribuição: monitor sai da aba A e aparece na aba B com o NOVO Designer (mesmo doc, novo uid)');
 /* 19. conclusão remove */
 const tDone = JSON.parse(JSON.stringify(tA)); tDone.status = 'concluido';
 const tDone2 = JSON.parse(JSON.stringify(desTask)); tDone2.designerFlowStatus = 'entregue';
-ok(vm.runInContext('kbv2SlaLiveData', ctx)(tDone) === null && vm.runInContext('kbv2SlaLiveData', ctx)(tDone2) === null,
-  'conclusão/entrega cancela a cobrança (banda nem é gerada)');
+ok(vm.runInContext('kbv2SlaLiveData', ctx)(tDone) === null && vm.runInContext('kbv2SlaLiveData', ctx)(tDone2) === null
+  && alertsWith([tDone], null).length === 0,
+  'conclusão/entrega cancela a cobrança (nem marcos, nem alerta no monitor)');
 /* 20. reabertura reavalia */
 const tReopen = JSON.parse(JSON.stringify(tDone)); tReopen.status = 'afazer';
-ok(vm.runInContext('kbv2SlaLiveData', ctx)(tReopen) !== null, 'reabertura reavalia (banda volta a ser elegível)');
-/* 21. alteração de prazo recalcula + agendamentos re-armados */
+ok(vm.runInContext('kbv2SlaLiveData', ctx)(tReopen) !== null && alertsWith([tReopen], null).length === 1,
+  'reabertura reavalia (cobrança volta a ser elegível e reaparece no monitor)');
+/* 21. alteração de prazo recalcula + agendamentos re-armados (+ boundary do monitor) */
 const t2h = JSON.parse(JSON.stringify(tA)); t2h.dueTime = '20:00'; t2h.cardDeadlineRev = 2;
 const mk2 = vm.runInContext('kbv2SlaLiveData', ctx)(t2h);
 const now21 = DUE - 5 * 60000; // antes vermelho; com +2h volta a ficar fora da janela
+const monBoundarySrc = grab('slaMonNextBoundary');
 ok(mk2.dueMs === DUE + 2 * 3600000 && stAt(mk2, now21).vis === false
-  && C.cardsNextBoundaryMs(t2h, now21, S.dtMs) === (DUE + 2 * 3600000) - 30 * 60000,
-  'prazo editado: contador recalcula p/ o novo canônico e o PRÓXIMO marco re-arma (T-30 novo)');
+  && C.cardsNextBoundaryMs(t2h, now21, S.dtMs) === (DUE + 2 * 3600000) - 30 * 60000
+  && /mk\.warnMs, mk\.redMs, mk\.dueMs/.test(monBoundarySrc),
+  'prazo editado: contador recalcula p/ o novo canônico; T-30 novo re-arma (main + boundary do monitor)');
 /* 22. nenhuma duplicação (dedup determinística por prazo+revisão) */
 const em1 = C.cardsEmissionsFor(tA, 'desA', DUE - 29 * 60000, S.dtMs);
 const em1b = C.cardsEmissionsFor(tA, 'desA', DUE - 29 * 60000, S.dtMs);

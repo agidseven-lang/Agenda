@@ -53,7 +53,9 @@ ok('B2.1 slaHeaderTargetCenterY existe', /function slaHeaderTargetCenterY\(\)\{/
 }
 { const cl = fnBody(DH, 'function slaClusterAlign(');
   ok('B2.4 slaClusterAlign usa o centro do bloco esquerdo (slaHeaderTargetCenterY)', /var cy=slaHeaderTargetCenterY\(\);/.test(cl));
-  ok('B2.5 centraliza avatar+sino+monitor no MESMO cy', /av\.style\.top=Math\.round\(cy-ah\/2\)/.test(cl) && /bell\.style\.top=Math\.round\(cy-bh\/2\)/.test(cl) && /w\.style\.top=Math\.round\(cy-ch\/2\)/.test(cl));
+  // F3.5.4G (emenda documentada — mesmo contrato, novo literal): as escritas viram _f354gSet(el,'top',...)
+  // (idempotente: so toca style quando o valor muda; correcao do sino). A MATEMATICA do cy e a MESMA.
+  ok('B2.5 centraliza avatar+sino+monitor no MESMO cy', /_f354gSet\(av,'top',Math\.round\(cy-ah\/2\)/.test(cl) && /_f354gSet\(bell,'top',Math\.round\(cy-bh\/2\)/.test(cl) && /_f354gSet\(w,'top',Math\.round\(cy-ch\/2\)/.test(cl));
   ok('B2.6 mede altura real (sem fallback fixo 38 que dava ~4px)', !/\)\|\|38;/.test(cl.replace(/height\|\|38/g,'')) || /getBoundingClientRect\(\)\.height\|\|46/.test(cl));
 }
 ok('B2.7 slaHeaderAlign delega ao eixo do bloco esquerdo', /function slaHeaderAlign\(\)\{[\s\S]{0,160}?slaClusterAlign\(\);/.test(DH));

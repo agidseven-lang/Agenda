@@ -2390,26 +2390,6 @@ body.desktop .kbv2-name{ white-space:normal; display:-webkit-box; -webkit-box-or
   body.desktop .kbv2-card-note .kbv2-note-k{ padding:5px 11px }
 }
 </style>
-<style id="f354f-sla-live-styles">
-/* ══ F3.5.4F — COBRANÇA SLA AO VIVO (banda ADITIVA no card aprovado 1.0.196) ══
-   Elemento OPCIONAL logo abaixo do topo do card: [avatar do Designer] [nome até 2
-   linhas] [cronômetro tabular]. Só EXISTE em tarefa SLA-elegível e só fica VISÍVEL
-   dentro da janela amarela/vermelha — fora dela permanece hidden e o shell aprovado
-   fica byte-idêntico em composição. O contador é atualizado APENAS por textContent/
-   classe pelo ticker global de 1s (nenhum re-render de card, nenhum timer por card). */
-body.desktop .kbv2-sla-live{ display:flex; align-items:center; gap:9px; margin:1px 0; padding:7px 10px; border-radius:11px; border:1px solid transparent; }
-body.desktop .kbv2-sla-live[hidden]{ display:none !important; }
-body.desktop .kbv2-sla-live .av{ flex:0 0 auto; border-radius:50%; background-size:cover; background-position:center; display:flex; align-items:center; justify-content:center; font-weight:800; color:#fff; }
-body.desktop .kbv2-sla-live-tx{ flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
-body.desktop .kbv2-sla-live-n{ font-size:12px; font-weight:800; line-height:1.25; color:inherit; overflow-wrap:anywhere; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
-body.desktop .kbv2-sla-live-c{ font-size:13.5px; font-weight:800; font-variant-numeric:tabular-nums; letter-spacing:.01em; line-height:1.2; white-space:nowrap; color:inherit; }
-body.desktop .kbv2-sla-live.amber{ color:#f2a93b; background:rgba(242,169,59,.12); border-color:rgba(242,169,59,.34); }
-body.desktop .kbv2-sla-live.red{ color:#ff6b61; background:rgba(239,68,68,.12); border-color:rgba(239,68,68,.38); }
-/* Identidade do Designer nas linhas do Monitor de prazos (aditivo — mesma avatar()/iniciais/cor) */
-#sla-monitor .slaop-av{ flex:0 0 auto; margin:2px 8px 0 0; display:inline-flex; }
-@media (max-height:820px){ body.desktop .kbv2-sla-live{ padding:6px 9px } body.desktop .kbv2-sla-live-c{ font-size:13px } }
-@media (max-height:720px){ body.desktop .kbv2-sla-live{ padding:5px 8px } body.desktop .kbv2-sla-live-c{ font-size:12.5px } }
-</style>
 </head>
 <body>
 
@@ -3227,6 +3207,20 @@ function slaibEnsureStyle(){
    +'.slamon-badge{flex:0 0 auto;min-width:24px;height:24px;padding:0 7px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:800;color:#fff;box-shadow:0 4px 10px -3px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.28)}'
    /* contadores SEGMENTADOS por severidade (breakdown rico) + selo "ao vivo" pulsante (tempo real) */
    +'.slamon-segs{display:inline-flex;align-items:center;gap:6px;margin-left:1px}'
+   /* ══ F3.5.4G — SLA AO VIVO no MONITOR SUPERIOR (determinação do owner): a banda saiu
+      do card; o Estado B do chip mostra [avatar 30px MAIOR] [nome] [cronômetro tabular].
+      Autocontido AQUI porque o widget é portal no <body> (mesma razão do sino). */
+   +'#sla-monitor .av{border-radius:50%;background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff}'
+   +'#sla-monitor .slaop-av{flex:0 0 auto;margin:2px 8px 0 0;display:inline-flex}'
+   +'#sla-monitor .slaop-time.f354g-live{font-variant-numeric:tabular-nums}'
+   +'.slamon.f354g-alert .slamon-chip{height:auto;min-height:46px;padding-top:6px;padding-bottom:6px;gap:10px}'
+   +'.slamon .f354g-avt{flex:0 0 auto;display:inline-flex;border-radius:50%}'
+   +'.slamon .f354g-avt .av{box-shadow:0 0 0 2px rgba(255,255,255,.16),0 4px 12px -4px rgba(0,0,0,.55)}'
+   +'.slamon.amber .f354g-avt .av{box-shadow:0 0 0 2px rgba(242,169,59,.55),0 4px 12px -4px rgba(0,0,0,.55)}'
+   +'.slamon.red .f354g-avt .av{box-shadow:0 0 0 2px rgba(255,107,97,.6),0 4px 12px -4px rgba(0,0,0,.55)}'
+   +'.slamon .f354g-nm{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;max-width:168px;font-size:12px;font-weight:800;line-height:1.2;letter-spacing:.01em;color:#e9eef7;margin-top:2px;overflow-wrap:anywhere;text-align:left}'
+   +'.slamon .f354g-ct{font-variant-numeric:tabular-nums;white-space:nowrap}'
+   +'.slamon .f354g-more{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:20px;padding:0 6px;border-radius:8px;font-size:10.5px;font-weight:800;color:#cdd6e6;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12)}'
    +'.slamon-seg{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 9px;border-radius:9px;font-size:12.5px;font-weight:800;border:1px solid transparent;box-shadow:inset 0 1px 0 rgba(255,255,255,.07)}.slamon-seg svg{width:12px;height:12px}'
    +'.slamon-seg.red{color:#ffb0a8;background:rgba(255,107,97,.15);border-color:rgba(255,107,97,.36)}'
    +'.slamon-seg.amber{color:#f6c074;background:rgba(242,169,59,.15);border-color:rgba(242,169,59,.34)}'
@@ -3309,17 +3303,31 @@ function slaibEnsureStyle(){
 function slaibRenderPanel(items,read){
   var ov=document.getElementById('slaib-ov'); if(!ov) return;
   read=read||slaibLoadRead();
+  var listEl=ov.querySelector('.slaib-list'); if(!listEl) return;
+  /* F3.5.4G — RESTAURAÇÃO DO SINO: assinatura ESTRUTURAL (chaves + severidade + lidas).
+     Estrutura igual ⇒ atualiza SÓ os textos em lugar ([data-slaib-txt]); estrutura
+     diferente ⇒ reconstrói UMA vez. Antes, cada chamada substituía o innerHTML da
+     lista — com o tick de 1s da 1.0.197 os nós sob o cursor eram destruídos entre o
+     mousedown e o mouseup e o clique nos itens NUNCA se completava. */
+  var sig=items.length?items.map(function(x){return String(x.key)+':'+x.sev+(read[x.key]?':r':':u');}).join('|'):'empty';
+  if(listEl.getAttribute('data-sig')===sig){
+    for(var i=0;i<items.length;i++){ var it=items[i];
+      var sel='[data-slaib-txt="'+((window.CSS&&CSS.escape)?CSS.escape(String(it.key)):String(it.key))+'"]';
+      var tx=listEl.querySelector(sel); if(tx&&it.text&&tx.textContent!==it.text) tx.textContent=it.text;
+    }
+    return;
+  }
   var rows=items.length?items.map(function(x){
     var isR=!!read[x.key];
     var sub=(x.client?slaibEsc(x.client)+' · ':'')+slaibEsc(x.title||x.taskId);
     return '<div class="slaib-it'+(isR?'':' unread')+'"><span class="slaib-dot '+slaibSevColor(x.sev)+'"></span>'
       +'<div class="slaib-bd"><div class="t">'+slaibEsc(x.label||x.eventType)+'</div>'
-      +(x.text?'<div class="msg">'+slaibEsc(x.text)+'</div>':'')
+      +(x.text?'<div class="msg" data-slaib-txt="'+slaibEsc(x.key)+'">'+slaibEsc(x.text)+'</div>':'')
       +'<div class="s">'+sub+'</div>'
       +'<div class="slaib-acts"><button data-slaib-open="'+slaibEsc(x.taskId)+'">Abrir tarefa</button>'
       +(isR?'':'<button data-slaib-read="'+slaibEsc(x.key)+'">Marcar lida</button>')+'</div></div></div>';
   }).join(''):'<div class="slaib-empty">Sem alertas de SLA.</div>';
-  var listEl=ov.querySelector('.slaib-list'); if(listEl) listEl.innerHTML=rows;
+  listEl.innerHTML=rows; listEl.setAttribute('data-sig',sig);
 }
 function slaibOpenTask(taskId){
   var t=(state.tasks||[]).find(function(x){return x.id===taskId;});
@@ -3382,22 +3390,27 @@ function slaHeaderTargetCenterY(){
 }
 /* Centraliza Monitor SLA + sino + avatar direito no MESMO centro Y do bloco esquerdo (BUG2, Δ<=2px).
    Mede a altura REAL de cada elemento; só posicionamento (top/right/height); sem flex/dropdown/lógica. */
+/* F3.5.4G — escrita idempotente: só toca style quando o valor MUDA (o realinhamento
+   contínuo da 1.0.197 reescrevia a geometria do sino a cada tick). */
+function _f354gSet(el,prop,val){ try{ if(el&&el.style[prop]!==val) el.style[prop]=val; }catch(_){ } }
 function slaClusterAlign(){
   try{
     if(!document.body.classList.contains('desktop')) return;
     var cy=slaHeaderTargetCenterY();
     if(cy==null) return;   // sem header de quadro real → nada a alinhar (overlays nem existem)
     var av=document.getElementById('cornerAvatar');
-    if(av){ var ah=av.getBoundingClientRect().height||38; av.style.top=Math.round(cy-ah/2)+'px'; }
+    var avr=av?av.getBoundingClientRect():null;
+    var avOk=!!(avr&&avr.width>0&&avr.height>0);   /* F3.5.4G — rect zero (foto carregando/re-render) NÃO reposiciona: preserva a última posição válida (antes o sino era jogado p/ fora da tela) */
+    if(av&&avOk){ var ah=avr.height||38; _f354gSet(av,'top',Math.round(cy-ah/2)+'px'); }
     var bell=document.getElementById('slaib-bell');
-    if(bell){ var bh=(av?Math.round(av.getBoundingClientRect().height):0)||Math.round(bell.getBoundingClientRect().height)||38;
-      bell.style.height=bh+'px'; bell.style.width=bh+'px'; bell.style.top=Math.round(cy-bh/2)+'px';
-      if(av){ var ar=av.getBoundingClientRect(); bell.style.right=Math.round(window.innerWidth-ar.left+10)+'px'; }
-      bell.style.bottom='auto'; bell.style.left='auto'; }
+    if(bell){ var bh=(avOk?Math.round(avr.height):0)||Math.round(bell.getBoundingClientRect().height)||38;
+      _f354gSet(bell,'height',bh+'px'); _f354gSet(bell,'width',bh+'px'); _f354gSet(bell,'top',Math.round(cy-bh/2)+'px');
+      if(avOk){ _f354gSet(bell,'right',Math.round(window.innerWidth-avr.left+10)+'px'); }
+      _f354gSet(bell,'bottom','auto'); _f354gSet(bell,'left','auto'); }
     var w=document.getElementById('sla-monitor');
     if(w){ var chip=w.querySelector('.slamon-chip'); var ch=(chip&&chip.getBoundingClientRect().height); if(!ch||ch<8) ch=(w.getBoundingClientRect().height||46);
-      w.style.top=Math.round(cy-ch/2)+'px';
-      var refE=bell||av; var rr2=refE&&refE.getBoundingClientRect(); if(rr2&&rr2.width) w.style.right=Math.round(window.innerWidth-rr2.left+10)+'px'; }
+      _f354gSet(w,'top',Math.round(cy-ch/2)+'px');
+      var refE=bell||av; var rr2=refE&&refE.getBoundingClientRect(); if(rr2&&rr2.width>0) _f354gSet(w,'right',Math.round(window.innerWidth-rr2.left+10)+'px'); }
   }catch(_){}
 }
 /* ── F3.3.2 — PAINEL OPERACIONAL SLA (read-side, topo do quadro do designer) ──
@@ -3463,10 +3476,34 @@ function slaMonData(){
   d.horizonMin=nextMs?Math.max(1,Math.round((nextMs-now)/60000)):0;
   return d;
 }
-function slaMonDropInner(d){
+/* F3.5.4G — linhas das COBRANÇAS DE CARDS no dropdown do monitor (mesmo componente
+   .slaop-it amarelo/vermelho; avatar REAL via avatar(); contador vivo por textContent
+   em [data-f354g-time]; "Abrir tarefa" reutiliza o trilho aprovado [data-sla-open]). */
+function f354gMonDropGrp(ga){
+  if(!ga||!ga.length) return '';
+  var red=ga.filter(function(a){return a.lvl==='red';}), amber=ga.filter(function(a){return a.lvl!=='red';});
+  function rows(list){
+    var s='';
+    for(var i=0;i<list.length;i++){ var a=list[i];
+      s+='<div class="slaop-it '+(a.lvl==='red'?'red':'amber')+'" data-row="'+slaibEsc(a.taskId)+'"><span class="bar"></span>'
+        +'<span class="slaop-av" title="'+slaibEsc(a.name)+'">'+avatar(a.userRef,26)+'</span>'
+        +'<div class="tx"><div class="slaop-t">'+slaibEsc(a.title||a.taskId)+'</div>'
+        +'<div class="slaop-meta">'+(a.client?slaibEsc(a.client)+' · ':'')+'resp. '+slaibEsc((a.name||'').split(' ')[0]||'—')+'</div>'
+        +'<div class="slaop-time f354g-live" data-f354g-time="'+slaibEsc(a.taskId)+'">'+slaibEsc(a.text)+'</div></div>'
+        +'<button class="slaop-open" data-sla-open="'+slaibEsc(a.taskId)+'">Abrir tarefa</button></div>';
+    }
+    return s;
+  }
+  var out='';
+  if(red.length) out+='<div class="slaop-grp red"><span class="pd"></span>Cobrança vermelha<span class="slaop-n">'+red.length+'</span></div>'+rows(red);
+  if(amber.length) out+='<div class="slaop-grp amber"><span class="pd"></span>Cobrança amarela<span class="slaop-n">'+amber.length+'</span></div>'+rows(amber);
+  return out;
+}
+function slaMonDropInner(d,ga){
   var hd='<div class="slamon-pop-hd"><span class="pic">'+SLAOP_CLOCK_SVG+'</span><span class="hx">Monitor de prazos<small>Prazo final · <span class="slamon-live"><i></i>ao vivo</span></small></span></div>';
-  if(!d.total) return hd+'<div class="slamon-empty"><span class="eic">'+SLAOP_CHECK_SVG+'</span><div><div class="et">Tudo em dia</div><div class="es">'+(d.nextMs?('Próximo término às '+slaibFmtHM(d.nextMs)+'. O alerta surge 30 min antes.'):'Nenhuma tarefa atrasada ou com prazo próximo.')+'</div></div></div>';
-  return hd+(d.overdue.length?slaOpGrpHtml('red',d.overdue):'')+(d.warning.length?slaOpGrpHtml('amber',d.warning):'');
+  var cards=(typeof f354gMonDropGrp==='function')?f354gMonDropGrp(ga):'';   /* F3.5.4G — cobranças de cards primeiro */
+  if(!d.total && !cards) return hd+'<div class="slamon-empty"><span class="eic">'+SLAOP_CHECK_SVG+'</span><div><div class="et">Tudo em dia</div><div class="es">'+(d.nextMs?('Próximo término às '+slaibFmtHM(d.nextMs)+'. O alerta surge 30 min antes.'):'Nenhuma tarefa atrasada ou com prazo próximo.')+'</div></div></div>';
+  return hd+cards+(d.overdue.length?slaOpGrpHtml('red',d.overdue):'')+(d.warning.length?slaOpGrpHtml('amber',d.warning):'');
 }
 /* min → "Xh Ym" / "Ym" (legível, p/ horizonte e métricas ao vivo do chip). */
 function slaMonDur(min){ min=Math.max(0,Math.round(min||0)); if(min<60) return min+' min'; var h=Math.floor(min/60),m=min%60; return m?(h+'h '+m+'min'):(h+'h'); }
@@ -3506,7 +3543,9 @@ function slaMonSig(d,sev){
 }
 function slaMonUpdateCounters(d){
   var w=document.getElementById('sla-monitor'); if(!w) return;
-  var st=w.querySelector('.slamon-status'); if(st) st.textContent=slaMonStatusText(d);
+  /* F3.5.4G — no Estado B o .slamon-status é o CRONÔMETRO da cobrança ([data-f354g-count],
+     mantido por f354gMonLiveUpdate); o status designerSla NÃO pode sobrescrevê-lo. */
+  var st=w.querySelector('.slamon-status'); if(st && !st.hasAttribute('data-f354g-count')) st.textContent=slaMonStatusText(d);
   (d.rows||[]).forEach(function(x){
     var sel='.slaop-it[data-row="'+((window.CSS&&CSS.escape)?CSS.escape(x.taskId):x.taskId)+'"]';
     var row=w.querySelector(sel); if(!row) return;
@@ -3535,18 +3574,31 @@ function slaMonRender(){
   if(!authed || !isOperationalBoardContext()){ if(w)w.remove(); return; }
   slaibEnsureStyle();
   var d=slaMonData();
-  var sev=d.overdue.length?'red':(d.warning.length?'amber':'green');
-  var sig=slaMonSig(d,sev);
+  /* F3.5.4G — as cobranças de cards (T-30/T-10) agora vivem AQUI (contexto por aba) */
+  var ga=(typeof f354gMonAlerts==='function')?f354gMonAlerts():[];
+  var top=ga.length?ga[0]:null;
+  var sev=(d.overdue.length||(top&&top.lvl==='red'))?'red':((d.warning.length||(top&&top.lvl==='amber'))?'amber':'green');
+  var sig=slaMonSig(d,sev)+'§'+f354gMonSig(ga);
   if(w && w.getAttribute('data-sig')===sig){ slaMonUpdateCounters(d); slaMonAlign(); return; }  // só contadores → em lugar (sem flicker)
   if(!w){ w=document.createElement('div'); w.id='sla-monitor'; document.body.appendChild(w); }
-  w.className='slamon '+sev+(slaMonOpen?' open':'');
+  w.className='slamon '+sev+(top?' f354g-alert':'')+(slaMonOpen?' open':'');
   var icon=(sev==='green')?SLAOP_SHIELD_SVG:(sev==='red'?SLAOP_ALERT_SVG:SLAOP_CLOCK_SVG);
+  /* Estado A (aprovado, intocado): "Tudo em dia"/status designerSla. Estado B (F3.5.4G):
+     herói da cobrança — avatar REAL 30px (MAIOR que os 22px reprovados dentro do card) +
+     nome do Designer (clamp 2 linhas + tooltip) + cronômetro tabular ao vivo. */
+  var hero = top
+    ? ('<span class="f354g-avt" title="'+slaibEsc(top.name)+'">'+avatar(top.userRef,30)+'</span>'
+      +'<span class="slamon-txt"><span class="slamon-kicker">Monitor SLA<span class="slamon-live"><i></i>ao vivo</span></span>'
+        +'<span class="f354g-nm" title="'+slaibEsc(top.name)+'">'+slaibEsc(top.name)+'</span>'
+        +'<span class="slamon-status f354g-ct" data-f354g-count>'+slaibEsc(top.text)+'</span></span>'
+      +(ga.length>1?'<span class="f354g-more" title="Outras cobranças no contexto atual">+'+(ga.length-1)+'</span>':''))
+    : ('<span class="slamon-txt"><span class="slamon-kicker">Monitor SLA<span class="slamon-live"><i></i>ao vivo</span></span>'
+        +'<span class="slamon-status">'+slaMonStatusText(d)+'</span></span>');
   var chip='<button class="slamon-chip" data-slamon-toggle="1" title="Monitor de prazos">'
     +'<span class="slamon-orb"><span class="slamon-ic">'+icon+'</span></span>'
-    +'<span class="slamon-txt"><span class="slamon-kicker">Monitor SLA<span class="slamon-live"><i></i>ao vivo</span></span>'
-      +'<span class="slamon-status">'+slaMonStatusText(d)+'</span></span>'
+    +hero
     +slaMonSegs(d)+'</button>';
-  w.innerHTML=chip+'<div class="slamon-pop">'+slaMonDropInner(d)+'</div>';
+  w.innerHTML=chip+'<div class="slamon-pop">'+slaMonDropInner(d,ga)+'</div>';
   w.setAttribute('data-sig',sig);
   slaMonAlign();
 }
@@ -3681,6 +3733,19 @@ function slaMonNextBoundary(now){
     var bs=[tl.warningAtMs, tl.overdueAtMs, tl.criticalAtMs];
     for(var k=0;k<bs.length;k++){ if(bs[k]>now && (!best||bs[k]<best)) best=bs[k]; }
   }
+  /* F3.5.4G — marcos das COBRANÇAS DE CARDS (T-30/T-10/prazo) também armam o boundary:
+     o Estado B do monitor superior nasce/transiciona no instante exato, sem depender
+     de tick permanente (mesma fonte kbv2SlaLiveData do chip/dropdown). */
+  try{
+    if(typeof kbv2SlaLiveData==='function'){
+      for(var j=0;j<vis.length;j++){ var t2=vis[j]; if(!t2) continue;
+        if(typeof isTaskCompleted==='function'&&isTaskCompleted(t2)) continue;
+        var mk=kbv2SlaLiveData(t2); if(!mk) continue;
+        var bs2=[mk.warnMs, mk.redMs, mk.dueMs];
+        for(var k2=0;k2<bs2.length;k2++){ if(bs2[k2]>now && (!best||bs2[k2]<best)) best=bs2[k2]; }
+      }
+    }
+  }catch(_){ }
   return best;
 }
 function slaMonScheduleBoundary(){
@@ -3760,37 +3825,71 @@ try{ setInterval(slaibRefresh,30000); }catch(_){}                 /* tempo real 
 /* F3.3.2 (precisão do contador): tick de 1s SÓ quando há contador ATIVO (laranja/vermelho/crítico
    na visão) — mantém "Vence em X"/tolerância exatos com o relógio real, sem custo quando calmo. */
 function slaMonHasActive(){ try{ var d=slaMonData(); return !!(d&&d.total); }catch(_){ return false; } }
-/* ══ F3.5.4F — atualização AO VIVO das bandas de cobrança dos cards ══
-   Consumidor NOVO do MESMO ticker global de 1s (nenhum interval adicional, nenhum
-   timer por card). Percorre as bandas presentes no DOM e ajusta SÓ textContent e
-   classe quando mudam (padrão anti-flicker do Monitor): zero re-render do quadro,
-   zero reinício de listener/animação, cleanup natural (o elemento sai no re-render
-   e NADA fica retido — a varredura é por querySelectorAll a cada tick). */
-function f354fLiveEls(){ try{ return document.querySelectorAll('.kbv2-sla-live[data-sla-live]'); }catch(_){ return []; } }
-function f354fSlaLiveUpdate(){
-  var els=f354fLiveEls(); if(!els||!els.length) return;
-  var now=canonicalNowMs();
-  for(var i=0;i<els.length;i++){ var el=els[i];
-    var marks={ dueMs:Number(el.getAttribute('data-due-ms'))||0, warnMs:Number(el.getAttribute('data-warn-ms'))||0,
-                redMs:Number(el.getAttribute('data-red-ms'))||0, critMs:Number(el.getAttribute('data-crit-ms'))||0 };
-    var st=f354fSlaLiveState(marks,now);
-    if(!st.vis){ if(!el.hidden) el.hidden=true; continue; }
-    if(el.hidden) el.hidden=false;
-    var want='kbv2-sla-live '+st.lvl;
-    if(el.className!==want) el.className=want;                       // classe SÓ quando muda de nível
-    var c=el.querySelector('[data-sla-live-count]');
-    if(c && c.textContent!==st.text) c.textContent=st.text;          // textContent apenas
-  }
+/* ══ F3.5.4G — SLA AO VIVO NO MONITOR SUPERIOR (a banda saiu do card) ══
+   O owner determinou: a cobrança amarela/vermelha com foto+nome+contador vive no
+   widget superior #sla-monitor ("Monitor SLA · ao vivo"), NUNCA dentro do card.
+   Camada ADITIVA baseada nos MESMOS helpers canônicos da F3.5.4F (kbv2SlaLiveData +
+   f354fSlaLiveState + f354fSpan — fonte temporal única, relógio canônico), com
+   CONTEXTO por aba: quadro de Designer/pessoa aberto (state.designerBoard||
+   state.personBoard) mostra SÓ a cobrança daquele uid; sem quadro específico, modo
+   GLOBAL documentado = cobrança mais urgente entre as tarefas visíveis ao usuário
+   (slaibVisible aplica o papel: Designer só enxerga as próprias). */
+function f354gMonCtxUid(){
+  try{
+    if(state && state.designerBoard) return String(state.designerBoard);
+    if(state && state.personBoard) return String(state.personBoard);
+  }catch(_){ }
+  return null;
 }
-function slaTick(){ try{ slaibRender(); }catch(_){} try{ slaMonRender(); }catch(_){} try{ slaBlockRender(); }catch(_){} try{ f354fSlaLiveUpdate(); }catch(_){} }
-/* F3.5.4F — o gate do tick passa a considerar TAMBÉM as bandas dos cards (inclui
-   Edição de Cards, que não entra em slaMonData por não ter designerSla). Calmo
-   (sem banda e sem Monitor ativo) segue sem custo. */
-try{ setInterval(function(){ if(slaMonHasActive()||f354fLiveEls().length) slaTick(); },1000); }catch(_){}
-/* F3.5.4F — retorno da bandeja/minimizado: corrige o contador IMEDIATAMENTE (sem
-   esperar o próximo tick). Timers já rodam em background (backgroundThrottling off),
-   isto cobre o caso de restauração com paint pendente. */
-try{ document.addEventListener('visibilitychange',function(){ try{ f354fSlaLiveUpdate(); }catch(_){} }); }catch(_){}
+function f354gMonAlerts(){
+  try{
+    var u=state&&state.user; if(!u) return [];
+    var vis=(typeof slaibVisible==='function')?slaibVisible(u):((state&&state.tasks)||[]);
+    var now=canonicalNowMs(), ctx=f354gMonCtxUid(), out=[];
+    for(var i=0;i<vis.length;i++){ var t=vis[i]; if(!t) continue;
+      if(typeof isTaskCompleted==='function'&&isTaskCompleted(t)) continue;   // conclusão REMOVE; reabertura reavalia aqui
+      var marks=kbv2SlaLiveData(t); if(!marks) continue;                      // mesmos marcos T-30/T-10 canônicos (prazo editado ⇒ recalcula)
+      var st=f354fSlaLiveState(marks,now); if(!st.vis) continue;
+      var rid=String((typeof designerOf==='function'?designerOf(t):'')||''); if(!rid) continue;  // uid canônico — nunca nome
+      if(ctx&&rid!==ctx) continue;                                            // isolamento por aba do Designer
+      var ru=((state&&state.users)||[]).find(function(x){return x&&x.id===rid;})
+             ||{id:rid,name:(t.designerAssignment&&t.designerAssignment.designerName)||t.assignee||'Designer'};
+      out.push({taskId:t.id,title:t.title||'',client:t.client||'',lvl:st.lvl,text:st.text,
+                dueMs:marks.dueMs,uid:rid,name:(ru.name||'Designer'),userRef:ru});
+    }
+    out.sort(function(a,b){var r=((b.lvl==='red')?1:0)-((a.lvl==='red')?1:0); if(r) return r; return (a.dueMs||0)-(b.dueMs||0);});
+    return out;
+  }catch(_){ return []; }
+}
+function f354gMonTop(){ var a=f354gMonAlerts(); return a.length?a[0]:null; }
+function f354gMonHasActive(){ try{ return !!f354gMonTop(); }catch(_){ return false; } }
+function f354gMonSig(ga){ return (ga||[]).map(function(a){return a.taskId+':'+a.lvl+':'+a.uid;}).join(','); }
+/* Tick (1s): atualiza SÓ textos (contador do chip + linhas do dropdown) — nenhum
+   rebuild por tick. Mudança ESTRUTURAL (cobrança aparecer/sumir/virar vermelha/
+   trocar de contexto) é capturada pela assinatura do slaMonRender no mesmo tick. */
+function f354gMonLiveUpdate(){
+  try{
+    var w=document.getElementById('sla-monitor'); if(!w) return;
+    var ga=f354gMonAlerts(); if(!ga.length) return;
+    var c=w.querySelector('[data-f354g-count]');
+    if(c && c.textContent!==ga[0].text) c.textContent=ga[0].text;
+    for(var i=0;i<ga.length;i++){ var a=ga[i];
+      var sel='[data-f354g-time="'+((window.CSS&&CSS.escape)?CSS.escape(a.taskId):a.taskId)+'"]';
+      var tm=w.querySelector(sel); if(tm && tm.textContent!==a.text) tm.textContent=a.text;
+    }
+  }catch(_){ }
+}
+function slaTick(){ try{ slaibRender(); }catch(_){} try{ slaMonRender(); }catch(_){} try{ slaBlockRender(); }catch(_){} try{ f354gMonLiveUpdate(); }catch(_){} }
+/* F3.5.4G — RESTAURAÇÃO DO SINO (causa-raiz da regressão da 1.0.197): o gate volta
+   a ser por DADOS (designerSla ativo OU cobrança de cards no contexto) e NUNCA por
+   querySelector no DOM — a F3.5.4F contava bandas mesmo hidden e mantinha o tick
+   ligado PARA SEMPRE nos quadros de Edição de Cards, reconstruindo o painel aberto
+   do sino e reescrevendo a geometria do topo a cada segundo. Calmo ⇒ ZERO tick
+   (comportamento e custo da 1.0.196). */
+try{ setInterval(function(){ if(slaMonHasActive()||f354gMonHasActive()) slaTick(); },1000); }catch(_){}
+/* Retorno da bandeja/minimizado: estado visual corrigido IMEDIATAMENTE (passada
+   completa: sino + monitor + bloqueio + boundary), sem esperar o próximo tick. */
+try{ document.addEventListener('visibilitychange',function(){ try{ slaibRefresh(); }catch(_){} }); }catch(_){}
 try{ window.addEventListener('resize',function(){ slaHeaderAlign(); }); }catch(_){}
 try{ setTimeout(slaibRefresh,0); }catch(_){}
 
@@ -6220,25 +6319,6 @@ function kbv2Card(t, persp){
          (d?'<span class="kbv2-due" style="color:'+d.color+';background:'+withAlpha(d.color,.18)+';border-color:'+withAlpha(d.color,.48)+'">'+esc(dShort)+'</span>':'')+
        '</div>'+
      '</div>';
-  /* F3.5.4F — COBRANÇA SLA AO VIVO (aditiva; shell 1.0.196 intocado). A banda só EXISTE
-     em tarefa SLA-elegível e nasce hidden fora da janela amarela/vermelha. Identificação
-     SEMPRE pelo UID do designer (designerOf) — nunca por nome. O texto inicial é
-     calculado AQUI (correto já no primeiro paint); o ticker global de 1s mantém vivo. */
-  {
-    const _lv=kbv2SlaLiveData(t);
-    if(_lv){
-      const _lvSt=f354fSlaLiveState(_lv,canonicalNowMs());
-      const _rid=designerOf(t)||'';
-      const _resp2=respOf(t)||{id:_rid,name:(t.designerAssignment&&t.designerAssignment.designerName)||t.assignee||'Designer'};
-      const _rname=(_resp2&&_resp2.name)||'Designer';
-      h+='<div class="kbv2-sla-live'+(_lvSt.vis?(' '+_lvSt.lvl):'')+'"'+(_lvSt.vis?'':' hidden')+
-         ' data-sla-live="1" data-due-ms="'+_lv.dueMs+'" data-warn-ms="'+_lv.warnMs+'" data-red-ms="'+_lv.redMs+'" data-crit-ms="'+(_lv.critMs||0)+'" data-sla-mode="'+_lv.mode+'" data-resp-id="'+esc(String(_rid))+'"'+
-         ' title="'+esc('Cobrança de prazo — '+_rname)+'">'+
-         avatar(_resp2,22)+
-         '<div class="kbv2-sla-live-tx"><div class="kbv2-sla-live-n" title="'+esc(_rname)+'">'+esc(_rname)+'</div>'+
-         '<div class="kbv2-sla-live-c" data-sla-live-count>'+esc(_lvSt.text||'')+'</div></div></div>';
-    }
-  }
   // 2) perfil
   h+='<div class="kbv2-card-profile">'+
        '<span class="kbv2-av">'+(asgName?avatar(asg||{name:asgName,id:t.assigneeId},34):'<div class="av" style="width:34px;height:34px">'+svg('person')+'</div>')+'<i class="kbv2-presence"></i></span>'+
