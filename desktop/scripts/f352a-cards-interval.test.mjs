@@ -167,8 +167,16 @@ ok('(52) cardsRules.js — diff controlado F3.5.4H (WARN/RED literais + gate pur
 ok('(53) slaRules.js byte-idêntico à 1.0.187', (() => { try { return execSync('git diff ' + BASE + ' -- desktop/src/main/slaRules.js', { cwd: ROOT }).toString().trim() === ''; } catch (_) { return false; } })());
 if (base) {
   const grab = (re, s) => { const m = s.match(re); return m ? m[0] : null; };
-  const fns = { isClientSector: /function isClientSector\(k\)\{return[^}]*\}/, buildClientMessage: /function buildClientMessage\([^]*?\n\}/, ensureStableClientReviewToken: /function ensureStableClientReviewToken\([^]*?\n\}/, buildShareClientUrl: /function buildShareClientUrl\([^]*?\n\}/, saveTask: /async function saveTask\(\)\{[^]*?\n\}/, canSendToClient: /function canSendToClient\([^]*?\n\}/, ensureReviewToken: /function ensureReviewToken\([^]*?\n\}/, openSendClientModal: /function openSendClientModal\([^]*?\n\}/ };
-  for (const [name, re] of Object.entries(fns)) { const a = grab(re, HTML), b = grab(re, base); ok('(54) ' + name + ' byte-idêntico à 1.0.187', !!a && !!b && a === b); }
+  /* F3.5.4I EMENDA — saveTask recebeu sua correção autorizada (saneamento/validação/idempotência/read-back
+   * do salvamento de Cronograma); deixa de ser byte-idêntico. As funções do FLUXO-CLIENTE congelado
+   * (Card Premium / mensagem / token / modal de envio) SEGUEM byte-idênticas — provado abaixo. */
+  const fns = { isClientSector: /function isClientSector\(k\)\{return[^}]*\}/, buildClientMessage: /function buildClientMessage\([^]*?\n\}/, ensureStableClientReviewToken: /function ensureStableClientReviewToken\([^]*?\n\}/, buildShareClientUrl: /function buildShareClientUrl\([^]*?\n\}/, canSendToClient: /function canSendToClient\([^]*?\n\}/, ensureReviewToken: /function ensureReviewToken\([^]*?\n\}/, openSendClientModal: /function openSendClientModal\([^]*?\n\}/ };
+  for (const [name, re] of Object.entries(fns)) { const a = grab(re, HTML), b = grab(re, base); ok('(54) ' + name + ' byte-idêntico à 1.0.187 (fluxo-cliente/Card Premium congelado)', !!a && !!b && a === b); }
+  ok('(54b) saveTask — diff controlado F3.5.4I (saneamento + validação + escrita idempotente + read-back; temas compactados)', (() => {
+    const st = grab(/async function saveTask\(\)\{[^]*?\n\}/, HTML) || '';
+    return /cronSanitizeDeep\(data\)/.test(st) && /cronValidateSend\(/.test(st) && /_draftId/.test(st) && /\.doc\(f\._draftId\)\.set\(_payload\)/.test(st)
+      && /cronContents=_cc/.test(st) && /cronClassifyError\(/.test(st) && /readback/.test(st);
+  })());
   ok('(55) isClientSector = cronograma||roteiro (edicao_cards fora do fluxo-cliente)', /function isClientSector\(k\)\{return k==='cronograma'\|\|k==='roteiro';\}/.test(HTML));
 } else { for (let i = 0; i < 9; i++) ok('(54) base indisponível — verificado no CI (skip #' + i + ')', true); }
 

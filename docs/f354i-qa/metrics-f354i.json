@@ -1,0 +1,7 @@
+{
+  "messages": {
+    "validation": "Preencha ao menos 1 tema para enviar ao cliente.",
+    "network": "Não foi possível confirmar o salvamento no servidor. Seus dados continuam nesta tela. Verifique a conexão e tente novamente."
+  },
+  "scenes": 6
+}

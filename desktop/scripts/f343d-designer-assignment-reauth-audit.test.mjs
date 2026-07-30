@@ -95,7 +95,7 @@ ok('3.1 newForm inicializa _sendAfterSave:false', /_sendAfterSave:false/.test(ne
 ok('3.2 _sendAfterSave=true em 1 único ponto (clique explícito envio-cliente)',
    countOf(/_sendAfterSave=true/g) === 1);
 ok('3.2 o setter vive no handler data-sendclient do wizard',
-   /\[data-sendclient\]'\)\)\{[\s\S]{0,220}state\.form\._sendAfterSave=true;await saveTask\(\);/.test(HTML));
+   /\[data-sendclient\]'\)\)\{[\s\S]{0,220}state\.form\._sendAfterSave=true;[\s\S]{0,80}await saveTask\(\);/.test(HTML));   /* F3.5.4I: handler agora mostra "Salvando…" (state.form._sending=true;render();) entre o setter e o await */
 // 3.3 (item 3) — saveTask CAPTURA e LIMPA a flag imediatamente, ANTES de qualquer return de validação.
 const saveTask = bodyOf('async function saveTask()');
 ok('3.3 saveTask consome com ===true e limpa imediatamente',
@@ -135,7 +135,7 @@ ok('4.2 data-form="close" e data-tab fazem state.form=null (cancel/fechamento/mu
    /a==='close'\)\{state\.form=null/.test(HTML) && /\[data-tab\]'\)\)\{state\.form=null/.test(HTML));
 // setter gated por canSendToClient → só setor-cliente.
 ok('4.2 botão "Enviar para o cliente" (data-sendclient="1") gated por canSendToClient(f)',
-   /if\(canSendToClient\(f\)\)\{[\s\S]{0,120}data-sendclient="1"/.test(HTML));
+   /if\(canSendToClient\(f\)\)\{[\s\S]{0,320}data-sendclient="1"/.test(HTML));   /* F3.5.4I: o botão ganhou o ramo "Salvando cronograma…" (f._sending) antes do data-sendclient */
 const canSend = bodyOf('function canSendToClient(f)');
 ok('4.2 canSendToClient exige isClientSector (mesmo predicado da trava do saveTask)',
    /isClientSector\(secOf\(f\.sector\)\.key\)/.test(canSend));

@@ -8332,7 +8332,7 @@ function openSheet(which){
 }
 
 /* ---- TASK FORM (wizard) ---- */
-function newForm(sector){return {id:null,step:0,sector:sector||null,title:'',client:'',assigneeId:null,assignee:'',status:'afazer',startDate:'',startTime:'',endDate:'',endTime:'',dueDate:'',dueTime:'',priority:false,subtype:null,fields:{},contents:[],items:[],videos:[],checklist:[],link:'',obs:'',_openContent:null,_sendAfterSave:false,/* F3.5.2 — Edição de Cards (aditivo): N cards avulsos + quantidade. F3.5.2A: cada card com INTERVALO
+function newForm(sector){return {id:null,step:0,sector:sector||null,title:'',client:'',assigneeId:null,assignee:'',status:'afazer',startDate:'',startTime:'',endDate:'',endTime:'',dueDate:'',dueTime:'',priority:false,subtype:null,fields:{},contents:[],items:[],videos:[],checklist:[],link:'',obs:'',_openContent:null,_sendAfterSave:false,_sending:false,_draftId:null,/* F3.5.4I — estado de envio + id idempotente do draft *//* F3.5.2 — Edição de Cards (aditivo): N cards avulsos + quantidade. F3.5.2A: cada card com INTERVALO
    completo {tema,legenda,obs,startDate,startTime,endDate,endTime} (início + término; término=prazo) */cards:[],cardsQty:1};}
 /* F3.5.2 — quem pode CRIAR tarefas de Edição de Cards: Social Media / Administrador (contrato atual
    de supervisão). Designer recebe/movimenta, mas não cria em nome da Social. Gate SÓ do novo setor. */
@@ -8569,7 +8569,9 @@ function stepReview(){const f=state.form;const s=secOf(f.sector);const sub=curSu
      (sub||TEMPLATES[s.key]?'<button class="rev-edit2" data-formgoto="2">'+svg('description')+'Editar briefing</button>':'')+'</div>';
   // Fase 1: Enviar para cliente — apenas Cronograma + cliente + 1+ conteudos + papel Social/Admin/Manager
   if(canSendToClient(f)){
-    h+='<div class="rev-send"><button class="btn rev-send-btn" data-sendclient="1">'+svg('send')+'Enviar para o cliente</button>'+
+    h+='<div class="rev-send">'+(f._sending    /* F3.5.4I — estado "Salvando…" (botão desabilitado durante a operação; anti-duplo-clique visual) */
+       ?'<button class="btn rev-send-btn" disabled aria-busy="true">'+svg('send')+'Salvando cronograma…</button>'
+       :'<button class="btn rev-send-btn" data-sendclient="1">'+svg('send')+'Enviar para o cliente</button>')+
        '<div class="rev-send-hint">Gera mensagem para WhatsApp com link de preview interno do cronograma.</div></div>';
   }
   return h;
@@ -8689,6 +8691,52 @@ function composedDesc(){const f=state.form;const sub=curSub();const t=tpl();let 
   if(f.obs)lines.push('',f.obs);
   return lines.join('\n').trim();
 }
+/* ══ F3.5.4I — SANEAMENTO / VALIDAÇÃO / ERRO CLASSIFICADO / OBSERVABILIDADE do salvamento ══
+ * Causa-raiz (provada, f354i-repro): array de temas ESPARSO (buracos=undefined) ou nested undefined em
+ * cronContents ⇒ Firestore .add()/.set() rejeita ("Unsupported field value: undefined") ⇒ o catch genérico
+ * do saveTask mascarava como "Verifique a conexão". Estes helpers saneiam o payload (removem undefined,
+ * compactam arrays esparsos), validam antes de escrever, classificam o erro REAL e registram diagnóstico
+ * sanitizado. NÃO tocam Card Premium/Worker/mensagem (chamados só APÓS o save confirmado). */
+function cronSanitizeDeep(v){
+  if(v===null) return null;
+  if(Array.isArray(v)){ var out=[]; for(var i=0;i<v.length;i++){ var e=v[i]; if(e===undefined) continue; var s=cronSanitizeDeep(e); if(s!==undefined) out.push(s); } return out; }
+  if(v instanceof Date) return v;
+  if(v&&typeof v==='object'){ var o={}; for(var k in v){ if(!Object.prototype.hasOwnProperty.call(v,k)) continue; var val=v[k]; if(val===undefined) continue; var sv=cronSanitizeDeep(val); if(sv!==undefined) o[k]=sv; } return o; }
+  if(typeof v==='number' && !isFinite(v)) return undefined;   /* NaN/Infinity NUNCA vão ao Firestore (a validação bloqueia antes) */
+  return v;
+}
+function cronMaskId(s){ try{ s=String(s||''); if(!s) return '—'; var h=0; for(var i=0;i<s.length;i++){h=((h<<5)-h+s.charCodeAt(i))|0;} return 'sha'+(h>>>0).toString(16).slice(0,8); }catch(_){ return '—'; } }
+function cronCode(e){ try{ var s=String((e&&e.name)||'')+'|'+String((e&&e.message)||''); var h=0; for(var i=0;i<s.length;i++){h=((h<<5)-h+s.charCodeAt(i))|0;} return (h>>>0).toString(16).slice(0,4).toUpperCase(); }catch(_){ return '0000'; } }
+function cronDiag(topic, extra){ try{
+  var ver=''; try{ ver=String(window.__APP_VERSION||(typeof api!=='undefined'&&api&&api.appVersion)||''); }catch(_v){}
+  var on=true; try{ if(typeof navigator!=='undefined'&&navigator&&navigator.onLine!==undefined) on=!!navigator.onLine; }catch(_o){}
+  var p=Object.assign({ts:Date.now(),appVersion:ver,online:on,uid:cronMaskId(state.user&&state.user.id)}, extra||{});
+  if(window.desktopAPI&&typeof window.desktopAPI.diagLog==='function') window.desktopAPI.diagLog(topic, p); else console.info('[diag]', topic, p);
+}catch(_){} }
+function cronClassifyError(e){
+  var code=String((e&&e.code)||''), name=(e&&e.name)||'Error', raw=String((e&&e.message)||'');
+  var msg=raw.replace(/\s+/g,' ').slice(0,180);
+  var perm=/permission-denied|missing or insufficient permissions/i;
+  var auth=/unauthenticated/i;
+  var inval=/invalid-argument|unsupported field value|invalid data|readback-mismatch/i;
+  var net=/unavailable|deadline-exceeded|network|timeout|failed to get document|offline|aborted/i;
+  var offline=false; try{ offline=(typeof navigator!=='undefined'&&navigator&&navigator.onLine===false); }catch(_){}
+  if(perm.test(code)||perm.test(raw)) return {errorCode:code||'permission-denied', stage:'permission', userMessage:'Sua sessão não tem autorização para salvar este cronograma. Entre novamente ou contate o administrador.', logMessage:msg};
+  if(auth.test(code)) return {errorCode:code||'unauthenticated', stage:'auth', userMessage:'Sua sessão expirou. Entre novamente para salvar o cronograma.', logMessage:msg};
+  if(inval.test(code)||inval.test(raw)) return {errorCode:code||'invalid-argument', stage:'validate', userMessage:'Não foi possível salvar porque existem dados inválidos no cronograma. Revise os temas e os campos destacados.', logMessage:msg};
+  if(offline||net.test(code)||net.test(raw)) return {errorCode:code||'unavailable', stage:'network', userMessage:'Não foi possível confirmar o salvamento no servidor. Seus dados continuam nesta tela. Verifique a conexão e tente novamente.', logMessage:msg};
+  return {errorCode:'CRON-'+cronCode(e), stage:'unexpected', userMessage:'Não foi possível concluir o envio. O cronograma não foi descartado. Código de diagnóstico: CRON-'+cronCode(e)+'.', logMessage:msg};
+}
+function cronValidateSend(f, isClient){
+  try{
+    if(!f) return {ok:false, stage:'validate', field:'form', message:'Formulário indisponível. Reabra a tarefa.'};
+    if(!String(f.title||'').trim()) return {ok:false, stage:'validate', field:'title', message:'Informe o título.'};
+    var pairs=[['startDate','startTime'],['endDate','endTime'],['dueDate','dueTime']];
+    for(var i=0;i<pairs.length;i++){ var d=f[pairs[i][0]]; if(d){ var ms=Number(dtMs(d, f[pairs[i][1]]||'00:00')); if(!isFinite(ms)||ms<=0) return {ok:false, stage:'validate', field:pairs[i][0], message:'Data/hora inválida no prazo. Revise o campo destacado.'}; } }
+    if(isClient){ var filled=(Array.isArray(f.contents)?f.contents:[]).filter(function(c){return c&&(c.tema||c.legenda);}); if(!filled.length) return {ok:false, stage:'validate', field:'contents', message:'Preencha ao menos 1 tema para enviar ao cliente.'}; }
+    return {ok:true};
+  }catch(e){ return {ok:false, stage:'validate', field:'form', message:'Falha ao validar o cronograma. Revise os campos e tente novamente.'}; }
+}
 async function saveTask(){const f=state.form;
   if(!f)return;
   // 1.0.104 — trava anti-duplo-envio: dois cliques rápidos em "Confirmar/Enviar" criavam
@@ -8710,7 +8758,10 @@ async function saveTask(){const f=state.form;
   }
   const u=f.assigneeId?state.users.find(x=>x.id===f.assigneeId):null;
   const data={title:f.title.trim(),client:f.client.trim(),sector:f.sector,desc:composedDesc(),status:f.status,assignee:u?u.name:'',assigneeId:f.assigneeId||null,link:f.link.trim(),priority:!!f.priority,startDate:f.startDate||'',startTime:f.startTime||'',endDate:f.endDate||'',endTime:f.endTime||'',dueDate:f.dueDate||'',dueTime:f.dueTime||'',due:f.dueDate||'',checklist:f.checklist.filter(c=>c.t.trim()),by:state.user.id,createdAt:Date.now(),src:'webpreview'};
-  if(f.contents.length)data.cronContents=f.contents;
+  /* F3.5.4I — COMPACTA os temas: descarta buracos (array esparso ⇒ undefined) e vazios, mantém TODOS os
+     PREENCHIDOS. Sem isso o Firestore rejeita o add() ("Unsupported field value: undefined (found in field
+     cronContents.N)") e o catch genérico mascarava como "Verifique a conexão". */
+  { var _cc=(Array.isArray(f.contents)?f.contents:[]).filter(function(c){return c&&(c.tema||c.legenda);}); if(_cc.length)data.cronContents=_cc; }
   // F3.3.77A — Edição de mídia: persiste os N vídeos como ARRAY ESTRUTURADO (data.videos = [{id,n,tema}]),
   // NUNCA como texto único e NUNCA em cronContents (evita entrelaçar com os helpers do fluxo-cliente/legenda).
   {const _sub=curSub(); if(_sub&&_sub.videoTema){const _nV=_sub.items||0,_vids=[];for(let i=0;i<_nV;i++){const v=(f.videos&&f.videos[i])||{};_vids.push({id:(v&&v.id)||('v'+(i+1)),n:i+1,tema:((v&&v.tema)||'').trim()});}if(_vids.length)data.videos=_vids;}}
@@ -8737,9 +8788,33 @@ async function saveTask(){const f=state.form;
   // Aditivo: cronograma inicia em 'rascunho_social' (ou 'pronto_cliente' se chamada do botao Enviar)
   if(isClientSector(secOf(f.sector).key)){data.cronStatus=sendAfter?'pronto_cliente':'rascunho_social';if(f.subtype)data.cronSub=f.subtype;
     data.clientFlowStatus=sendAfter?'enviado':'afazer';data.clientWorkflowStage=data.clientFlowStatus;}
+  // ══ F3.5.4I — validação → saneamento → escrita IDEMPOTENTE → read-back → erro REAL classificado ══
+  const _isClientSend=isClientSector(secOf(f.sector).key);
+  cronDiag('cron.send.start',{stage:'start',sector:f.sector,client:!!data.client,temas:(data.cronContents||[]).length,sendAfter:sendAfter});
+  { const _v=cronValidateSend(f,_isClientSend); if(!_v.ok){ f._saving=false; f._sending=false; cronDiag('cron.payload.invalid',{stage:_v.stage,field:_v.field}); alert(_v.message); if(_v.field==='title'){f.step=1;} else if(_v.field==='contents'){f.step=2;} render(); return; } }
+  cronDiag('cron.payload.validated',{stage:'validated',temas:(data.cronContents||[]).length});
+  const _payload=cronSanitizeDeep(data);              // remove undefined + compacta arrays esparsos (Firestore rejeita undefined)
+  if(!f._draftId){ try{ f._draftId=db.collection('tasks').doc().id; }catch(_e){ f._draftId=null; } }   // id ESTÁVEL ⇒ retry NÃO duplica
   let ref;
-  try{ref=await db.collection('tasks').add(data);}
-  catch(e){f._saving=false;console.warn('saveTask add',e);alert('Não foi possível salvar a tarefa. Verifique a conexão e tente novamente.');render();return;}
+  try{
+    cronDiag('cron.firestore.write.start',{stage:'write',taskId:cronMaskId(f._draftId)});
+    if(f._draftId){ await db.collection('tasks').doc(f._draftId).set(_payload); ref={id:f._draftId}; }
+    else { ref=await db.collection('tasks').add(_payload); }        // fallback: id indisponível
+    cronDiag('cron.firestore.write.success',{stage:'write',taskId:cronMaskId(ref&&ref.id)});
+    if(ref&&ref.id){                                                 // read-back: confirma persistência ANTES de compartilhar
+      cronDiag('cron.readback.start',{stage:'readback',taskId:cronMaskId(ref.id)});
+      const _snap=await db.collection('tasks').doc(ref.id).get(); const _rb=(_snap&&_snap.exists)?_snap.data():null;
+      const _okRb=_rb && _rb.title===_payload.title && _rb.sector===_payload.sector && (!_payload.cronContents || (_rb.cronContents&&_rb.cronContents.length===_payload.cronContents.length));
+      if(!_okRb) throw Object.assign(new Error('read-back divergente'),{code:'readback-mismatch'});
+      cronDiag('cron.readback.success',{stage:'readback',taskId:cronMaskId(ref.id)});
+    }
+  }catch(e){
+    f._saving=false; f._sending=false; const _cls=cronClassifyError(e);
+    console.warn('saveTask add',e);                                  /* preserva o log herdado */
+    cronDiag('cron.firestore.write.failure',{stage:_cls.stage,errorCode:_cls.errorCode,errorName:(e&&e.name)||'Error',message:_cls.logMessage,taskId:cronMaskId(f._draftId)});
+    alert(_cls.userMessage); render(); return;
+  }
+  f._sending=false;
   const sector=f.sector;state.form=null;
   // F3.4.3E — TRAVA POR SETOR: o modal de envio ao cliente só abre quando o setor SALVO é
   // comprovadamente de cliente (isClientSector). Para edicao_midia/Social/Designer/Roteiro e
@@ -8991,7 +9066,7 @@ document.addEventListener('click',async e=>{
   if(el=g('[data-formgoto]')){const v=el.dataset.formgoto;if(v==='resp'){state.form.step=1;render();openAssignee();}else{state.form.step=+v;render();}return;}
   if(el=g('[data-sendclient]')){
     // se estamos no wizard (state.form), salva primeiro com cronStatus=pronto_cliente e entao abre o modal de envio
-    if(state.form){state.form._sendAfterSave=true;await saveTask();}
+    if(state.form){state.form._sendAfterSave=true;state.form._sending=true;render();await saveTask();}   /* F3.5.4I — mostra "Salvando cronograma…" antes do await */
     else{openSendClientModal(state.tasks.find(x=>x.id===el.dataset.taskid));}
     return;
   }

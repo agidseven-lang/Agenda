@@ -154,7 +154,14 @@ ok('B2.2 wizard: prazo (término) OBRIGATÓRIO p/ edicao_midia', /Data de térmi
 ok('B2.3 saveTask valida Designer + término antes de criar (edicao_midia)', /if\(secOf\(f\.sector\)\.key==='edicao_midia'\)\{[\s\S]{0,260}if\(!f\.assigneeId\)\{[\s\S]{0,200}if\(!f\.endDate\)\{/.test(H));
 ok('B2.4 criação ATÔMICA: data.designerAssignment montado ANTES do add() (mesma operação)', /data\.designerAssignment=\{ designerId:f\.assigneeId/.test(H) && /data\.designerFlowStatus='afazer'/.test(H) && /data\.status='afazer'/.test(H));
 ok('B2.5 designerSla.planDueAt = término (dtMs de f.endDate); sem prazo automático fixo', /data\.designerSla=\{ planStartAt:\(f\.startDate\?dtMs\(f\.startDate[\s\S]{0,80}planDueAt:\(f\.endDate\?dtMs\(f\.endDate/.test(H));
-ok('B2.6 UMA única gravação (add) — o bloco de atribuição está DENTRO de saveTask, antes de db...add(data)', H.indexOf("data.designerAssignment={ designerId:f.assigneeId") < H.indexOf("ref=await db.collection('tasks').add(data)"));
+/* F3.5.4I: a escrita passou a ser idempotente (.doc(_draftId).set(_payload), após cronSanitizeDeep);
+ * o bloco de atribuição do designer continua DENTRO de saveTask e ANTES da escrita — invariante preservada. */
+ok('B2.6 UMA única gravação — bloco de atribuição DENTRO de saveTask, antes da escrita idempotente', (() => {
+  const iAssign = H.indexOf("data.designerAssignment={ designerId:f.assigneeId");
+  const iWrite = H.indexOf("db.collection('tasks').doc(f._draftId).set(_payload)");
+  const iSan = H.indexOf("const _payload=cronSanitizeDeep(data)");
+  return iAssign > 0 && iWrite > iAssign && iSan > iAssign && iSan < iWrite;
+})());
 ok('B2.7 edicao_midia na criação NÃO seta clientFlowStatus/cronStatus (só isClientSector)', /if\(isClientSector\(secOf\(f\.sector\)\.key\)\)\{data\.cronStatus=/.test(H));
 ok('B2.8 detailState edicao_midia COM designer → NÃO "Pronto para enviar" (Aguardando/produção)', /if\(secOf\(t\.sector\)\.key==='edicao_midia'\)\{\s*if\(hasDesigner\(t\)\)\{[\s\S]{0,400}edm_aguardando_iniciar/.test(H));
 ok('B2.9 recuperação de legado preservada: edicao_midia SEM designer ainda oferece senddesigner', /key:'edm_aguardando_atrib'[\s\S]{0,340}actions:\['senddesigner'\]/.test(H));

@@ -70,8 +70,10 @@ ok('saveCardsBatch NÃO grava o campo designerSla:', SCB.indexOf('designerSla:')
 for (const fn of ['function ensureReviewToken', 'ensureStableClientReviewToken', 'function buildShareClientUrl', 'function buildClientMessage', 'function openSendClientModal']) {
   ok('Card Premium presente: ' + fn, HTML.indexOf(fn) >= 0);
 }
-// add() único legado do saveTask preservado (caminho de tarefa única intacto)
-ok("add() único legado preservado (db.collection('tasks').add(data))", HTML.indexOf("db.collection('tasks').add(data)") >= 0);
+// ESCRITA ÚNICA por submissão preservada — F3.5.4I trocou o add(data) por escrita IDEMPOTENTE
+// (.doc(f._draftId).set(_payload)) com fallback .add(_payload); segue UMA tarefa por submissão.
+ok("saveTask: escrita única idempotente (doc(_draftId).set(_payload) + fallback add(_payload))",
+   HTML.indexOf("db.collection('tasks').doc(f._draftId).set(_payload)") >= 0 && HTML.indexOf("db.collection('tasks').add(_payload)") >= 0);
 
 /* ── 7. BYTE-IDÊNTICO vs base 1.0.186: isClientSector + funções do fluxo-cliente ───── */
 let base = null;
