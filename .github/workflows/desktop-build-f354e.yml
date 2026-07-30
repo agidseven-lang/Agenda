@@ -408,7 +408,7 @@ jobs:
           grep -qF 'Sem itens vinculados' "$EXH" || { echo "::error:: texto do empty state ausente"; exit 1; }
           grep -q 'id="f354e-card-styles"' "$EXH" || { echo "::error:: bloco f354e-card-styles ausente"; exit 1; }
           grep -qF 'body.desktop .kbv2-card-notes{ border:1px solid rgba(255,255,255,.07); border-radius:11px;' "$EXH" || { echo "::error:: painel da LEGENDA ausente"; exit 1; }
-          grep -qF '-webkit-line-clamp:unset' "$EXH" || { echo "::error:: LEGENDA ainda clampada"; exit 1; }
+          grep -qF -- '-webkit-line-clamp:unset' "$EXH" || { echo "::error:: LEGENDA ainda clampada"; exit 1; }
           EXH="$EXH" node -e 's=require("fs").readFileSync(process.env.EXH,"utf8");const a=s.indexOf("id=\"f354b-card-styles\""),b=s.indexOf("id=\"f354e-card-styles\"");if(!(a>0&&b>a)){console.error("cascata invalida: f354e nao vem depois de f354b");process.exit(1);}'
           node -e 's=require("fs").readFileSync(process.env.RUNNER_TEMP+"/asarx/src/renderer/index.html","utf8");const z=s.indexOf("id=\"f354e-card-styles\"");const blk=s.slice(z,z+3000);if(!/\.kbv2-name\{ white-space:normal; display:-webkit-box;/.test(blk)){console.error("nome 2 linhas ausente no bloco f354e");process.exit(1);}'
           # checklist com contagem mesmo vazio (0 de 0)
