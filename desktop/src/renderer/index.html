@@ -2351,6 +2351,45 @@ body.desktop .kbv2-card-footer{ margin-top:3px; }
   body.desktop .kbv2-themes-h{ padding:5px 11px; font-size:10px }
 }
 </style>
+<style id="f354e-card-styles">
+/* ════════ F3.5.4E — SHELL ÚNICO: painel central UNIVERSAL + nome em 2 linhas ════════
+   Reprovação física da 1.0.195: dois "modelos" percebidos na mesma tela. Este bloco fecha as
+   causas visuais DENTRO do kbv2: (1) LEGENDA/OBSERVAÇÕES deixam de ser texto solto e ganham a
+   MESMA caixa do painel TEMAS (mesmos tokens: borda .07, raio 11, fundo .03, cabeçalho 10px
+   maiúsculo, texto 13px/1.45, quebra natural, SEM clamp, SEM scroll interno); (2) empty state
+   discreto no MESMO painel; (3) nome do responsável em até 2 linhas com quebra controlada.
+   Cascata posterior de mesma especificidade — literais históricos pinados permanecem intactos. */
+
+/* ── LEGENDA/OBSERVAÇÕES = painel padrão (markup kbv2-card-notes PRESERVADO) ── */
+body.desktop .kbv2-card-notes{ border:1px solid rgba(255,255,255,.07); border-radius:11px;
+  background:rgba(255,255,255,.03); margin:1px 0; gap:0; overflow:visible; }
+body.desktop .kbv2-card-note{ gap:0; }
+body.desktop .kbv2-card-note .kbv2-note-k{ font-size:10px; letter-spacing:.1em; color:#8a93a7;
+  padding:7px 12px; background:rgba(255,255,255,.04); border-radius:10px 10px 0 0; }
+body.desktop .kbv2-card-note+.kbv2-card-note .kbv2-note-k{ border-radius:0; border-top:1px solid rgba(255,255,255,.06); }
+body.desktop .kbv2-card-note .kbv2-note-v{ font-size:13px; line-height:1.45; color:#DBE2EE;
+  padding:8px 12px; display:block; -webkit-line-clamp:unset; overflow:visible;
+  overflow-wrap:break-word; word-break:break-word; white-space:normal; }
+
+/* ── EMPTY STATE dentro do painel central (nenhum card fica sem a seção) ── */
+body.desktop .kbv2-slot-empty-v{ font-size:12px; color:#8b94a6; font-style:italic;
+  padding:9px 12px; border-top:1px solid rgba(255,255,255,.06); line-height:1.4; }
+
+/* ── NOME DO RESPONSÁVEL: até 2 linhas, quebra controlada, tooltip integral já existente ── */
+body.desktop .kbv2-name{ white-space:normal; display:-webkit-box; -webkit-box-orient:vertical;
+  -webkit-line-clamp:2; overflow:hidden; text-overflow:clip; overflow-wrap:break-word;
+  word-break:break-word; line-height:1.25; }
+
+/* ── notebook: painel LEGENDA acompanha as bandas do TEMAS ── */
+@media (max-height:820px){
+  body.desktop .kbv2-card-note .kbv2-note-v{ font-size:13px; padding:7px 12px }
+  body.desktop .kbv2-card-note .kbv2-note-k{ padding:6px 12px }
+}
+@media (max-height:720px){
+  body.desktop .kbv2-card-note .kbv2-note-v{ font-size:12.5px; padding:6px 11px }
+  body.desktop .kbv2-card-note .kbv2-note-k{ padding:5px 11px }
+}
+</style>
 </head>
 <body>
 
@@ -2557,7 +2596,14 @@ const state={user:null,users:[],events:[],tasks:[],tab:'hoje',boardSector:null,p
 
 /* ---- DESKTOP MODE detection (>=1024px) ---- */
 const DESKTOP_MQ=window.matchMedia('(min-width:1024px)');
-function isDesktop(){return DESKTOP_MQ.matches;}
+/* F3.5.4E — CAUSA-RAIZ da coexistência de DOIS modelos de card: isDesktop() era SÓ a media
+   query acima. No APP ELECTRON, janela restaurada estreita ou escala do Windows ≥125%
+   (1366px físicos ÷ 1,5 = 911px CSS < 1024) derrubava a MQ → body.desktop saía → os quadros
+   caíam no ramo "Mobile (paridade APK)" → .map(taskCard) renderizava o card LEGADO tcv4 ao
+   lado do kbv2 na mesma sessão. No Electron (window.api injetado pelo preload) o app é
+   SEMPRE desktop; a MQ continua valendo apenas no navegador/paridade APK. */
+const IS_ELECTRON_APP=!!(typeof window!=='undefined'&&window.api);
+function isDesktop(){return IS_ELECTRON_APP||DESKTOP_MQ.matches;}
 function applyDesktopClass(){document.body.classList.toggle('desktop',isDesktop());}
 applyDesktopClass();
 DESKTOP_MQ.addEventListener('change',()=>{applyDesktopClass();if(state.user)render();});
@@ -5681,6 +5727,10 @@ function stageIcon(key){
   return M[key]||'flag';
 }
 function taskCard(t, persp){
+  /* F3.5.4E — SHELL ÚNICO: no desktop, QUALQUER chamada residual a este template legado
+     devolve o card oficial (KanbanTaskCardUnified). O tcv4 abaixo permanece SOMENTE para a
+     paridade mobile/APK no navegador — inalcançável no app por construção. */
+  if(isDesktop())return kbv2Card(t, persp);
   /* ═══ CARD V4 — implementação FIEL ao print de referência aprovado pelo usuário
      (estrutura completa do card original com acabamento premium):
      pill de status + prazo → pessoa (avatar 44 + nome + cargo c/ presença) →
@@ -6129,7 +6179,17 @@ function kbv2Card(t, persp){
        '</div></div>';
     h+='<div class="kbv2-hint">🔒 <span>Preencha ao menos <b>1 tema</b> para liberar o <b>envio ao cliente</b> (Card Premium).</span></div>';
   }
-  if(Array.isArray(t.checklist)&&t.checklist.length){const done=t.checklist.filter(c=>c.d).length;h+='<div class="kbv2-card-chk" title="Checklist: '+done+' de '+t.checklist.length+' itens concluídos (completo em Detalhes)">'+svg('check')+'<span>'+done+' de '+t.checklist.length+' no checklist</span></div>';}
+  /* F3.5.4E — SLOT CENTRAL UNIVERSAL: nenhum tipo/status fica sem a seção central do card.
+     Tarefa sem temas E sem legenda ganha um empty state DISCRETO dentro do MESMO painel
+     padrão (mesma caixa do TEMAS) — sem trocar o modelo, sem card compacto, sem altura
+     artificial. Conteúdo real continua variando por DADOS; o SHELL nunca. */
+  else if(!isCron&&!(s.key==='edicao_cards'&&(cardsFieldOf(t,'legenda')||cardsFieldOf(t,'obs')))){
+    h+='<div class="kbv2-card-themes kbv2-slot-empty"><div class="kbv2-themes-h"><span>Conteúdo</span></div>'+
+       '<div class="kbv2-slot-empty-v">Sem itens vinculados — detalhes completos na tarefa</div></div>';
+  }
+  /* F3.5.4E — checklist mostra contagem também quando o array existe VAZIO (0 de 0):
+     o bloco de progresso é o MESMO em todos os cards; só some quando a tarefa nem tem o campo. */
+  if(Array.isArray(t.checklist)){const done=t.checklist.filter(c=>c.d).length;h+='<div class="kbv2-card-chk" title="Checklist: '+done+' de '+t.checklist.length+' itens concluídos (completo em Detalhes)">'+svg('check')+'<span>'+done+' de '+t.checklist.length+' no checklist</span></div>';}
   // 7) trilho de progresso + 8) etapa atual + 9) próxima ação
   if(prog){
     let rail='';

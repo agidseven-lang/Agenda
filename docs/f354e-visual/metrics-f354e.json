@@ -1,0 +1,1132 @@
+{
+  "cenas": {
+    "01-antes-afazer-x-andamento": [
+      {
+        "width": 453,
+        "padding": "13px/13px",
+        "radius": "14px",
+        "statusChipH": 24,
+        "btnH": 34,
+        "dotsW": 38,
+        "off": {
+          "profile": 47,
+          "origin": 90,
+          "client": 115,
+          "title": 130,
+          "chips": 158,
+          "slot": 190,
+          "chk": null,
+          "rail": 246,
+          "stage": 267,
+          "date": 324,
+          "footer": 350
+        },
+        "notePanel": {
+          "borderW": "0px",
+          "radius": "0px",
+          "bg": "rgba(0, 0, 0, 0)"
+        },
+        "themesPanel": null,
+        "nameLines": 1,
+        "hasMaisN": false,
+        "tcv4": false,
+        "themesVisible": 0,
+        "themesTotal": 0
+      },
+      {
+        "width": 453,
+        "padding": "13px/13px",
+        "radius": "14px",
+        "statusChipH": 24,
+        "btnH": 34,
+        "dotsW": 38,
+        "off": {
+          "profile": 47,
+          "origin": 90,
+          "client": 115,
+          "title": 130,
+          "chips": 158,
+          "slot": 190,
+          "chk": 382,
+          "rail": 406,
+          "stage": 427,
+          "date": 485,
+          "footer": 511
+        },
+        "notePanel": null,
+        "themesPanel": {
+          "borderW": "1px",
+          "radius": "11px",
+          "bg": "rgba(255, 255, 255, 0.03)"
+        },
+        "nameLines": 1,
+        "hasMaisN": false,
+        "tcv4": false,
+        "themesVisible": 4,
+        "themesTotal": 4
+      }
+    ],
+    "02-depois-afazer-x-andamento": [
+      {
+        "width": 477,
+        "padding": "13px/13px",
+        "radius": "14px",
+        "statusChipH": 24,
+        "btnH": 34,
+        "dotsW": 38,
+        "off": {
+          "profile": 47,
+          "origin": 90,
+          "client": 115,
+          "title": 130,
+          "chips": 158,
+          "slot": 190,
+          "chk": 282,
+          "rail": 306,
+          "stage": 327,
+          "date": 384,
+          "footer": 410
+        },
+        "notePanel": {
+          "borderW": "1px",
+          "radius": "11px",
+          "bg": "rgba(255, 255, 255, 0.03)"
+        },
+        "themesPanel": null,
+        "nameLines": 1,
+        "hasMaisN": false,
+        "tcv4": false,
+        "themesVisible": 0,
+        "themesTotal": 0
+      },
+      {
+        "width": 477,
+        "padding": "13px/13px",
+        "radius": "14px",
+        "statusChipH": 24,
+        "btnH": 34,
+        "dotsW": 38,
+        "off": {
+          "profile": 47,
+          "origin": 90,
+          "client": 115,
+          "title": 130,
+          "chips": 158,
+          "slot": 190,
+          "chk": 382,
+          "rail": 406,
+          "stage": 427,
+          "date": 485,
+          "footer": 511
+        },
+        "notePanel": null,
+        "themesPanel": {
+          "borderW": "1px",
+          "radius": "11px",
+          "bg": "rgba(255, 255, 255, 0.03)"
+        },
+        "nameLines": 1,
+        "hasMaisN": false,
+        "tcv4": false,
+        "themesVisible": 4,
+        "themesTotal": 4
+      }
+    ],
+    "03-sobreposicao-estrutural": [
+      {
+        "width": 477,
+        "padding": "13px/13px",
+        "radius": "14px",
+        "statusChipH": 24,
+        "btnH": 34,
+        "dotsW": 38,
+        "off": {
+          "profile": 47,
+          "origin": 90,
+          "client": 115,
+          "title": 130,
+          "chips": 158,
+          "slot": 190,
+          "chk": 282,
+          "rail": 306,
+          "stage": 327,
+          "date": 384,
+          "footer": 410
+        },
+        "notePanel": {
+          "borderW": "1px",
+          "radius": "11px",
+          "bg": "rgba(255, 255, 255, 0.03)"
+        },
+        "themesPanel": null,
+        "nameLines": 1,
+        "hasMaisN": false,
+        "tcv4": false,
+        "themesVisible": 0,
+        "themesTotal": 0
+      },
+      {
+        "width": 477,
+        "padding": "13px/13px",
+        "radius": "14px",
+        "statusChipH": 24,
+        "btnH": 34,
+        "dotsW": 38,
+        "off": {
+          "profile": 47,
+          "origin": 90,
+          "client": 115,
+          "title": 130,
+          "chips": 158,
+          "slot": 190,
+          "chk": 382,
+          "rail": 406,
+          "stage": 427,
+          "date": 485,
+          "footer": 511
+        },
+        "notePanel": null,
+        "themesPanel": {
+          "borderW": "1px",
+          "radius": "11px",
+          "bg": "rgba(255, 255, 255, 0.03)"
+        },
+        "nameLines": 1,
+        "hasMaisN": false,
+        "tcv4": false,
+        "themesVisible": 4,
+        "themesTotal": 4
+      }
+    ],
+    "04-afazer-edicao-cards": [
+      {
+        "width": 622,
+        "padding": "12px/12px",
+        "radius": "14px",
+        "statusChipH": 24,
+        "btnH": 38,
+        "dotsW": 38,
+        "off": {
+          "profile": 45,
+          "origin": 87,
+          "client": 111,
+          "title": 126,
+          "chips": 152,
+          "slot": 183,
+          "chk": 255,
+          "rail": 278,
+          "stage": 298,
+          "date": 355,
+          "footer": 380
+        },
+        "notePanel": {
+          "borderW": "1px",
+          "radius": "11px",
+          "bg": "rgba(255, 255, 255, 0.03)"
+        },
+        "themesPanel": null,
+        "nameLines": 1,
+        "hasMaisN": false,
+        "tcv4": false,
+        "themesVisible": 0,
+        "themesTotal": 0
+      }
+    ],
+    "05-andamento-edicao-cards": [
+      {
+        "width": 502,
+        "padding": "12px/12px",
+        "radius": "14px",
+        "statusChipH": 24,
+        "btnH": 38,
+        "dotsW": 38,
+        "off": {
+          "profile": 45,
+          "origin": 87,
+          "client": 111,
+          "title": 126,
+          "chips": 152,
+          "slot": 183,
+          "chk": 325,
+          "rail": 348,
+          "stage": 368,
+          "date": 425,
+          "footer": 450
+        },
+        "notePanel": {
+          "borderW": "1px",
+          "radius": "11px",
+          "bg": "rgba(255, 255, 255, 0.03)"
+        },
+        "themesPanel": null,
+        "nameLines": 1,
+        "hasMaisN": false,
+        "tcv4": false,
+        "themesVisible": 0,
+        "themesTotal": 0
+      }
+    ],
+    "06-afazer-edicao-videos": [
+      {
+        "width": 304,
+        "padding": "12px/12px",
+        "radius": "14px",
+        "statusChipH": 24,
+        "btnH": 38,
+        "dotsW": 38,
+        "off": {
+          "profile": 45,
+          "origin": 87,
+          "client": 111,
+          "title": 126,
+          "chips": 152,
+          "slot": 183,
+          "chk": 298,
+          "rail": 321,
+          "stage": 341,
+          "date": 398,
+          "footer": 423
+        },
+        "notePanel": null,
+        "themesPanel": {
+          "borderW": "1px",
+          "radius": "11px",
+          "bg": "rgba(255, 255, 255, 0.03)"
+        },
+        "nameLines": 1,
+        "hasMaisN": false,
+        "tcv4": false,
+        "themesVisible": 2,
+        "themesTotal": 2
+      }
+    ],
+    "07-andamento-edicao-videos": [
+      {
+        "width": 330,
+        "padding": "13px/13px",
+        "radius": "14px",
+        "statusChipH": 24,
+        "btnH": 34,
+        "dotsW": 38,
+        "off": {
+          "profile": 47,
+          "origin": 90,
+          "client": 115,
+          "title": 130,
+          "chips": 158,
+          "slot": 190,
+          "chk": 382,
+          "rail": 406,
+          "stage": 427,
+          "date": 485,
+          "footer": 511
+        },
+        "notePanel": null,
+        "themesPanel": {
+          "borderW": "1px",
+          "radius": "11px",
+          "bg": "rgba(255, 255, 255, 0.03)"
+        },
+        "nameLines": 1,
+        "hasMaisN": false,
+        "tcv4": false,
+        "themesVisible": 4,
+        "themesTotal": 4
+      }
+    ],
+    "08-revisao": [
+      {
+        "width": 522,
+        "padding": "12px/12px",
+        "radius": "14px",
+        "statusChipH": 24,
+        "btnH": 38,
+        "dotsW": 38,
+        "off": {
+          "profile": 45,
+          "origin": 87,
+          "client": 111,
+          "title": 126,
+          "chips": 152,
+          "slot": 183,
+          "chk": 255,
+          "rail": 278,
+          "stage": 298,
+          "date": 355,
+          "footer": 380
+        },
+        "notePanel": {
+          "borderW": "1px",
+          "radius": "11px",
+          "bg": "rgba(255, 255, 255, 0.03)"
+        },
+        "themesPanel": null,
+        "nameLines": 1,
+        "hasMaisN": false,
+        "tcv4": false,
+        "themesVisible": 0,
+        "themesTotal": 0
+      }
+    ],
+    "09-concluido": [
+      {
+        "width": 276,
+        "padding": "12px/12px",
+        "radius": "14px",
+        "statusChipH": 24,
+        "btnH": 38,
+        "dotsW": 38,
+        "off": {
+          "profile": 45,
+          "origin": 87,
+          "client": 111,
+          "title": 126,
+          "chips": 152,
+          "slot": 183,
+          "chk": 336,
+          "rail": 359,
+          "stage": 379,
+          "date": 409,
+          "footer": 434
+        },
+        "notePanel": null,
+        "themesPanel": {
+          "borderW": "1px",
+          "radius": "11px",
+          "bg": "rgba(255, 255, 255, 0.03)"
+        },
+        "nameLines": 1,
+        "hasMaisN": false,
+        "tcv4": false,
+        "themesVisible": 3,
+        "themesTotal": 3
+      }
+    ],
+    "10-meu-quadro": [
+      {
+        "width": 477,
+        "padding": "12px/12px",
+        "radius": "14px",
+        "statusChipH": 24,
+        "btnH": 38,
+        "dotsW": 38,
+        "off": {
+          "profile": 45,
+          "origin": 87,
+          "client": 111,
+          "title": 126,
+          "chips": 152,
+          "slot": 184,
+          "chk": 275,
+          "rail": 298,
+          "stage": 318,
+          "date": 375,
+          "footer": 401
+        },
+        "notePanel": {
+          "borderW": "1px",
+          "radius": "11px",
+          "bg": "rgba(255, 255, 255, 0.03)"
+        },
+        "themesPanel": null,
+        "nameLines": 1,
+        "hasMaisN": false,
+        "tcv4": false,
+        "themesVisible": 0,
+        "themesTotal": 0
+      },
+      {
+        "width": 477,
+        "padding": "12px/12px",
+        "radius": "14px",
+        "statusChipH": 24,
+        "btnH": 38,
+        "dotsW": 38,
+        "off": {
+          "profile": 45,
+          "origin": 87,
+          "client": 111,
+          "title": 126,
+          "chips": 152,
+          "slot": 184,
+          "chk": null,
+          "rail": 259,
+          "stage": 279,
+          "date": 336,
+          "footer": 362
+        },
+        "notePanel": null,
+        "themesPanel": {
+          "borderW": "1px",
+          "radius": "11px",
+          "bg": "rgba(255, 255, 255, 0.03)"
+        },
+        "nameLines": 1,
+        "hasMaisN": false,
+        "tcv4": false,
+        "themesVisible": 1,
+        "themesTotal": 1
+      },
+      {
+        "width": 477,
+        "padding": "12px/12px",
+        "radius": "14px",
+        "statusChipH": 24,
+        "btnH": 38,
+        "dotsW": 38,
+        "off": {
+          "profile": 45,
+          "origin": 87,
+          "client": 111,
+          "title": 126,
+          "chips": 152,
+          "slot": 183,
+          "chk": 374,
+          "rail": 397,
+          "stage": 417,
+          "date": 474,
+          "footer": 499
+        },
+        "notePanel": null,
+        "themesPanel": {
+          "borderW": "1px",
+          "radius": "11px",
+          "bg": "rgba(255, 255, 255, 0.03)"
+        },
+        "nameLines": 1,
+        "hasMaisN": false,
+        "tcv4": false,
+        "themesVisible": 4,
+        "themesTotal": 4
+      },
+      {
+        "width": 477,
+        "padding": "12px/12px",
+        "radius": "14px",
+        "statusChipH": 24,
+        "btnH": 38,
+        "dotsW": 38,
+        "off": {
+          "profile": 45,
+          "origin": 87,
+          "client": 111,
+          "title": 126,
+          "chips": 152,
+          "slot": 183,
+          "chk": 274,
+          "rail": 297,
+          "stage": 317,
+          "date": 374,
+          "footer": 399
+        },
+        "notePanel": {
+          "borderW": "1px",
+          "radius": "11px",
+          "bg": "rgba(255, 255, 255, 0.03)"
+        },
+        "themesPanel": null,
+        "nameLines": 1,
+        "hasMaisN": false,
+        "tcv4": false,
+        "themesVisible": 0,
+        "themesTotal": 0
+      }
+    ],
+    "11-designers": [
+      {
+        "width": 318,
+        "padding": "13px/13px",
+        "radius": "14px",
+        "statusChipH": 24,
+        "btnH": 34,
+        "dotsW": 38,
+        "off": {
+          "profile": 47,
+          "origin": 90,
+          "client": 115,
+          "title": 130,
+          "chips": 158,
+          "slot": 190,
+          "chk": 306,
+          "rail": 330,
+          "stage": 351,
+          "date": 409,
+          "footer": 435
+        },
+        "notePanel": null,
+        "themesPanel": {
+          "borderW": "1px",
+          "radius": "11px",
+          "bg": "rgba(255, 255, 255, 0.03)"
+        },
+        "nameLines": 1,
+        "hasMaisN": false,
+        "tcv4": false,
+        "themesVisible": 2,
+        "themesTotal": 2
+      },
+      {
+        "width": 318,
+        "padding": "13px/13px",
+        "radius": "14px",
+        "statusChipH": 24,
+        "btnH": 34,
+        "dotsW": 38,
+        "off": {
+          "profile": 79,
+          "origin": 122,
+          "client": 147,
+          "title": 162,
+          "chips": 190,
+          "slot": 222,
+          "chk": 414,
+          "rail": 438,
+          "stage": 459,
+          "date": 531,
+          "footer": 557
+        },
+        "notePanel": null,
+        "themesPanel": {
+          "borderW": "1px",
+          "radius": "11px",
+          "bg": "rgba(255, 255, 255, 0.03)"
+        },
+        "nameLines": 1,
+        "hasMaisN": false,
+        "tcv4": false,
+        "themesVisible": 4,
+        "themesTotal": 4
+      }
+    ],
+    "12-social-medias": [
+      {
+        "width": 477,
+        "padding": "12px/12px",
+        "radius": "14px",
+        "statusChipH": 24,
+        "btnH": 38,
+        "dotsW": 38,
+        "off": {
+          "profile": 45,
+          "origin": 87,
+          "client": 111,
+          "title": 126,
+          "chips": 152,
+          "slot": 184,
+          "chk": 275,
+          "rail": 298,
+          "stage": 318,
+          "date": 375,
+          "footer": 401
+        },
+        "notePanel": {
+          "borderW": "1px",
+          "radius": "11px",
+          "bg": "rgba(255, 255, 255, 0.03)"
+        },
+        "themesPanel": null,
+        "nameLines": 1,
+        "hasMaisN": false,
+        "tcv4": false,
+        "themesVisible": 0,
+        "themesTotal": 0
+      },
+      {
+        "width": 477,
+        "padding": "12px/12px",
+        "radius": "14px",
+        "statusChipH": 24,
+        "btnH": 38,
+        "dotsW": 38,
+        "off": {
+          "profile": 45,
+          "origin": 87,
+          "client": 111,
+          "title": 126,
+          "chips": 152,
+          "slot": 184,
+          "chk": null,
+          "rail": 259,
+          "stage": 279,
+          "date": 336,
+          "footer": 362
+        },
+        "notePanel": null,
+        "themesPanel": {
+          "borderW": "1px",
+          "radius": "11px",
+          "bg": "rgba(255, 255, 255, 0.03)"
+        },
+        "nameLines": 1,
+        "hasMaisN": false,
+        "tcv4": false,
+        "themesVisible": 1,
+        "themesTotal": 1
+      },
+      {
+        "width": 477,
+        "padding": "12px/12px",
+        "radius": "14px",
+        "statusChipH": 24,
+        "btnH": 38,
+        "dotsW": 38,
+        "off": {
+          "profile": 45,
+          "origin": 87,
+          "client": 111,
+          "title": 126,
+          "chips": 152,
+          "slot": 183,
+          "chk": 374,
+          "rail": 397,
+          "stage": 417,
+          "date": 474,
+          "footer": 499
+        },
+        "notePanel": null,
+        "themesPanel": {
+          "borderW": "1px",
+          "radius": "11px",
+          "bg": "rgba(255, 255, 255, 0.03)"
+        },
+        "nameLines": 1,
+        "hasMaisN": false,
+        "tcv4": false,
+        "themesVisible": 4,
+        "themesTotal": 4
+      },
+      {
+        "width": 477,
+        "padding": "12px/12px",
+        "radius": "14px",
+        "statusChipH": 24,
+        "btnH": 38,
+        "dotsW": 38,
+        "off": {
+          "profile": 45,
+          "origin": 87,
+          "client": 111,
+          "title": 126,
+          "chips": 152,
+          "slot": 183,
+          "chk": 274,
+          "rail": 297,
+          "stage": 317,
+          "date": 374,
+          "footer": 399
+        },
+        "notePanel": {
+          "borderW": "1px",
+          "radius": "11px",
+          "bg": "rgba(255, 255, 255, 0.03)"
+        },
+        "themesPanel": null,
+        "nameLines": 1,
+        "hasMaisN": false,
+        "tcv4": false,
+        "themesVisible": 0,
+        "themesTotal": 0
+      }
+    ],
+    "13-clientes": [
+      {
+        "width": 338,
+        "padding": "13px/13px",
+        "radius": "14px",
+        "statusChipH": 24,
+        "btnH": 34,
+        "dotsW": 38,
+        "off": {
+          "profile": 47,
+          "origin": 90,
+          "client": 115,
+          "title": 130,
+          "chips": 158,
+          "slot": 191,
+          "chk": 345,
+          "rail": 369,
+          "stage": 390,
+          "date": 421,
+          "footer": 448
+        },
+        "notePanel": null,
+        "themesPanel": {
+          "borderW": "1px",
+          "radius": "11px",
+          "bg": "rgba(255, 255, 255, 0.03)"
+        },
+        "nameLines": 1,
+        "hasMaisN": false,
+        "tcv4": false,
+        "themesVisible": 3,
+        "themesTotal": 3
+      },
+      {
+        "width": 338,
+        "padding": "13px/13px",
+        "radius": "14px",
+        "statusChipH": 24,
+        "btnH": 34,
+        "dotsW": 38,
+        "off": {
+          "profile": 47,
+          "origin": 90,
+          "client": 115,
+          "title": 130,
+          "chips": 158,
+          "slot": 191,
+          "chk": null,
+          "rail": 687,
+          "stage": 708,
+          "date": 766,
+          "footer": 793
+        },
+        "notePanel": null,
+        "themesPanel": {
+          "borderW": "1px",
+          "radius": "11px",
+          "bg": "rgba(255, 255, 255, 0.03)"
+        },
+        "nameLines": 1,
+        "hasMaisN": false,
+        "tcv4": false,
+        "themesVisible": 12,
+        "themesTotal": 12
+      }
+    ],
+    "14-setores": [
+      {
+        "width": 527,
+        "padding": "12px/12px",
+        "radius": "14px",
+        "statusChipH": 24,
+        "btnH": 38,
+        "dotsW": 38,
+        "off": {
+          "profile": 45,
+          "origin": 87,
+          "client": 111,
+          "title": 126,
+          "chips": 152,
+          "slot": 183,
+          "chk": 312,
+          "rail": 335,
+          "stage": 355,
+          "date": 411,
+          "footer": 436
+        },
+        "notePanel": {
+          "borderW": "1px",
+          "radius": "11px",
+          "bg": "rgba(255, 255, 255, 0.03)"
+        },
+        "themesPanel": null,
+        "nameLines": 1,
+        "hasMaisN": false,
+        "tcv4": false,
+        "themesVisible": 0,
+        "themesTotal": 0
+      },
+      {
+        "width": 527,
+        "padding": "12px/12px",
+        "radius": "14px",
+        "statusChipH": 24,
+        "btnH": 38,
+        "dotsW": 38,
+        "off": {
+          "profile": 45,
+          "origin": 87,
+          "client": 111,
+          "title": 126,
+          "chips": 152,
+          "slot": 183,
+          "chk": 325,
+          "rail": 348,
+          "stage": 368,
+          "date": 425,
+          "footer": 450
+        },
+        "notePanel": {
+          "borderW": "1px",
+          "radius": "11px",
+          "bg": "rgba(255, 255, 255, 0.03)"
+        },
+        "themesPanel": null,
+        "nameLines": 1,
+        "hasMaisN": false,
+        "tcv4": false,
+        "themesVisible": 0,
+        "themesTotal": 0
+      }
+    ],
+    "15-escala-100": [
+      {
+        "width": 472,
+        "padding": "11px/11px",
+        "radius": "14px",
+        "statusChipH": 24,
+        "btnH": 34,
+        "dotsW": 38,
+        "off": {
+          "profile": 43,
+          "origin": 84,
+          "client": 107,
+          "title": 122,
+          "chips": 146,
+          "slot": 176,
+          "chk": 262,
+          "rail": 284,
+          "stage": 303,
+          "date": 359,
+          "footer": 383
+        },
+        "notePanel": {
+          "borderW": "1px",
+          "radius": "11px",
+          "bg": "rgba(255, 255, 255, 0.03)"
+        },
+        "themesPanel": null,
+        "nameLines": 1,
+        "hasMaisN": false,
+        "tcv4": false,
+        "themesVisible": 0,
+        "themesTotal": 0
+      },
+      {
+        "width": 472,
+        "padding": "11px/11px",
+        "radius": "14px",
+        "statusChipH": 24,
+        "btnH": 34,
+        "dotsW": 38,
+        "off": {
+          "profile": 43,
+          "origin": 84,
+          "client": 107,
+          "title": 122,
+          "chips": 146,
+          "slot": 176,
+          "chk": 356,
+          "rail": 378,
+          "stage": 397,
+          "date": 453,
+          "footer": 477
+        },
+        "notePanel": null,
+        "themesPanel": {
+          "borderW": "1px",
+          "radius": "11px",
+          "bg": "rgba(255, 255, 255, 0.03)"
+        },
+        "nameLines": 1,
+        "hasMaisN": false,
+        "tcv4": false,
+        "themesVisible": 4,
+        "themesTotal": 4
+      }
+    ],
+    "16-escala-125": [
+      {
+        "width": 472,
+        "padding": "11px/11px",
+        "radius": "14px",
+        "statusChipH": 24,
+        "btnH": 34,
+        "dotsW": 38,
+        "off": {
+          "profile": 43,
+          "origin": 84,
+          "client": 107,
+          "title": 122,
+          "chips": 146,
+          "slot": 176,
+          "chk": 262,
+          "rail": 284,
+          "stage": 303,
+          "date": 359,
+          "footer": 383
+        },
+        "notePanel": {
+          "borderW": "1px",
+          "radius": "11px",
+          "bg": "rgba(255, 255, 255, 0.03)"
+        },
+        "themesPanel": null,
+        "nameLines": 1,
+        "hasMaisN": false,
+        "tcv4": false,
+        "themesVisible": 0,
+        "themesTotal": 0
+      },
+      {
+        "width": 472,
+        "padding": "11px/11px",
+        "radius": "14px",
+        "statusChipH": 24,
+        "btnH": 34,
+        "dotsW": 38,
+        "off": {
+          "profile": 43,
+          "origin": 84,
+          "client": 107,
+          "title": 122,
+          "chips": 146,
+          "slot": 176,
+          "chk": 356,
+          "rail": 378,
+          "stage": 397,
+          "date": 453,
+          "footer": 477
+        },
+        "notePanel": null,
+        "themesPanel": {
+          "borderW": "1px",
+          "radius": "11px",
+          "bg": "rgba(255, 255, 255, 0.03)"
+        },
+        "nameLines": 1,
+        "hasMaisN": false,
+        "tcv4": false,
+        "themesVisible": 4,
+        "themesTotal": 4
+      }
+    ],
+    "17-menu-aberto": [
+      {
+        "width": 330,
+        "padding": "13px/13px",
+        "radius": "14px",
+        "statusChipH": 24,
+        "btnH": 34,
+        "dotsW": 38,
+        "off": {
+          "profile": 47,
+          "origin": 90,
+          "client": 115,
+          "title": 130,
+          "chips": 158,
+          "slot": 190,
+          "chk": 382,
+          "rail": 406,
+          "stage": 427,
+          "date": 485,
+          "footer": 511
+        },
+        "notePanel": null,
+        "themesPanel": {
+          "borderW": "1px",
+          "radius": "11px",
+          "bg": "rgba(255, 255, 255, 0.03)"
+        },
+        "nameLines": 1,
+        "hasMaisN": false,
+        "tcv4": false,
+        "themesVisible": 4,
+        "themesTotal": 4
+      }
+    ],
+    "18-nome-longo": [
+      {
+        "width": 388,
+        "padding": "12px/12px",
+        "radius": "14px",
+        "statusChipH": 24,
+        "btnH": 38,
+        "dotsW": 38,
+        "off": {
+          "profile": 45,
+          "origin": 102,
+          "client": 126,
+          "title": 141,
+          "chips": 167,
+          "slot": 198,
+          "chk": null,
+          "rail": 271,
+          "stage": 291,
+          "date": 348,
+          "footer": 373
+        },
+        "notePanel": null,
+        "themesPanel": {
+          "borderW": "1px",
+          "radius": "11px",
+          "bg": "rgba(255, 255, 255, 0.03)"
+        },
+        "nameLines": 2,
+        "hasMaisN": false,
+        "tcv4": false,
+        "themesVisible": 0,
+        "themesTotal": 0
+      }
+    ],
+    "19-legenda-longa": [
+      {
+        "width": 628,
+        "padding": "13px/13px",
+        "radius": "14px",
+        "statusChipH": 24,
+        "btnH": 34,
+        "dotsW": 38,
+        "off": {
+          "profile": 47,
+          "origin": 90,
+          "client": 115,
+          "title": 130,
+          "chips": 158,
+          "slot": 190,
+          "chk": 319,
+          "rail": 343,
+          "stage": 364,
+          "date": 422,
+          "footer": 448
+        },
+        "notePanel": {
+          "borderW": "1px",
+          "radius": "11px",
+          "bg": "rgba(255, 255, 255, 0.03)"
+        },
+        "themesPanel": null,
+        "nameLines": 1,
+        "hasMaisN": false,
+        "tcv4": false,
+        "themesVisible": 0,
+        "themesTotal": 0
+      }
+    ],
+    "20-doze-temas": [
+      {
+        "width": 273,
+        "padding": "13px/13px",
+        "radius": "14px",
+        "statusChipH": 24,
+        "btnH": 34,
+        "dotsW": 38,
+        "off": {
+          "profile": 47,
+          "origin": 90,
+          "client": 115,
+          "title": 130,
+          "chips": 158,
+          "slot": 190,
+          "chk": null,
+          "rail": 686,
+          "stage": 707,
+          "date": 765,
+          "footer": 791
+        },
+        "notePanel": null,
+        "themesPanel": {
+          "borderW": "1px",
+          "radius": "11px",
+          "bg": "rgba(255, 255, 255, 0.03)"
+        },
+        "nameLines": 1,
+        "hasMaisN": false,
+        "tcv4": false,
+        "themesVisible": 12,
+        "themesTotal": 12
+      }
+    ]
+  }
+}
