@@ -46,9 +46,9 @@ ok('B1 app aberto/visivel -> TOAST premium (notif-toast, channel toast)', /if \(
 ok('B2 background -> backgroundNotificationWindow (showBgNotify, channel bg-window)', /const bgOk = showBgNotify\(p, \(\) => \{/.test(MAIN) && /channel = bgOk \? "bg-window"/.test(MAIN));
 // F3.4.7 — nativa (helper nativeNotify) = FALLBACK: imediato (!bgOk) OU tardio (no-ACK).
 ok('B3 nativa do Windows = FALLBACK (so se a janela premium falhar ou nao provar render)', /if \(!bgOk\) nativeOk = nativeNotify\(p, key, deep\);/.test(MAIN) && /function nativeNotify\([\s\S]*?new Notification\(/.test(MAIN));
-ok('B4 windowActive = visivel e nao-minimizado', /isVisible\(\) && !w\.isMinimized\(\)/.test(MAIN));
+ok('B4 windowActive por FOCO real (F3.5.4K; desfocado/occluído⇒premium)', /function windowActive\(\)/.test(MAIN) && /w\.isFocused\(\)/.test(MAIN.slice(MAIN.indexOf('function windowActive'), MAIN.indexOf('function windowActive') + 300)));
 ok('B5 X/fechar -> bandeja (hide), processo vivo', /on\("close",[\s\S]*?if \(!quitting\)[\s\S]*?mainWin\?\.hide\(\)/.test(MAIN) && /window-all-closed[\s\S]*?preventDefault/.test(MAIN));
-ok('B6 clique reabre mainWindow + deep link (initBgNotify)', /initBgNotify\(\([^)]*\) => \{[\s\S]*?w\.show\(\)[\s\S]*?send\("notif-open", deep\)/.test(MAIN));
+ok('B6 clique via bringToFrontAndOpen (traz à frente + deep-link enfileirável) — F3.5.4K', /initBgNotify\(\([^)]*\) => \{[\s\S]*?bringToFrontAndOpen\(deep\)/.test(MAIN));
 ok('B7 AUMID setado (toast nativo do Windows)', /setAppUserModelId\("br\.com\.idseven\.agenda\.desktop"\)/.test(MAIN));
 ok('B8 Firestore long-polling no MAIN (realtime em background)', /experimentalForceLongPolling: true/.test(FB));
 ok('B9 bgNotify: frameless/transparente/alwaysOnTop/skipTaskbar/sem-foco/showInactive', /frame: false/.test(BG) && /transparent: true/.test(BG) && /alwaysOnTop: true/.test(BG) && /skipTaskbar: true/.test(BG) && /focusable: false/.test(BG) && /showInactive\(\)/.test(BG) && /setAlwaysOnTop\(true, "screen-saver"\)/.test(BG));

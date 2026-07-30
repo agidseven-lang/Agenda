@@ -186,11 +186,11 @@ console.log('\n===== F3.4.7 — C) deliverNotification (provas de FONTE, main.ts
 {
   ok('C1 dedupe do HUB gravado SÓ após canal aceitar (markSeen pós-decisão; sem add pré-resultado)',
     /const markSeen = \(\) => \{\s*\n\s*_notifSeen\.add\(key\);/.test(MAIN)
-    && /if \(bgOk \|\| nativeOk\) markSeen\(\);/.test(MAIN)
+    && /if \(bgOk \|\| nativeOk\) \{ markSeen\(\);/.test(MAIN)
     && !/_notifSeen\.add\(key\);\s*\n\s*diag\("deliver\.begin"/.test(MAIN));
-  ok('C2 caminho TOAST marca seen e devolve channel "toast" (regra visível⇒toast preservada)',
-    /markSeen\(\);\s*\n\s*return \{ ok: true, channel: "toast" \};/.test(MAIN)
-    && /if \(windowActive\(\)\) \{\s*\n\s*mainWin\?\.webContents\.send\("notif-toast", p\);/.test(MAIN));
+  ok('C2 caminho TOAST (FOCADO) marca seen e devolve channel "toast" — F3.5.4K por foco',
+    /markSeen\(\);[\s\S]{0,160}?return \{ ok: true, channel: "toast" \};/.test(MAIN)
+    && /if \(windowActive\(\)\) \{[\s\S]{0,160}?mainWin\?\.webContents\.send\("notif-toast", p\);/.test(MAIN));
   ok('C3 janela premium com PROVA DE RENDER: fallback nativo no no-ACK (showBgNotify(p, ()=>…nativeNotify…))',
     /const bgOk = showBgNotify\(p, \(\) => \{\s*\n\s*const lateOk = nativeNotify\(p, key, deep\);/.test(MAIN)
     && /deliver\.bg\.noAck→native/.test(MAIN));

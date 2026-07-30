@@ -173,8 +173,10 @@ let bg;
     /mainWin\.on\("close", \(e\) => \{[\s\S]*?if \(!quitting\) \{[\s\S]*?e\.preventDefault\(\);[\s\S]*?mainWin\?\.hide\(\);/.test(MAIN_SRC));
   ok('13 Quit explícito encerra de fato (realQuit: quitting=true → app.quit())',
     /function realQuit\(\) \{[\s\S]*?quitting = true;[\s\S]*?app\.quit\(\);/.test(MAIN_SRC));
-  ok('14 clique da notificação restaura + foca + abre (restore/show/focus + notif-open)',
-    /n\.on\("click", \(\) => \{[\s\S]*?if \(w\.isMinimized\(\)\) w\.restore\(\); w\.show\(\); w\.focus\(\);[\s\S]*?send\("notif-open", deep\)/.test(MAIN_SRC));
+  ok('14 clique da notificação → bringToFrontAndOpen (restore/show/focus + deep-link) — F3.5.4K',
+    /n\.on\("click", \(\) => \{[\s\S]*?bringToFrontAndOpen\(deep\)/.test(MAIN_SRC)
+    && /function bringToFrontAndOpen\(deep[\s\S]*?w\.restore\(\)[\s\S]*?w\.show\(\); w\.focus\(\)[\s\S]*?openDeep/.test(MAIN_SRC)
+    && /function openDeep\(deep[\s\S]*?send\("notif-open", d\)/.test(MAIN_SRC));
 }
 
 try { fs.rmSync(tmp, { recursive: true, force: true }); } catch { /* */ }

@@ -44,7 +44,12 @@ function ackCancel(key: string): void {
 function position(h: number): void {
   if (!bgWin || bgWin.isDestroyed()) return;
   try {
-    const wa = screen.getPrimaryDisplay().workArea;
+    // F3.5.4K — MULTIMONITOR: posiciona no MONITOR ATIVO (display mais próximo do cursor); fallback ao
+    // primário. Canto inferior direito do workArea daquele display (respeita taskbar/DPI). Nunca fora da tela.
+    let wa: Electron.Rectangle;
+    try { wa = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea; }
+    catch { wa = screen.getPrimaryDisplay().workArea; }
+    if (!wa) wa = screen.getPrimaryDisplay().workArea;
     const height = Math.max(1, Math.min(Math.round(h) || 160, wa.height - 24));
     const x = wa.x + wa.width - WIDTH - 14;
     const y = wa.y + wa.height - height - 14;
@@ -112,4 +117,10 @@ export function stopBgNotify(): void {
   try { pendingAck.forEach((v) => { try { clearTimeout(v.timer); } catch { /* */ } }); pendingAck.clear(); } catch { /* */ } // F3.4.7 — nenhum fallback tardio após teardown
   try { if (bgWin && !bgWin.isDestroyed()) bgWin.destroy(); } catch { /* */ }
   bgWin = null;
+}
+
+/** F3.5.4K — status SANITIZADO da janela premium p/ o painel de diagnóstico (Configurações → Notificações).
+ *  initialized = initBgNotify já registrado (wireIpc); hasWindow = janela premium instanciada e viva. */
+export function bgStatus(): { initialized: boolean; hasWindow: boolean } {
+  return { initialized: wired, hasWindow: !!(bgWin && !bgWin.isDestroyed()) };
 }

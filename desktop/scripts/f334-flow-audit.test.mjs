@@ -78,7 +78,7 @@ ok('8a Kanban Opção 2 (themes-list rola + CARD-FIT)', /kbv2-themes-list/.test(
 ok('8b login sem sino/avatar/monitor (removidos)', /getElementById\('sla-monitor'\)/.test(html) && /getElementById\('slaib-bell'\)/.test(html));
 ok('8c SLA Monitor + alerta laranja pontual (slaCount ceil + boundary→notifScanSla)', /function slaCount\(ms\)\{ return slaMMSSfmt\(ms,'up'\); \}/.test(html) && /notifScanSla\(\)/.test(html));
 ok('8d toast premium (card largo + foto real + sem reticência)', /\.ntf\{[^}]*width:420px/.test(html) && /function resolveUserIdentity\(/.test(html) && /ntf-resp/.test(html));
-ok('8e canal: app visível usa toast in-app (windowActive sem isFocused)', /w\.isVisible\(\) && !w\.isMinimized\(\)\);/.test(mainTs) && !/isFocused\(\)\s*\)/.test(mainTs.slice(mainTs.indexOf('function windowActive'), mainTs.indexOf('function windowActive') + 400)));
+ok('8e canal F3.5.4K: toast só com FOCO real (windowActive usa isFocused; desfocado⇒premium)', /return !!\(w && !w\.isDestroyed\(\) && w\.isFocused\(\)\);/.test(mainTs));
 ok('8f Editar prazo UI sem gravação real', /data-sla-editprazo/.test(html) && /function slaEditPrazoOpen/.test(html));
 ok('8g WhatsApp premium intacto (preload saveCardImage)', /saveCardImage/.test(preloadTs));
 

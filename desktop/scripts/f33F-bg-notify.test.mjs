@@ -67,7 +67,7 @@ ok('main: nativa do Windows é FALLBACK (bg indisponível OU sem prova de render
   && /const lateOk = nativeNotify\(p, key, deep\);/.test(mainTs)
   && /function nativeNotify\([\s\S]*?new Notification\(/.test(mainTs));
 ok('main: canal bg-window', /channel = bgOk \? "bg-window"/.test(mainTs));
-ok('main: initBgNotify reabre mainWindow + deep link', /initBgNotify\(\([^)]*\) => \{[\s\S]*?w\.show\(\);[\s\S]*?send\("notif-open", deep\)/.test(mainTs));
+ok('main: initBgNotify delega a bringToFrontAndOpen (traz à frente + deep-link) — F3.5.4K', /initBgNotify\(\([^)]*\) => \{[\s\S]*?bringToFrontAndOpen\(deep\)/.test(mainTs));
 ok('main: stopBgNotify no realQuit', /function realQuit\(\)[\s\S]*?stopBgNotify\(\)/.test(mainTs));
 ok('main: Central (notif-history) cobre o canal bg (antes da decisão)', /send\("notif-history", p\)[\s\S]*?if \(windowActive\(\)\)/.test(mainTs));
 ok('main: dedup _notifSeen segue guardando antes do canal', /_notifSeen\.has\(key\)[\s\S]*?_notifSeen\.add\(key\)/.test(mainTs));

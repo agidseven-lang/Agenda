@@ -96,7 +96,7 @@ ok('NOTIF: fluxo/status p/ equipe (Social)', nf.resolveNotificationTargets({ eve
 ok('NOTIF: fluxo p/ supervisão (vê tudo)', nf.resolveNotificationTargets({ eventType: 'flow_completed', task: tk, currentUser: { id: 'Z' }, currentUserCanSeeAll: true }).shouldNotifyCurrentUser === true);
 // contrato visual do toast (estático no renderer)
 ok('NOTIF: toast premium (card largo 420 + foto real + sem reticência)', /\.ntf\{[^}]*width:420px/.test(DH) && /function resolveUserIdentity\(/.test(DH) && !/\.ntf-ds\{[^}]*text-overflow:ellipsis/.test(DH));
-ok('NOTIF: canal app-aberto = toast in-app; nativo só minimizado/bandeja (windowActive sem foco)', /w\.isVisible\(\) && !w\.isMinimized\(\)\);/.test(mainTs) && /webContents\.send\("notif-toast"/.test(mainTs) && /new Notification\(/.test(mainTs));
+ok('NOTIF F3.5.4K: canal FOCADO = toast in-app; desfocado/occluído = janela premium; nativa = fallback/lock (windowActive por foco)', /return !!\(w && !w\.isDestroyed\(\) && w\.isFocused\(\)\);/.test(mainTs) && /webContents\.send\("notif-toast"/.test(mainTs) && /new Notification\(/.test(mainTs));
 
 // ════════ CONTRATO 4 — CAMPOS Worker/Android (NÃO remover sem auditoria cross-platform) ════════
 ['operationalStatus', 'clientWorkflowStage', 'designerWorkflowStage', 'socialFlowStatus'].forEach((f) => {

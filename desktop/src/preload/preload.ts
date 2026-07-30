@@ -44,6 +44,8 @@ contextBridge.exposeInMainWorld("desktopAPI", {
   // F3.3.10-DIAG — renderer escreve eventos no log local do main (sem rede/Firestore). Build instrumentada.
   diagLog: (tag: string, data?: any) => { try { ipcRenderer.send("diag-log", tag, data); } catch { /* */ } },
   diagPath: (): Promise<string> => ipcRenderer.invoke("diag-path"),
+  // F3.5.4K — status SANITIZADO das notificações p/ Configurações → Notificações (read-only; sem token/uid/conteúdo)
+  notifDiag: (): Promise<any> => ipcRenderer.invoke("notif-diag"),
   // abrir URL externa (WhatsApp app/web, browser) via shell.openExternal
   openExternal: (url: string): Promise<boolean> => ipcRenderer.invoke("open-external", url),
   // F3.3.73I6C18C — prepara/valida o Card Premium ANTES do WhatsApp (GET read-only no main,

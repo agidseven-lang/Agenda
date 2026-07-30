@@ -18,7 +18,7 @@ import { diag, diagPath } from "./diag"; // F3.3.10-DIAG (logger local; build in
 import { startReminder } from "./reminder";
 import { startSlaScheduler } from "./slaScheduler"; // F3.4.3 — produtor AUTORITATIVO de SLA no main (amarelo/vermelho/crítico), sobrevive à janela oculta
 import { createUserSlaSeen } from "./slaSeenUser"; // F3.5.4-C3 — seen de SLA POR USUÁRIO (uid|dedupKey; legado honrado) injetado SEM tocar no scheduler
-import { initBgNotify, showBgNotify, stopBgNotify } from "./bgNotify"; // F3.3.10-BG (janela premium própria)
+import { initBgNotify, showBgNotify, stopBgNotify, bgStatus } from "./bgNotify"; // F3.3.10-BG (janela premium própria)
 import { registerAuthIpc, getAuthUser } from "./auth"; // F3.3.56-G2 — auth server-side (token confinado ao main); F3.4.3 — papel autenticado p/ operational_block
 import { registerPrewarmIpc } from "./prewarm"; // F3.3.73I6C18C — prewarm do Card Premium (IPC restrito ao /share)
 import { createClockSync } from "./clockSync"; // F3.3.77A-R4B — relógio canônico via cabeçalho HTTP Date (Cloud Run read-only)
@@ -32,6 +32,13 @@ let stopReminder: (() => void) | null = null;
 let slaScheduler: ReturnType<typeof startSlaScheduler> | null = null; // F3.4.3 — SLA producer autoritativo (main)
 let clockSync: ReturnType<typeof createClockSync> | null = null; // F3.3.77A-R4B — relógio canônico (main)
 let quitting = false;
+// F3.5.4K — ENTREGA EM QUALQUER ESTADO DA JANELA. Estado do SO (lock) + fila de deep-link + handle da
+// Categoria A + telemetria SANITIZADA da última entrega (painel Configurações → Notificações). Módulo-
+// escopo porque a AUTORIDADE da entrega em segundo plano é o MAIN (sobrevive a foco/min/tray/lock).
+let sessionLocked = false;
+let pendingDeep: string | null = null;
+let notifierAHandle: { stop: () => void; reconcile: (reason?: string) => void } | null = null;
+const notifTele = { lastAt: 0, lastChannel: "", lastEventType: "", lastFailAt: 0, lastFailReason: "" };
 // F3.3.70D3R10U — opts do tray centralizados (usados por startup, session-login,
 // heartbeat e IPC tray-recreate; a recriacao usa SEMPRE o mesmo menu/quit).
 const trayWin = () => mainWin;
@@ -77,13 +84,52 @@ const toastAck = createToastAckTracker({ onLog: (t, d) => { try { diag(t, d as a
 function _appIcon(): string | undefined {
   try { return path.join(app.getAppPath(), "build", "icon.png"); } catch { return undefined; }
 }
+// F3.5.4K — CANAL POR FOCO REAL. O toast in-app só é o canal quando o usuário está REALMENTE olhando
+// o Agenda (janela FOCADA). "Aberta atrás de outro programa" (visível, sem foco), minimizada, oculta/
+// bandeja ⇒ NÃO é "ativo": a entrega vai para a JANELA PREMIUM always-on-top (aparece acima do outro
+// programa SEM roubar foco). ANTES: isVisible() classificava a janela ocluída como "ativa" ⇒ o toast
+// era enviado ao renderer atrás da outra aplicação (invisível) e o ACK do renderer cancelava o fallback
+// premium — causa-raiz F3.5.4K (a notificação não aparecia com outro programa em 1º plano).
 function windowActive(): boolean {
-  // REGRA DE CANAL (correção de regressão): janela ABERTA e VISÍVEL ⇒ TOAST premium in-app —
-  // mesmo SEM foco (usuário pode estar olhando o app atrás de outra janela). Só cai p/ a nativa
-  // do SO quando minimizada/bandeja/oculta (isVisible()=false). NÃO exigir isFocused() — exigir
-  // foco fazia "aberto sem foco" virar nativo genérico (a regressão reportada).
   const w = mainWin;
-  return !!(w && !w.isDestroyed() && w.isVisible() && !w.isMinimized());
+  return !!(w && !w.isDestroyed() && w.isFocused());
+}
+// F3.5.4K — mascara ids p/ logs sanitizados (NUNCA uid/taskId integrais).
+function nmask(s: unknown): string { const v = String(s == null ? "" : s); if (!v) return ""; return v.length <= 6 ? (v.slice(0, 2) + "…") : (v.slice(0, 4) + "…" + v.slice(-2)); }
+// F3.5.4K — estado da janela p/ observabilidade + painel (focada/visível/minimizada/tray).
+function winState(): { focused: boolean; visible: boolean; minimized: boolean; tray: boolean } {
+  const w = mainWin; const alive = !!(w && !w.isDestroyed());
+  const visible = alive && w!.isVisible(); const minimized = alive && w!.isMinimized(); const focused = alive && w!.isFocused();
+  return { focused, visible, minimized, tray: alive ? (!visible && !minimized) : false };
+}
+// F3.5.4K — evento de observabilidade SANITIZADO (nunca token/senha/conteúdo/uid|taskId integral).
+function nlog(event: string, extra?: Record<string, unknown>): void {
+  try {
+    const ws = winState();
+    diag(event, Object.assign({
+      appState: ws.tray ? "tray" : (ws.minimized ? "minimized" : (ws.focused ? "focused" : (ws.visible ? "visible-unfocused" : "hidden"))),
+      windowFocused: ws.focused, windowVisible: ws.visible, sessionLocked,
+      nativeSupported: (() => { try { return Notification.isSupported(); } catch { return false; } })(),
+      version: (() => { try { return app.getVersion(); } catch { return "dev"; } })(),
+    }, extra || {}));
+  } catch { /* observabilidade nunca derruba a entrega */ }
+}
+// F3.5.4K — FILA DE DEEP-LINK: se o renderer ainda não terminou de carregar (cold start / recém
+// restaurado), o clique é ENFILEIRADO e drenado no did-finish-load. O clique nunca se perde e nunca
+// abre a tarefa errada. Instância única preservada (requestSingleInstanceLock).
+function openDeep(deep: string): void {
+  const w = mainWin; const d = String(deep || ""); if (!d) return;
+  if (!w || w.isDestroyed()) { pendingDeep = d; return; }
+  if (w.webContents.isLoading()) { pendingDeep = d; nlog("notify.deeplink.queued", { deep: d }); return; }
+  try { w.webContents.send("notif-open", d); nlog("notify.deeplink.opened", { deep: d }); } catch { pendingDeep = d; }
+}
+// F3.5.4K — traz a janela principal à frente (restore/show/focus) e abre a tarefa (deep-link enfileirável).
+// Clique da janela premium, da Notification nativa e do protocolo idseven://. Uma única instância.
+function bringToFrontAndOpen(deep: string): void {
+  const w = mainWin;
+  if (!w || w.isDestroyed()) { if (deep) pendingDeep = String(deep); return; }
+  try { if (w.isMinimized()) w.restore(); w.show(); w.focus(); } catch { /* */ }
+  if (deep) openDeep(String(deep));
 }
 // F3.4.3 — "AGORA" CANÔNICO do produtor de SLA no main. Espelha EXATAMENTE o gate de offset do
 // renderer (_slaApplyClockState): aplica o offset só para synced/degraded/stale; local_fallback/
@@ -109,23 +155,26 @@ function nativeNotify(p: NotifPayload, key: string, deep: string): boolean {
     });
     n.on("click", () => {
       diag("native.click", { dedupKey: key, deep });
-      const w = mainWin;
-      if (w) { if (w.isMinimized()) w.restore(); w.show(); w.focus(); if (deep) w.webContents.send("notif-open", deep); }
+      nlog("notify.click.received", { via: "native", dedupKey: key, taskId: nmask(p.taskId) });
+      bringToFrontAndOpen(deep);
     });
     n.show();
+    nlog("notify.native.sent", { dedupKey: key, taskId: nmask(p.taskId) });
     return true;
-  } catch (e2) { diag("native.fallback.error", { err: String(((e2 as any) && (e2 as any).message) || e2) }); return false; }
+  } catch (e2) { nlog("notify.native.failed", { dedupKey: key, errorCode: String(((e2 as any) && (e2 as any).message) || e2) }); diag("native.fallback.error", { err: String(((e2 as any) && (e2 as any).message) || e2) }); return false; }
 }
 function deliverNotification(p: NotifPayload): { ok: boolean; channel: string } {
   try {
     if (!p || typeof p !== "object") return { ok: false, channel: "none" };
     const key = String(p.dedupKey || `${p.eventType || "evt"}:${p.taskId || ""}:${p.createdAt || ""}`);
-    if (_notifSeen.has(key)) { diag("deliver.dedup", { key }); return { ok: true, channel: "dedup" }; }
+    if (_notifSeen.has(key)) { diag("deliver.dedup", { key }); nlog("notify.dedup.skipped", { dedupKey: key, taskId: nmask(p.taskId) }); return { ok: true, channel: "dedup" }; }
     diag("deliver.begin", { eventType: p.eventType, taskId: p.taskId, targetUserId: p.targetUserId, actorId: p.actorId, responsibleId: p.responsibleId, dedupKey: key, windowActive: windowActive(), visible: !!(mainWin && !mainWin.isDestroyed() && mainWin.isVisible()), minimized: !!(mainWin && !mainWin.isDestroyed() && mainWin.isMinimized()) });
     // F3.3.10 — CAPTURA p/ a Central (histórico local no renderer). CAPTURE-ONLY: encaminha o MESMO
     // payload já deduplicado, sem alterar roteamento/toast/nativa/dedup/som/severidade/destino. Nunca
     // pode impedir a entrega — por isso vem em try/catch isolado e ANTES da decisão toast×nativa.
     try { mainWin?.webContents.send("notif-history", p); } catch { /* captura nunca afeta a notificação real */ }
+    nlog("notify.event.detected", { eventType: p.eventType, taskId: nmask(p.taskId), recipientUid: nmask(p.targetUserId) });
+    nlog("notify.main.received", { eventType: p.eventType, taskId: nmask(p.taskId), recipientUid: nmask(p.targetUserId), dedupKey: key });
     const deep = (p.action && p.action.deep) ? String(p.action.deep) : "";
     // F3.4.7 — o dedup do HUB só é GRAVADO após um canal REAL aceitar a entrega. Antes, a chave era
     // marcada ANTES do resultado: uma falha silenciosa bloqueava aquela transição PARA SEMPRE
@@ -135,12 +184,26 @@ function deliverNotification(p: NotifPayload): { ok: boolean; channel: string } 
       _notifSeen.add(key);
       if (_notifSeen.size > 4000) { const it = _notifSeen.values(); for (let i = 0; i < 1000; i++) { const v = it.next(); if (v.done) break; _notifSeen.delete(v.value); } }
     };
+    // F3.5.4K — SESSÃO BLOQUEADA: uma BrowserWindow NÃO aparece sobre a tela de bloqueio do Windows.
+    // Entrega direto pela Notification NATIVA (entra na Central; clique abre ao desbloquear). Respeita
+    // Não Perturbe / Assistente de Foco / notificações desativadas / política corporativa (o SO decide
+    // exibir). A captura p/ o sino já foi feita acima. Sem overlay sobre o lock-screen.
+    if (sessionLocked) {
+      nlog("notify.delivery.policy", { policy: "locked-native", dedupKey: key, taskId: nmask(p.taskId) });
+      const nLk = nativeNotify(p, key, deep);
+      nlog("notify.locked.native", { dedupKey: key, taskId: nmask(p.taskId), nativeOk: nLk });
+      if (nLk) { markSeen(); notifTele.lastAt = Date.now(); notifTele.lastChannel = "native-locked"; notifTele.lastEventType = String(p.eventType || ""); }
+      else { notifTele.lastFailAt = Date.now(); notifTele.lastFailReason = "locked-native-failed"; }
+      return { ok: nLk, channel: nLk ? "native-locked" : "none" };
+    }
+    // FOCADO (usuário olhando o Agenda) — TOAST premium in-app. F3.5.4K: só com FOCO real (isFocused).
     if (windowActive()) {
+      nlog("notify.delivery.policy", { policy: "toast-focused", dedupKey: key, taskId: nmask(p.taskId) });
       mainWin?.webContents.send("notif-toast", p);
       diag("deliver.toast", { dedupKey: key, taskId: p.taskId });
       // F3.5.3 — WATCHDOG DE ACK (aditivo; roteamento/dedup 1.0.191 preservados): o renderer
       // confirma o RENDER via "notif-toast-ack" (dedupKey). Sem ACK em 4s (listener ausente, erro de
-      // JS, recarga), o fallback entrega pela bg-window/nativa — a janela "aberta" deixa de perder
+      // JS, recarga), o fallback entrega pela bg-window/nativa — a janela "focada" deixa de perder
       // notificação em silêncio. Guarda typeof: harnesses que extraem só este corpo (fixtures f343)
       // rodam SEM o tracker e mantêm a semântica aprovada byte-a-byte.
       if (typeof toastAck !== "undefined" && toastAck) {
@@ -152,23 +215,26 @@ function deliverNotification(p: NotifPayload): { ok: boolean; channel: string } 
         });
       }
       markSeen();
+      notifTele.lastAt = Date.now(); notifTele.lastChannel = "toast"; notifTele.lastEventType = String(p.eventType || "");
       return { ok: true, channel: "toast" };
     }
-    // BACKGROUND (minimizado/oculto/bandeja) — F3.3.10-BG: a entrega visual CONFIÁVEL é a janela
-    // PREMIUM própria do app (controlada pelo main, aparece mesmo com a mainWindow hidden e NÃO
-    // depende da Notification nativa do Windows). A nativa do SO vira FALLBACK se a janela premium
-    // não puder ser exibida — F3.4.7: OU se ela não PROVAR o render (ACK bgnotify-rendered) no
-    // prazo (deixou de ser otimista). Clique → reabre a mainWindow e navega (deep link). A captura
-    // p/ a Central já foi feita acima (notif-history), independente do canal.
+    // DESFOCADO (Agenda aberto ATRÁS de outro programa), minimizado, oculto/bandeja — F3.5.4K + F3.3.10-BG:
+    // a entrega visual CONFIÁVEL é a JANELA PREMIUM always-on-top/showInactive (aparece ACIMA do outro
+    // programa SEM roubar foco; controlada pelo main; independe do renderer visível). A nativa do SO vira
+    // FALLBACK se a premium não puder ser exibida OU não PROVAR o render (ACK bgnotify-rendered) no prazo.
+    // Clique → traz o Agenda e abre a tarefa (deep-link enfileirável). Captura p/ a Central já feita acima.
+    nlog("notify.delivery.policy", { policy: "premium-overlay", dedupKey: key, taskId: nmask(p.taskId) });
     const bgOk = showBgNotify(p, () => {
       const lateOk = nativeNotify(p, key, deep);
       diag("deliver.bg.noAck→native", { dedupKey: key, taskId: p.taskId, nativeOk: lateOk });
     });
+    if (bgOk) nlog("notify.premium.shown", { dedupKey: key, taskId: nmask(p.taskId) }); else nlog("notify.premium.failed", { dedupKey: key, taskId: nmask(p.taskId) });
     let nativeOk = false;
     if (!bgOk) nativeOk = nativeNotify(p, key, deep);
     const channel = bgOk ? "bg-window" : (nativeOk ? "native" : "none");
     diag("deliver.bg", { dedupKey: key, deep, taskId: p.taskId, title: String(p.title || ""), channel, fallbackNative: !bgOk });
-    if (bgOk || nativeOk) markSeen();
+    if (bgOk || nativeOk) { markSeen(); notifTele.lastAt = Date.now(); notifTele.lastChannel = channel; notifTele.lastEventType = String(p.eventType || ""); }
+    else { notifTele.lastFailAt = Date.now(); notifTele.lastFailReason = "premium-and-native-failed"; }
     return { ok: bgOk || nativeOk, channel };
   } catch (e) { diag("deliver.error", { err: String(((e as any) && (e as any).message) || e) }); return { ok: false, channel: "error" }; }
 }
@@ -254,10 +320,7 @@ function deepLinkTarget(list: string[]): string | null {
 }
 function routeDeepLink(target: string | null) {
   if (!target || !mainWin) return;
-  if (mainWin.isMinimized()) mainWin.restore();
-  mainWin.show();
-  mainWin.focus();
-  mainWin.webContents.send("notif-open", target);
+  bringToFrontAndOpen(target); // F3.5.4K — traz à frente + deep-link enfileirável (nunca perde o clique)
 }
 
 const lock = app.requestSingleInstanceLock();
@@ -303,6 +366,8 @@ function createWindow() {
   mainWin.webContents.on("did-finish-load", () => {
     mainWin?.webContents.setZoomFactor(1.0);
     mainWin?.webContents.setVisualZoomLevelLimits(1, 1);
+    // F3.5.4K — drena o deep-link ENFILEIRADO (clique recebido antes de o renderer ficar pronto).
+    if (pendingDeep) { const d = pendingDeep; pendingDeep = null; try { mainWin?.webContents.send("notif-open", d); nlog("notify.deeplink.opened", { deep: d, drained: true }); } catch { /* */ } }
   });
 
   // Fechar = esconde na tray (nao encerra). Quit real so pelo menu da tray.
@@ -354,11 +419,23 @@ app.whenReady().then(() => {
   } catch { /* */ }
   // UPDATER:END
 
+  // F3.5.4K — SESSÃO/ENERGIA p/ a POLÍTICA DE ENTREGA (aditivo; não altera SLA/updater acima).
+  // lock-screen ⇒ o overlay premium NÃO pode aparecer sobre a tela de bloqueio ⇒ a entrega passa a
+  // usar a Notification NATIVA (deliverNotification checa sessionLocked). unlock/resume ⇒ recupera a
+  // Categoria A UMA vez (reconcile); os recibos persistentes impedem repetição (sem duplicar após
+  // desbloquear/retomar). suspend ⇒ só diagnóstico. Vários listeners coexistem (EventEmitter).
+  try {
+    powerMonitor.on("lock-screen", () => { sessionLocked = true; nlog("notify.session.locked", {}); });
+    powerMonitor.on("unlock-screen", () => { sessionLocked = false; nlog("notify.session.unlocked", {}); try { if (notifierAHandle) notifierAHandle.reconcile("unlock"); } catch { /* */ } });
+    powerMonitor.on("suspend", () => { diag("power.suspend"); });
+    powerMonitor.on("resume", () => { try { if (notifierAHandle) notifierAHandle.reconcile("resume"); } catch { /* */ } });
+  } catch { /* powerMonitor pode não existir em todas as plataformas */ }
+
   // F3.3.10-BG — registra a janela premium de background + callback de "Abrir tarefa"
   // (reabre a mainWindow minimizada/oculta e navega via deep link). NÃO rouba foco do SO.
   initBgNotify((deep: string) => {
-    const w = mainWin;
-    if (w && !w.isDestroyed()) { if (w.isMinimized()) w.restore(); w.show(); w.focus(); if (deep) w.webContents.send("notif-open", deep); }
+    nlog("notify.click.received", { via: "premium", deep }); // F3.5.4K — clique na janela premium
+    bringToFrontAndOpen(deep); // traz o Agenda à frente + abre a tarefa (deep-link enfileirável)
   });
 
   // IPC do renderer
@@ -379,6 +456,23 @@ app.whenReady().then(() => {
   ipcMain.handle("notify", (_e, payload: NotifPayload) => deliverNotification(payload));
   // F3.5.3 — renderer confirma o RENDER do toast (dedupKey): cancela o fallback pendente.
   ipcMain.on("notif-toast-ack", (_e, key: string) => { toastAck.ack(String(key || "")); });
+  // F3.5.4K — painel Configurações → Notificações: status técnico SANITIZADO (sem token/senha/uid|taskId
+  // integral/conteúdo). Somente booleans/rótulos/timestamps + versão. Read-only; nunca dispara entrega.
+  ipcMain.handle("notif-diag", () => {
+    const ws = winState();
+    let premiumReady = false; try { premiumReady = !!bgStatus().initialized; } catch { premiumReady = false; }
+    let nativeSupported = false; try { nativeSupported = Notification.isSupported(); } catch { nativeSupported = false; }
+    return {
+      listenerMainActive: !!stopNotifier,
+      nativeSupported,
+      sessionLocked,
+      windowFocused: ws.focused, windowVisible: ws.visible, windowMinimized: ws.minimized, windowTray: ws.tray,
+      premiumReady,
+      lastDeliveryAt: notifTele.lastAt, lastChannel: notifTele.lastChannel, lastEventType: notifTele.lastEventType,
+      lastFailAt: notifTele.lastFailAt, lastFailReason: notifTele.lastFailReason,
+      version: (() => { try { return app.getVersion(); } catch { return "dev"; } })(),
+    };
+  });
   // F3.5.3 — leitura de texto da área de transferência p/ o pipeline explícito de COLAGEM do
   // formulário (Legenda/Tema/Observações). SOMENTE texto simples; nunca HTML executável.
   ipcMain.handle("clipboard-read-text", () => { try { return String(clipboard.readText() || ""); } catch { return ""; } });
@@ -483,12 +577,13 @@ app.whenReady().then(() => {
       // tardio cruzando usuários).
       const _stopEventNew = startNotifier(() => mainWin, uid, deliverNotification, getAuthUser);
       const _notifierA = startNotifierA(uid, deliverNotification);
+      notifierAHandle = _notifierA; // F3.5.4K — handle p/ reconcile no resume/unlock (recuperação única)
       // F3.5.4-C1 — _notifSeen (dedup de EXIBIÇÃO do HUB) é POR SESSÃO DE USUÁRIO: sem o clear,
       // um evento exibido ao usuário anterior voltava como {ok:true, channel:"dedup"} para o novo
       // usuário no MESMO computador — o notifierA gravava recibo e avançava cursor SEM nenhuma
       // superfície exibida (perda silenciosa cruzando usuários). A dedup REAL continua nos
       // recibos persistentes por usuário+dispositivo (notifStore) e no seen-set do SLA.
-      stopNotifier = () => { try { _stopEventNew(); } catch { /* */ } try { _notifierA.stop(); } catch { /* */ } try { toastAck.clear(); } catch { /* */ } try { _notifSeen.clear(); } catch { /* */ } };
+      stopNotifier = () => { try { _stopEventNew(); } catch { /* */ } try { _notifierA.stop(); } catch { /* */ } notifierAHandle = null; try { toastAck.clear(); } catch { /* */ } try { _notifSeen.clear(); } catch { /* */ } };
       // F3.3.77A-R4B — RELÓGIO CANÔNICO: liga a sincronização (main) via cabeçalho HTTP Date do
       // getUserSelf (Cloud Run, read-only, SEM auth ⇒ zero mutação). Empurra o offset ao renderer,
       // que o aplica em canonicalNowMs()/_slaClockOffsetMs e rearma as timelines de SLA.

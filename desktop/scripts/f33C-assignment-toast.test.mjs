@@ -40,7 +40,7 @@ ok('helper notifIsAttrEvent escopa designer_assigned/task_assigned', /function n
 // notifAttrToastOnce é alias. Ambos os canais (notif-toast e captura) passam por ela — nunca duplica.
 ok('guarda notifToastOnce dedup por dedupKey e chama notifShowToast', /function notifToastOnce\(p\)\{[\s\S]*?notifAttrToastSeen\[k\][\s\S]*?notifShowToast\(p\)/.test(html) && /function notifAttrToastOnce\(p\)\{ return notifToastOnce\(p\); \}/.test(html));
 ok('onNotifToast: TODOS os eventos via guarda única (notifToastOnce)', /onNotifToast\(function\(p\)\{ notifToastOnce\(p\);/.test(html));
-ok('onNotifHistory compensa TODOS os eventos só com janela visível', /onNotifHistory\(function\(p\)\{[\s\S]*?if\(typeof document==='undefined'\|\|document\.visibilityState!=='hidden'\) notifToastOnce\(p\)/.test(html));
+ok('onNotifHistory compensa o toast in-app só com FOCO real (F3.5.4K)', /onNotifHistory\(function\(p\)\{[\s\S]*?document\.hasFocus\(\)[\s\S]*?notifToastOnce\(p\)/.test(html));
 ok('toast de atribuição tem layout em linhas próprio (isAttr)', /if\(isAttr\)\{[\s\S]*?ntf-ti">atribuiu uma tarefa<\/div>[\s\S]*?ntf-attr-task[\s\S]*?ntf-attr-cli/.test(html));
 ok('layout de atribuição não afeta demais toasts (else mantém estrutura)', /\} else \{\s*el\.innerHTML='<div class="ntf-card">'\+av/.test(html));
 
@@ -60,6 +60,7 @@ html = html.replace('<script src="https://www.gstatic.com/firebasejs/10.12.2/fir
 const driver = `<pre id="RESULT" style="position:fixed;z-index:99999;color:#0f0;background:#000;white-space:pre-wrap">PENDING</pre>
 <script>
 function vis(v){ try{ Object.defineProperty(document,'visibilityState',{get:function(){return v;},configurable:true}); }catch(_){} }
+function foc(v){ try{ document.hasFocus=function(){return v;}; }catch(_){} } /* F3.5.4K — compensação do toast in-app agora keia em FOCO real */
 function nNtf(){ return document.querySelectorAll('.ntf').length; }
 function clearNtf(){ document.querySelectorAll('.ntf').forEach(function(e){e.remove();}); }
 function go(){
@@ -71,13 +72,13 @@ function go(){
     document.body.classList.add('authed'); var ap=document.getElementById('app'); if(ap) ap.style.display='flex'; applyDesktopClass();
     R.cbsWired = !!(window.__cbs.toast && window.__cbs.hist);
     var mk=function(k){ return {eventType:'designer_assigned',source:'notifier',taskId:'t1',taskTitle:'Cronograma semanal',clientName:'Hospital Visão',actorId:'social1',responsibleId:'designer1',responsibleName:'Miercohévisk Niheb',title:'Arydyjany Carlôto atribuiu uma tarefa',body:'x',context:'Etapa: Aguardando produção',severity:'info',sound:false,action:{type:'board',deep:'board/cronograma'},dedupKey:k}; };
-    vis('visible'); clearNtf(); var b=nNtf(); window.__cbs.hist(mk('designer_assigned:t1:A')); R.A_nativeOnly_visible=nNtf()-b;
-    vis('visible'); clearNtf(); b=nNtf(); var pB=mk('designer_assigned:t1:B'); window.__cbs.hist(pB); window.__cbs.toast(pB); R.B_bothChannels_visible=nNtf()-b;
-    vis('hidden'); clearNtf(); b=nNtf(); window.__cbs.hist(mk('designer_assigned:t1:C')); R.C_nativeOnly_hidden=nNtf()-b;
-    vis('visible'); clearNtf(); b=nNtf(); var pD={eventType:'sla_warning',taskId:'t9',taskTitle:'Arte',clientName:'X',severity:'warning',title:'prazo próximo',responsibleName:'Miercohévisk Niheb',sound:false,action:{type:'detail',deep:'detail/t9'},dedupKey:'sla_warning:t9'}; window.__cbs.hist(pD); window.__cbs.toast(pD); R.D_sla_bothChannels=nNtf()-b;
-    vis('visible'); clearNtf(); b=nNtf(); window.__cbs.hist({eventType:'sla_warning',taskId:'t8',title:'x',severity:'warning',sound:false,dedupKey:'sla_warning:t8'}); R.E_sla_historyOnly=nNtf()-b;
+    vis('visible'); foc(true); clearNtf(); var b=nNtf(); window.__cbs.hist(mk('designer_assigned:t1:A')); R.A_nativeOnly_visible=nNtf()-b;
+    vis('visible'); foc(true); clearNtf(); b=nNtf(); var pB=mk('designer_assigned:t1:B'); window.__cbs.hist(pB); window.__cbs.toast(pB); R.B_bothChannels_visible=nNtf()-b;
+    vis('hidden'); foc(false); clearNtf(); b=nNtf(); window.__cbs.hist(mk('designer_assigned:t1:C')); R.C_nativeOnly_hidden=nNtf()-b;
+    vis('visible'); foc(true); clearNtf(); b=nNtf(); var pD={eventType:'sla_warning',taskId:'t9',taskTitle:'Arte',clientName:'X',severity:'warning',title:'prazo próximo',responsibleName:'Miercohévisk Niheb',sound:false,action:{type:'detail',deep:'detail/t9'},dedupKey:'sla_warning:t9'}; window.__cbs.hist(pD); window.__cbs.toast(pD); R.D_sla_bothChannels=nNtf()-b;
+    vis('visible'); foc(true); clearNtf(); b=nNtf(); window.__cbs.hist({eventType:'sla_warning',taskId:'t8',title:'x',severity:'warning',sound:false,dedupKey:'sla_warning:t8'}); R.E_sla_historyOnly=nNtf()-b;
     // F — estrutura em linhas do toast de atribuição (Problema 2): nome / "atribuiu uma tarefa" / tarefa / cliente / responsável / etapa
-    vis('visible'); clearNtf(); window.__cbs.hist(mk('designer_assigned:t1:F'));
+    vis('visible'); foc(true); clearNtf(); window.__cbs.hist(mk('designer_assigned:t1:F'));
     var nf=document.querySelector('.ntf');
     R.struct = nf ? { who:(nf.querySelector('.ntf-hd b')||{}).textContent||'', line2:(nf.querySelector('.ntf-ti')||{}).textContent||'', task:(nf.querySelector('.ntf-attr-task')||{}).textContent||'', cli:(nf.querySelector('.ntf-attr-cli')||{}).textContent||'', resp:(nf.querySelector('.ntf-resp')||{}).textContent||'', etapa:(nf.querySelector('.ntf-ctx')||{}).textContent||'' } : null;
     // controle: SLA NÃO usa o layout de atribuição

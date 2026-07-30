@@ -4508,7 +4508,7 @@ function render(){
   }
   else if(state.tab==='equipe')c.innerHTML=renderEquipe();
   else if(state.tab==='perfil')c.innerHTML=renderPerfil();
-  else if(state.tab==='config')c.innerHTML=renderConfig();
+  else if(state.tab==='config'){c.innerHTML=renderConfig();if(typeof afterConfig==='function')afterConfig();}
   else if(state.tab==='exec'){c.innerHTML=renderExecPanel();afterExecPanel();}
   else if(state.tab==='relatorios'){c.innerHTML=renderReports();afterReports();}
   else if(state.tab==='notificacoes'){c.innerHTML=renderNotifCentral();afterNotifCentral();}
@@ -4871,7 +4871,7 @@ function afterNotifCentral(){
   var cx=document.querySelector('[data-nc-close]'); if(cx) cx.onclick=function(){ notifDetailId=null; var c=document.getElementById('content'); if(c){ c.innerHTML=renderNotifCentral(); afterNotifCentral(); } };
 }
 /* registro do canal de captura 100% (hub do main → histórico local). Capture-only. */
-try{ if(window.desktopAPI&&typeof window.desktopAPI.onNotifHistory==='function'){ window.desktopAPI.onNotifHistory(function(p){ try{ notifHistoryAppend(p); }catch(_){} try{ if(typeof document==='undefined'||document.visibilityState!=='hidden') notifToastOnce(p); }catch(_){} }); } }catch(_){}   /* F3.4.7 — compensação estendida a TODOS os eventos (era só atribuição); once compartilhado ⇒ nunca duplica */
+try{ if(window.desktopAPI&&typeof window.desktopAPI.onNotifHistory==='function'){ window.desktopAPI.onNotifHistory(function(p){ try{ notifHistoryAppend(p); }catch(_){} try{ if(typeof document==='undefined'||(typeof document.hasFocus==='function'?document.hasFocus():document.visibilityState!=='hidden')) notifToastOnce(p); }catch(_){} }); } }catch(_){}   /* F3.5.4K — compensação do toast in-app SÓ com FOCO real (não apenas "visível"): quando o Agenda está atrás de outro programa/minimizado, o MAIN já entrega pela JANELA PREMIUM always-on-top; sem foco NÃO se levanta um toast in-app invisível que duplicaria o overlay. O sino (notifHistoryAppend) continua SEMPRE. */
 /* ════════════════════════ F3.3.10-NOTIF-CENTRAL END ════════════════════════ */
 
 /* ---- HOJE ---- */
@@ -8288,6 +8288,10 @@ function renderConfig(){
       settRow('gear','Segurança da sessão','Sessão protegida por autenticação server-side','seguranca')+'<div class="divline"></div>'+info('Dados coletados','Apenas dados de uso da equipe (tarefas/agenda)')+'</div>';
   h+='<div style="height:18px"></div><div class="lbl">Preferências de Notificação</div><div class="card">'+
       act('send','Testar notificação','Dispara um toast nativo agora','data-cfgnotiftest="1"')+'<div class="divline"></div>'+info('Lembretes','Aviso 1h antes do compromisso (bandeja)')+'<div class="divline"></div>'+info('Versão do aplicativo',(window.desktopAPI&&window.desktopAPI.version)||'—')+'</div>';
+  /* F3.5.4K — DIAGNÓSTICO DE NOTIFICAÇÕES (Configurações → Notificações): status técnico SANITIZADO
+     (listener do main, nativas suportadas, sessão bloqueada/desbloqueada, estado da janela, janela
+     premium pronta, última entrega/canal, última falha/motivo, versão). Sem token/uid/conteúdo. */
+  h+='<div style="height:18px"></div><div class="lbl">Notificações · Diagnóstico</div><div class="card" id="notifDiagCard">'+notifDiagCardHtml(null)+'</div>';
   // F3.3.70D3R10U — Bandeja do sistema (tray): status real via IPC tray-status +
   // botao "Recriar icone da bandeja" (IPC tray-recreate) + orientacao da seta ^.
   h+='<div style="height:18px"></div><div class="lbl">Bandeja do sistema (tray)</div><div class="card">'+
@@ -8320,6 +8324,33 @@ function renderConfig(){
     '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:16px">ID Seven · Desktop '+BUILD+'</div>';
   return h+'</div>';
 }
+/* F3.5.4K — painel de Diagnóstico de Notificações (Configurações → Notificações). Read-only; consome
+   o IPC sanitizado desktopAPI.notifDiag() (sem token/senha/uid|taskId integral/conteúdo). */
+function notifDiagRow(l,v,tone){ var c = tone==='ok' ? 'var(--accent)' : (tone==='bad' ? 'var(--red)' : 'var(--soft)'); return '<div class="settrow" style="cursor:default"><div class="icb icb-mut">'+svg('info')+'</div><div class="sm"><div class="sl">'+esc(l)+'</div><div class="ss" style="color:'+c+'">'+esc(v)+'</div></div></div>'; }
+function notifDiagTs(ms){ if(!ms) return '—'; try{ return new Date(Number(ms)).toLocaleString('pt-BR'); }catch(_){ return String(ms); } }
+function notifDiagCardHtml(d){
+  if(!d) return '<div class="settrow" style="cursor:default"><div class="icb icb-mut">'+svg('clock')+'</div><div class="sm"><div class="sl" style="color:var(--soft)">Carregando diagnóstico…</div></div></div>';
+  var yn=function(b){return b?'Sim':'Não';};
+  var ws = d.windowTray?'Bandeja (oculto)':(d.windowMinimized?'Minimizado':(d.windowFocused?'Focado':(d.windowVisible?'Visível (atrás de outro programa)':'Oculto')));
+  return notifDiagRow('Listener do main (entrega)', d.listenerMainActive?'Ativo':'Inativo', d.listenerMainActive?'ok':'bad')+'<div class="divline"></div>'+
+    notifDiagRow('Notificações nativas do Windows', d.nativeSupported?'Suportadas':'Não suportadas', d.nativeSupported?'ok':'bad')+'<div class="divline"></div>'+
+    notifDiagRow('Sessão do Windows', d.sessionLocked?'Bloqueada':'Desbloqueada')+'<div class="divline"></div>'+
+    notifDiagRow('Janela principal', ws)+'<div class="divline"></div>'+
+    notifDiagRow('Janela premium pronta', yn(d.premiumReady), d.premiumReady?'ok':'')+'<div class="divline"></div>'+
+    notifDiagRow('Última entrega', notifDiagTs(d.lastDeliveryAt)+(d.lastChannel?(' · '+d.lastChannel):'')+(d.lastEventType?(' · '+d.lastEventType):''))+'<div class="divline"></div>'+
+    notifDiagRow('Última falha', d.lastFailAt?(notifDiagTs(d.lastFailAt)+' · '+(d.lastFailReason||'')):'nenhuma', d.lastFailAt?'bad':'ok')+'<div class="divline"></div>'+
+    notifDiagRow('Versão do aplicativo', d.version||'—')+'<div class="divline"></div>'+
+    '<button class="settrow" data-cfgnotifdiag="1"><div class="icb">'+svg('send')+'</div><div class="sm"><div class="sl">Atualizar diagnóstico</div><div class="ss">Relê o estado técnico agora</div></div><div class="arr">'+svg('arr')+'</div></button>';
+}
+function notifDiagFill(){
+  try{
+    var card=document.getElementById('notifDiagCard'); if(!card) return;
+    if(window.desktopAPI&&typeof window.desktopAPI.notifDiag==='function'){
+      window.desktopAPI.notifDiag().then(function(d){ var c=document.getElementById('notifDiagCard'); if(c) c.innerHTML=notifDiagCardHtml(d||{}); }).catch(function(){ var c=document.getElementById('notifDiagCard'); if(c) c.innerHTML=notifDiagCardHtml({listenerMainActive:false,nativeSupported:false,version:(window.desktopAPI&&window.desktopAPI.version)||'—'}); });
+    } else { card.innerHTML=notifDiagCardHtml({listenerMainActive:false,nativeSupported:false,sessionLocked:false,windowFocused:true,windowVisible:true,premiumReady:false,version:(window.desktopAPI&&window.desktopAPI.version)||'web'}); }
+  }catch(_){}
+}
+function afterConfig(){ try{ notifDiagFill(); }catch(_){} }
 function settRow(ic,l,s,sheet){return '<button class="settrow" data-sheet="'+sheet+'"><div class="icb">'+svg(ic)+'</div><div class="sm"><div class="sl">'+esc(l)+'</div><div class="ss">'+esc(s)+'</div></div><div class="arr">'+svg('arr')+'</div></button>';}
 function openSheet(which){
   const u=state.user;let rows,title;
@@ -9139,6 +9170,7 @@ document.addEventListener('click',async e=>{
   }
   if(el=g('[data-sheet]')){openSheet(el.dataset.sheet);return;}
   if(el=g('[data-cfgnotiftest]')){try{window.desktopAPI&&window.desktopAPI.notifTest&&window.desktopAPI.notifTest();}catch(_){}flashToast('Notificação de teste disparada.');return;}
+  if(el=g('[data-cfgnotifdiag]')){try{notifDiagFill();}catch(_){}flashToast('Diagnóstico de notificações atualizado.');return;}
   // F3.3.70D3R10U — "Recriar ícone da bandeja": IPC tray-recreate + re-render p/ o status novo
   if(el=g('[data-cfgtrayrecreate]')){
     (async function(){

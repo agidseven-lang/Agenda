@@ -105,7 +105,7 @@ ok('compensação: dedup por dedupKey (não duplica)', /if\(notifAttrToastSeen\[
 // F3.4.7 — RE-ÂNCORA AUTORIZADA: a compensação via captura cobre TODOS os eventos (era só atribuição),
 // mantendo o gate de janela visível (minimizado/bandeja = nativa/bg-window). Corrige a amarela/vermelha
 // que o canal notif-toast às vezes não renderizava com a janela aberta.
-ok('compensação (captura) p/ todos os eventos só com janela visível', /onNotifHistory\(function\(p\)\{[\s\S]*?if\(typeof document==='undefined'\|\|document\.visibilityState!=='hidden'\) notifToastOnce\(p\)/.test(html));
+ok('compensação (captura) do toast in-app só com FOCO real (F3.5.4K; desfocado⇒premium)', /onNotifHistory\(function\(p\)\{[\s\S]*?document\.hasFocus\(\)[\s\S]*?notifToastOnce\(p\)/.test(html));
 ok('tab Notificações aditiva', /\{k:'notificacoes',l:'Notifica[çc][õo]es',i:'bell'\}/.test(html));
 ok('render() roteia notificacoes', /else if\(state\.tab==='notificacoes'\)\{c\.innerHTML=renderNotifCentral\(\);afterNotifCentral\(\);\}/.test(html));
 ok('badge de não-lidas no nav (aditivo)', /notifNavBadge\(t\.k\)/.test(html));
@@ -117,7 +117,7 @@ ok('main.ts: toast premium aprovado intacto', /webContents\.send\("notif-toast",
 // F3.4.7 — RE-ÂNCORA AUTORIZADA: showBgNotify agora recebe onNoRender (fallback do no-ACK); a janela
 // premium segue primária (bg-window) e a nativa (nativeNotify) segue como fallback.
 ok('main.ts: nativa preservada como FALLBACK + janela premium primaria (bg-window)', /new Notification\(/.test(mainTs) && /showBgNotify\(p, \(\) => \{/.test(mainTs) && /"bg-window"/.test(mainTs));
-ok('main.ts: windowActive (regra de canal) intacta', /function windowActive\(\)/.test(mainTs) && /isVisible\(\) && !w\.isMinimized\(\)/.test(mainTs));
+ok('main.ts: windowActive (regra de canal F3.5.4K) por FOCO real', /function windowActive\(\)/.test(mainTs) && /w\.isFocused\(\)/.test(mainTs.slice(mainTs.indexOf('function windowActive'), mainTs.indexOf('function windowActive') + 300)));
 ok('main.ts: backgroundThrottling:false (timers em background)', /backgroundThrottling:\s*false/.test(mainTs));
 ok('main.ts: switches anti-backgrounding (SLA confiável minimizado/bandeja)', /disable-background-timer-throttling/.test(mainTs) && /disable-renderer-backgrounding/.test(mainTs) && /disable-backgrounding-occluded-windows/.test(mainTs));
 ok('main.ts: setAppUserModelId (toast nativo Windows confiável)', /setAppUserModelId\("br\.com\.idseven\.agenda\.desktop"\)/.test(mainTs));

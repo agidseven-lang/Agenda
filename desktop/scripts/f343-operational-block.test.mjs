@@ -16,7 +16,7 @@
  * ===================================================================================== */
 import fs from 'fs'; import os from 'os'; import path from 'path'; import Module from 'module';
 import { createRequire } from 'module'; import { fileURLToPath } from 'url'; import { execFileSync } from 'child_process';
-import { extractDeliver } from './fixtures/f343/deliver-harness.mjs';
+import { extractDeliver, fnSrc, stripTypes } from './fixtures/f343/deliver-harness.mjs';
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DESK = path.resolve(__dirname, '..');
@@ -157,10 +157,12 @@ for (const [state, canal, rot] of [['visible', 'toast', '3 app VISÍVEL'], ['min
   const brace = MAIN.indexOf('{', MAIN.indexOf('=>', m));
   let d = 0, end = -1; for (let j = brace; j < MAIN.length; j++) { const c = MAIN[j]; if (c === '{') d++; else if (c === '}') { d--; if (!d) { end = j; break; } } }
   const body = MAIN.slice(brace, end + 1).replace(/: string/g, '');
+  // F3.5.4K — openCb do initBgNotify delega a bringToFrontAndOpen: injeta as funções REAIS + nlog stub.
+  const opd = stripTypes(fnSrc(MAIN, 'openDeep')); const bring = stripTypes(fnSrc(MAIN, 'bringToFrontAndOpen'));
   const runBgClick = (winState, deep) => {
     const winCalls = [], sent = [];
-    const w = { isDestroyed: () => false, isMinimized: () => winState === 'minimized', restore: () => winCalls.push('restore'), show: () => winCalls.push('show'), focus: () => winCalls.push('focus'), webContents: { send: (ch, a) => sent.push([ch, a]) } };
-    new Function('mainWin', 'deep', '(function(mainWin,deep)' + body + ')(mainWin,deep);')(w, deep);
+    const w = { isDestroyed: () => false, isMinimized: () => winState === 'minimized', restore: () => winCalls.push('restore'), show: () => winCalls.push('show'), focus: () => winCalls.push('focus'), webContents: { send: (ch, a) => sent.push([ch, a]), isLoading: () => false } };
+    new Function('mainWin', 'deep', 'let pendingDeep=null; function nlog(){} ' + opd + '\n' + bring + '\n(function(mainWin,deep)' + body + ')(mainWin,deep);')(w, deep);
     return { winCalls, sent };
   };
   const cm = runBgClick('minimized', opP.action.deep);

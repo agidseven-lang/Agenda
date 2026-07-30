@@ -195,11 +195,17 @@ t('V4', 'Categoria B byte-idêntica à 1.0.192 (6 congelados) + DIFF CONTROLADO 
   /* EMENDA F3.5.4H — a foto do ator (Categoria A) e a infra de entrega permanecem intactas. Os
    * únicos 2 arquivos autorizados a mudar nesta fase são slaScheduler.ts (bloco aditivo
    * legacyDedupKeys) e cardsRules.js (gate vermelho puro) — os outros 6 seguem byte-idênticos. */
-  const frozen = ['slaRules.js', 'bgNotify.ts', 'tray.ts', 'updaterService.ts', 'firebase.ts', 'reminder.ts'];
+  // F3.5.4K — bgNotify.ts SAIU dos congelados: recebe DIFF CONTROLADO (multimonitor + export bgStatus).
+  const frozen = ['slaRules.js', 'tray.ts', 'updaterService.ts', 'firebase.ts', 'reminder.ts'];
   for (const f of frozen) {
     const d = execSync(`git diff fdd684261f59f7d288c6d4197d7ecd0050ce0bb5 -- src/main/${f}`, { cwd: ROOT }).toString();
     eq(d, '', `src/main/${f} deve ser byte-idêntico`);
   }
+  // F3.5.4K — bgNotify.ts: diff CONTROLADO = multimonitor (getDisplayNearestPoint) + bgStatus; as
+  // propriedades do overlay (showInactive/alwaysOnTop/focusable:false) permanecem INTACTAS.
+  const bgd = execSync('git diff fdd684261f59f7d288c6d4197d7ecd0050ce0bb5 -- src/main/bgNotify.ts', { cwd: ROOT }).toString();
+  eq(/getDisplayNearestPoint/.test(bgd) && /bgStatus/.test(bgd), true, 'bgNotify.ts: diff F3.5.4K = multimonitor + bgStatus');
+  eq(bgd.split('\n').filter((l) => l.startsWith('-') && !l.startsWith('---')).some((l) => /showInactive|alwaysOnTop|focusable/.test(l)), false, 'bgNotify.ts: overlay (showInactive/alwaysOnTop/focusable) preservado');
   const sch = execSync('git diff fdd684261f59f7d288c6d4197d7ecd0050ce0bb5 -- src/main/slaScheduler.ts', { cwd: ROOT }).toString();
   const rm = sch.split('\n').filter((l) => l.startsWith('-') && !l.startsWith('---'));
   eq(rm.length === 0 && /legacyDedupKeys/.test(sch), true, 'slaScheduler.ts: só o bloco aditivo legacyDedupKeys (0 remoções)');
