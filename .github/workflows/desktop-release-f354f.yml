@@ -162,8 +162,8 @@ jobs:
           META_SHA512=$(grep -E '^sha512:' "pacote/$LY_NAME" | head -1 | sed -E 's/^sha512:[[:space:]]*//' | tr -d '\r')
           CALC_SHA512=$(openssl dgst -sha512 -binary "pacote/$EXE_NAME" | openssl base64 -A)
           [ "$META_SHA512" = "$CALC_SHA512" ] || { echo "::error::sha512 do latest.yml != EXE (updater rejeitaria)"; exit 1; }
-          grep -q "versionName : 1.0.197" pacote/VERSAO-DESKTOP.txt || { echo "::error::VERSAO-DESKTOP sem 1.0.196"; exit 1; }
-          grep -q "1.0.197-card-template-unification" pacote/VERSAO-DESKTOP.txt || { echo "::error::rotulo da candidata ausente"; exit 1; }
+          grep -q "versionName : 1.0.197" pacote/VERSAO-DESKTOP.txt || { echo "::error::VERSAO-DESKTOP sem 1.0.197"; exit 1; }
+          grep -q "1.0.197-sla-designer-timer-task-update" pacote/VERSAO-DESKTOP.txt || { echo "::error::rotulo da candidata ausente"; exit 1; }
           echo "OK: 5 hashes + SHA256SUMS + latest.yml (1.0.197/EXE/sha512==EXE) + VERSAO-DESKTOP"
 
       - name: "Release notes"
