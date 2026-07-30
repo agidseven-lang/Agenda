@@ -103,14 +103,21 @@ jobs:
           [ "$HS" = "$STABLE_SHA" ] || { echo "::error::head do run != STABLE_SHA"; exit 1; }
           [ "$BR" = "$TEST_BRANCH" ] || { echo "::error::branch do run != branch de teste"; exit 1; }
 
-      - name: "Gate 2 — STABLE_SHA e o TIP da branch de teste e descende da 1.0.194"
+      - name: "Gate 2 — STABLE_SHA na linhagem do tip; commits alem dele SO o workflow de release"
         run: |
           set -euo pipefail
           H="$(gh api "repos/$REPO/git/ref/heads/$TEST_BRANCH" --jq '.object.sha')"
-          [ "$H" = "$STABLE_SHA" ] || { echo "::error::tip da branch ($H) != STABLE_SHA"; exit 1; }
-          CMP="$(gh api "repos/$REPO/compare/$BASE_194_SHA...$STABLE_SHA" --jq '.status')"
-          { [ "$CMP" = "ahead" ] || [ "$CMP" = "identical" ]; } || { echo "::error::STABLE_SHA nao descende da 1.0.194 ($CMP)"; exit 1; }
-          echo "OK: tip==STABLE_SHA; descende da base 1.0.194"
+          CMP="$(gh api "repos/$REPO/compare/$STABLE_SHA...$H" --jq '.status')"
+          echo "compare $STABLE_SHA...$H: $CMP"
+          { [ "$CMP" = "identical" ] || [ "$CMP" = "ahead" ]; } || { echo "::error::STABLE_SHA fora da linhagem do tip ($CMP)"; exit 1; }
+          # os commits entre o candidato buildado e o tip devem tocar APENAS este workflow de
+          # release (o PRODUTO publicado e exatamente o dos bytes do run em STABLE_SHA)
+          gh api "repos/$REPO/compare/$STABLE_SHA...$H" --jq '.files[].filename' | tee /tmp/extra.txt || true
+          if grep -vE '^\.github/workflows/desktop-release-f354d\.yml$' /tmp/extra.txt | grep -q .; then
+            echo "::error::commits pos-candidato tocam arquivos alem do workflow de release"; exit 1; fi
+          CMP2="$(gh api "repos/$REPO/compare/$BASE_194_SHA...$STABLE_SHA" --jq '.status')"
+          { [ "$CMP2" = "ahead" ] || [ "$CMP2" = "identical" ]; } || { echo "::error::STABLE_SHA nao descende da 1.0.194 ($CMP2)"; exit 1; }
+          echo "OK: STABLE_SHA ancestral do tip; extras = so o workflow de release; base 1.0.194 na linhagem"
 
       - name: "Gate 3 — release v1.0.195 NAO existe; tag so pode preexistir apontando p/ STABLE_SHA"
         run: |
