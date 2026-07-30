@@ -200,8 +200,11 @@ jobs:
           # slaScheduler.ts: o diff vs 1.0.198 deve conter SOMENTE o bloco aditivo legacyDedupKeys
           # (nenhuma linha de entrega removida/alterada): 0 remocoes reais, insercoes contem legacyDedupKeys.
           SCH="desktop/src/main/slaScheduler.ts"
-          REM=$(git diff "$BASE_198_SHA" HEAD -- "$SCH" | grep -E '^-' | grep -vE '^---' | wc -l | tr -d ' ')
-          [ "$REM" = "0" ] || { echo "::error:: slaScheduler.ts tem $REM remocao(oes) — diff nao e puramente aditivo"; exit 1; }
+          # conta linhas de REMOCAO reais (comecam com '-' seguido de nao-'-', excluindo o header '---').
+          # grep -c retorna 1 quando o count e 0; '|| true' evita que o pipefail derrube o passo (diff
+          # puramente aditivo => 0 remocoes).
+          REM=$(git diff "$BASE_198_SHA" HEAD -- "$SCH" | grep -cE '^-[^-]' || true)
+          [ "${REM:-0}" = "0" ] || { echo "::error:: slaScheduler.ts tem $REM remocao(oes) — diff nao e puramente aditivo"; exit 1; }
           git diff "$BASE_198_SHA" HEAD -- "$SCH" | grep -qF 'legacyDedupKeys' || { echo "::error:: diff do slaScheduler.ts nao contem o bloco legacyDedupKeys"; exit 1; }
           git diff "$BASE_198_SHA" HEAD -- "$SCH" | grep -qF 'sla.dedup.legacy' || { echo "::error:: log sla.dedup.legacy ausente do bloco aditivo"; exit 1; }
           echo "DIFF CONTROLADO F3.5.4H: cardsRules.js (gate puro + literais + chaves uid/legacy) + slaScheduler.ts (SO aditivo legacyDedupKeys) OK."
