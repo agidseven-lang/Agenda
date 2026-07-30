@@ -19,6 +19,9 @@ const HERE = path.dirname(fileURLToPath(import.meta.url)); const DESK = path.res
 const OUT = path.join(ROOT, 'docs', 'f354i-qa'); fs.mkdirSync(OUT, { recursive: true });
 const HTML = fs.readFileSync(path.join(DESK, 'src', 'renderer', 'index.html'), 'utf8');
 let chromium; try { chromium = require2('playwright').chromium; } catch (_) { console.error('Playwright ausente — rode com NODE_PATH=/opt/node22/lib/node_modules'); process.exit(2); }
+// resolve o Chromium instalado (CI: /opt/pw-browsers/chromium-*/chrome-linux/chrome; mesmo idiom do f354g/h)
+process.env.PLAYWRIGHT_BROWSERS_PATH = process.env.PLAYWRIGHT_BROWSERS_PATH || '/opt/pw-browsers';
+const EXE = (() => { try { const b = '/opt/pw-browsers'; for (const d of fs.readdirSync(b)) { const p = path.join(b, d, 'chrome-linux', 'chrome'); if (d.startsWith('chromium') && fs.existsSync(p)) return p; } } catch (_) {} return undefined; })();
 
 function grabFn(sig) { const a = HTML.indexOf(sig); if (a < 0) return ''; let d = 0, st = false; for (let j = HTML.indexOf('{', a); j < HTML.length; j++) { const c = HTML[j]; if (c === '{') { d++; st = true; } else if (c === '}') { d--; if (st && d === 0) return HTML.slice(a, j + 1); } } return ''; }
 function cssOf() { let out = '', i = 0; for (;;) { const a = HTML.indexOf('<style', i); if (a < 0) break; const s = HTML.indexOf('>', a) + 1; const b = HTML.indexOf('</style>', s); out += HTML.slice(s, b) + '\n'; i = b + 8; } return out; }
@@ -50,7 +53,7 @@ const alertBanner = (txt, tone) => '<div style="margin:14px 0 4px;padding:12px 1
   (tone === 'err' ? 'background:rgba(244,63,94,.12);border:1px solid rgba(244,63,94,.4);color:#fda4af' : tone === 'ok' ? 'background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.4);color:#6ee7b7' : 'background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4);color:#fcd34d') + '">' + txt + '</div>';
 
 (async () => {
-  const browser = await chromium.launch();
+  const browser = await chromium.launch(EXE ? { executablePath: EXE } : {});
   const shot = async (name, inner, w, h) => { const ctx = await browser.newContext({ viewport: { width: w || 720, height: h || 900 }, deviceScaleFactor: 1.25 }); const pg = await ctx.newPage(); await pg.setContent(page(inner), { waitUntil: 'load' }); await pg.waitForTimeout(120); await pg.screenshot({ path: path.join(OUT, name + '.png') }); await ctx.close(); console.log('  ✓', name + '.png'); };
   const metrics = {};
   await shot('01-wizard-preenchido', reviewCard(btnEnviar), 720, 980);
