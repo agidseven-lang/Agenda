@@ -622,8 +622,9 @@ jobs:
           # 2-3 — FORMULAS: amarela=due-30min, vermelha=due-10min (literais herdados INTACTOS)
           grep -qF 'var CARDS_WARN_MS = 30 * 60000' "$CR" || { echo "::error:: (2) formula amarela (30min) alterada"; exit 1; }
           grep -qF 'var CARDS_RED_MS  = 10 * 60000' "$CR" || { echo "::error:: (3) formula vermelha (10min) alterada"; exit 1; }
-          # 4 — SEM Math.abs (comparacoes em ms crus; nenhuma simetria acidental)
-          if grep -q 'Math.abs' "$CR"; then echo "::error:: (4) Math.abs presente em cardsRules"; exit 1; fi
+          # 4 — SEM Math.abs (comparacoes em ms crus; nenhuma simetria acidental). Casa a CHAMADA
+          # `Math.abs(` — nao o texto "Math.abs;" que aparece no COMENTARIO explicativo da funcao.
+          if grep -qE 'Math\.abs\(' "$CR"; then echo "::error:: (4) chamada Math.abs( presente em cardsRules"; exit 1; fi
           # 5 — cardFinishMs prioriza o dueAt CANONICO persistido (parse local so como fallback compat)
           grep -qF 'var ca = Number(t && t.dueAt) || 0; if(ca > 0) return ca;' "$CR" || { echo "::error:: (5) cardFinishMs nao prioriza dueAt canonico"; exit 1; }
           # 6 — relogio canonico UNICO no renderer (offset aplicado 1x; espelho do main)
@@ -651,7 +652,9 @@ jobs:
           # 16 — renderer NAO e produtor (notifScan vazio; produtor unico no main)
           grep -qF 'function notifScan(){}' "$EXH" || { echo "::error:: (16) renderer voltou a ser produtor (notifScan nao-vazio)"; exit 1; }
           # 17-18 — Monitor SLA e Sino NAO disparam a nativa (sem api.notify/notifEmit nas fontes visuais)
-          node -e 's=require("fs").readFileSync(process.env.EXH,"utf8");if(/f354gMon\w*[\s\S]{0,400}?api\.notify/.test(s)){console.error("(17) Monitor dispara nativa");process.exit(1);}if(/slaib\w*[\s\S]{0,300}?api\.notify/.test(s)){console.error("(18) Sino dispara nativa");process.exit(1);}' EXH="$EXH"
+          # (o EXH= vem ANTES do `node` — prefixo de env; depois do comando seria arg posicional e
+          #  process.env.EXH ficaria indefinido, quebrando o readFileSync.)
+          EXH="$EXH" node -e 's=require("fs").readFileSync(process.env.EXH,"utf8");if(/f354gMon\w*[\s\S]{0,400}?api\.notify/.test(s)){console.error("(17) Monitor dispara nativa");process.exit(1);}if(/slaib\w*[\s\S]{0,300}?api\.notify/.test(s)){console.error("(18) Sino dispara nativa");process.exit(1);}'
           # 19 — tray PRESERVADO (close->tray; produtor autoritativo segue vivo no main)
           grep -qF 'ensureTray' "$DM/main.js" || { echo "::error:: (19) ensureTray ausente"; exit 1; }
           grep -qF 'startSlaScheduler' "$DM/main.js" || { echo "::error:: (19) produtor autoritativo (scheduler) nao ligado no main"; exit 1; }
