@@ -21,7 +21,7 @@ function harness(opts = {}) {
   const advance = (ms) => { clock += ms; for (;;) { const due = timers.filter((t) => t.at <= clock).sort((a, b) => a.at - b.at); if (!due.length) break; const t = due[0]; clearTimer(t.id); try { t.fn(); } catch (e) { /* */ } } };
   const st = { online: true, auth: true, selfheal: opts.selfheal !== false, active: 0, restarts: 0, reconciles: 0, alerts: 0, maxActiveSeen: 0 };
   const wd = createListenerWatchdog({
-    restartAll: () => { st.active = 0; /* main PARA a geração antiga */ st.active = 1; /* inicia UMA nova */ st.restarts++; st.maxActiveSeen = Math.max(st.maxActiveSeen, st.active); },
+    restartAll: () => { if (opts.throwOnRestart) throw new Error("restart-boom"); st.active = 0; /* main PARA a geração antiga */ st.active = 1; /* inicia UMA nova */ st.restarts++; st.maxActiveSeen = Math.max(st.maxActiveSeen, st.active); },
     reconcileAll: () => { st.reconciles++; },
     isAuthValid: () => st.auth, isOnline: () => st.online, selfHealingEnabled: () => st.selfheal,
     onAdminAlert: () => { st.alerts++; },
@@ -58,20 +58,54 @@ const G = (n) => ({ col: "tasks", generation: n });
   ok("2 tempo passa → ainda 0 restart (firebase é o reconectador)", h.st.restarts === 0);
 }
 
-// 3 — DEGRADED sustentado → UM ÚNICO restart de último recurso; sem loop; single-active
+// 3 — DEGRADED sustentado → UM ÚNICO restart de último recurso; sem loop; single-active; SEM alerta ainda
 {
   const h = harness(); h.wd.start(); h.wd.onHealth({ ...G(1), event: "snapshot", changes: 5 });
   h.wd.onHealth({ ...G(1), event: "rearm", attempt: 4 });
   ok("3 attempt≥limiar → DEGRADED", h.snap().state === "DEGRADED");
-  ok("3 DEGRADED → alerta admin (1x)", h.st.alerts === 1);
+  ok("3 DEGRADED → NÃO alerta admin ainda (firebase segue reconectando)", h.st.alerts === 0);
   ok("3 DEGRADED → exatamente 1 timer de último recurso", h.snap().lastResortArmed === true && h.timersLen() === 1);
   h.wd.onHealth({ ...G(1), event: "rearm", attempt: 5 }); // continua falhando
   ok("3 segundo rearm NÃO arma 2º timer", h.timersLen() === 1);
-  ok("3 alerta admin não repete", h.st.alerts === 1);
+  ok("3 sem alerta com timer armado", h.st.alerts === 0);
   h.advance(120001); // vence o último recurso
   ok("3 último recurso → 1 restart", h.st.restarts === 1);
   ok("3 nunca >1 listener ativo (para antiga antes da nova)", h.st.maxActiveSeen === 1 && h.st.active === 1);
   ok("3 sem restart simultâneo (não reentrante)", h.snap().restarting === false);
+  ok("3 um único restart ainda NÃO alerta (autocorreção pode ter resolvido)", h.st.alerts === 0);
+}
+
+// 3b — autocorreção ESGOTADA (maxLastResort restarts sem cura) → alerta admin 1x + FAILED (item 18)
+{
+  const h = harness(); h.wd.start(); h.wd.onHealth({ ...G(1), event: "snapshot", changes: 5 });
+  for (let i = 0; i < 3; i++) { // maxLastResortPerWindow = 3
+    h.wd.onHealth({ ...G(1), event: "rearm", attempt: 4 + i }); // DEGRADED → arma timer (i+1)
+    ok("3b arma 1 timer (ciclo " + i + ")", h.snap().lastResortArmed === true && h.timersLen() === 1);
+    ok("3b sem alerta durante as tentativas (ciclo " + i + ")", h.st.alerts === 0);
+    h.advance(120001); // dispara restart (i+1)
+    ok("3b restart " + (i + 1), h.st.restarts === (i + 1) && h.snap().restarting === false);
+  }
+  ok("3b 3 restarts, ainda 0 alerta", h.st.restarts === 3 && h.st.alerts === 0);
+  h.wd.onHealth({ ...G(1), event: "rearm", attempt: 7 }); // esgotado ⇒ autocorreção FALHOU
+  ok("3b esgotado → FAILED", h.snap().state === "FAILED");
+  ok("3b esgotado → alerta admin (1x)", h.st.alerts === 1);
+  ok("3b esgotado → NÃO arma novo timer", h.snap().lastResortArmed === false && h.timersLen() === 0);
+  h.wd.onHealth({ ...G(1), event: "rearm", attempt: 8 });
+  ok("3b alerta NÃO repete no mesmo episódio", h.st.alerts === 1);
+  ok("3b nunca >1 listener ativo em todo o episódio", h.st.maxActiveSeen === 1);
+  h.wd.onHealth({ ...G(2), event: "snapshot", changes: 2 }); // firebase se curou (nova geração)
+  ok("3b cura → HEALTHY (reset do episódio)", h.snap().state === "HEALTHY");
+}
+
+// 3c — restartAll LANÇA no último recurso → autocorreção FALHOU ⇒ alerta admin
+{
+  const h = harness({ throwOnRestart: true }); h.wd.start(); h.wd.onHealth({ ...G(1), event: "snapshot", changes: 5 });
+  h.wd.onHealth({ ...G(1), event: "rearm", attempt: 4 });
+  ok("3c DEGRADED sem alerta", h.snap().state === "DEGRADED" && h.st.alerts === 0);
+  h.advance(120001); // dispara o restart que lança
+  ok("3c restart que lança → alerta admin (1x)", h.st.alerts === 1);
+  ok("3c sem restart simultâneo após exceção", h.snap().restarting === false);
+  ok("3c watchdog contabilizou a tentativa", h.snap().restarts === 1);
 }
 
 // 4 — snapshot saudável desarma o último recurso e zera contadores

@@ -101,10 +101,18 @@ console.log('\n══ DIFERENCIAL 1.0.198 × 1.0.199 (a falha NÃO veio da 1.0.1
 
 console.log('\n══ REGRESSÕES CONGELADAS (34-40) — diff 1.0.199→HEAD confinado ══');
 { /* F3.5.4K toca APENAS main.ts (roteamento por foco/lock/deep-link/observabilidade) e bgNotify.ts
-     (multimonitor+bgStatus); o núcleo durável de SLA/notif/scheduler/regras permanece byte-idêntico. */
-  const frozenMain = ['slaScheduler.ts','slaRules.js','cardsRules.js','notifEvents.js','notifier.ts','notifierA.ts','notifStore.ts','toastAck.ts','reminder.ts','firebase.ts','tray.ts','updaterService.ts','actorProfile.js','clockSync.ts'];
+     (multimonitor+bgStatus); o núcleo durável de SLA/notif/scheduler/regras permanece byte-idêntico.
+     F3.5.4N — firebase.ts SAIU dos byte-congelados: recebe DIFF CONTROLADO (observador de saúde aditivo). */
+  const frozenMain = ['slaScheduler.ts','slaRules.js','cardsRules.js','notifEvents.js','notifier.ts','notifierA.ts','notifStore.ts','toastAck.ts','reminder.ts','tray.ts','updaterService.ts','actorProfile.js','clockSync.ts'];
   let dfrozen = ''; for (const f of frozenMain) dfrozen += gitDiffWt(V199, 'desktop/src/main/' + f);
-  ok(dfrozen === '', '(34-38 base) SLA/notif/scheduler/regras/núcleo durável intactos (F3.5.4K só toca main.ts+bgNotify.ts)'); }
+  ok(dfrozen === '', '(34-38 base) SLA/notif/scheduler/regras/núcleo durável intactos (F3.5.4K só toca main.ts+bgNotify.ts)');
+  // F3.5.4N — firebase.ts: diff CONTROLADO = observador de saúde ADITIVO; entrega (cb) + re-attach intactos.
+  const fbd = gitDiffWt(V199, 'desktop/src/main/firebase.ts') || '';
+  const fbRm = fbd.split('\n').filter((l) => l.startsWith('-') && !l.startsWith('---'));
+  const fbAdditive = /setListenHealthObserver/.test(fbd) && /_emitHealth/.test(fbd) && /const generation = \+\+_genCounter/.test(fbd);
+  const fbOnlyDiag = fbRm.every((l) => l.trim() === '-' || /diag\("firestore\.(snapshot|error)"/.test(l));
+  const fbNoLogicRm = !fbRm.some((l) => /onSnapshot|attempt\+\+|delayMs|rearmTimer|Math\.pow|unsub/.test(l));
+  ok(fbAdditive && fbOnlyDiag && fbNoLogicRm, '(34-38 base) firebase.ts — DIFF CONTROLADO F3.5.4N: observador de saúde aditivo (entrega/re-attach intactos)'); }
 { const dNotif = gitDiffWt(V199, 'desktop/src/main/notifEvents.js') + gitDiffWt(V199, 'desktop/src/main/slaScheduler.ts'); ok(dNotif === '', '(37) notificações — notifEvents/slaScheduler byte-idênticos'); }
 { const dSla = gitDiffWt(V199, 'desktop/src/main/slaRules.js') + gitDiffWt(V199, 'desktop/src/main/cardsRules.js'); ok(dSla === '', '(38-39) SLA/sino — slaRules/cardsRules byte-idênticos'); }
 { const scb199 = grabFn('async function saveCardsBatch(', gitShow(V199)), scbNow = grabFn('async function saveCardsBatch(', HTML); ok(!!scb199 && scb199 === scbNow, '(35) Edição de Cards — saveCardsBatch byte-idêntico à 1.0.199'); }

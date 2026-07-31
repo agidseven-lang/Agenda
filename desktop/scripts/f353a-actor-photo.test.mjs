@@ -196,11 +196,21 @@ t('V4', 'Categoria B byte-idêntica à 1.0.192 (6 congelados) + DIFF CONTROLADO 
    * únicos 2 arquivos autorizados a mudar nesta fase são slaScheduler.ts (bloco aditivo
    * legacyDedupKeys) e cardsRules.js (gate vermelho puro) — os outros 6 seguem byte-idênticos. */
   // F3.5.4K — bgNotify.ts SAIU dos congelados: recebe DIFF CONTROLADO (multimonitor + export bgStatus).
-  const frozen = ['slaRules.js', 'tray.ts', 'updaterService.ts', 'firebase.ts', 'reminder.ts'];
+  // F3.5.4N — firebase.ts SAIU dos congelados: recebe DIFF CONTROLADO (observador de saúde ADITIVO).
+  const frozen = ['slaRules.js', 'tray.ts', 'updaterService.ts', 'reminder.ts'];
   for (const f of frozen) {
     const d = execSync(`git diff fdd684261f59f7d288c6d4197d7ecd0050ce0bb5 -- src/main/${f}`, { cwd: ROOT }).toString();
     eq(d, '', `src/main/${f} deve ser byte-idêntico`);
   }
+  // F3.5.4N — firebase.ts: diff CONTROLADO = observador de saúde ADITIVO (setListenHealthObserver +
+  // _emitHealth + generation) p/ o watchdog. A ENTREGA (cb) e o RE-ATTACH (backoff 5s→60s) permanecem
+  // INTACTOS: as ÚNICAS remoções são as 2 linhas de diag() de snapshot/error, reescritas p/ extrair
+  // changes/emsg em variável antes de emitir — nenhuma remoção na lógica de entrega/reconexão.
+  const fbd = execSync('git diff fdd684261f59f7d288c6d4197d7ecd0050ce0bb5 -- src/main/firebase.ts', { cwd: ROOT }).toString();
+  eq(/setListenHealthObserver/.test(fbd) && /_emitHealth/.test(fbd) && /const generation = \+\+_genCounter/.test(fbd), true, 'firebase.ts: diff F3.5.4N = observador de saúde aditivo');
+  const fbRm = fbd.split('\n').filter((l) => l.startsWith('-') && !l.startsWith('---'));
+  eq(fbRm.every((l) => l.trim() === '-' || /diag\("firestore\.(snapshot|error)"/.test(l)), true, 'firebase.ts: só as 2 linhas de diag (snapshot/error) foram reescritas');
+  eq(fbRm.some((l) => /onSnapshot|attempt\+\+|delayMs|rearmTimer|cb\(s as any\)|Math\.pow|unsub/.test(l)), false, 'firebase.ts: 0 remoções na lógica de entrega/re-attach (reconexão preservada)');
   // F3.5.4K — bgNotify.ts: diff CONTROLADO = multimonitor (getDisplayNearestPoint) + bgStatus; as
   // propriedades do overlay (showInactive/alwaysOnTop/focusable:false) permanecem INTACTAS.
   const bgd = execSync('git diff fdd684261f59f7d288c6d4197d7ecd0050ce0bb5 -- src/main/bgNotify.ts', { cwd: ROOT }).toString();

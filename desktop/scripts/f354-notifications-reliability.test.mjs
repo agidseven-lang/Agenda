@@ -196,8 +196,18 @@ ok(/seen: createUserSlaSeen\(uid\)/.test(MAIN), 'C3d main.ts injeta o seen POR U
   /* EMENDA F3.5.4H — os 6 arquivos abaixo (slaRules + toda a infra de entrega Categoria B) PERMANECEM
    * byte-idênticos à 1.0.192: a correção do disparo vermelho não os toca. slaScheduler.ts e cardsRules.js
    * receberam a ÚNICA alteração autorizada da fase — verificada logo abaixo por DIFF CONTROLADO. */
-  const frozen = execSync('git diff fdd684261f59f7d288c6d4197d7ecd0050ce0bb5 -- src/main/slaRules.js src/main/tray.ts src/main/updaterService.ts src/main/firebase.ts src/main/reminder.ts', { cwd: DESK }).toString();
-  ok(frozen.trim() === '', 'C3e infra de entrega (Categoria B: slaRules/tray/updater/firebase/reminder) byte-idêntica à 1.0.192');
+  // F3.5.4N — firebase.ts SAIU dos byte-congelados: recebe DIFF CONTROLADO (observador de saúde aditivo).
+  const frozen = execSync('git diff fdd684261f59f7d288c6d4197d7ecd0050ce0bb5 -- src/main/slaRules.js src/main/tray.ts src/main/updaterService.ts src/main/reminder.ts', { cwd: DESK }).toString();
+  ok(frozen.trim() === '', 'C3e infra de entrega (Categoria B: slaRules/tray/updater/reminder) byte-idêntica à 1.0.192');
+  // F3.5.4N — firebase.ts: diff CONTROLADO = observador de saúde ADITIVO (setListenHealthObserver +
+  // _emitHealth + generation). A ENTREGA (cb) e o RE-ATTACH (backoff 5s→60s) ficam INTACTOS: as únicas
+  // remoções são as 2 linhas de diag() (snapshot/error) reescritas p/ extrair changes/emsg antes de emitir.
+  const fbd = execSync('git diff fdd684261f59f7d288c6d4197d7ecd0050ce0bb5 -- src/main/firebase.ts', { cwd: DESK }).toString();
+  const fbRm = fbd.split('\n').filter((l) => l.startsWith('-') && !l.startsWith('---'));
+  const fbAdditive = /setListenHealthObserver/.test(fbd) && /_emitHealth/.test(fbd) && /const generation = \+\+_genCounter/.test(fbd);
+  const fbOnlyDiag = fbRm.every((l) => l.trim() === '-' || /diag\("firestore\.(snapshot|error)"/.test(l));
+  const fbNoLogicRm = !fbRm.some((l) => /onSnapshot|attempt\+\+|delayMs|rearmTimer|Math\.pow|unsub/.test(l));
+  ok(fbAdditive && fbOnlyDiag && fbNoLogicRm, 'C3e firebase.ts — DIFF CONTROLADO F3.5.4N: observador de saúde aditivo (entrega/re-attach intactos)');
   /* F3.5.4K — bgNotify.ts recebe DIFF CONTROLADO (multimonitor + bgStatus); overlay preservado. */
   const bgd = execSync('git diff fdd684261f59f7d288c6d4197d7ecd0050ce0bb5 -- src/main/bgNotify.ts', { cwd: DESK }).toString();
   ok(/getDisplayNearestPoint/.test(bgd) && !bgd.split('\n').filter((l) => l.startsWith('-') && !l.startsWith('---')).some((l) => /showInactive|alwaysOnTop|focusable/.test(l)), 'C3e-bg bgNotify.ts: diff F3.5.4K (multimonitor) com overlay preservado');

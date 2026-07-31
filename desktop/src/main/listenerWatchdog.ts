@@ -57,8 +57,8 @@ export function createListenerWatchdog(deps: WatchdogDeps) {
   let lastResortTimer: any = null;   // ÚNICO timer do watchdog (≤1)
   let restarting = false;            // impede restart reentrante/simultâneo
   let lastResortCount = 0;
-  let degradedAlerted = false;
-  const tele = { lastSnapshotAt: 0, lastErrorAt: 0, lastReconcileAt: 0, lastRestartAt: 0, restarts: 0, reconciliations: 0, maxAttempt: 0, currentGeneration: 0 };
+  let alertedThisEpisode = false;    // alerta admin no máx. 1x por episódio de degradação (item 18)
+  const tele = { lastSnapshotAt: 0, lastErrorAt: 0, lastReconcileAt: 0, lastRestartAt: 0, lastAlertAt: 0, restarts: 0, reconciliations: 0, alerts: 0, maxAttempt: 0, currentGeneration: 0 };
 
   function setState(s: WatchdogState, reason?: string): void { if (state !== s) { state = s; log("listener.health." + s.toLowerCase(), { reason: reason || "", generation: tele.currentGeneration }); } }
   function clearLastResort(): void { if (lastResortTimer) { try { clearTimer(lastResortTimer); } catch { /* */ } lastResortTimer = null; } }
@@ -71,13 +71,27 @@ export function createListenerWatchdog(deps: WatchdogDeps) {
     log("listener.reconcile.success", { reason, generation: tele.currentGeneration });
   }
 
+  /** Alerta o admin (item 18): SÓ quando a autocorreção FALHA (últimos recursos esgotados ou restart lança). */
+  function fireAdminAlert(reasonCode: string, attempts: number): void {
+    if (alertedThisEpisode) return;                            // no máx. 1x por episódio (some no snapshot saudável)
+    alertedThisEpisode = true;
+    tele.lastAlertAt = now(); tele.alerts++;
+    try { deps.onAdminAlert && deps.onAdminAlert({ generation: tele.currentGeneration, reasonCode, attempts }); } catch { /* */ }
+    log("listener.admin.alerted", { reasonCode, attempts, generation: tele.currentGeneration });
+  }
+
   function enterDegraded(reasonCode: string, attempts: number): void {
     setState("DEGRADED", reasonCode);
-    if (!degradedAlerted) { degradedAlerted = true; try { deps.onAdminAlert && deps.onAdminAlert({ generation: tele.currentGeneration, reasonCode, attempts }); } catch { /* */ } log("listener.admin.alerted", { reasonCode, attempts, generation: tele.currentGeneration }); }
-    // ÚLTIMO RECURSO: arma NO MÁXIMO um timer; nunca concorre com o re-attach do firebase.
+    // Enquanto degradado, o firebase.ts SEGUE reanexando (5s→60s). NÃO alertamos aqui: o alerta é só
+    // quando a autocorreção como um todo FALHA (item 18). flag OFF ⇒ nunca reinicia; firebase reconecta.
     if (!deps.selfHealingEnabled()) { log("listener.selfheal.disabled", {}); return; }
     if (lastResortTimer || restarting) return;                // já há (no máx.) um armado/executando
-    if (lastResortCount >= maxLastResort) { log("listener.lastresort.capped", { lastResortCount }); return; }
+    if (lastResortCount >= maxLastResort) {                    // últimos recursos ESGOTADOS e ainda degradado
+      fireAdminAlert("selfheal_exhausted", attempts);         // autocorreção FALHOU ⇒ alerta admin (1x/episódio)
+      setState("FAILED", "selfheal_exhausted");               // firebase.ts continua tentando reanexar por conta própria
+      log("listener.lastresort.capped", { lastResortCount });
+      return;
+    }
     // Se o firebase se curar nesse meio-tempo, o handler de snapshot chama clearLastResort() e este
     // callback NUNCA roda (timer removido). Portanto, se ele RODA, nenhum snapshot chegou na janela
     // ⇒ falha sustentada real. Ainda assim re-checa parada/flag/auth/rede antes do único restart.
@@ -88,7 +102,7 @@ export function createListenerWatchdog(deps: WatchdogDeps) {
       if (!deps.isOnline()) { setState("OFFLINE", "offline"); return; }
       doLastResortRestart(reasonCode);
     }, lastResortMs);
-    log("listener.lastresort.armed", { delayMs: lastResortMs, reasonCode });
+    log("listener.lastresort.armed", { delayMs: lastResortMs, reasonCode, attempt: lastResortCount + 1 });
   }
 
   /** UM restart completo (último recurso). restartAll (main) PARA a geração antiga ANTES da nova. */
@@ -99,7 +113,8 @@ export function createListenerWatchdog(deps: WatchdogDeps) {
     tele.lastRestartAt = now(); tele.restarts++;
     setState("RECONNECTING", "last-resort");
     log("listener.restart.started", { reasonCode, attempt: lastResortCount, generation: tele.currentGeneration });
-    try { deps.restartAll("watchdog-last-resort"); } catch (e) { log("listener.restart.failed", { err: String((e as any) && (e as any).message || e) }); }
+    try { deps.restartAll("watchdog-last-resort"); }
+    catch (e) { log("listener.restart.failed", { err: String((e as any) && (e as any).message || e) }); fireAdminAlert("restart_threw", lastResortCount); } // autocorreção FALHOU
     restarting = false; // restartAll é síncrono no main (para antiga → inicia nova); a saúde volta via snapshot
   }
 
@@ -113,7 +128,7 @@ export function createListenerWatchdog(deps: WatchdogDeps) {
       if (sig.event === "snapshot") {
         tele.lastSnapshotAt = now();
         clearLastResort();                 // firebase saudável ⇒ desarma último recurso
-        degradedAlerted = false; lastResortCount = 0; restarting = false;
+        alertedThisEpisode = false; lastResortCount = 0; restarting = false;
         if ((sig.changes || 0) > 0 || !sawHealthy) { sawHealthy = true; setState("HEALTHY", "snapshot"); }
         else setState("IDLE_HEALTHY", "idle");   // sem eventos novos NUNCA é falha
         return;
@@ -144,9 +159,9 @@ export function createListenerWatchdog(deps: WatchdogDeps) {
     onUnlock(): void { if (stopped) return; reconcileOnce("unlock"); },
     onSuspend(): void { if (stopped) return; clearLastResort(); log("listener.suspend", {}); }, // pausa; não é falha
 
-    onLogout(): void { clearLastResort(); restarting = false; sawHealthy = false; lastResortCount = 0; degradedAlerted = false; setState("STOPPED_BY_LOGOUT", "logout"); },
+    onLogout(): void { clearLastResort(); restarting = false; sawHealthy = false; lastResortCount = 0; alertedThisEpisode = false; setState("STOPPED_BY_LOGOUT", "logout"); },
     onQuit(): void { stopped = true; clearLastResort(); setState("STOPPED_BY_QUIT", "quit"); },
-    resetForLogin(): void { stopped = false; clearLastResort(); restarting = false; sawHealthy = false; lastResortCount = 0; degradedAlerted = false; state = "STARTING"; },
+    resetForLogin(): void { stopped = false; clearLastResort(); restarting = false; sawHealthy = false; lastResortCount = 0; alertedThisEpisode = false; state = "STARTING"; },
 
     snapshot(): { state: WatchdogState; lastResortArmed: boolean; restarting: boolean } & typeof tele {
       return Object.assign({ state, lastResortArmed: !!lastResortTimer, restarting }, tele);

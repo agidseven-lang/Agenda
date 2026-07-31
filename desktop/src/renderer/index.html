@@ -8299,6 +8299,9 @@ function renderConfig(){
       act('send','Recriar ícone da bandeja','Use se o ícone sumir da área perto do relógio','data-cfgtrayrecreate="1"')+'<div class="divline"></div>'+
       info('Onde encontro o ícone?','Ele pode ficar escondido na seta ^ perto do relógio do Windows.')+'<div class="divline"></div>'+
       info('Fechar (X) × Sair','X envia o app para a bandeja (continua rodando). “Sair”, no menu da bandeja, encerra de verdade.')+'</div>';
+  /* F3.5.4N — INICIALIZAÇÃO COM O WINDOWS: liga/desliga o início automático (minimizado na bandeja) +
+     estado REAL do SO (verify). Preenchido em afterConfig() via desktopAPI.startupGet() (async). */
+  h+='<div style="height:18px"></div><div class="lbl">Inicialização com o Windows</div><div class="card" id="startupCard">'+startupCardHtml(null)+'</div>';
   /* F3.3.73I6C14 — Aparência REAL client-side: chips aplicam na hora (appearSet) e ficam
      salvos neste computador (localStorage). Sem backend; padrão = Escuro/100%/desligado. */
   const ap=appearLoad();
@@ -8339,6 +8342,13 @@ function notifDiagCardHtml(d){
     notifDiagRow('Janela premium pronta', yn(d.premiumReady), d.premiumReady?'ok':'')+'<div class="divline"></div>'+
     notifDiagRow('Última entrega', notifDiagTs(d.lastDeliveryAt)+(d.lastChannel?(' · '+d.lastChannel):'')+(d.lastEventType?(' · '+d.lastEventType):''))+'<div class="divline"></div>'+
     notifDiagRow('Última falha', d.lastFailAt?(notifDiagTs(d.lastFailAt)+' · '+(d.lastFailReason||'')):'nenhuma', d.lastFailAt?'bad':'ok')+'<div class="divline"></div>'+
+    /* F3.5.4N — autocorreção do canal (supervisor/último recurso) + rede + inicialização */
+    notifDiagRow('Autocorreção do canal', d.selfHealingEnabled===false?'Desligada':('Ligada'+(d.watchdogState&&d.watchdogState!=='—'?(' · '+d.watchdogState):'')), d.selfHealingEnabled===false?'':'ok')+'<div class="divline"></div>'+
+    notifDiagRow('Rede', d.netOnline===false?'Offline':'Online', d.netOnline===false?'':'ok')+'<div class="divline"></div>'+
+    notifDiagRow('Reconexões de último recurso', String(d.selfHealRestarts||0)+(d.selfHealLastRestartAt?(' · '+notifDiagTs(d.selfHealLastRestartAt)):''))+'<div class="divline"></div>'+
+    notifDiagRow('Alerta de autocorreção', (d.selfHealAlerts?(notifDiagTs(d.selfHealLastAlertAt)+' · '+(d.selfHealLastReason||'')):'nenhum'), d.selfHealAlerts?'bad':'ok')+'<div class="divline"></div>'+
+    notifDiagRow('Iniciar com o Windows', d.startupSupported===false?'Só no Windows':(d.startupWillLaunch?'Ativo':'Inativo'), d.startupWillLaunch?'ok':'')+'<div class="divline"></div>'+
+    '<button class="settrow" data-cfgselfheal="'+(d.selfHealingEnabled===false?'on':'off')+'"><div class="icb">'+svg('gear')+'</div><div class="sm"><div class="sl">Autocorreção de notificações</div><div class="ss">'+(d.selfHealingEnabled===false?'Desligada — tocar para ligar':'Ligada — tocar para desligar')+'</div></div><div class="arr">'+svg('arr')+'</div></button><div class="divline"></div>'+
     notifDiagRow('Versão do aplicativo', d.version||'—')+'<div class="divline"></div>'+
     '<button class="settrow" data-cfgnotifdiag="1"><div class="icb">'+svg('send')+'</div><div class="sm"><div class="sl">Atualizar diagnóstico</div><div class="ss">Relê o estado técnico agora</div></div><div class="arr">'+svg('arr')+'</div></button>';
 }
@@ -8350,7 +8360,40 @@ function notifDiagFill(){
     } else { card.innerHTML=notifDiagCardHtml({listenerMainActive:false,nativeSupported:false,sessionLocked:false,windowFocused:true,windowVisible:true,premiumReady:false,version:(window.desktopAPI&&window.desktopAPI.version)||'web'}); }
   }catch(_){}
 }
-function afterConfig(){ try{ notifDiagFill(); }catch(_){} }
+/* F3.5.4N — painel Inicialização com o Windows (Configurações). Read-only + toggle; consome
+   desktopAPI.startupGet()/startupSet(). O estado vem do SO (verify) — nunca de um espelho local. */
+function startupCardHtml(d){
+  if(!d) return '<div class="settrow" style="cursor:default"><div class="icb icb-mut">'+svg('clock')+'</div><div class="sm"><div class="sl" style="color:var(--soft)">Carregando…</div></div></div>';
+  if(d.supported===false){
+    return '<div class="settrow" style="cursor:default"><div class="icb icb-mut">'+svg('info')+'</div><div class="sm"><div class="sl">Iniciar com o sistema</div><div class="ss">Disponível apenas no Windows.</div></div></div>';
+  }
+  var on=!!d.openAtLogin;
+  var seg=function(val,cur,lbl){return '<button class="chip" data-cfgstartup="'+val+'" style="'+(cur===val?'background:var(--accent);border-color:transparent;color:#fff':'')+'">'+esc(lbl)+'</button>';};
+  var toggle='<div class="settrow" style="cursor:default"><div class="icb">'+svg('gear')+'</div><div class="sm"><div class="sl">Iniciar com o Windows</div><div class="ss">Sobe minimizado na bandeja ao ligar o computador</div></div><div style="display:flex;gap:6px">'+seg('on',(on?'on':'off'),'Ligado')+seg('off',(on?'on':'off'),'Desligado')+'</div></div>';
+  var st=notifDiagRow('Registro no Windows', d.willLaunch?'Ativo — vai iniciar no login':'Inativo', d.willLaunch?'ok':'')+'<div class="divline"></div>'+
+    notifDiagRow('Consistência do registro', d.consistent?'OK':'Divergente', d.consistent?'ok':'bad');
+  return toggle+'<div class="divline"></div>'+st;
+}
+function startupFill(){
+  try{
+    var card=document.getElementById('startupCard'); if(!card) return;
+    if(window.desktopAPI&&typeof window.desktopAPI.startupGet==='function'){
+      window.desktopAPI.startupGet().then(function(d){ var c=document.getElementById('startupCard'); if(c) c.innerHTML=startupCardHtml(d||{supported:false}); }).catch(function(){ var c=document.getElementById('startupCard'); if(c) c.innerHTML=startupCardHtml({supported:false}); });
+    } else { card.innerHTML=startupCardHtml({supported:false}); }
+  }catch(_){}
+}
+function afterConfig(){ try{ notifDiagFill(); }catch(_){} try{ startupFill(); }catch(_){} }
+/* F3.5.4N — REDE: reporta o estado REAL do SO (navigator.onLine + eventos online/offline) ao main.
+   O firebase.ts reconecta sozinho; isto só informa o supervisor (watchdog) p/ estado + reconcile único. */
+(function(){
+  try{
+    if(!(window.desktopAPI&&typeof window.desktopAPI.netStatus==='function')) return;
+    var send=function(){ try{ window.desktopAPI.netStatus(navigator.onLine!==false); }catch(_){} };
+    send();
+    window.addEventListener('online', send);
+    window.addEventListener('offline', send);
+  }catch(_){}
+})();
 function settRow(ic,l,s,sheet){return '<button class="settrow" data-sheet="'+sheet+'"><div class="icb">'+svg(ic)+'</div><div class="sm"><div class="sl">'+esc(l)+'</div><div class="ss">'+esc(s)+'</div></div><div class="arr">'+svg('arr')+'</div></button>';}
 function openSheet(which){
   const u=state.user;let rows,title;
@@ -9171,6 +9214,27 @@ document.addEventListener('click',async e=>{
   if(el=g('[data-sheet]')){openSheet(el.dataset.sheet);return;}
   if(el=g('[data-cfgnotiftest]')){try{window.desktopAPI&&window.desktopAPI.notifTest&&window.desktopAPI.notifTest();}catch(_){}flashToast('Notificação de teste disparada.');return;}
   if(el=g('[data-cfgnotifdiag]')){try{notifDiagFill();}catch(_){}flashToast('Diagnóstico de notificações atualizado.');return;}
+  /* F3.5.4N — INICIALIZAÇÃO: liga/desliga "iniciar com o Windows" (SO é a verdade; reflete no verify). */
+  if(el=g('[data-cfgstartup]')){
+    var _cfgStartupOn=el.getAttribute('data-cfgstartup')==='on';
+    (async function(){
+      try{ if(window.desktopAPI&&window.desktopAPI.startupSet){ await window.desktopAPI.startupSet(_cfgStartupOn); } }catch(_){}
+      try{ startupFill(); }catch(_){}
+      try{ notifDiagFill(); }catch(_){}
+      flashToast(_cfgStartupOn?'Iniciar com o Windows: ligado.':'Iniciar com o Windows: desligado.');
+    })();
+    return;
+  }
+  /* F3.5.4N — AUTOCORREÇÃO (item 17): liga/desliga SOMENTE a autocorreção (firebase reconecta sempre). */
+  if(el=g('[data-cfgselfheal]')){
+    var _cfgSelfhealOn=el.getAttribute('data-cfgselfheal')==='on';
+    (async function(){
+      try{ if(window.desktopAPI&&window.desktopAPI.selfHealSet){ await window.desktopAPI.selfHealSet(_cfgSelfhealOn); } }catch(_){}
+      try{ notifDiagFill(); }catch(_){}
+      flashToast(_cfgSelfhealOn?'Autocorreção de notificações: ligada.':'Autocorreção de notificações: desligada.');
+    })();
+    return;
+  }
   // F3.3.70D3R10U — "Recriar ícone da bandeja": IPC tray-recreate + re-render p/ o status novo
   if(el=g('[data-cfgtrayrecreate]')){
     (async function(){

@@ -46,6 +46,15 @@ contextBridge.exposeInMainWorld("desktopAPI", {
   diagPath: (): Promise<string> => ipcRenderer.invoke("diag-path"),
   // F3.5.4K — status SANITIZADO das notificações p/ Configurações → Notificações (read-only; sem token/uid/conteúdo)
   notifDiag: (): Promise<any> => ipcRenderer.invoke("notif-diag"),
+  // F3.5.4N — REDE: o renderer reporta o estado REAL do SO (navigator.onLine + eventos online/offline).
+  // Sinal usado pelo watchdog (supervisor); o firebase.ts continua reconectando por conta própria.
+  netStatus: (online: boolean) => { try { ipcRenderer.send("net-status", !!online); } catch { /* */ } },
+  // F3.5.4N — INICIALIZAÇÃO COM O WINDOWS (Configurações → Inicialização): estado REAL do SO + toggle.
+  startupGet: (): Promise<any> => ipcRenderer.invoke("startup-get"),
+  startupSet: (v: boolean): Promise<any> => ipcRenderer.invoke("startup-set", v),
+  // F3.5.4N — AUTOCORREÇÃO do canal (item 17): ligar/desligar SOMENTE a autocorreção (firebase reconecta sempre).
+  selfHealGet: (): Promise<any> => ipcRenderer.invoke("selfheal-get"),
+  selfHealSet: (v: boolean): Promise<any> => ipcRenderer.invoke("selfheal-set", v),
   // abrir URL externa (WhatsApp app/web, browser) via shell.openExternal
   openExternal: (url: string): Promise<boolean> => ipcRenderer.invoke("open-external", url),
   // F3.3.73I6C18C — prepara/valida o Card Premium ANTES do WhatsApp (GET read-only no main,

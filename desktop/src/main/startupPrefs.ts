@@ -1,15 +1,19 @@
 /**
- * F3.5.4N — startupPrefs.ts — INICIAR COM O WINDOWS (default-ON idempotente + verificação real).
+ * F3.5.4N — startupPrefs.ts — INICIAR COM O WINDOWS (default-ON de 1ª execução + verificação real).
  * =====================================================================================
- * Autoridade das preferências de inicialização, sobre o mecanismo NATIVO do Electron
- * (app.setLoginItemSettings / getLoginItemSettings — SEM atalho improvisado, .bat, cópia p/ a
- * pasta Inicializar ou PowerShell). Duas preferências:
- *   - openAtLogin  : iniciar o Agenda automaticamente com o Windows;
- *   - hiddenStart  : iniciar minimizado na bandeja (registra o arg "--hidden" no login item).
+ * Autoridade sobre o mecanismo NATIVO do Electron (app.setLoginItemSettings /
+ * getLoginItemSettings — SEM atalho improvisado, .bat, cópia p/ a pasta Inicializar ou PowerShell).
  *
- * POLÍTICA 1.0.204: ambas ON por padrão, aplicadas UMA ÚNICA VEZ (defaultsApplied). Se o usuário
- * desligar (userOverride), uma atualização futura NUNCA reativa silenciosamente (reforço do
- * mandato). Persistência em JSON próprio; estado real do Windows verificável (verify()).
+ * MODELO "O SO É A VERDADE" (evita duas autoridades brigando pelo mesmo item de login):
+ *   - o ESTADO de "iniciar com o Windows" é lido SEMPRE do próprio SO (getLoginItemSettings),
+ *     nunca de um espelho em JSON que poderia ficar velho;
+ *   - o app SEMPRE registra com o argumento "--hidden" (sobe minimizado na bandeja — objetivo do
+ *     F3.5.4N), EXATAMENTE como o autostart.ts usado pela bandeja (checkbox "Iniciar com o Windows").
+ *     Assim a bandeja (congelada) e as Configurações escrevem o MESMO item de login, sem divergir;
+ *   - o ÚNICO estado persistido em JSON é o marcador `defaultsApplied`: garante que o default-ON
+ *     seja aplicado UMA ÚNICA VEZ (na 1ª execução em que ainda não foi aplicado). Depois disso, o
+ *     módulo NUNCA reescreve o item de login por conta própria — respeita qualquer decisão posterior
+ *     do usuário (pela bandeja OU pelas Configurações). O registro persiste sozinho no Windows.
  *
  * Controlador injetável (sys + store) → testável sem Electron.
  */
@@ -21,8 +25,6 @@ export type LoginItemSys = {
 };
 export type PrefsStore = { read: () => any; write: (o: any) => void };
 
-export type StartupPrefs = { openAtLogin: boolean; hiddenStart: boolean; defaultsApplied: boolean; userOverride: boolean };
-
 export type StartupPrefsDeps = {
   sys: LoginItemSys;
   store: PrefsStore;
@@ -30,77 +32,86 @@ export type StartupPrefsDeps = {
   argv?: () => string[];
 };
 
+// Sobe minimizado na bandeja (objetivo F3.5.4N). MESMO arg do autostart.ts (consistência com a bandeja).
 const HIDDEN_ARG = "--hidden";
 
 export function createStartupPrefs(deps: StartupPrefsDeps) {
   const log = deps.onLog || (() => { /* */ });
   const argv = deps.argv || (() => (typeof process !== "undefined" ? process.argv : []));
+  const isWin = () => deps.sys.platform === "win32";
 
-  function read(): StartupPrefs {
-    let raw: any = {};
-    try { raw = deps.store.read() || {}; } catch { raw = {}; }
-    return {
-      openAtLogin: raw.openAtLogin === true,
-      hiddenStart: raw.hiddenStart === true,
-      defaultsApplied: raw.defaultsApplied === true,
-      userOverride: raw.userOverride === true,
-    };
+  /** Marcador persistente: o default-ON já foi aplicado alguma vez? (única coisa em JSON) */
+  function defaultsApplied(): boolean {
+    try { const raw = deps.store.read() || {}; return raw.defaultsApplied === true; } catch { return false; }
   }
-  function persist(p: StartupPrefs): void { try { deps.store.write(p); } catch (e) { log("startup.setting.write.error", { err: String((e as any) && (e as any).message || e) }); } }
+  function markDefaultsApplied(): void {
+    try { const raw = deps.store.read() || {}; raw.defaultsApplied = true; deps.store.write(raw); }
+    catch (e) { log("startup.mark.error", { err: String((e as any) && (e as any).message || e) }); }
+  }
 
-  /** Reflete a preferência no registro NATIVO do Windows (idempotente). */
-  function applyToOs(p: StartupPrefs): void {
-    if (deps.sys.platform !== "win32") return;
-    try {
-      deps.sys.set({ openAtLogin: p.openAtLogin, args: p.hiddenStart ? [HIDDEN_ARG] : [] });
-      log("startup.setting.apply", { openAtLogin: p.openAtLogin, hiddenStart: p.hiddenStart });
-    } catch (e) { log("startup.setting.apply.error", { err: String((e as any) && (e as any).message || e) }); }
+  /** Estado REAL do SO: o app está registrado para iniciar com o Windows (com --hidden)? */
+  function osOpenAtLogin(): boolean {
+    if (!isWin()) return false;
+    try { const s = deps.sys.get({ args: [HIDDEN_ARG] }) || {}; return !!s.openAtLogin; } catch { return false; }
+  }
+
+  /** Escreve o item de login NATIVO (idempotente; sempre com --hidden). */
+  function setOs(v: boolean): void {
+    if (!isWin()) return;
+    try { deps.sys.set({ openAtLogin: !!v, args: [HIDDEN_ARG] }); log("startup.setting.apply", { openAtLogin: !!v, hiddenStart: true }); }
+    catch (e) { log("startup.setting.apply.error", { err: String((e as any) && (e as any).message || e) }); }
   }
 
   return {
-    read,
+    /** Estado atual (lido do SO). hiddenStart é sempre true (o registro usa --hidden). */
+    read(): { openAtLogin: boolean; hiddenStart: boolean; defaultsApplied: boolean } {
+      return { openAtLogin: osOpenAtLogin(), hiddenStart: true, defaultsApplied: defaultsApplied() };
+    },
 
-    /** Aplica os defaults ON UMA vez (nunca sobre o override do usuário). Chamado no whenReady. */
-    applyDefaultsOnce(): StartupPrefs {
-      const p = read();
-      log("startup.setting.read", { openAtLogin: p.openAtLogin, hiddenStart: p.hiddenStart, defaultsApplied: p.defaultsApplied, userOverride: p.userOverride });
-      if (deps.sys.platform !== "win32") return p;
-      if (p.defaultsApplied || p.userOverride) { applyToOs(p); return p; } // já decidido: só reflete no SO
-      const next: StartupPrefs = { openAtLogin: true, hiddenStart: true, defaultsApplied: true, userOverride: false };
-      applyToOs(next); persist(next);
+    /**
+     * Aplica o default-ON UMA ÚNICA VEZ (1ª execução sem marcador). Nunca reescreve depois: se o
+     * usuário já decidiu (bandeja/Configurações), o item de login do Windows persiste sozinho e este
+     * método vira no-op. Chamado no whenReady. Fora do Windows: no-op.
+     */
+    applyDefaultsOnce(): { openAtLogin: boolean; hiddenStart: boolean; defaultsApplied: boolean; changed: boolean } {
+      if (!isWin()) { log("startup.defaults.skip", { platform: deps.sys.platform }); return { openAtLogin: false, hiddenStart: true, defaultsApplied: defaultsApplied(), changed: false }; }
+      if (defaultsApplied()) {
+        const cur = osOpenAtLogin();
+        log("startup.defaults.already", { openAtLogin: cur });
+        return { openAtLogin: cur, hiddenStart: true, defaultsApplied: true, changed: false };
+      }
+      setOs(true);                 // 1ª execução: liga por padrão (minimizado na bandeja)
+      markDefaultsApplied();
       log("startup.defaults.applied", { openAtLogin: true, hiddenStart: true });
-      return next;
+      return { openAtLogin: true, hiddenStart: true, defaultsApplied: true, changed: true };
     },
 
-    /** Usuário liga/desliga "iniciar com o Windows" (marca override; nunca mais reativa sozinho). */
-    setOpenAtLogin(v: boolean): StartupPrefs {
-      const p = read(); p.openAtLogin = !!v; p.userOverride = true; p.defaultsApplied = true;
-      applyToOs(p); persist(p); return p;
-    },
-    /** Usuário liga/desliga "iniciar minimizado". */
-    setHiddenStart(v: boolean): StartupPrefs {
-      const p = read(); p.hiddenStart = !!v; p.userOverride = true; p.defaultsApplied = true;
-      applyToOs(p); persist(p); return p;
+    /** Usuário liga/desliga "iniciar com o Windows" (Configurações). Marca defaultsApplied p/ nunca reverter. */
+    setOpenAtLogin(v: boolean): { openAtLogin: boolean; hiddenStart: boolean } {
+      setOs(!!v);
+      markDefaultsApplied(); // uma decisão explícita conta como default já resolvido
+      log("startup.setting.user", { openAtLogin: !!v });
+      return { openAtLogin: osOpenAtLogin(), hiddenStart: true };
     },
 
     /** Estado REAL do Windows (prova de que o registro foi efetivamente aplicado). */
     verify(): { platform: string; openAtLoginPref: boolean; hiddenStartPref: boolean; osOpenAtLogin: boolean; willLaunch: boolean; consistent: boolean } {
-      const p = read();
-      if (deps.sys.platform !== "win32") return { platform: deps.sys.platform, openAtLoginPref: p.openAtLogin, hiddenStartPref: p.hiddenStart, osOpenAtLogin: false, willLaunch: false, consistent: true };
+      if (!isWin()) return { platform: deps.sys.platform, openAtLoginPref: false, hiddenStartPref: true, osOpenAtLogin: false, willLaunch: false, consistent: true };
       let s: LoginItemStatus = {};
-      try { s = deps.sys.get({ args: p.hiddenStart ? [HIDDEN_ARG] : [] }) || {}; } catch { s = {}; }
-      const osOpenAtLogin = !!s.openAtLogin;
-      const willLaunch = s.executableWillLaunchAtLogin !== undefined ? !!s.executableWillLaunchAtLogin : osOpenAtLogin;
-      const consistent = osOpenAtLogin === p.openAtLogin;
-      log("startup.setting.verify", { osOpenAtLogin, willLaunch, consistent });
-      return { platform: "win32", openAtLoginPref: p.openAtLogin, hiddenStartPref: p.hiddenStart, osOpenAtLogin, willLaunch, consistent };
+      try { s = deps.sys.get({ args: [HIDDEN_ARG] }) || {}; } catch { s = {}; }
+      const os = !!s.openAtLogin;
+      const willLaunch = s.executableWillLaunchAtLogin !== undefined ? !!s.executableWillLaunchAtLogin : os;
+      // "consistent" = o SO reflete o que o usuário pediu (openAtLogin do SO == willLaunch efetivo).
+      const consistent = willLaunch === os;
+      log("startup.setting.verify", { osOpenAtLogin: os, willLaunch, consistent });
+      return { platform: "win32", openAtLoginPref: os, hiddenStartPref: true, osOpenAtLogin: os, willLaunch, consistent };
     },
 
     /** O processo foi iniciado pelo Windows (login item)? arg --hidden OU wasOpenedAtLogin do SO. */
     wasOpenedAtLogin(): boolean {
       try {
         if ((argv() || []).includes(HIDDEN_ARG)) return true;
-        if (deps.sys.platform === "win32") { const s = deps.sys.get(); if (s && s.wasOpenedAtLogin) return true; }
+        if (isWin()) { const s = deps.sys.get(); if (s && s.wasOpenedAtLogin) return true; }
       } catch { /* */ }
       return false;
     },

@@ -22,7 +22,9 @@ import { initBgNotify, showBgNotify, stopBgNotify, bgStatus } from "./bgNotify";
 import { registerAuthIpc, getAuthUser } from "./auth"; // F3.3.56-G2 — auth server-side (token confinado ao main); F3.4.3 — papel autenticado p/ operational_block
 import { registerPrewarmIpc } from "./prewarm"; // F3.3.73I6C18C — prewarm do Card Premium (IPC restrito ao /share)
 import { createClockSync } from "./clockSync"; // F3.3.77A-R4B — relógio canônico via cabeçalho HTTP Date (Cloud Run read-only)
-import { listen as fbListen } from "./firebase"; // F3.5.4L — escuta read-only p/ "tarefa concluída com modal aberto" (sessão)
+import { listen as fbListen, setListenHealthObserver } from "./firebase"; // F3.5.4L — escuta read-only p/ "tarefa concluída com modal aberto" (sessão); F3.5.4N — observador de saúde do listener
+import { createListenerWatchdog } from "./listenerWatchdog"; // F3.5.4N — SUPERVISOR + ÚLTIMO RECURSO (firebase.ts é o 1º reconectador)
+import { createStartupPrefs } from "./startupPrefs"; // F3.5.4N — iniciar com o Windows (default-ON 1x; SO é a verdade; verify)
 import { createSlaReminderController, classifyReminderLevel } from "./slaReminder"; // F3.5.4L — lembrete CENTRAL persistente de SLA (amarelo/vermelho)
 import { createSlaReminderSurface, loadReminderSounds } from "./slaReminderWindow"; // F3.5.4L — superfície Electron (janela central, som local)
 import { createSlaReminderStore } from "./slaReminderStore"; // F3.5.4L — recibo de reconhecimento (OK) + pendentes persistentes
@@ -51,6 +53,17 @@ let currentUid = "";
 let slaReminderSounds: { warning: string; critical: string } = { warning: "", critical: "" };
 let stopSlaWatch: (() => void) | null = null; // escuta read-only de conclusão (tarefa concluída c/ modal aberto)
 const slaReminderTele = { lastShownAt: 0, lastLevel: "", lastAckAt: 0, queueLen: 0 };
+// F3.5.4N — INICIALIZAÇÃO COM O WINDOWS + SUPERVISOR/ÚLTIMO RECURSO do canal de notificações.
+// O reconectador PRIMÁRIO permanece no firebase.ts (re-attach 5s→60s, timer ÚNICO por coleção). O
+// watchdog SÓ observa os sinais reais e, em falha SUSTENTADA, faz UM restart de último recurso (single-
+// active). netOnline vem do renderer (navigator.onLine + eventos, sinal REAL do SO). selfHealingEnabled
+// (item 17) desliga SOMENTE a autocorreção (firebase segue reconectando). Telemetria SANITIZADA p/ o
+// painel Configurações → Notificações → Diagnóstico (itens 16/18).
+let listenerWatchdog: ReturnType<typeof createListenerWatchdog> | null = null;
+let startupPrefs: ReturnType<typeof createStartupPrefs> | null = null;
+let netOnline = true;
+let selfHealingEnabled = true;
+const selfHealTele = { lastAlertAt: 0, lastReasonCode: "", alerts: 0, lastRestartAt: 0, restarts: 0, lastReconcileAt: 0, reconciles: 0 };
 // F3.3.70D3R10U — opts do tray centralizados (usados por startup, session-login,
 // heartbeat e IPC tray-recreate; a recriacao usa SEMPRE o mesmo menu/quit).
 const trayWin = () => mainWin;
@@ -60,6 +73,7 @@ let updater: ReturnType<typeof createUpdaterService> | null = null;
 function updaterTeardownForInstall() {
   // Mesmo teardown do realQuit, porém SEM app.quit() (o quitAndInstall encerra e reabre).
   quitting = true;
+  try { if (typeof listenerWatchdog !== "undefined" && listenerWatchdog) listenerWatchdog.onQuit(); } catch { /* */ } // F3.5.4N — encerra supervisão (limpa timer de último recurso)
   try { if (stopNotifier) stopNotifier(); } catch { /* */ }
   try { if (stopReminder) stopReminder(); } catch { /* */ }
   try { if (clockSync) { clockSync.stop(); clockSync = null; } } catch { /* */ }
@@ -420,6 +434,7 @@ function createWindow() {
 
 function realQuit() {
   quitting = true;
+  try { if (typeof listenerWatchdog !== "undefined" && listenerWatchdog) listenerWatchdog.onQuit(); } catch { /* */ } // F3.5.4N — encerra supervisão (limpa timer de último recurso)
   if (stopNotifier) stopNotifier();
   if (stopReminder) stopReminder();
   if (clockSync) { try { clockSync.stop(); } catch { /* */ } clockSync = null; }
@@ -431,6 +446,83 @@ function realQuit() {
   try { destroyTray(); } catch { /* */ }
   diag("app.realQuit→destroyTray"); // F3.3.10-DIAG
   app.quit();
+}
+
+// F3.5.4N — persistência mínima em JSON no userData (marcador de startup + flag de autocorreção).
+// Sem segredo, sem PII: apenas booleans locais. Falha de I/O nunca derruba o app.
+function jsonStore(file: string) {
+  const full = () => path.join(app.getPath("userData"), file);
+  return {
+    read: (): any => { try { return JSON.parse(fs.readFileSync(full(), "utf8")); } catch { return {}; } },
+    write: (o: any): void => { try { fs.writeFileSync(full(), JSON.stringify(o || {}, null, 2)); } catch (e) { diag("f354n.store.write.error", { file, err: String(((e as any) && (e as any).message) || e) }); } },
+  };
+}
+// F3.5.4N — flag de autocorreção (item 17). Default ON (undefined ⇒ true). Desliga SOMENTE o último
+// recurso do watchdog; o re-attach do firebase.ts continua SEMPRE (não é "autocorreção" opcional).
+function loadSelfHealingFlag(): boolean { try { return (jsonStore("f354n-notify.json").read() || {}).selfHealingEnabled !== false; } catch { return true; } }
+function saveSelfHealingFlag(v: boolean): void { try { const s = jsonStore("f354n-notify.json"); const raw = s.read() || {}; raw.selfHealingEnabled = !!v; s.write(raw); } catch { /* */ } }
+
+// F3.5.4N — reconciliação IDEMPOTENTE dos produtores de rede (recibos do notifierA + seen persistente
+// do slaScheduler impedem duplicação). Chamada pelo watchdog em reconexão/resume/unlock — 1 passada por
+// produtor. slaReminderCtl (re-exibição LOCAL, sem rede) NÃO passa por aqui: segue no powerMonitor.
+function reconcileAllProducers(reason: string): void {
+  try { if (notifierAHandle) notifierAHandle.reconcile(reason); } catch { /* */ }
+  try { if (slaScheduler) slaScheduler.reconcile(reason); } catch { /* */ }
+  selfHealTele.lastReconcileAt = Date.now(); selfHealTele.reconciles++;
+}
+
+// F3.5.4N — INÍCIO dos listeners Firestore do usuário (o MESMO caminho do login). Único ponto que liga
+// o notifier de eventos + a Categoria A durável + o slaScheduler + a escuta de conclusão. Reusado pelo
+// ÚLTIMO RECURSO do watchdog. Recibos (notifierA) + seen persistente (slaScheduler) + gate sinceMs
+// (notifier de eventos) impedem duplicação quando o 1º snapshot reentrega o estado após um restart.
+function startUserListeners(uid: string): void {
+  const _stopEventNew = startNotifier(() => mainWin, uid, deliverNotification, getAuthUser);
+  const _notifierA = startNotifierA(uid, deliverNotification);
+  notifierAHandle = _notifierA; // handle p/ reconcile (resume/unlock/reconexão) — recuperação única
+  // stopNotifier COMPÕE os teardowns aprovados. _notifSeen.clear()/toastAck.clear() são POR SESSÃO DE
+  // USUÁRIO (troca de usuário); num restart do MESMO usuário isso é inofensivo — a dedup REAL está nos
+  // recibos persistentes (notifierA), no seen persistente (slaScheduler) e no gate sinceMs (eventos).
+  stopNotifier = () => { try { _stopEventNew(); } catch { /* */ } try { _notifierA.stop(); } catch { /* */ } notifierAHandle = null; try { toastAck.clear(); } catch { /* */ } try { _notifSeen.clear(); } catch { /* */ } };
+  // F3.4.3/R4B — PRODUTOR AUTORITATIVO de SLA no MAIN (amarelo/vermelho/crítico), MESMO "agora" canônico
+  // do renderer (slaNow → offset do clockSync), entrega pelo MESMO HUB (deliverNotification). authUser =
+  // papel AUTENTICADO (só p/ o gate canSeeAll do operational_block). F3.5.4-C3 — seen POR USUÁRIO (opts.seen)
+  // p/ isolar T-30/T-10 entre usuários na MESMA máquina. Forma aprovada F3.4.3/R4B (registro literal preservado):
+  //   slaScheduler = startSlaScheduler(() => uid, deliverNotification, { now: slaNow, authUser: getAuthUser });
+  slaScheduler = startSlaScheduler(() => uid, deliverNotification, { now: slaNow, authUser: getAuthUser, seen: createUserSlaSeen(uid) });
+  slaScheduler.reconcile("boot");
+  // F3.5.4L — escuta READ-ONLY de conclusão (tarefa concluída com o modal aberto ⇒ mantém OK/suprime o
+  // vermelho futuro). Aditiva; não toca scheduler/notifierA. Encerrada no logout/quit/restart.
+  try {
+    if (stopSlaWatch) { try { stopSlaWatch(); } catch { /* */ } stopSlaWatch = null; }
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const _slaRulesRt: any = require("./slaRules");
+    stopSlaWatch = fbListen("tasks", (snap: any) => {
+      try {
+        const changes = (snap && snap.docChanges && snap.docChanges()) || [];
+        for (const ch of changes) {
+          const id = ch && ch.doc && ch.doc.id; if (!id) continue;
+          if (ch.type === "removed") { if (slaReminderCtl) slaReminderCtl.noteCompleted(String(id)); continue; }
+          const d: any = (ch.doc.data && ch.doc.data()) || {};
+          try { if (_slaRulesRt.slaPanelDelivered(Object.assign({ id }, d)) && slaReminderCtl) slaReminderCtl.noteCompleted(String(id)); } catch { /* */ }
+        }
+      } catch { /* escuta de conclusão nunca derruba nada */ }
+    });
+  } catch { /* */ }
+}
+
+// F3.5.4N — ÚLTIMO RECURSO do watchdog: PARA a geração antiga ANTES de iniciar a nova (single-active por
+// usuário; nunca dois listeners do mesmo tipo). O watchdog garante 1 restart por vez (sem simultâneo).
+// Só reinicia os listeners Firestore; clockSync/updater/slaReminder seguem intactos.
+function restartAllListeners(reason: string): void {
+  const uid = currentUid;
+  if (!uid) { diag("listener.restartAll.skip", { reason, why: "no-session" }); return; }
+  diag("listener.restartAll.begin", { reason });
+  try { if (stopNotifier) { stopNotifier(); stopNotifier = null; } } catch { /* */ }           // PARA a geração antiga
+  try { if (slaScheduler) { slaScheduler.stop(); slaScheduler = null; } } catch { /* */ }
+  try { if (stopSlaWatch) { stopSlaWatch(); stopSlaWatch = null; } } catch { /* */ }
+  startUserListeners(uid);                                                                       // inicia UMA nova geração
+  selfHealTele.lastRestartAt = Date.now(); selfHealTele.restarts++;
+  diag("listener.restartAll.done", { reason });
 }
 
 app.whenReady().then(() => {
@@ -460,7 +552,10 @@ app.whenReady().then(() => {
   try {
     powerMonitor.on("lock-screen", () => { sessionLocked = true; nlog("notify.session.locked", {}); try { if (slaReminderCtl) slaReminderCtl.onLockChange(true); } catch { /* */ } });
     powerMonitor.on("unlock-screen", () => { sessionLocked = false; nlog("notify.session.unlocked", {}); try { if (notifierAHandle) notifierAHandle.reconcile("unlock"); } catch { /* */ } try { if (slaReminderCtl) slaReminderCtl.onLockChange(false); } catch { /* */ } });
-    powerMonitor.on("suspend", () => { diag("power.suspend"); });
+    // F3.5.4N — suspend PAUSA o timer de último recurso do watchdog (suspend NÃO é falha). O reconcile de
+    // resume/unlock segue nos handlers aprovados (F3.4.3/F3.5.4K, acima/abaixo); o watchdog cobre a
+    // recuperação por RETORNO DE REDE (setNetwork → reconcileAll) e o último recurso, sem 2º reconcile.
+    powerMonitor.on("suspend", () => { diag("power.suspend"); try { if (listenerWatchdog) listenerWatchdog.onSuspend(); } catch { /* */ } });
     powerMonitor.on("resume", () => { try { if (notifierAHandle) notifierAHandle.reconcile("resume"); } catch { /* */ } try { if (slaReminderCtl) slaReminderCtl.reconcile("resume"); } catch { /* */ } });
   } catch { /* powerMonitor pode não existir em todas as plataformas */ }
 
@@ -502,6 +597,47 @@ app.whenReady().then(() => {
     diag("sla.reminder.init", { warnBytes: (slaReminderSounds.warning || "").length, critBytes: (slaReminderSounds.critical || "").length });
   } catch (e) { diag("sla.reminder.init.error", { err: String(((e as any) && (e as any).message) || e) }); }
 
+  // F3.5.4N — INICIALIZAÇÃO COM O WINDOWS (default-ON de 1ª execução; SO é a verdade; verify real).
+  // Sobre o mecanismo NATIVO do Electron; MESMO arg "--hidden" da bandeja (autostart.ts, congelada) ⇒
+  // as duas superfícies escrevem o MESMO item de login sem brigar. Aplica o default UMA vez só.
+  try {
+    startupPrefs = createStartupPrefs({
+      sys: { platform: process.platform, get: (o?: { args?: string[] }) => app.getLoginItemSettings(o || {}) as any, set: (o: { openAtLogin: boolean; args?: string[] }) => app.setLoginItemSettings(o) },
+      store: jsonStore("f354n-startup.json"),
+      onLog: (t, d) => { try { diag(t, d as any); } catch { /* */ } },
+      argv: () => process.argv,
+    });
+    const sr = startupPrefs.applyDefaultsOnce();
+    diag("startup.ready", { openAtLogin: sr.openAtLogin, changed: sr.changed, wasOpenedAtLogin: startupPrefs.wasOpenedAtLogin() });
+  } catch (e) { diag("startup.init.error", { err: String(((e as any) && (e as any).message) || e) }); }
+
+  // F3.5.4N — SUPERVISOR + ÚLTIMO RECURSO do canal de notificações. O reconectador PRIMÁRIO é o
+  // firebase.ts (re-attach 5s→60s, timer ÚNICO por coleção). O watchdog SÓ observa os sinais REAIS
+  // (attach/snapshot/error/rearm + geração) via setListenHealthObserver — NÃO cria 2º ciclo de
+  // reconexão. flag notificationSelfHealingEnabled (item 17; default ON) desliga SOMENTE o último
+  // recurso; o re-attach do firebase continua. Alerta admin SÓ quando a autocorreção FALHA (item 18).
+  selfHealingEnabled = loadSelfHealingFlag();
+  try {
+    listenerWatchdog = createListenerWatchdog({
+      restartAll: (reason) => restartAllListeners(reason),      // PARA a geração antiga ANTES da nova (single-active)
+      reconcileAll: (reason) => reconcileAllProducers(reason),  // idempotente (recibos/seen impedem duplicação)
+      isAuthValid: () => !!currentUid,
+      isOnline: () => netOnline,
+      selfHealingEnabled: () => selfHealingEnabled,
+      onAdminAlert: (info) => {
+        // item 18 — autocorreção FALHOU: registro SANITIZADO + Notification NATIVA (local; independe do
+        // Firestore que caiu). Sem PII/uid/token. Uma vez por episódio (o watchdog já garante 1x).
+        selfHealTele.lastAlertAt = Date.now(); selfHealTele.lastReasonCode = String(info.reasonCode || ""); selfHealTele.alerts++;
+        nlog("notify.selfheal.alert", { reasonCode: info.reasonCode, attempts: info.attempts });
+        try { new Notification({ title: "Agenda ID Seven", body: "Reconectando as notificações… se persistir, reabra o aplicativo.", silent: true, icon: _appIcon() }).show(); } catch { /* */ }
+      },
+      onLog: (t, d) => { try { diag(t, d as any); } catch { /* */ } },
+    });
+    listenerWatchdog.start();
+    setListenHealthObserver((h) => { try { if (listenerWatchdog) listenerWatchdog.onHealth(h as any); } catch { /* observador nunca derruba a entrega */ } });
+    diag("listener.watchdog.ready", { selfHealingEnabled });
+  } catch (e) { diag("listener.watchdog.init.error", { err: String(((e as any) && (e as any).message) || e) }); }
+
   // F3.3.10-BG — registra a janela premium de background + callback de "Abrir tarefa"
   // (reabre a mainWindow minimizada/oculta e navega via deep link). NÃO rouba foco do SO.
   initBgNotify((deep: string) => {
@@ -533,6 +669,10 @@ app.whenReady().then(() => {
     const ws = winState();
     let premiumReady = false; try { premiumReady = !!bgStatus().initialized; } catch { premiumReady = false; }
     let nativeSupported = false; try { nativeSupported = Notification.isSupported(); } catch { nativeSupported = false; }
+    // F3.5.4N — estado SANITIZADO da autocorreção (item 16/18) e da inicialização com o Windows.
+    let wd: any = null; try { wd = listenerWatchdog ? listenerWatchdog.snapshot() : null; } catch { wd = null; }
+    let sv: any = null; try { sv = startupPrefs ? startupPrefs.verify() : null; } catch { sv = null; }
+    let wasOpenedAtLogin = false; try { wasOpenedAtLogin = !!(startupPrefs && startupPrefs.wasOpenedAtLogin()); } catch { wasOpenedAtLogin = false; }
     return {
       listenerMainActive: !!stopNotifier,
       nativeSupported,
@@ -542,8 +682,46 @@ app.whenReady().then(() => {
       lastDeliveryAt: notifTele.lastAt, lastChannel: notifTele.lastChannel, lastEventType: notifTele.lastEventType,
       lastFailAt: notifTele.lastFailAt, lastFailReason: notifTele.lastFailReason,
       version: (() => { try { return app.getVersion(); } catch { return "dev"; } })(),
+      // F3.5.4N — autocorreção do canal (supervisor/último recurso)
+      selfHealingEnabled,
+      netOnline,
+      watchdogState: wd ? wd.state : "—",
+      watchdogLastResortArmed: wd ? !!wd.lastResortArmed : false,
+      selfHealRestarts: selfHealTele.restarts, selfHealLastRestartAt: selfHealTele.lastRestartAt,
+      selfHealReconciles: selfHealTele.reconciles, selfHealLastReconcileAt: selfHealTele.lastReconcileAt,
+      selfHealAlerts: selfHealTele.alerts, selfHealLastAlertAt: selfHealTele.lastAlertAt, selfHealLastReason: selfHealTele.lastReasonCode,
+      // F3.5.4N — inicialização com o Windows (estado REAL do SO)
+      startupSupported: process.platform === "win32",
+      startupOpenAtLogin: sv ? !!sv.osOpenAtLogin : false,
+      startupWillLaunch: sv ? !!sv.willLaunch : false,
+      wasOpenedAtLogin,
     };
   });
+  // F3.5.4N — REDE: o renderer reporta navigator.onLine + eventos online/offline (sinal REAL do SO). O
+  // firebase.ts reconecta sozinho; o watchdog usa isto p/ estado + reconcile ÚNICO ao voltar a rede.
+  ipcMain.on("net-status", (_e, online: boolean) => {
+    const b = !!online; if (b === netOnline) return;
+    netOnline = b; nlog("net.status.changed", { online: b });
+    try { if (listenerWatchdog) listenerWatchdog.setNetwork(b); } catch { /* */ }
+  });
+  // F3.5.4N — INICIALIZAÇÃO (Configurações): estado REAL do SO + toggle "iniciar com o Windows".
+  ipcMain.handle("startup-get", () => {
+    try {
+      if (!startupPrefs) return { supported: false, openAtLogin: false, willLaunch: false, consistent: true, wasOpenedAtLogin: false };
+      const v = startupPrefs.verify();
+      return { supported: process.platform === "win32", openAtLogin: v.osOpenAtLogin, willLaunch: v.willLaunch, consistent: v.consistent, wasOpenedAtLogin: startupPrefs.wasOpenedAtLogin(), hiddenStart: true };
+    } catch { return { supported: false, openAtLogin: false, willLaunch: false, consistent: true, wasOpenedAtLogin: false }; }
+  });
+  ipcMain.handle("startup-set", (_e, v: boolean) => {
+    try {
+      if (!startupPrefs) return { ok: false };
+      startupPrefs.setOpenAtLogin(!!v); const vf = startupPrefs.verify();
+      return { ok: true, openAtLogin: vf.osOpenAtLogin, willLaunch: vf.willLaunch, consistent: vf.consistent };
+    } catch (e) { return { ok: false, error: String(((e as any) && (e as any).message) || e) }; }
+  });
+  // F3.5.4N — AUTOCORREÇÃO (item 17): flag que desliga SOMENTE a autocorreção (firebase segue reconectando).
+  ipcMain.handle("selfheal-get", () => ({ enabled: selfHealingEnabled }));
+  ipcMain.handle("selfheal-set", (_e, v: boolean) => { selfHealingEnabled = !!v; saveSelfHealingFlag(selfHealingEnabled); diag("notify.selfheal.flag", { enabled: selfHealingEnabled }); return { enabled: selfHealingEnabled }; });
   // F3.5.3 — leitura de texto da área de transferência p/ o pipeline explícito de COLAGEM do
   // formulário (Legenda/Tema/Observações). SOMENTE texto simples; nunca HTML executável.
   ipcMain.handle("clipboard-read-text", () => { try { return String(clipboard.readText() || ""); } catch { return ""; } });
@@ -636,71 +814,27 @@ app.whenReady().then(() => {
     if (stopReminder) stopReminder();
     if (slaScheduler) { try { slaScheduler.stop(); } catch { /* */ } slaScheduler = null; } // F3.4.3
     if (uid) {
-      // F3.3.3 — notifier/reminder roteiam pelo HUB (ganham toast in-app quando focado,
-      // mantêm a nativa quando minimizado/tray). Mesmos eventos/dedup de antes.
-      // F3.4.4 — passa o papel AUTENTICADO (main, F3.4.3) p/ o roteamento de FLUXO (supervisão
-      // vê-tudo) do produtor u3; sem authUser ⇒ sem privilégio vê-tudo (fail-closed).
-      // F3.5.3 — Categoria A DURÁVEL (atribuição/movimentação/conclusão/reabertura p/ TODOS os
-      // usuários ativos, ator incluído): backlog do 1º snapshot (recupera o perdido com o PC
-      // desligado) + tempo real, com cursor/recibos/deviceId persistentes. Instância ÚNICA por
-      // login, COMPOSTA no stopNotifier — logout/troca/quit/updater já a encerram pelos teardowns
-      // aprovados (nenhuma linha nova nas regiões pinadas). toastAck.clear() idem (sem fallback
-      // tardio cruzando usuários).
-      const _stopEventNew = startNotifier(() => mainWin, uid, deliverNotification, getAuthUser);
-      const _notifierA = startNotifierA(uid, deliverNotification);
-      notifierAHandle = _notifierA; // F3.5.4K — handle p/ reconcile no resume/unlock (recuperação única)
-      // F3.5.4-C1 — _notifSeen (dedup de EXIBIÇÃO do HUB) é POR SESSÃO DE USUÁRIO: sem o clear,
-      // um evento exibido ao usuário anterior voltava como {ok:true, channel:"dedup"} para o novo
-      // usuário no MESMO computador — o notifierA gravava recibo e avançava cursor SEM nenhuma
-      // superfície exibida (perda silenciosa cruzando usuários). A dedup REAL continua nos
-      // recibos persistentes por usuário+dispositivo (notifStore) e no seen-set do SLA.
-      stopNotifier = () => { try { _stopEventNew(); } catch { /* */ } try { _notifierA.stop(); } catch { /* */ } notifierAHandle = null; try { toastAck.clear(); } catch { /* */ } try { _notifSeen.clear(); } catch { /* */ } };
-      // F3.3.77A-R4B — RELÓGIO CANÔNICO: liga a sincronização (main) via cabeçalho HTTP Date do
-      // getUserSelf (Cloud Run, read-only, SEM auth ⇒ zero mutação). Empurra o offset ao renderer,
-      // que o aplica em canonicalNowMs()/_slaClockOffsetMs e rearma as timelines de SLA.
+      currentUid = uid; // F3.5.4N — ANTES de iniciar os listeners (restartAll/isAuthValid dependem do uid)
+      try { if (listenerWatchdog) listenerWatchdog.resetForLogin(); } catch { /* */ } // F3.5.4N — novo episódio de supervisão
+      // F3.5.3/F3.5.4N — INÍCIO dos listeners Firestore (notifier de eventos + Categoria A DURÁVEL p/
+      // TODOS os usuários ativos + produtor AUTORITATIVO de SLA + escuta de conclusão). Extraído p/
+      // startUserListeners: é o MESMO caminho reusado pelo ÚLTIMO RECURSO do watchdog (para a geração
+      // antiga ANTES da nova; single-active). authUser=papel AUTENTICADO (F3.4.3/R4B). Recibos
+      // (notifierA) + seen POR USUÁRIO (slaScheduler, F3.5.4-C3) + gate sinceMs (eventos) + _notifSeen/
+      // toastAck por sessão (F3.5.4-C1) impedem duplicação no 1º snapshot após login/restart.
+      startUserListeners(uid);
+      // F3.3.77A-R4B — RELÓGIO CANÔNICO: sincronização (main) via cabeçalho HTTP Date do getUserSelf
+      // (Cloud Run, read-only, SEM auth ⇒ zero mutação). Empurra o offset ao renderer.
       if (clockSync) { try { clockSync.stop(); } catch { /* */ } }
       clockSync = createClockSync({
         emit: (s) => { try { const w = mainWin; if (w && !w.isDestroyed()) w.webContents.send("clock-state", s); } catch { /* */ } },
         onLog: (t, d) => { try { diag(t, d as any); } catch { /* */ } },
       });
       clockSync.start();
-      // F3.4.3 — PRODUTOR AUTORITATIVO DE SLA no MAIN (amarelo/vermelho/crítico). Reaproveita o
-      // listener Firestore long-polling (main, nunca suspenso), usa o MESMO "agora" canônico do
-      // renderer (slaNow → offset do clockSync) e entrega pelo MESMO HUB (deliverNotification →
-      // toast quando visível / bg-window quando oculto). reconcile('boot') entrega os boundaries
-      // já vencidos (ex.: app reaberto após o prazo) exatamente uma vez (seen-set persistente).
-      // authUser: papel AUTENTICADO (auth-core getUserSelf/login), usado só p/ o gate canSeeAll do
-      // operational_block — nunca o role do renderer, nunca a coleção users, nunca Rules/backend.
-      // F3.5.4-C3 — seen POR USUÁRIO injetado via opts.seen (mesmo arquivo idseven-sla-seen.json;
-      // chaves novas "<uid>|<dedupKey>"; legadas honradas em leitura). Sem isso, T-30/T-10 consumida
-      // por um usuário era engolida p/ outro usuário na MESMA máquina (ex.: reatribuição). A forma
-      // aprovada F3.4.3/R4B (produtor ÚNICO no main + relógio canônico + papel autenticado) segue
-      // EXATAMENTE a mesma — registro literal preservado:
-      //   slaScheduler = startSlaScheduler(() => uid, deliverNotification, { now: slaNow, authUser: getAuthUser });
-      slaScheduler = startSlaScheduler(() => uid, deliverNotification, { now: slaNow, authUser: getAuthUser, seen: createUserSlaSeen(uid) });
-      slaScheduler.reconcile("boot");
-      // F3.5.4L — LEMBRETE CENTRAL: uid corrente (filtra pendentes), reexibe pendentes NÃO reconhecidos
-      // do usuário logado (persistência entre reinícios) e liga a escuta READ-ONLY de conclusão (tarefa
-      // concluída com o modal aberto ⇒ vira "concluída" mantendo OK; suprime o vermelho futuro). Escuta
-      // independente/aditiva — NÃO toca o scheduler/notifierA (congelados). Encerrada no logout/quit.
-      currentUid = uid;
+      // F3.5.4L — LEMBRETE CENTRAL: reexibe pendentes NÃO reconhecidos do usuário logado (persistência
+      // entre reinícios). uid corrente (getUid) já foi setado acima; a escuta de conclusão foi ligada
+      // dentro de startUserListeners.
       try { if (slaReminderCtl) slaReminderCtl.reconcile("login"); } catch { /* */ }
-      try {
-        if (stopSlaWatch) { try { stopSlaWatch(); } catch { /* */ } stopSlaWatch = null; }
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const _slaRulesRt: any = require("./slaRules");
-        stopSlaWatch = fbListen("tasks", (snap: any) => {
-          try {
-            const changes = (snap && snap.docChanges && snap.docChanges()) || [];
-            for (const ch of changes) {
-              const id = ch && ch.doc && ch.doc.id; if (!id) continue;
-              if (ch.type === "removed") { if (slaReminderCtl) slaReminderCtl.noteCompleted(String(id)); continue; }
-              const d: any = (ch.doc.data && ch.doc.data()) || {};
-              try { if (_slaRulesRt.slaPanelDelivered(Object.assign({ id }, d)) && slaReminderCtl) slaReminderCtl.noteCompleted(String(id)); } catch { /* */ }
-            }
-          } catch { /* escuta de conclusão nunca derruba nada */ }
-        });
-      } catch { /* */ }
       // UPDATER:BEGIN (F3.4.1A — política de verificação item 2: após restauração da sessão)
       if (updater) updater.checkAuto("session-restore");
       // UPDATER:END
@@ -715,6 +849,7 @@ app.whenReady().then(() => {
     // F3.5.4L — encerra a escuta de conclusão e limpa o modal/fila em memória (store PRESERVADO;
     // o próximo login reexibe os pendentes do novo usuário). currentUid zerado.
     currentUid = "";
+    try { if (listenerWatchdog) listenerWatchdog.onLogout(); } catch { /* */ } // F3.5.4N — encerra supervisão (limpa timer de último recurso)
     try { if (stopSlaWatch) { stopSlaWatch(); stopSlaWatch = null; } } catch { /* */ }
     try { if (slaReminderCtl) slaReminderCtl.clearActive(); } catch { /* */ }
   });
