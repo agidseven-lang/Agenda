@@ -1,70 +1,120 @@
 /**
- * F3.5.4N — faultAuth.ts — AUTORIZAÇÃO ASSINADA (Ed25519) do fault-injection de teste.
+ * F3.5.4N — faultAuth.ts — AUTORIZAÇÃO LOCAL do fault-injection (100% dentro do Agenda, no
+ * computador autorizado; SEM chave externa, SEM ferramenta externa, SEM ação técnica do owner).
  * =====================================================================================
- * O mecanismo de fault-injection (interromper de verdade a assinatura para provar a autocorreção)
- * fica PRESENTE no binário porém INACESSÍVEL por padrão. Só é liberado por um TOKEN:
- *   - assinado por uma chave PRIVADA que vive FORA do aplicativo (com o owner, offline);
- *   - o app embute SOMENTE a chave PÚBLICA (verificação; NÃO é segredo, não mina tokens);
- *   - vinculado ao deviceId da máquina autorizada;
- *   - com expiração (exp) curta;
- *   - de uso único por nonce (o chamador registra o nonce consumido).
- * Assim: NÃO há segredo reutilizável nem senha fixa no cliente (reforço #8); usuário comum ou
- * ambiente de produção NÃO conseguem ativar (sem a chave privada, nenhum token válido existe);
- * e os MESMOS bytes testados vão para produção (o hook é inerte sem token — reforço #5/#18).
+ * Toda a autorização é criada DENTRO do app, no dispositivo autorizado, protegida pelo WINDOWS
+ * (Electron safeStorage → DPAPI). Nenhum segredo é exportado, exibido, logado ou enviado; nada
+ * entra em GitHub/app.asar/artifacts; não é compartilhável entre dispositivos.
  *
- * Formato do token: base64url(JSON(payload)) + "." + base64url(assinatura Ed25519 do JSON(payload)).
- *   payload = { action:"listener.fault-injection", deviceId, exp:<ms epoch>, nonce }
+ * Duas camadas:
+ *  (1) ENROLAMENTO do dispositivo — grava um segredo aleatório CIFRADO por safeStorage (DPAPI é
+ *      atrelado ao usuário+máquina: o ciphertext não decifra em outro computador). É a prova de
+ *      "dispositivo autorizado". Criado só quando o admin ativa o Diagnóstico administrativo no
+ *      canal interno F3.5.4N.
+ *  (2) AUTORIZAÇÃO TEMPORÁRIA — "Preparar teste" cria uma autorização só em MEMÓRIA do processo
+ *      main: exp ≤10min, nonce, USO ÚNICO, vinculada ao deviceId. "Executar teste real" a CONSOME.
+ *      Logout / troca de canal / fechar/reiniciar o app a invalidam (memória + invalidate()).
+ *
+ * Fail-closed: sem safeStorage disponível, sem enrolamento válido, ou sem autorização viva, tudo
+ * é negado — nenhuma assinatura é interrompida. Injetável (secure/store/now/rng) → testável.
  */
-import crypto from "crypto";
+export type SecureStore = {
+  isAvailable: () => boolean;      // safeStorage.isEncryptionAvailable()
+  encrypt: (plain: string) => Buffer;   // safeStorage.encryptString
+  decrypt: (buf: Buffer) => string;     // safeStorage.decryptString
+};
+export type EnrollStore = {
+  readB64: () => string | null;    // ciphertext (base64) do enrolamento, se houver
+  writeB64: (b64: string) => void;
+  clear: () => void;
+};
+export type FaultAuthDeps = {
+  secure: SecureStore;
+  store: EnrollStore;
+  now?: () => number;
+  rng?: (n: number) => string;     // hex aleatório (default crypto.randomBytes)
+  onLog?: (tag: string, data?: unknown) => void;
+  ttlMs?: number;                  // default 10min
+};
 
-// Chave PÚBLICA de verificação (SPKI PEM). NÃO é segredo. A chave PRIVADA correspondente é gerada
-// EXCLUSIVAMENTE na máquina Windows controlada da ID Seven (ferramenta local independente
-// tools/f354n-fault-authorizer) e permanece SOMENTE com o owner — NUNCA entra no app/repo/log/chat.
-// ATÉ o owner gerar e me enviar a PÚBLICA DEFINITIVA, esta constante é um PLACEHOLDER e o
-// fault-injection fica FAIL-CLOSED (verifyFaultToken devolve ok:false / no_pubkey_provisioned):
-// nenhuma assinatura é interrompida, nenhum botão admin aparece, nenhum IPC executa a ação.
-export const FAULT_INJECTION_PUBLIC_KEY_PEM = "__F354N_FAULT_PUBLIC_KEY_PLACEHOLDER__";
+const DEFAULT_TTL_MS = 10 * 60 * 1000;
 
-/** Há chave pública DEFINITIVA provisionada? (PEM real, não o placeholder) */
-export function faultPublicKeyProvisioned(pem?: string): boolean {
-  const p = String(pem || FAULT_INJECTION_PUBLIC_KEY_PEM || "");
-  return p.indexOf("BEGIN PUBLIC KEY") >= 0;
-}
+type PreparedAuth = { deviceId: string; exp: number; nonce: string; used: boolean };
 
-export type FaultAuthResult = { ok: boolean; reason?: string; exp?: number; nonce?: string };
+export function createFaultAuth(deps: FaultAuthDeps) {
+  const now = deps.now || (() => Date.now());
+  const ttl = deps.ttlMs || DEFAULT_TTL_MS;
+  const log = deps.onLog || (() => { /* */ });
+  const rng = deps.rng || ((n: number) => { try { return require("crypto").randomBytes(n).toString("hex"); } catch { return String(now()) + ":" + n; } });
 
-function b64urlDecode(s: string): Buffer {
-  const pad = s.length % 4 === 0 ? "" : "=".repeat(4 - (s.length % 4));
-  return Buffer.from(s.replace(/-/g, "+").replace(/_/g, "/") + pad, "base64");
-}
+  let prepared: PreparedAuth | null = null;
 
-/**
- * Verifica um token de fault-injection. NÃO tem efeito colateral (não consome nonce): o chamador
- * é responsável por rejeitar nonce já usado. Retorna ok=false com reason sanitizado em qualquer
- * divergência (assinatura inválida, deviceId, expirado, ação, formato).
- */
-export function verifyFaultToken(token: string, deviceId: string, nowMs: number, publicKeyPem?: string): FaultAuthResult {
-  try {
-    const t = String(token || "");
-    const dot = t.indexOf(".");
-    if (dot <= 0 || dot >= t.length - 1) return { ok: false, reason: "format" };
-    const payloadRaw = b64urlDecode(t.slice(0, dot));
-    const sig = b64urlDecode(t.slice(dot + 1));
-    let payload: any;
-    try { payload = JSON.parse(payloadRaw.toString("utf8")); } catch { return { ok: false, reason: "payload" }; }
-    if (!payload || payload.action !== "listener.fault-injection") return { ok: false, reason: "action" };
-    if (String(payload.deviceId || "") !== String(deviceId || "") || !deviceId) return { ok: false, reason: "device" };
-    const exp = Number(payload.exp || 0);
-    if (!exp || nowMs >= exp) return { ok: false, reason: "expired" };
-    if (!payload.nonce) return { ok: false, reason: "nonce" };
-    const pem = publicKeyPem || FAULT_INJECTION_PUBLIC_KEY_PEM;
-    if (!faultPublicKeyProvisioned(pem)) return { ok: false, reason: "no_pubkey_provisioned" }; // FAIL-CLOSED até a pública definitiva
-    let pub: crypto.KeyObject;
-    try { pub = crypto.createPublicKey(pem); } catch { return { ok: false, reason: "pubkey" }; }
-    const good = crypto.verify(null, payloadRaw, pub, sig);
-    if (!good) return { ok: false, reason: "signature" };
-    return { ok: true, exp, nonce: String(payload.nonce) };
-  } catch (e) {
-    return { ok: false, reason: "error" };
+  function isSupported(): boolean { try { return !!deps.secure.isAvailable(); } catch { return false; } }
+
+  function readEnroll(): { deviceId: string; secret: string; at: number } | null {
+    try {
+      const b64 = deps.store.readB64(); if (!b64) return null;
+      const plain = deps.secure.decrypt(Buffer.from(b64, "base64")); // só decifra na mesma máquina/usuário
+      const o = JSON.parse(plain);
+      if (o && typeof o.deviceId === "string" && typeof o.secret === "string") return o;
+    } catch { /* fail-closed */ }
+    return null;
   }
+
+  function isDeviceEnrolled(deviceId: string): boolean {
+    if (!deviceId) return false;
+    const e = readEnroll();
+    return !!(e && e.deviceId === deviceId);
+  }
+
+  return {
+    isSupported,
+    isDeviceEnrolled,
+
+    /** Admin ativa o Diagnóstico administrativo neste dispositivo (grava enrolamento cifrado). */
+    enroll(deviceId: string): { ok: boolean; reason?: string } {
+      if (!isSupported()) { log("listener.faultauth.unsupported", {}); return { ok: false, reason: "unsupported" }; }
+      if (!deviceId) return { ok: false, reason: "device" };
+      try {
+        const rec = JSON.stringify({ deviceId, secret: rng(32), at: now() });
+        deps.store.writeB64(deps.secure.encrypt(rec).toString("base64"));
+        log("listener.faultauth.enrolled", { device: mask(deviceId) });
+        return { ok: true };
+      } catch (e) { return { ok: false, reason: "encrypt" }; }
+    },
+
+    /** Admin desativa (limpa enrolamento e qualquer autorização viva). */
+    unenroll(): void { try { deps.store.clear(); } catch { /* */ } prepared = null; log("listener.faultauth.unenrolled", {}); },
+
+    /** "Preparar teste": cria autorização temporária (memória) se enrolado + suportado. */
+    prepare(deviceId: string): { ok: boolean; reason?: string; exp?: number } {
+      if (!isSupported()) return { ok: false, reason: "unsupported" };
+      if (!isDeviceEnrolled(deviceId)) return { ok: false, reason: "not_enrolled" };
+      prepared = { deviceId, exp: now() + ttl, nonce: rng(12), used: false };
+      log("listener.faultauth.prepared", { device: mask(deviceId), ttlMs: ttl });
+      return { ok: true, exp: prepared.exp };
+    },
+
+    /** "Executar teste real": consome a autorização (uso único). */
+    consume(deviceId: string): { ok: boolean; reason?: string; nonce?: string } {
+      const p = prepared;
+      if (!p) return { ok: false, reason: "no_auth" };
+      if (p.used) return { ok: false, reason: "used" };
+      if (now() >= p.exp) { prepared = null; return { ok: false, reason: "expired" }; }
+      if (p.deviceId !== deviceId || !deviceId) return { ok: false, reason: "device" };
+      p.used = true;
+      log("listener.faultauth.consumed", { device: mask(deviceId) });
+      return { ok: true, nonce: p.nonce };
+    },
+
+    /** Invalida a autorização viva (logout / troca de canal / teardown). */
+    invalidate(reason: string): void { if (prepared) { prepared = null; log("listener.faultauth.invalidated", { reason }); } },
+
+    status(deviceId: string): { supported: boolean; enrolled: boolean; prepared: boolean; exp: number } {
+      const alive = !!(prepared && !prepared.used && now() < prepared.exp && prepared.deviceId === deviceId);
+      return { supported: isSupported(), enrolled: isDeviceEnrolled(deviceId), prepared: alive, exp: alive && prepared ? prepared.exp : 0 };
+    },
+  };
 }
+
+function mask(s: string): string { const v = String(s || ""); return v.length <= 6 ? "***" : v.slice(0, 3) + "…" + v.slice(-2); }
