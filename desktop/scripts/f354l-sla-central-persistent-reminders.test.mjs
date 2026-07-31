@@ -283,7 +283,20 @@ function bytesIdenticalVs201(rel) {
   try { const out = execSync("git -C " + JSON.stringify(DESK) + " diff --stat 047261b7587951e0496d5f4eff0cda5998269161 HEAD -- " + JSON.stringify(rel), { encoding: "utf8" }); return out.trim() === ""; }
   catch { return false; }
 }
-ok(bytesIdenticalVs201("src/renderer/index.html"), "49 index.html byte-idêntico a 1.0.201 (comuns/Monitor SLA/sino intactos)");
+// F3.5.4N — index.html SAIU do byte-congelado: recebe DIFF CONTROLADO (seção "Inicialização com o
+// Windows" + toggle de autocorreção + reporte de rede — TUDO aditivo). As COMUNS (toast/Monitor SLA/
+// sino/Cronograma/Card Premium) ficam intactas: nenhuma remoção as toca e as âncoras seguem presentes.
+function f354nIndexControlledDiff() {
+  let d = "";
+  try { d = execSync("git -C " + JSON.stringify(DESK) + " diff 047261b7587951e0496d5f4eff0cda5998269161 HEAD -- src/renderer/index.html", { encoding: "utf8" }); } catch { return false; }
+  const rm = d.split("\n").filter((l) => l.startsWith("-") && !l.startsWith("---"));
+  const hasF354n = /startupCardHtml/.test(d) && /data-cfgstartup/.test(d) && /data-cfgselfheal/.test(d) && /desktopAPI\.netStatus/.test(d);
+  const rmTouchesFrozen = rm.some((l) => /f354gMonAlerts|slaibToggle|cronSanitizeDeep|notifToastOnce|buildShareClientUrl|kbv2/.test(l));
+  const cur = fs.readFileSync(path.join(DESK, "src/renderer/index.html"), "utf8");
+  const anchorsPresent = /f354gMonAlerts/.test(cur) && /function slaibToggle\(/.test(cur) && /function cronSanitizeDeep\(/.test(cur) && /notifToastOnce/.test(cur);
+  return hasF354n && !rmTouchesFrozen && anchorsPresent;
+}
+ok(f354nIndexControlledDiff(), "49 index.html — DIFF CONTROLADO F3.5.4N (Inicialização + autocorreção aditivas; comuns/Monitor SLA/sino/Cronograma intactos)");
 ok(bytesIdenticalVs201("src/main/slaScheduler.ts"), "50 slaScheduler.ts (tempos/boundaries) byte-idêntico a 1.0.201");
 ok(bytesIdenticalVs201("src/main/slaRules.js"), "51 slaRules.js (T-30/T-10/destinatários/dedup) byte-idêntico");
 ok(bytesIdenticalVs201("src/main/cardsRules.js"), "52 cardsRules.js (T-30/T-10 cards) byte-idêntico");
