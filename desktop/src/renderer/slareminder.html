@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data: https: http:; media-src data:; font-src 'none'; connect-src 'none'" />
+<title>Agenda ID Seven — Lembrete de SLA</title>
+<style>
+  :root{ --amber:#F59E0B; --amber-d:#B45309; --red:#DC2626; --red-d:#991B1B; --ink:#0F172A; --muted:#64748B; }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html,body{ background:transparent; overflow:hidden; -webkit-user-select:none; user-select:none; font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif; }
+  #wrap{ padding:20px 16px 16px; display:flex; justify-content:center; }
+  .card{ position:relative; width:100%; max-width:420px; background:#FFFFFF; border-radius:20px;
+    box-shadow:0 30px 80px -18px rgba(2,6,23,.62), 0 6px 18px rgba(2,6,23,.18);
+    padding:44px 22px 20px; text-align:center; border:1px solid rgba(15,23,42,.06); }
+  .card::before{ content:""; position:absolute; left:0; right:0; top:0; height:6px; border-radius:20px 20px 0 0; background:var(--amber); }
+  .card.red::before{ background:var(--red); }
+  .av{ position:absolute; top:-32px; left:50%; transform:translateX(-50%); width:72px; height:72px; border-radius:50%;
+    border:4px solid #fff; box-shadow:0 8px 22px rgba(2,6,23,.28); background:#E2E8F0 center/cover no-repeat;
+    display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:26px; overflow:hidden; }
+  .kicker{ font-size:13px; font-weight:800; letter-spacing:2px; color:var(--amber-d); margin-bottom:2px; }
+  .card.red .kicker{ color:var(--red-d); }
+  .name{ font-size:15px; font-weight:700; color:var(--ink); margin-bottom:10px; }
+  .msg{ font-size:15px; color:var(--ink); line-height:1.4; margin:0 4px 8px; }
+  .task{ font-size:14px; font-weight:600; color:var(--ink); margin:6px 8px 2px; }
+  .ctx{ font-size:12.5px; color:var(--muted); margin:0 8px 16px; }
+  .ok{ display:block; width:100%; border:none; border-radius:12px; padding:13px 16px; font-size:15px; font-weight:800;
+    letter-spacing:.5px; color:#fff; cursor:pointer; background:var(--amber); box-shadow:0 8px 18px -6px rgba(245,158,11,.7); }
+  .card.red .ok{ background:var(--red); box-shadow:0 8px 18px -6px rgba(220,38,38,.7); }
+  .ok:active{ transform:translateY(1px); }
+  .pend{ margin-top:10px; font-size:11.5px; color:var(--muted); min-height:14px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div class="card" id="card">
+    <div class="av" id="av"></div>
+    <div class="kicker" id="kicker">ATENÇÃO</div>
+    <div class="name" id="name"></div>
+    <div class="msg" id="msg"></div>
+    <div class="task" id="task"></div>
+    <div class="ctx" id="ctx"></div>
+    <button class="ok" id="ok" type="button">OK</button>
+    <div class="pend" id="pend"></div>
+  </div>
+</div>
+<script>
+(function(){
+  "use strict";
+  var api = window.slaAPI || {};
+  var cur = null;            // view atual
+  var lastSoundKey = "";     // toca 1x por chave (abrir) e na promoção (chave muda de nível)
+  var audio = null;
+
+  function initials(name){
+    var n = String(name||"").trim(); if(!n) return "?";
+    var p = n.split(/\s+/); var a = (p[0]||"")[0]||""; var b = (p.length>1?(p[p.length-1][0]||""):"");
+    return (a+b).toUpperCase() || "?";
+  }
+  function colorFor(name){
+    var s = String(name||""); var h = 0; for(var i=0;i<s.length;i++){ h=(h*31 + s.charCodeAt(i))>>>0; }
+    var hues=[210,265,330,20,150,190]; return "hsl("+hues[h%hues.length]+" 55% 55%)";
+  }
+  function render(v){
+    if(!v) return; cur = v;
+    var card = document.getElementById("card");
+    var red = (v.level === "critical");
+    card.className = "card" + (red ? " red" : "");
+    document.getElementById("kicker").textContent = red ? "URGENTE" : "ATENÇÃO";
+    var av = document.getElementById("av");
+    if(v.actorAvatar){ av.style.backgroundImage = "url('"+String(v.actorAvatar).replace(/'/g,"")+"')"; av.textContent=""; av.style.background = "#E2E8F0 center/cover no-repeat"; av.style.backgroundImage="url('"+String(v.actorAvatar).replace(/'/g,"")+"')"; }
+    else { av.style.backgroundImage=""; av.style.background = colorFor(v.actorName); av.textContent = initials(v.actorName); }
+    document.getElementById("name").textContent = v.actorName || "";
+    document.getElementById("msg").textContent = v.body || "";
+    var tk = v.taskTitle || "Tarefa"; if(v.clientName) tk += " — " + v.clientName;
+    document.getElementById("task").textContent = tk;
+    document.getElementById("ctx").textContent = v.context || "";
+    var pend = document.getElementById("pend");
+    pend.textContent = (Number(v.queueLen)>1) ? (v.queueLen + " alertas pendentes") : "";
+    // som: 1x ao abrir/promover (nunca em loop, nunca a cada render)
+    if(v.soundDataUri && v.key && v.key !== lastSoundKey){
+      lastSoundKey = v.key;
+      try { audio = new Audio(v.soundDataUri); audio.play().catch(function(){}); } catch(_e){}
+    }
+    // altura -> centraliza no main; prova de render p/ fallback nativo
+    try{ var h = document.getElementById("card").getBoundingClientRect().height + 40; api.resize && api.resize(Math.ceil(h)); }catch(_e){}
+    try{ api.rendered && api.rendered(v.key); }catch(_e){}
+  }
+  if(api.onCard) api.onCard(render);
+  document.getElementById("ok").addEventListener("click", function(){
+    if(cur && cur.key){ try{ api.ok && api.ok(cur.key); }catch(_e){} }
+  });
+  // clique no cartão (fora do OK) NÃO fecha e NÃO abre nada por engano; só o OK reconhece.
+  // ESC/clique-fora não têm efeito aqui (janela focusable:false; sem handler de ESC).
+})();
+</script>
+</body>
+</html>

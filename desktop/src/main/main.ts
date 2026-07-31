@@ -22,6 +22,10 @@ import { initBgNotify, showBgNotify, stopBgNotify, bgStatus } from "./bgNotify";
 import { registerAuthIpc, getAuthUser } from "./auth"; // F3.3.56-G2 — auth server-side (token confinado ao main); F3.4.3 — papel autenticado p/ operational_block
 import { registerPrewarmIpc } from "./prewarm"; // F3.3.73I6C18C — prewarm do Card Premium (IPC restrito ao /share)
 import { createClockSync } from "./clockSync"; // F3.3.77A-R4B — relógio canônico via cabeçalho HTTP Date (Cloud Run read-only)
+import { listen as fbListen } from "./firebase"; // F3.5.4L — escuta read-only p/ "tarefa concluída com modal aberto" (sessão)
+import { createSlaReminderController, classifyReminderLevel } from "./slaReminder"; // F3.5.4L — lembrete CENTRAL persistente de SLA (amarelo/vermelho)
+import { createSlaReminderSurface, loadReminderSounds } from "./slaReminderWindow"; // F3.5.4L — superfície Electron (janela central, som local)
+import { createSlaReminderStore } from "./slaReminderStore"; // F3.5.4L — recibo de reconhecimento (OK) + pendentes persistentes
 // UPDATER:BEGIN (F3.4.1A — atualizador nativo, processo main)
 import { createUpdaterService } from "./updaterService";
 // UPDATER:END
@@ -39,6 +43,14 @@ let sessionLocked = false;
 let pendingDeep: string | null = null;
 let notifierAHandle: { stop: () => void; reconcile: (reason?: string) => void } | null = null;
 const notifTele = { lastAt: 0, lastChannel: "", lastEventType: "", lastFailAt: 0, lastFailReason: "" };
+// F3.5.4L — lembrete CENTRAL persistente de SLA (amarelo/vermelho). Controlador (fila/promoção/ack/
+// persistência/lock) + superfície Electron (janela central). Uma instância; o uid logado filtra a
+// reexibição de pendentes. Sons locais lidos UMA vez do pacote (data URI).
+let slaReminderCtl: ReturnType<typeof createSlaReminderController> | null = null;
+let currentUid = "";
+let slaReminderSounds: { warning: string; critical: string } = { warning: "", critical: "" };
+let stopSlaWatch: (() => void) | null = null; // escuta read-only de conclusão (tarefa concluída c/ modal aberto)
+const slaReminderTele = { lastShownAt: 0, lastLevel: "", lastAckAt: 0, queueLen: 0 };
 // F3.3.70D3R10U — opts do tray centralizados (usados por startup, session-login,
 // heartbeat e IPC tray-recreate; a recriacao usa SEMPRE o mesmo menu/quit).
 const trayWin = () => mainWin;
@@ -52,6 +64,8 @@ function updaterTeardownForInstall() {
   try { if (stopReminder) stopReminder(); } catch { /* */ }
   try { if (clockSync) { clockSync.stop(); clockSync = null; } } catch { /* */ }
   try { if (slaScheduler) { slaScheduler.stop(); slaScheduler = null; } } catch { /* */ } // F3.4.3
+  try { if (typeof stopSlaWatch !== "undefined" && stopSlaWatch) { stopSlaWatch(); stopSlaWatch = null; } } catch { /* */ } // F3.5.4L (typeof-guard p/ harnesses)
+  try { if (typeof slaReminderCtl !== "undefined" && slaReminderCtl) slaReminderCtl.stop(); } catch { /* */ } // F3.5.4L
   try { stopBgNotify(); } catch { /* */ }
   try { destroyTray(); } catch { /* */ }
   diag("updater.teardownForInstall");
@@ -184,6 +198,23 @@ function deliverNotification(p: NotifPayload): { ok: boolean; channel: string } 
       _notifSeen.add(key);
       if (_notifSeen.size > 4000) { const it = _notifSeen.values(); for (let i = 0; i < 1000; i++) { const v = it.next(); if (v.done) break; _notifSeen.delete(v.value); } }
     };
+    // F3.5.4L — LEMBRETE CENTRAL DE SLA: os alertas AMARELO/VERMELHO do Monitor SLA (eventType /^sla_/
+    // ou operational_block) NÃO usam o toast/premium efêmero — vão para a JANELA CENTRAL PERSISTENTE que
+    // só fecha no OK (fila, promoção amarelo→vermelho, som local, lock→nativa, persistência). As comuns
+    // (movimentação/atribuição/task_updated/event_reminder/etc.) seguem INTACTAS pelo caminho 1.0.201
+    // abaixo. Classificação por eventType (event_reminder é severity 'warning' mas NÃO é SLA).
+    // typeof-guard: harnesses de teste que extraem SÓ o corpo de deliverNotification (fixtures f343/
+    // f354k) rodam sem slaReminderCtl no escopo — o typeof evita ReferenceError e o ramo é ignorado,
+    // preservando byte-a-byte a semântica das notificações COMUNS (toast/premium/nativa) da 1.0.201.
+    if (typeof slaReminderCtl !== "undefined" && slaReminderCtl && classifyReminderLevel(p)) {
+      const r = slaReminderCtl.enqueue(p);
+      if (r && r.ok) {
+        markSeen();
+        notifTele.lastAt = Date.now(); notifTele.lastChannel = r.channel; notifTele.lastEventType = String(p.eventType || "");
+        slaReminderTele.lastShownAt = Date.now(); slaReminderTele.lastLevel = String(classifyReminderLevel(p) || ""); try { slaReminderTele.queueLen = slaReminderCtl.status().queueLen || 0; } catch { /* */ }
+      } else { notifTele.lastFailAt = Date.now(); notifTele.lastFailReason = "sla-central-failed"; }
+      return { ok: !!(r && r.ok), channel: (r && r.channel) || "sla-central" };
+    }
     // F3.5.4K — SESSÃO BLOQUEADA: uma BrowserWindow NÃO aparece sobre a tela de bloqueio do Windows.
     // Entrega direto pela Notification NATIVA (entra na Central; clique abre ao desbloquear). Respeita
     // Não Perturbe / Assistente de Foco / notificações desativadas / política corporativa (o SO decide
@@ -393,6 +424,8 @@ function realQuit() {
   if (stopReminder) stopReminder();
   if (clockSync) { try { clockSync.stop(); } catch { /* */ } clockSync = null; }
   if (slaScheduler) { try { slaScheduler.stop(); } catch { /* */ } slaScheduler = null; } // F3.4.3
+  try { if (typeof stopSlaWatch !== "undefined" && stopSlaWatch) { stopSlaWatch(); stopSlaWatch = null; } } catch { /* */ } // F3.5.4L (typeof-guard p/ harnesses)
+  try { if (typeof slaReminderCtl !== "undefined" && slaReminderCtl) slaReminderCtl.stop(); } catch { /* */ } // F3.5.4L
   try { stopBgNotify(); } catch { /* */ }
   // F3.3.73I6C11 — "Sair do aplicativo" remove o icone da bandeja (evita tray-fantasma no Windows).
   try { destroyTray(); } catch { /* */ }
@@ -425,11 +458,49 @@ app.whenReady().then(() => {
   // Categoria A UMA vez (reconcile); os recibos persistentes impedem repetição (sem duplicar após
   // desbloquear/retomar). suspend ⇒ só diagnóstico. Vários listeners coexistem (EventEmitter).
   try {
-    powerMonitor.on("lock-screen", () => { sessionLocked = true; nlog("notify.session.locked", {}); });
-    powerMonitor.on("unlock-screen", () => { sessionLocked = false; nlog("notify.session.unlocked", {}); try { if (notifierAHandle) notifierAHandle.reconcile("unlock"); } catch { /* */ } });
+    powerMonitor.on("lock-screen", () => { sessionLocked = true; nlog("notify.session.locked", {}); try { if (slaReminderCtl) slaReminderCtl.onLockChange(true); } catch { /* */ } });
+    powerMonitor.on("unlock-screen", () => { sessionLocked = false; nlog("notify.session.unlocked", {}); try { if (notifierAHandle) notifierAHandle.reconcile("unlock"); } catch { /* */ } try { if (slaReminderCtl) slaReminderCtl.onLockChange(false); } catch { /* */ } });
     powerMonitor.on("suspend", () => { diag("power.suspend"); });
-    powerMonitor.on("resume", () => { try { if (notifierAHandle) notifierAHandle.reconcile("resume"); } catch { /* */ } });
+    powerMonitor.on("resume", () => { try { if (notifierAHandle) notifierAHandle.reconcile("resume"); } catch { /* */ } try { if (slaReminderCtl) slaReminderCtl.reconcile("resume"); } catch { /* */ } });
   } catch { /* powerMonitor pode não existir em todas as plataformas */ }
+
+  // F3.5.4L — LEMBRETE CENTRAL PERSISTENTE DE SLA (amarelo/vermelho). Superfície do MAIN (sobrevive a
+  // renderer indisponível/min/tray): sons locais em data URI, store de recibo(OK)+pendentes, controlador
+  // (fila/prioridade/promoção/lock/reconcile). O OK grava recibo ANTES de fechar e registra no sino
+  // (via notif-history; sem toast pois a janela principal não está focada no clique do modal). NÃO
+  // altera as notificações COMUNS (1.0.201) nem o produtor/tempos/destinatários de SLA (congelados).
+  try {
+    slaReminderSounds = loadReminderSounds();
+    const slaReminderStore = createSlaReminderStore({ log: (t: string, d?: unknown) => { try { diag(t, d as any); } catch { /* */ } } });
+    const slaSurface = createSlaReminderSurface({
+      onAck: (key, windowState) => { try { if (slaReminderCtl) slaReminderCtl.ack(key, windowState); } catch { /* */ } },
+      onOpenTask: (deep) => { nlog("notify.click.received", { via: "sla-reminder", deep }); bringToFrontAndOpen(deep); },
+      nativeNotify: (view) => nativeNotify({ title: view.title + " — " + (view.taskTitle || "SLA"), body: view.body || "", eventType: "sla_reminder_native", taskId: (view.deep || "").replace(/^detail\//, ""), action: { type: "detail", deep: view.deep }, sound: true } as any, view.key, view.deep),
+      onLog: (t, d) => { try { diag(t, d as any); } catch { /* */ } },
+    });
+    slaReminderCtl = createSlaReminderController({
+      surface: slaSurface, store: slaReminderStore, now: () => Date.now(),
+      appVersion: (() => { try { return app.getVersion(); } catch { return "dev"; } })(),
+      isLocked: () => sessionLocked, getUid: () => currentUid,
+      soundFor: (lvl) => (lvl === "critical" ? slaReminderSounds.critical : slaReminderSounds.warning),
+      onAcked: (info) => {
+        try {
+          const lvlTxt = info.level === "critical" ? "vermelho" : "amarelo";
+          const nm = String(info.actorName || "").trim();
+          mainWin?.webContents.send("notif-history", {
+            eventType: "sla_ack", severity: "info", taskId: info.taskId, dedupKey: "sla_ack:" + info.key,
+            title: "Alerta de SLA reconhecido",
+            body: (nm ? nm + " " : "") + "reconheceu o alerta " + lvlTxt + " da tarefa " + (info.taskTitle || ""),
+            context: "", createdAt: Date.now(), source: "sla-reminder", providerCalled: false,
+            action: { type: "detail", deep: info.taskId ? "detail/" + info.taskId : "" },
+          });
+          slaReminderTele.lastAckAt = Date.now();
+        } catch { /* histórico local nunca derruba o ack */ }
+      },
+      onLog: (t, d) => { try { diag(t, d as any); } catch { /* */ } },
+    });
+    diag("sla.reminder.init", { warnBytes: (slaReminderSounds.warning || "").length, critBytes: (slaReminderSounds.critical || "").length });
+  } catch (e) { diag("sla.reminder.init.error", { err: String(((e as any) && (e as any).message) || e) }); }
 
   // F3.3.10-BG — registra a janela premium de background + callback de "Abrir tarefa"
   // (reabre a mainWindow minimizada/oculta e navega via deep link). NÃO rouba foco do SO.
@@ -608,6 +679,28 @@ app.whenReady().then(() => {
       //   slaScheduler = startSlaScheduler(() => uid, deliverNotification, { now: slaNow, authUser: getAuthUser });
       slaScheduler = startSlaScheduler(() => uid, deliverNotification, { now: slaNow, authUser: getAuthUser, seen: createUserSlaSeen(uid) });
       slaScheduler.reconcile("boot");
+      // F3.5.4L — LEMBRETE CENTRAL: uid corrente (filtra pendentes), reexibe pendentes NÃO reconhecidos
+      // do usuário logado (persistência entre reinícios) e liga a escuta READ-ONLY de conclusão (tarefa
+      // concluída com o modal aberto ⇒ vira "concluída" mantendo OK; suprime o vermelho futuro). Escuta
+      // independente/aditiva — NÃO toca o scheduler/notifierA (congelados). Encerrada no logout/quit.
+      currentUid = uid;
+      try { if (slaReminderCtl) slaReminderCtl.reconcile("login"); } catch { /* */ }
+      try {
+        if (stopSlaWatch) { try { stopSlaWatch(); } catch { /* */ } stopSlaWatch = null; }
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const _slaRulesRt: any = require("./slaRules");
+        stopSlaWatch = fbListen("tasks", (snap: any) => {
+          try {
+            const changes = (snap && snap.docChanges && snap.docChanges()) || [];
+            for (const ch of changes) {
+              const id = ch && ch.doc && ch.doc.id; if (!id) continue;
+              if (ch.type === "removed") { if (slaReminderCtl) slaReminderCtl.noteCompleted(String(id)); continue; }
+              const d: any = (ch.doc.data && ch.doc.data()) || {};
+              try { if (_slaRulesRt.slaPanelDelivered(Object.assign({ id }, d)) && slaReminderCtl) slaReminderCtl.noteCompleted(String(id)); } catch { /* */ }
+            }
+          } catch { /* escuta de conclusão nunca derruba nada */ }
+        });
+      } catch { /* */ }
       // UPDATER:BEGIN (F3.4.1A — política de verificação item 2: após restauração da sessão)
       if (updater) updater.checkAuto("session-restore");
       // UPDATER:END
@@ -619,6 +712,11 @@ app.whenReady().then(() => {
     if (stopReminder) { stopReminder(); stopReminder = null; }
     if (clockSync) { try { clockSync.stop(); } catch { /* */ } clockSync = null; }
     if (slaScheduler) { try { slaScheduler.stop(); } catch { /* */ } slaScheduler = null; } // F3.4.3
+    // F3.5.4L — encerra a escuta de conclusão e limpa o modal/fila em memória (store PRESERVADO;
+    // o próximo login reexibe os pendentes do novo usuário). currentUid zerado.
+    currentUid = "";
+    try { if (stopSlaWatch) { stopSlaWatch(); stopSlaWatch = null; } } catch { /* */ }
+    try { if (slaReminderCtl) slaReminderCtl.clearActive(); } catch { /* */ }
   });
   // F3.3.77A-R4B — o renderer consulta/força a sincronização do relógio (sem expor token/URL/headers).
   ipcMain.handle("clock-get-state", () => (clockSync ? clockSync.getState() : null));

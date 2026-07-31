@@ -82,7 +82,10 @@ ok('23 SLA/notifier NÃO param no minimize/hide (só em logout/realQuit)', !/on\
 
 /* ── 24 — Sair encerra (realQuit): app.quit + tray "Sair" cabeado a realQuit ── */
 ok('24 Sair: trayOpts.quit === realQuit (menu da bandeja encerra de verdade)', /const trayOpts = \{[^}]*quit: realQuit/.test(MAIN));
-ok('24 realQuit chama app.quit() e destrói a bandeja', /function realQuit\(\)[\s\S]{0,500}destroyTray\(\)[\s\S]{0,160}app\.quit\(\)/.test(MAIN));
+/* F3.5.4L — orçamento de chars ampliado (500→1200): realQuit ganhou o teardown do lembrete central de
+ * SLA (stopSlaWatch + slaReminderCtl.stop, typeof-guarded) ANTES do destroyTray. A INTENÇÃO do teste é
+ * preservada: realQuit continua chamando destroyTray() e app.quit(). */
+ok('24 realQuit chama app.quit() e destrói a bandeja', /function realQuit\(\)[\s\S]{0,1200}destroyTray\(\)[\s\S]{0,160}app\.quit\(\)/.test(MAIN));
 ok('24 realQuit encerra os produtores (notifier/reminder/slaScheduler/clockSync)', /function realQuit\(\)[\s\S]{0,400}stopNotifier\(\)[\s\S]{0,300}slaScheduler\.stop\(\)/.test(MAIN));
 
 console.log('\n===== F3.4.3 — DELIVERY CHANNEL / CLICK / TRAY (main.ts REAL) =====');
