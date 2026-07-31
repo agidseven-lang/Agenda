@@ -1,0 +1,368 @@
+# =====================================================================
+# [push/manual] F3.5.4N — Desktop Build (candidata 1.0.204 — inicialização com o Windows + autocorreção do canal)
+# ---------------------------------------------------------------------
+# Base 1.0.203 OFICIAL (@12abeef, tag v1.0.203, testada fisicamente). Delta F3.5.4N (produção, 100% real):
+#   (1) INICIAR COM O WINDOWS — startupPrefs.ts (default-ON 1x; "o SO é a verdade"; verify) + UI Configurações.
+#   (2) AUTOCORREÇÃO DO CANAL — o reconectador PRIMÁRIO segue no firebase.ts (re-attach 5s→60s, timer ÚNICO
+#       por coleção); o listenerWatchdog SÓ observa os sinais REAIS (firebase.ts emite attach/snapshot/error/
+#       rearm via setListenHealthObserver — diff ADITIVO) e, em falha SUSTENTADA, faz UM restart de último
+#       recurso (single-active). Reconcile por retorno de rede (net-status do renderer). Flag p/ desligar só a
+#       autocorreção. Diagnóstico sanitizado. Alerta admin só quando a autocorreção FALHA.
+# Arquivos autorizados: main.ts (wiring), firebase.ts (observador ADITIVO), preload.ts, index.html (UI),
+# listenerWatchdog.ts (novo), startupPrefs.ts (novo), package(-lock).json, testes. TODO O RESTO byte-idêntico
+# à 1.0.203 (slaScheduler/slaRules/cardsRules/notifier/notifierA/notifStore/slaReminder*/tray/autostart/
+# updater/bgNotify/reminder/Card Premium/Cronograma/Monitor SLA/sino; T-30/T-10; destinatários; Android).
+# Roda no PRÓPRIO ref: `--publish never`, NADA publicado (artifacts privados).
+# =====================================================================
+name: "[push/manual] F3.5.4N Desktop Build (candidata 1.0.204 — inicialização Windows + autocorreção do canal)"
+"on":
+  push:
+    branches:
+      - "desktop/f354n-windows-startup-self-healing-1.0.204"
+    paths-ignore:
+      - ".github/workflows/desktop-release-f354n.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  BASE_202_SHA: "90a518b43b23fcb434a45f6f136dfdaccdad455d" # Desktop 1.0.202 OFICIAL (referência histórica)
+  BASE_203_SHA: "12abeefe547f57700c8faba07b512204c2d24dec" # Desktop 1.0.203 OFICIAL (tag v1.0.203; BASE do delta F3.5.4N)
+  TEST_BRANCH: "desktop/f354n-windows-startup-self-healing-1.0.204"
+  APP_DIR: "desktop"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout (SHA do push; history completo p/ baselines)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Gate REF + ANCESTRIA — branch correta e descendente da 1.0.203 pinada
+        run: |
+          set -e
+          [ "${{ github.ref_name }}" = "$TEST_BRANCH" ] || { echo "::error:: ref '${{ github.ref_name }}' != $TEST_BRANCH"; exit 1; }
+          git merge-base --is-ancestor "$BASE_203_SHA" HEAD || { echo "::error:: HEAD nao descende da base 1.0.203 ($BASE_203_SHA)"; exit 1; }
+          echo "ref=$TEST_BRANCH head=$(git rev-parse HEAD) base=$BASE_203_SHA OK"
+
+      - name: Derivar versao — exige 1.0.204 exato, sem sufixo
+        run: |
+          APP_VERSION=$(node -p "require('./desktop/package.json').version")
+          echo "versao=$APP_VERSION"
+          [ "$APP_VERSION" = "1.0.204" ] || { echo "::error:: versao != 1.0.204"; exit 1; }
+          case "$APP_VERSION" in *-*) echo "::error:: versao com sufixo proibido ($APP_VERSION)"; exit 1;; esac
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: npm ci
+        working-directory: desktop
+        run: npm ci --no-audit --no-fund
+
+      - name: TypeScript build (main + preload + renderer + modulos .js)
+        working-directory: desktop
+        run: npm run build
+
+      - name: Lint (tsc --noEmit)
+        working-directory: desktop
+        run: node ./node_modules/typescript/lib/tsc.js -p tsconfig.json --noEmit
+
+      - name: Gate F3.5.4N WATCHDOG — supervisor/último-recurso (firebase é o 1º reconectador)
+        working-directory: desktop
+        run: |
+          set -e
+          node scripts/f354n-watchdog.test.mjs || { echo "::error:: f354n-watchdog vermelho"; exit 1; }
+
+      - name: Gate F3.5.4N STARTUP — iniciar com o Windows (default-ON 1x; SO é a verdade; verify)
+        working-directory: desktop
+        run: |
+          set -e
+          node scripts/f354n-startup.test.mjs || { echo "::error:: f354n-startup vermelho"; exit 1; }
+
+      - name: Gate REGRESSAO — HUB/entrega/SLA/Categoria A/reminder/clock/updater (delta ZERO vs 1.0.203)
+        working-directory: desktop
+        run: |
+          set -e
+          for t in \
+            f354k-notification-all-window-states \
+            f354l-sla-central-persistent-reminders \
+            f354h-red-notification-boundary \
+            f354i-cronograma-save-send-client \
+            f354-notifications-reliability \
+            f354f-task-edit-update-notification \
+            f354f-sla-designer-live-timer \
+            f353-durable-notifications \
+            f353a-actor-photo \
+            f343-delivery-channel \
+            f343-operational-block \
+            f343-main-scheduler \
+            f343-sla-golden-master \
+            f343-preservation \
+            f347-immediate-visual-delivery \
+            f347-independent-behavior \
+            f352-cards-notify \
+            f352-cards-channel-substitution \
+            f3377a-r4b-http-date-clock \
+            f33A-notif-central \
+            f33F-bg-notify \
+            f341a-updater-state-machine; do
+            node "scripts/$t.test.mjs" || { echo "::error:: regressao vermelha em $t"; exit 1; }
+          done
+          echo "REGRESSAO OK (delta zero vs 1.0.203)."
+
+      - name: Gate CONGELADOS — comportamento byte-idêntico à 1.0.203 (tudo exceto o delta F3.5.4N)
+        run: |
+          set -e
+          # main.ts / firebase.ts / preload.ts / index.html sao o DELTA AUTORIZADO F3.5.4N (fora deste gate).
+          FROZEN="desktop/src/main/slaScheduler.ts desktop/src/main/slaRules.js desktop/src/main/cardsRules.js desktop/src/main/notifEvents.js desktop/src/main/notifier.ts desktop/src/main/notifierA.ts desktop/src/main/notifStore.ts desktop/src/main/slaSeenUser.ts desktop/src/main/toastAck.ts desktop/src/main/reminder.ts desktop/src/main/bgNotify.ts desktop/src/main/tray.ts desktop/src/main/autostart.ts desktop/src/main/updaterService.ts desktop/src/main/clockSync.ts desktop/src/main/actorProfile.js desktop/src/main/auth.ts desktop/src/main/auth-core.ts desktop/src/main/prewarm.ts desktop/src/main/diag.ts desktop/src/main/slaReminder.ts desktop/src/main/slaReminderWindow.ts desktop/src/main/slaReminderStore.ts desktop/src/preload/slareminder-preload.ts desktop/src/preload/bgnotify-preload.ts desktop/src/renderer/slareminder.html desktop/src/renderer/bgnotify.html desktop/src/renderer/sounds/sla-warning.wav desktop/src/renderer/sounds/sla-critical.wav desktop/electron-builder.yml desktop/scripts/copy-renderer.js desktop/tsconfig.json"
+          for f in $FROZEN; do
+            if ! git -C "$GITHUB_WORKSPACE" diff --quiet "$BASE_203_SHA" HEAD -- "$f"; then
+              echo "::error:: arquivo CONGELADO alterado vs 1.0.203: $f"; git -C "$GITHUB_WORKSPACE" diff --stat "$BASE_203_SHA" HEAD -- "$f"; exit 1; fi
+          done
+          echo "CONGELADOS byte-identicos a 1.0.203 OK."
+
+      - name: Gate firebase.ts — DIFF CONTROLADO (observador de saúde ADITIVO; entrega + re-attach INTACTOS)
+        run: |
+          set -e
+          FBD=$(git -C "$GITHUB_WORKSPACE" diff "$BASE_203_SHA" HEAD -- desktop/src/main/firebase.ts)
+          echo "$FBD" | grep -q 'setListenHealthObserver' || { echo "::error:: firebase.ts sem setListenHealthObserver (observador)"; exit 1; }
+          echo "$FBD" | grep -q '_emitHealth' || { echo "::error:: firebase.ts sem _emitHealth"; exit 1; }
+          echo "$FBD" | grep -q 'const generation = ++_genCounter' || { echo "::error:: firebase.ts sem geracao por assinatura"; exit 1; }
+          # ENTREGA (cb) e RE-ATTACH (backoff 5s→60s) preservados: nenhuma REMOCAO na logica de reconexao/entrega.
+          RM=$(echo "$FBD" | grep -E '^-' | grep -vE '^---')
+          if echo "$RM" | grep -qE 'onSnapshot|attempt\+\+|delayMs|rearmTimer|Math\.pow|unsub|cb\(s as any\)'; then
+            echo "::error:: firebase.ts: REMOCAO na logica de entrega/re-attach (reconexao alterada)"; echo "$RM"; exit 1; fi
+          # experimentalForceLongPolling (transporte confiavel em Node) mantido:
+          grep -q 'experimentalForceLongPolling: true' desktop/src/main/firebase.ts || { echo "::error:: firebase.ts sem experimentalForceLongPolling"; exit 1; }
+          echo "firebase.ts DIFF CONTROLADO F3.5.4N OK (aditivo; entrega/re-attach intactos)."
+
+      - name: Gate ISOLAMENTO — diff vs 1.0.203 SÓ nos arquivos autorizados F3.5.4N
+        run: |
+          set -e
+          git -C "$GITHUB_WORKSPACE" diff --name-only "$BASE_203_SHA" HEAD | tee /tmp/f354n-diff.txt
+          if grep -vE '^(desktop/src/main/main\.ts$|desktop/src/main/firebase\.ts$|desktop/src/main/listenerWatchdog\.ts$|desktop/src/main/startupPrefs\.ts$|desktop/src/preload/preload\.ts$|desktop/src/renderer/index\.html$|desktop/scripts/f354n-watchdog\.test\.mjs$|desktop/scripts/f354n-startup\.test\.mjs$|desktop/scripts/f353a-actor-photo\.test\.mjs$|desktop/scripts/f354-notifications-reliability\.test\.mjs$|desktop/scripts/f354i-cronograma-save-send-client\.test\.mjs$|desktop/package\.json$|desktop/package-lock\.json$|docs/f354n-qa/|\.github/workflows/desktop-build-f354n\.yml$|\.github/workflows/desktop-release-f354n\.yml$)' /tmp/f354n-diff.txt | grep -q .; then
+            echo "::error:: diff vs 1.0.203 toca arquivo NAO autorizado"; exit 1; fi
+          echo "ISOLAMENTO OK — diff confinado aos arquivos autorizados F3.5.4N."
+
+      - name: Gate ANDROID/BACKEND intactos — diff nao toca android/ nem functions/ nem worker
+        run: |
+          set -e
+          BAD=$(git -C "$GITHUB_WORKSPACE" diff --name-only "$BASE_203_SHA" HEAD | grep -E '^(android/|functions/|worker/|presence-service/|firestore\.rules)' | wc -l)
+          [ "$BAD" = "0" ] || { echo "::error:: diff toca backend/android ($BAD)"; git -C "$GITHUB_WORKSPACE" diff --name-only "$BASE_203_SHA" HEAD | grep -E '^(android/|functions/|worker/|presence-service/|firestore\.rules)'; exit 1; }
+          echo "ANDROID/BACKEND intactos OK."
+
+  build:
+    needs: verify
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      APP_DIR: desktop
+    steps:
+      - name: Forcar LF no checkout
+        run: git config --global core.autocrlf false
+
+      - name: Checkout (mesmo SHA do run)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Gate REF + ANCESTRIA (windows)
+        run: |
+          set -e
+          [ "${{ github.ref_name }}" = "$TEST_BRANCH" ] || { echo "::error:: ref != $TEST_BRANCH"; exit 1; }
+          git merge-base --is-ancestor "$BASE_203_SHA" HEAD || { echo "::error:: HEAD nao descende da 1.0.203"; exit 1; }
+
+      - name: Gate LINE ENDINGS LF (fontes do delta)
+        run: |
+          set -e
+          for f in desktop/src/main/main.ts desktop/src/main/firebase.ts desktop/src/main/listenerWatchdog.ts desktop/src/main/startupPrefs.ts desktop/src/preload/preload.ts desktop/src/renderer/index.html; do
+            if grep -lU $'\r' "$f" >/dev/null 2>&1; then echo "::error:: CRLF em $f"; exit 1; fi
+          done
+          echo "LF OK."
+
+      - name: Derivar versao — exige 1.0.204 exato
+        run: |
+          APP_VERSION=$(node -p "require('./desktop/package.json').version")
+          [ "$APP_VERSION" = "1.0.204" ] || { echo "::error:: versao != 1.0.204 ($APP_VERSION)"; exit 1; }
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: npm ci
+        working-directory: desktop
+        run: npm ci --no-audit --no-fund
+
+      - name: TypeScript build
+        working-directory: desktop
+        run: npm run build
+
+      - name: electron-builder (NSIS + MSI; --publish never)
+        working-directory: desktop
+        run: npx electron-builder --win nsis msi --publish never
+
+      - name: Gate tray icon empacotado
+        working-directory: desktop
+        run: |
+          set -e
+          test -f dist-installer/win-unpacked/resources/icon.png || { echo "::error:: tray icon.png ausente em resources"; exit 1; }
+          echo "resources/icon.png OK"
+
+      - name: Gate prova-de-versao (asar == 1.0.204) + renderer EMPACOTADO == fonte (EOL-normalizado)
+        working-directory: desktop
+        run: |
+          set -e
+          ASAR="dist-installer/win-unpacked/resources/app.asar"; test -f "$ASAR" || { echo "::error:: app.asar ausente"; exit 1; }
+          EXDIR="$RUNNER_TEMP/asarx"; rm -rf "$EXDIR"; mkdir -p "$EXDIR"; npx --yes @electron/asar extract "$ASAR" "$EXDIR"
+          PKGV=$(P="$EXDIR/package.json" node -e 'console.log(JSON.parse(require("fs").readFileSync(process.env.P,"utf8")).version||"")')
+          [ "$PKGV" = "1.0.204" ] || { echo "::error:: package.json EMPACOTADO version=$PKGV != 1.0.204"; exit 1; }
+          cmp_norm() { EX="$1" SRC="$2" node -e 'const fs=require("fs");const n=s=>String(s).replace(/\r\n/g,"\n");if(n(fs.readFileSync(process.env.EX,"utf8"))!==n(fs.readFileSync(process.env.SRC,"utf8"))){console.error(process.env.SRC+" EMPACOTADO != fonte");process.exit(1);}'; }
+          cmp_norm "$EXDIR/src/renderer/index.html" "src/renderer/index.html"
+          cmp_norm "$EXDIR/src/renderer/slareminder.html" "src/renderer/slareminder.html"
+          echo "GATE prova-de-versao 1.0.204 + renderer==fonte OK."
+
+      - name: Gate F3.5.4N EMPACOTADO — inicialização + autocorreção presentes; comportamento 1.0.203 preservado (24 gates)
+        working-directory: desktop
+        run: |
+          set -e
+          EXDIR="$RUNNER_TEMP/asarx"; DM="$EXDIR/dist/main"; DP="$EXDIR/dist/preload"; RR="$EXDIR/src/renderer"
+          MJS="$DM/main.js"
+          cmp_norm() { EX="$1" SRC="$2" node -e 'const fs=require("fs");const n=s=>String(s).replace(/\r\n/g,"\n");if(n(fs.readFileSync(process.env.EX,"utf8"))!==n(fs.readFileSync(process.env.SRC,"utf8"))){console.error(process.env.SRC+" EMPACOTADO != fonte");process.exit(1);}'; }
+          # ===== INICIALIZAÇÃO COM O WINDOWS (F3.5.4N) =====
+          # 1 — startupPrefs empacotado (default-ON 1x; SO é a verdade; verify)
+          test -f "$DM/startupPrefs.js" || { echo "::error:: startupPrefs.js ausente no asar"; exit 1; }
+          grep -q 'createStartupPrefs' "$DM/startupPrefs.js" || { echo "::error:: createStartupPrefs ausente"; exit 1; }
+          grep -q 'applyDefaultsOnce' "$DM/startupPrefs.js" || { echo "::error:: applyDefaultsOnce ausente"; exit 1; }
+          grep -q -- '--hidden' "$DM/startupPrefs.js" || { echo "::error:: startupPrefs sem --hidden (inicio minimizado)"; exit 1; }
+          # 2 — main aplica default-ON no whenReady + IPC de inicializacao
+          grep -q 'createStartupPrefs' "$MJS" && grep -q 'applyDefaultsOnce' "$MJS" || { echo "::error:: main nao aplica startup defaults"; exit 1; }
+          grep -q '"startup-get"' "$MJS" && grep -q '"startup-set"' "$MJS" || { echo "::error:: IPC startup-get/set ausente"; exit 1; }
+          # 3 — autostart nativo (bandeja congelada) preservado
+          grep -q 'setLoginItemSettings' "$DM/autostart.js" || { echo "::error:: autostart nativo ausente"; exit 1; }
+          # ===== AUTOCORREÇÃO DO CANAL (F3.5.4N) =====
+          # 4 — listenerWatchdog empacotado (supervisor + último recurso)
+          test -f "$DM/listenerWatchdog.js" || { echo "::error:: listenerWatchdog.js ausente"; exit 1; }
+          grep -q 'createListenerWatchdog' "$DM/listenerWatchdog.js" || { echo "::error:: createListenerWatchdog ausente"; exit 1; }
+          grep -q 'lastResort' "$DM/listenerWatchdog.js" || { echo "::error:: watchdog sem último recurso"; exit 1; }
+          grep -q 'IDLE_HEALTHY' "$DM/listenerWatchdog.js" || { echo "::error:: watchdog sem estado ocioso-saudável"; exit 1; }
+          # 5 — firebase.js observa saúde (aditivo) + transporte + re-attach backoff preservados
+          grep -q 'setListenHealthObserver' "$DM/firebase.js" || { echo "::error:: firebase sem observador de saúde"; exit 1; }
+          grep -q '_emitHealth' "$DM/firebase.js" || { echo "::error:: firebase sem _emitHealth"; exit 1; }
+          grep -q 'experimentalForceLongPolling' "$DM/firebase.js" || { echo "::error:: firebase sem long-polling"; exit 1; }
+          grep -q 'Math.pow(2' "$DM/firebase.js" || { echo "::error:: firebase sem backoff exponencial (re-attach)"; exit 1; }
+          # 6 — main liga o watchdog aos sinais reais + rede + restart/reconcile
+          grep -q 'createListenerWatchdog' "$MJS" && grep -q 'setListenHealthObserver' "$MJS" || { echo "::error:: main nao liga o watchdog aos sinais do firebase"; exit 1; }
+          grep -q 'restartAllListeners' "$MJS" && grep -q 'reconcileAllProducers' "$MJS" && grep -q 'startUserListeners' "$MJS" || { echo "::error:: main sem restart/reconcile/startUserListeners"; exit 1; }
+          grep -q '"net-status"' "$MJS" || { echo "::error:: main sem IPC net-status"; exit 1; }
+          # 7 — flag de autocorreção (item 17) + alerta admin (item 18)
+          grep -q 'selfHealingEnabled' "$MJS" && grep -q '"selfheal-get"' "$MJS" && grep -q '"selfheal-set"' "$MJS" || { echo "::error:: main sem flag de autocorreção"; exit 1; }
+          grep -q 'onAdminAlert' "$MJS" || { echo "::error:: main sem alerta admin"; exit 1; }
+          # 8 — preload expõe as pontes novas (sem segredo)
+          test -f "$DP/preload.js" || { echo "::error:: preload.js ausente"; exit 1; }
+          grep -q 'netStatus' "$DP/preload.js" && grep -q 'startupGet' "$DP/preload.js" && grep -q 'startupSet' "$DP/preload.js" && grep -q 'selfHealGet' "$DP/preload.js" && grep -q 'selfHealSet' "$DP/preload.js" || { echo "::error:: preload sem pontes F3.5.4N"; exit 1; }
+          # 9 — renderer: UI de inicialização + toggle autocorreção + reporte de rede
+          grep -q 'startupCardHtml' "$RR/index.html" || { echo "::error:: UI de inicialização ausente"; exit 1; }
+          grep -q 'data-cfgstartup' "$RR/index.html" || { echo "::error:: toggle iniciar-com-Windows ausente"; exit 1; }
+          grep -q 'data-cfgselfheal' "$RR/index.html" || { echo "::error:: toggle autocorreção ausente"; exit 1; }
+          grep -q 'desktopAPI.netStatus' "$RR/index.html" || { echo "::error:: reporte de rede ausente"; exit 1; }
+          # ===== COMPORTAMENTO 1.0.203 PRESERVADO (arquivos congelados byte-idênticos) =====
+          # 10 — HUB de entrega comum (toast/nativa/bg-window/lock-native) intacto no main
+          grep -q 'function deliverNotification' "$MJS" || { echo "::error:: deliverNotification ausente"; exit 1; }
+          grep -q 'notif-toast' "$MJS" && grep -q 'showBgNotify' "$MJS" || { echo "::error:: roteamento toast/bg ausente"; exit 1; }
+          # 11 — LEMBRETE CENTRAL de SLA (F3.5.4L/M) intacto
+          grep -q 'createSlaReminderController' "$DM/slaReminder.js" && grep -q 'classifyReminderLevel' "$DM/slaReminder.js" || { echo "::error:: controlador do lembrete central ausente"; exit 1; }
+          grep -q 'showInactive' "$DM/slaReminderWindow.js" && grep -q 'slareminder.html' "$DM/slaReminderWindow.js" || { echo "::error:: janela central do lembrete ausente"; exit 1; }
+          test -f "$RR/sounds/sla-warning.wav" && head -c 4 "$RR/sounds/sla-warning.wav" | grep -q 'RIFF' || { echo "::error:: som local do lembrete ausente/invalido"; exit 1; }
+          # 12 — DESTINATARIOS: notifEvents == fonte + Categoria A
+          cmp_norm "$DM/notifEvents.js" "src/main/notifEvents.js"
+          grep -q "recipientMode: 'all_active_users'" "$DM/notifEvents.js" || { echo "::error:: Categoria A alterada"; exit 1; }
+          grep -qF "recipientMode: 'assigned_designer'" "$DM/notifEvents.js" || { echo "::error:: assigned_designer ausente"; exit 1; }
+          # 13 — TEMPOS CONGELADOS: cardsRules T-30/T-10 + slaRules == fonte
+          cmp_norm "$DM/cardsRules.js" "src/main/cardsRules.js"
+          cmp_norm "$DM/slaRules.js" "src/main/slaRules.js"
+          grep -qF 'var CARDS_WARN_MS = 30 * 60000' "$DM/cardsRules.js" || { echo "::error:: T-30 alterada"; exit 1; }
+          grep -qF 'var CARDS_RED_MS  = 10 * 60000' "$DM/cardsRules.js" || { echo "::error:: T-10 alterada"; exit 1; }
+          # 14 — scheduler + Categoria A duravel empacotados
+          grep -q 'startSlaScheduler' "$DM/slaScheduler.js" || { echo "::error:: slaScheduler nao empacotado"; exit 1; }
+          grep -q 'startNotifierA' "$DM/notifierA.js" || { echo "::error:: notifierA (Categoria A) nao empacotado"; exit 1; }
+          # 15 — COMUNS no renderer: toast + Monitor SLA + sino + Cronograma preservados
+          grep -q 'notifToastOnce' "$RR/index.html" || { echo "::error:: toast comum ausente"; exit 1; }
+          grep -q 'f354gMonAlerts' "$RR/index.html" || { echo "::error:: Monitor SLA ausente"; exit 1; }
+          grep -q 'function slaibToggle(' "$RR/index.html" || { echo "::error:: sino ausente"; exit 1; }
+          grep -q 'function cronSanitizeDeep(' "$RR/index.html" || { echo "::error:: Cronograma (cronSanitizeDeep) ausente"; exit 1; }
+          # 16 — bgNotify premium + tray + updater channel latest preservados
+          grep -q 'showBgNotify' "$DM/bgNotify.js" || { echo "::error:: bgNotify premium ausente"; exit 1; }
+          test -f "$RR/bgnotify.html" || { echo "::error:: bgnotify.html ausente"; exit 1; }
+          grep -q 'ensureTray' "$MJS" || { echo "::error:: ensureTray ausente"; exit 1; }
+          grep -qE 'channel[[:space:]]*=[[:space:]]*"latest"' "$DM/updaterService.js" || { echo "::error:: updater channel != latest"; exit 1; }
+          # 17 — Android NAO tocado
+          A2=$(git -C "$GITHUB_WORKSPACE" diff --name-only "$BASE_203_SHA" HEAD | grep -c '^android/' || true); [ "$A2" = "0" ] || { echo "::error:: diff toca android/ ($A2)"; exit 1; }
+          echo "GATE F3.5.4N EMPACOTADO: VERIFIED"
+
+      - name: Empacotar bundle (EXE/MSI/latest.yml/blockmap/SBOM/SHA256SUMS/VERSAO-DESKTOP) + SHA256SUMS
+        working-directory: ${{ env.APP_DIR }}
+        env:
+          APP_VERSION: "1.0.204"
+        run: |
+          set -e
+          npx --yes @cyclonedx/cyclonedx-npm --omit dev --output-format JSON --output-file "$RUNNER_TEMP/sbom-cyclonedx.json" || echo '{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}' > "$RUNNER_TEMP/sbom-cyclonedx.json"
+          OUT="$GITHUB_WORKSPACE/dist-pkg"; mkdir -p "$OUT"
+          EXE=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe | head -1)
+          MSI=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.msi 2>/dev/null | head -1)
+          BM=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap | head -1)
+          cp "$EXE" "$OUT/"; [ -n "$MSI" ] && cp "$MSI" "$OUT/"; cp dist-installer/latest.yml "$OUT/"; cp "$BM" "$OUT/"
+          cp "$RUNNER_TEMP/sbom-cyclonedx.json" "$OUT/SBOM-cyclonedx.json"
+          EXE_NAME=$(basename "$EXE"); MSI_NAME=$([ -n "$MSI" ] && basename "$MSI" || echo ""); BM_NAME=$(basename "$BM")
+          ( cd "$OUT" && sha256sum "$EXE_NAME" ${MSI_NAME:+$MSI_NAME} latest.yml "$BM_NAME" SBOM-cyclonedx.json > SHA256SUMS )
+          {
+            echo "productName : Agenda ID Seven Desktop"
+            echo "versionName : $APP_VERSION"
+            echo "rotulo      : 1.0.204-windows-startup-self-healing (CANDIDATA — inicializacao com o Windows + autocorrecao do canal de notificacoes)"
+            echo "channel     : latest (estrutura do updater; NADA publicado neste build)"
+            echo "appId       : br.com.idseven.agenda.desktop"
+            echo "instalador  : $EXE_NAME"
+            echo "SHA-256 exe : $(sha256sum "$OUT/$EXE_NAME" | awk '{print $1}')"
+            [ -n "$MSI_NAME" ] && echo "instalador2 : $MSI_NAME" && echo "SHA-256 msi : $(sha256sum "$OUT/$MSI_NAME" | awk '{print $1}')"
+            echo "commit      : $GITHUB_SHA (branch $GITHUB_REF_NAME)"
+            echo "baseline    : Desktop 1.0.203 OFICIAL (commit 12abeef; tag v1.0.203 preservada; testada fisicamente)"
+            echo "origem      : F3.5.4N — INICIALIZACAO COM O WINDOWS (default-ON 1x, minimizado na bandeja; verify) + AUTOCORRECAO DO CANAL (firebase.ts segue o 1o reconectador; watchdog supervisor+ultimo recurso reage a sinais REAIS; reconcile por retorno de rede; flag p/ desligar so a autocorrecao; diagnostico sanitizado; alerta admin so quando a autocorrecao falha). Notificacoes comuns, tempos T-30/T-10, destinatarios, Card Premium/Cronograma/Monitor SLA/sino, lembrete central de SLA, updater e Android: INTOCADOS"
+            echo "assinatura  : mesmo processo da 1.0.203 (sem code-signing -> NotSigned)"
+            echo "distribuicao: CANDIDATA — build gated; publicacao no Latest ocorre no workflow desktop-release-f354n.yml (mesmos bytes deste run)"
+          } > "$OUT/VERSAO-DESKTOP.txt"
+          echo "== SHA256SUMS =="; cat "$OUT/SHA256SUMS"
+
+      - name: Upload artifact — installer (EXE + MSI) PRIVADO
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-1.0.204-installer
+          path: |
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.msi
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload artifact — updatemeta (latest.yml + blockmap + SHA256SUMS + SBOM + VERSAO) PRIVADO
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-1.0.204-updatemeta
+          path: |
+            dist-pkg/latest.yml
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap
+            dist-pkg/SHA256SUMS
+            dist-pkg/SBOM-cyclonedx.json
+            dist-pkg/VERSAO-DESKTOP.txt
+          if-no-files-found: error
+          retention-days: 30
