@@ -168,7 +168,7 @@ jobs:
         run: |
           set -e
           git -C "$GITHUB_WORKSPACE" diff --name-only "$BASE_204_SHA" HEAD | tee /tmp/f354o-diff.txt
-          if grep -vE '^(desktop/src/main/main\.ts$|desktop/src/main/bgNotify\.ts$|desktop/src/main/notificationGrouping\.ts$|desktop/src/preload/preload\.ts$|desktop/src/preload/bgnotify-preload\.ts$|desktop/src/renderer/index\.html$|desktop/src/renderer/bgnotify\.html$|desktop/scripts/f354o-common-notification-grouping\.test\.mjs$|desktop/package\.json$|desktop/package-lock\.json$|docs/f354o-qa/|\.github/workflows/desktop-build-f354o\.yml$|\.github/workflows/desktop-release-f354o\.yml$)' /tmp/f354o-diff.txt | grep -q .; then
+          if grep -vE '^(desktop/src/main/main\.ts$|desktop/src/main/bgNotify\.ts$|desktop/src/main/notificationGrouping\.ts$|desktop/src/preload/preload\.ts$|desktop/src/preload/bgnotify-preload\.ts$|desktop/src/renderer/index\.html$|desktop/src/renderer/bgnotify\.html$|desktop/scripts/f354o-common-notification-grouping\.test\.mjs$|desktop/scripts/f354l-sla-central-persistent-reminders\.test\.mjs$|desktop/package\.json$|desktop/package-lock\.json$|docs/f354o-qa/|\.github/workflows/desktop-build-f354o\.yml$|\.github/workflows/desktop-release-f354o\.yml$)' /tmp/f354o-diff.txt | grep -q .; then
             echo "::error:: diff vs 1.0.204 toca arquivo NAO autorizado"; exit 1; fi
           echo "ISOLAMENTO OK — diff confinado aos arquivos autorizados F3.5.4O."
 

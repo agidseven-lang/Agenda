@@ -283,26 +283,53 @@ function bytesIdenticalVs201(rel) {
   try { const out = execSync("git -C " + JSON.stringify(DESK) + " diff --stat 047261b7587951e0496d5f4eff0cda5998269161 HEAD -- " + JSON.stringify(rel), { encoding: "utf8" }); return out.trim() === ""; }
   catch { return false; }
 }
-// F3.5.4N — index.html SAIU do byte-congelado: recebe DIFF CONTROLADO (seção "Inicialização com o
-// Windows" + toggle de autocorreção + reporte de rede — TUDO aditivo). As COMUNS (toast/Monitor SLA/
-// sino/Cronograma/Card Premium) ficam intactas: nenhuma remoção as toca e as âncoras seguem presentes.
-function f354nIndexControlledDiff() {
+// F3.5.4N/F3.5.4O — index.html SAIU do byte-congelado: recebe DIFF CONTROLADO. F3.5.4N (aditivo):
+// seção "Inicialização com o Windows" + toggle de autocorreção + reporte de rede. F3.5.4O (aditivo):
+// AGRUPAMENTO das notificações comuns — toast agrupado (notifGroupUpdate), atributo data-group, toggle
+// data-cfggrouping, canal onNotifGroupUpdate, e a compensação do sino passa a PULAR _groupUpdate. As
+// COMUNS (toast/Monitor SLA/sino/Cronograma/Card Premium) ficam intactas: nenhuma FUNÇÃO é removida e
+// as âncoras seguem presentes. Obs.: a linha da compensação do sino é EDITADA por F3.5.4O (ganha o
+// gate _groupUpdate) e ainda chama notifToastOnce — por isso a preservação de notifToastOnce é provada
+// por PRESENÇA no arquivo atual (anchorsPresent), não pela heurística de linha removida.
+function f354oIndexControlledDiff() {
   let d = "";
   try { d = execSync("git -C " + JSON.stringify(DESK) + " diff 047261b7587951e0496d5f4eff0cda5998269161 HEAD -- src/renderer/index.html", { encoding: "utf8" }); } catch { return false; }
   const rm = d.split("\n").filter((l) => l.startsWith("-") && !l.startsWith("---"));
   const hasF354n = /startupCardHtml/.test(d) && /data-cfgstartup/.test(d) && /data-cfgselfheal/.test(d) && /desktopAPI\.netStatus/.test(d);
-  const rmTouchesFrozen = rm.some((l) => /f354gMonAlerts|slaibToggle|cronSanitizeDeep|notifToastOnce|buildShareClientUrl|kbv2/.test(l));
+  const hasF354o = /function notifGroupUpdate\(/.test(d) && /data-cfggrouping/.test(d) && /data-group/.test(d) && /onNotifGroupUpdate/.test(d);
+  // FUNÇÕES/telas congeladas que F3.5.4O NÃO toca — nenhuma remoção pode retirá-las:
+  const rmTouchesFrozen = rm.some((l) => /f354gMonAlerts|slaibToggle|cronSanitizeDeep|buildShareClientUrl|kbv2/.test(l));
   const cur = fs.readFileSync(path.join(DESK, "src/renderer/index.html"), "utf8");
-  const anchorsPresent = /f354gMonAlerts/.test(cur) && /function slaibToggle\(/.test(cur) && /function cronSanitizeDeep\(/.test(cur) && /notifToastOnce/.test(cur);
-  return hasF354n && !rmTouchesFrozen && anchorsPresent;
+  const anchorsPresent = /f354gMonAlerts/.test(cur) && /function slaibToggle\(/.test(cur) && /function cronSanitizeDeep\(/.test(cur) && /notifToastOnce/.test(cur) && /function notifShowToast\(/.test(cur) && /function notifSound\(/.test(cur);
+  return hasF354n && hasF354o && !rmTouchesFrozen && anchorsPresent;
 }
-ok(f354nIndexControlledDiff(), "49 index.html — DIFF CONTROLADO F3.5.4N (Inicialização + autocorreção aditivas; comuns/Monitor SLA/sino/Cronograma intactos)");
+ok(f354oIndexControlledDiff(), "49 index.html — DIFF CONTROLADO F3.5.4N+F3.5.4O (Inicialização/autocorreção + agrupamento das comuns aditivos; toast/Monitor SLA/sino/Cronograma intactos)");
 ok(bytesIdenticalVs201("src/main/slaScheduler.ts"), "50 slaScheduler.ts (tempos/boundaries) byte-idêntico a 1.0.201");
 ok(bytesIdenticalVs201("src/main/slaRules.js"), "51 slaRules.js (T-30/T-10/destinatários/dedup) byte-idêntico");
 ok(bytesIdenticalVs201("src/main/cardsRules.js"), "52 cardsRules.js (T-30/T-10 cards) byte-idêntico");
 ok(bytesIdenticalVs201("src/main/notifEvents.js"), "53 notifEvents.js (Categoria A/destinatários) byte-idêntico");
 ok(bytesIdenticalVs201("src/main/notifier.ts") && bytesIdenticalVs201("src/main/notifierA.ts"), "54 notifier/notifierA byte-idênticos (comuns 1.0.201 intactas)");
-ok(bytesIdenticalVs201("src/main/bgNotify.ts") && bytesIdenticalVs201("src/renderer/bgnotify.html"), "55 janela premium (bgNotify) das comuns byte-idêntica");
+// F3.5.4O — a janela premium das comuns recebe o AGRUPAMENTO (aditivo): bgNotify.ts ganha updateBgGroup
+// (canal bg-group-update) e bgnotify.html ganha o card agrupado (renderGroupUpdate/data-group). O overlay
+// (showInactive/alwaysOnTop/focusable) e a renderização individual (render(p)/seen/bgAPI.rendered) NÃO
+// são removidos. Deixam de ser byte-idênticos à 1.0.201 — passam a DIFF CONTROLADO F3.5.4O.
+function f354oPremiumControlledDiff() {
+  let dts = "", dhtml = "";
+  try { dts = execSync("git -C " + JSON.stringify(DESK) + " diff 047261b7587951e0496d5f4eff0cda5998269161 HEAD -- src/main/bgNotify.ts", { encoding: "utf8" }); } catch { return false; }
+  try { dhtml = execSync("git -C " + JSON.stringify(DESK) + " diff 047261b7587951e0496d5f4eff0cda5998269161 HEAD -- src/renderer/bgnotify.html", { encoding: "utf8" }); } catch { return false; }
+  const rmTs = dts.split("\n").filter((l) => l.startsWith("-") && !l.startsWith("---"));
+  const rmHtml = dhtml.split("\n").filter((l) => l.startsWith("-") && !l.startsWith("---"));
+  const tsAdds = /export function updateBgGroup/.test(dts) && /bg-group-update/.test(dts);
+  const tsOverlayKept = !rmTs.some((l) => /showInactive|alwaysOnTop|focusable/.test(l)); // overlay sem-foco preservado
+  const htmlAdds = /renderGroupUpdate/.test(dhtml) && /data-group/.test(dhtml);
+  const htmlRenderKept = !rmHtml.some((l) => /bgAPI\.rendered|seen\[key\]/.test(l)); // render individual + prova de render preservados
+  const curTs = fs.readFileSync(path.join(DESK, "src/main/bgNotify.ts"), "utf8");
+  const curHtml = fs.readFileSync(path.join(DESK, "src/renderer/bgnotify.html"), "utf8");
+  const anchors = /export function showBgNotify/.test(curTs) && /export function initBgNotify/.test(curTs) && /export function stopBgNotify/.test(curTs) && /export function updateBgGroup/.test(curTs)
+    && /function render\(p\)/.test(curHtml) && /renderGroupUpdate/.test(curHtml) && /bgAPI\.rendered/.test(curHtml);
+  return tsAdds && tsOverlayKept && htmlAdds && htmlRenderKept && anchors;
+}
+ok(f354oPremiumControlledDiff(), "55 janela premium (bgNotify) — DIFF CONTROLADO F3.5.4O (updateBgGroup/card agrupado aditivos; overlay sem-foco + render individual preservados)");
 ok(bytesIdenticalVs201("src/main/updaterService.ts") && bytesIdenticalVs201("src/main/slaSeenUser.ts") && bytesIdenticalVs201("src/main/notifStore.ts") && bytesIdenticalVs201("src/main/toastAck.ts"), "56 updater + recibos/seen/toastAck byte-idênticos (Card Premium/Cronograma/Roteiro no index.html idem; Android intocado)");
 
 console.log("\nF3.5.4L: " + pass + " passaram, " + fail + " falharam");
