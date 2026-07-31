@@ -330,7 +330,13 @@ jobs:
           grep -q 'notifDiagCardHtml' "$EXH" || { echo "::error:: painel de diagnostico ausente no renderer"; exit 1; }
           grep -q 'data-cfgnotifdiag' "$EXH" || { echo "::error:: acao Atualizar diagnostico ausente"; exit 1; }
           # 14 — FROZEN notifEvents.js EMPACOTADO == fonte (destinatarios/dedup intactos)
-          S=$(sha256sum src/main/notifEvents.js | awk '{print $1}'); A=$(sha256sum "$DM/notifEvents.js" | awk '{print $1}'); [ "$S" = "$A" ] || { echo "::error:: notifEvents.js empacotado != fonte"; exit 1; }
+          #    comparacao de CONTEUDO normalizando EOL (identica ao gate do index.html na linha ~282):
+          #    o .js e COPIADO por scripts/copy-renderer.js (nao passa por tsc) e no runner Windows a
+          #    copia empacotada pode ficar com CRLF enquanto a fonte esta em LF (checkout forcado a LF);
+          #    o SHA-256 cru acusaria divergencia so por EOL. A congelacao real ja e provada no verify
+          #    (MAIN DIFF-CONTROLADO: nucleo duravel byte-identico a 1.0.200) — aqui exigimos igualdade
+          #    de conteudo (sem \r) entre empacotado e fonte.
+          NE_SRC="src/main/notifEvents.js" NE_PKG="$DM/notifEvents.js" node -e 'const fs=require("fs");const nrm=s=>String(s).replace(/\r\n/g,"\n");if(nrm(fs.readFileSync(process.env.NE_PKG,"utf8"))!==nrm(fs.readFileSync(process.env.NE_SRC,"utf8"))){console.error("notifEvents.js EMPACOTADO != fonte");process.exit(1);}'
           grep -q "recipientMode: 'all_active_users'" "$DM/notifEvents.js" || { echo "::error:: Categoria A (all_active_users) alterada"; exit 1; }
           # 15 — FROZEN task_updated / assigned_designer preservados
           grep -qF "eventId: 'task_updated:' + taskId" "$DM/notifEvents.js" || { echo "::error:: task_updated ausente"; exit 1; }
