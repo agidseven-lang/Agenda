@@ -17,13 +17,19 @@
  */
 import crypto from "crypto";
 
-// Chave PÚBLICA de verificação (SPKI PEM). NÃO é segredo. A privada correspondente NUNCA entra
-// no app/repo — fica offline com o owner (entregue no runbook). Para trocar de custódia, basta
-// substituir esta constante pela pública do owner.
-export const FAULT_INJECTION_PUBLIC_KEY_PEM =
-  "-----BEGIN PUBLIC KEY-----\n" +
-  "MCowBQYDK2VwAyEAc1F2Rpw2HrdIjF6O9lzbIB0a4rLvp7YhTqDM9w8nypc=\n" +
-  "-----END PUBLIC KEY-----\n";
+// Chave PÚBLICA de verificação (SPKI PEM). NÃO é segredo. A chave PRIVADA correspondente é gerada
+// EXCLUSIVAMENTE na máquina Windows controlada da ID Seven (ferramenta local independente
+// tools/f354n-fault-authorizer) e permanece SOMENTE com o owner — NUNCA entra no app/repo/log/chat.
+// ATÉ o owner gerar e me enviar a PÚBLICA DEFINITIVA, esta constante é um PLACEHOLDER e o
+// fault-injection fica FAIL-CLOSED (verifyFaultToken devolve ok:false / no_pubkey_provisioned):
+// nenhuma assinatura é interrompida, nenhum botão admin aparece, nenhum IPC executa a ação.
+export const FAULT_INJECTION_PUBLIC_KEY_PEM = "__F354N_FAULT_PUBLIC_KEY_PLACEHOLDER__";
+
+/** Há chave pública DEFINITIVA provisionada? (PEM real, não o placeholder) */
+export function faultPublicKeyProvisioned(pem?: string): boolean {
+  const p = String(pem || FAULT_INJECTION_PUBLIC_KEY_PEM || "");
+  return p.indexOf("BEGIN PUBLIC KEY") >= 0;
+}
 
 export type FaultAuthResult = { ok: boolean; reason?: string; exp?: number; nonce?: string };
 
@@ -51,8 +57,10 @@ export function verifyFaultToken(token: string, deviceId: string, nowMs: number,
     const exp = Number(payload.exp || 0);
     if (!exp || nowMs >= exp) return { ok: false, reason: "expired" };
     if (!payload.nonce) return { ok: false, reason: "nonce" };
+    const pem = publicKeyPem || FAULT_INJECTION_PUBLIC_KEY_PEM;
+    if (!faultPublicKeyProvisioned(pem)) return { ok: false, reason: "no_pubkey_provisioned" }; // FAIL-CLOSED até a pública definitiva
     let pub: crypto.KeyObject;
-    try { pub = crypto.createPublicKey(publicKeyPem || FAULT_INJECTION_PUBLIC_KEY_PEM); } catch { return { ok: false, reason: "pubkey" }; }
+    try { pub = crypto.createPublicKey(pem); } catch { return { ok: false, reason: "pubkey" }; }
     const good = crypto.verify(null, payloadRaw, pub, sig);
     if (!good) return { ok: false, reason: "signature" };
     return { ok: true, exp, nonce: String(payload.nonce) };
