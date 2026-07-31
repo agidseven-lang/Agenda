@@ -156,8 +156,8 @@ jobs:
       - name: Gate ANDROID/BACKEND intactos — diff nao toca android/ nem functions/ nem worker
         run: |
           set -e
-          BAD=$(git -C "$GITHUB_WORKSPACE" diff --name-only "$BASE_203_SHA" HEAD | grep -E '^(android/|functions/|worker/|presence-service/|firestore\.rules)' | wc -l)
-          [ "$BAD" = "0" ] || { echo "::error:: diff toca backend/android ($BAD)"; git -C "$GITHUB_WORKSPACE" diff --name-only "$BASE_203_SHA" HEAD | grep -E '^(android/|functions/|worker/|presence-service/|firestore\.rules)'; exit 1; }
+          BAD=$(git -C "$GITHUB_WORKSPACE" diff --name-only "$BASE_203_SHA" HEAD | grep -cE '^(android/|functions/|worker/|presence-service/|firestore\.rules)' || true)
+          [ "$BAD" = "0" ] || { echo "::error:: diff toca backend/android ($BAD)"; git -C "$GITHUB_WORKSPACE" diff --name-only "$BASE_203_SHA" HEAD | grep -E '^(android/|functions/|worker/|presence-service/|firestore\.rules)' || true; exit 1; }
           echo "ANDROID/BACKEND intactos OK."
 
   build:
