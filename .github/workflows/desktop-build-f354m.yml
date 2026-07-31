@@ -1,0 +1,382 @@
+# =====================================================================
+# [push/manual] F3.5.4M — Desktop Build de TESTE (candidata 1.0.203 — ajuste visual dos lembretes de SLA)
+# ---------------------------------------------------------------------
+# Base 1.0.202 OFICIAL (@90a518b, tag v1.0.202, testada fisicamente: logica dos lembretes centrais OK).
+# Delta F3.5.4M: EXCLUSIVAMENTE VISUAL no lembrete central de SLA (amarelo/vermelho). Correcoes:
+#   (1) avatar deixa de ser cortado no topo — antes ficava em y=-12px (acima da borda da janela) porque
+#       o overhang (32px) era maior que o espaco reservado no #wrap (20px); agora o avatar e IRMAO do
+#       card (fora dele), com top:14px (>0), 100% visivel; o resize passa a medir o #wrap.
+#   (2) faixa superior encaixada — o card ganhou overflow:hidden, clipando a ::before aos cantos
+#       arredondados (antes vazava por falta de clip). Como o avatar saiu do card, o overflow:hidden
+#       NAO o corta. Anel/halo do avatar coerente com o tema (amber/vermelho); acabamento premium.
+# TODA A LOGICA da 1.0.202 preservada: unico arquivo de produto alterado = src/renderer/slareminder.html.
+# desktop/src/main/** e desktop/src/preload/** byte-identicos a 1.0.202 (main.ts, slaReminder*,
+# slaReminderWindow, slaReminderStore, slareminder-preload). Sons, index.html, nucleo de notificacoes,
+# T-30/T-10, destinatarios, Card Premium/Cronograma/Monitor SLA/sino, updater e Android: INTOCADOS.
+# Roda no PROPRIO ref: `--publish never`, NADA publicado (artifacts privados).
+# =====================================================================
+name: "[push/manual] F3.5.4M Desktop Build (candidata 1.0.203 — ajuste visual dos lembretes de SLA)"
+"on":
+  push:
+    branches:
+      - "desktop/f354m-sla-reminder-visual-fix-1.0.203"
+    paths-ignore:
+      - ".github/workflows/desktop-release-f354m.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  BASE_201_SHA: "047261b7587951e0496d5f4eff0cda5998269161" # Desktop 1.0.201 OFICIAL (referencia historica)
+  BASE_202_SHA: "90a518b43b23fcb434a45f6f136dfdaccdad455d" # Desktop 1.0.202 OFICIAL (tag v1.0.202; BASE do delta F3.5.4M)
+  TEST_BRANCH: "desktop/f354m-sla-reminder-visual-fix-1.0.203"
+  APP_DIR: "desktop"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout (SHA do push; history completo p/ baselines)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Gate REF + ANCESTRIA — branch de teste correta e descendente da 1.0.202 pinada
+        run: |
+          set -e
+          [ "${{ github.ref_name }}" = "$TEST_BRANCH" ] || { echo "::error:: ref '${{ github.ref_name }}' != $TEST_BRANCH"; exit 1; }
+          git merge-base --is-ancestor "$BASE_202_SHA" HEAD || { echo "::error:: HEAD nao descende da base 1.0.202 ($BASE_202_SHA)"; exit 1; }
+          echo "ref=$TEST_BRANCH head=$(git rev-parse HEAD) base=$BASE_202_SHA OK"
+
+      - name: Derivar versao — exige 1.0.203 exato, sem sufixo
+        run: |
+          APP_VERSION=$(node -p "require('./desktop/package.json').version")
+          echo "versao=$APP_VERSION"
+          [ "$APP_VERSION" = "1.0.203" ] || { echo "::error:: versao != 1.0.203"; exit 1; }
+          case "$APP_VERSION" in *-*) echo "::error:: versao com sufixo proibido ($APP_VERSION)"; exit 1;; esac
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: npm ci
+        working-directory: desktop
+        run: npm ci --no-audit --no-fund
+
+      - name: TypeScript build (main + preload + renderer + modulos .js)
+        working-directory: desktop
+        run: npm run build
+
+      - name: Lint (tsc --noEmit)
+        working-directory: desktop
+        run: node ./node_modules/typescript/lib/tsc.js -p tsconfig.json --noEmit
+
+      - name: Instalar Playwright/Chromium (provas visuais)
+        working-directory: desktop
+        run: |
+          set -e
+          sudo mkdir -p /opt/pw-browsers && sudo chown "$USER" /opt/pw-browsers
+          npm i --no-save playwright@1.56.1 --no-audit --no-fund
+          PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers npx playwright install --with-deps chromium
+
+      - name: Gate F3.5.4M — prova geometrica do lembrete (avatar 100% visivel + faixa encaixada; 100/125/150%)
+        working-directory: desktop
+        env:
+          NODE_PATH: ""
+        run: |
+          set -e
+          NODE_PATH="$(npm root -g)" node scripts/f354m-visual-fix.test.mjs || { echo "::error:: f354m visual-fix vermelho"; exit 1; }
+
+      - name: Gate LOGICA F3.5.4L PRESERVADA — sla-central-persistent-reminders (56 casos; deve seguir verde)
+        working-directory: desktop
+        run: |
+          set -e
+          node scripts/f354l-sla-central-persistent-reminders.test.mjs || { echo "::error:: f354l logica regrediu"; exit 1; }
+
+      - name: Gate REGRESSAO — suites do HUB/entrega/teardown (delta ZERO vs 1.0.202)
+        working-directory: desktop
+        run: |
+          set -e
+          for t in f354k-notification-all-window-states f343-delivery-channel f343-operational-block f347-immediate-visual-delivery f347-independent-behavior f354-notifications-reliability f33A-notif-central f33F-bg-notify f353a-actor-photo; do
+            node "scripts/$t.test.mjs" || { echo "::error:: regressao vermelha em $t"; exit 1; }
+          done
+          echo "REGRESSAO OK."
+
+      - name: Gate CONGELADOS — TUDO da 1.0.202 byte-identico, EXCETO slareminder.html
+        run: |
+          set -e
+          # F3.5.4M e exclusivamente visual: todo o delta L (main.ts + slaReminder*/janela/store/preload/sons)
+          # e o nucleo comum ficam byte-identicos a 1.0.202. So slareminder.html muda.
+          FROZEN="desktop/src/main/main.ts desktop/src/main/slaReminder.ts desktop/src/main/slaReminderWindow.ts desktop/src/main/slaReminderStore.ts desktop/src/preload/slareminder-preload.ts desktop/src/renderer/sounds/sla-warning.wav desktop/src/renderer/sounds/sla-critical.wav desktop/src/renderer/index.html desktop/src/renderer/bgnotify.html desktop/src/preload/preload.ts desktop/src/preload/bgnotify-preload.ts desktop/src/main/slaScheduler.ts desktop/src/main/slaRules.js desktop/src/main/cardsRules.js desktop/src/main/notifEvents.js desktop/src/main/notifier.ts desktop/src/main/notifierA.ts desktop/src/main/notifStore.ts desktop/src/main/slaSeenUser.ts desktop/src/main/toastAck.ts desktop/src/main/reminder.ts desktop/src/main/bgNotify.ts desktop/src/main/tray.ts desktop/src/main/updaterService.ts desktop/src/main/clockSync.ts desktop/src/main/actorProfile.js desktop/src/main/firebase.ts desktop/src/main/auth.ts desktop/src/main/auth-core.ts desktop/src/main/prewarm.ts desktop/src/main/autostart.ts desktop/src/main/diag.ts desktop/electron-builder.yml desktop/scripts/copy-renderer.js desktop/tsconfig.json"
+          for f in $FROZEN; do
+            if ! git -C "$GITHUB_WORKSPACE" diff --quiet "$BASE_202_SHA" HEAD -- "$f"; then
+              echo "::error:: arquivo CONGELADO alterado vs 1.0.202: $f"; exit 1; fi
+          done
+          echo "CONGELADOS byte-identicos a 1.0.202 OK."
+
+      - name: Gate MAIN/PRELOAD ZERO — desktop/src/main e desktop/src/preload byte-identicos a 1.0.202
+        run: |
+          set -e
+          CM=$(git -C "$GITHUB_WORKSPACE" diff --name-only "$BASE_202_SHA" HEAD -- desktop/src/main | wc -l)
+          CP=$(git -C "$GITHUB_WORKSPACE" diff --name-only "$BASE_202_SHA" HEAD -- desktop/src/preload | wc -l)
+          [ "$CM" = "0" ] || { echo "::error:: desktop/src/main mudou ($CM arquivos) — F3.5.4M e so visual"; git -C "$GITHUB_WORKSPACE" diff --name-only "$BASE_202_SHA" HEAD -- desktop/src/main; exit 1; }
+          [ "$CP" = "0" ] || { echo "::error:: desktop/src/preload mudou ($CP arquivos) — F3.5.4M e so visual"; exit 1; }
+          echo "MAIN/PRELOAD ZERO OK (nenhuma mudanca de logica)."
+
+      - name: Gate RENDERER — SO slareminder.html muda vs 1.0.202 (index.html byte-identico)
+        run: |
+          set -e
+          git -C "$GITHUB_WORKSPACE" diff --quiet "$BASE_202_SHA" HEAD -- desktop/src/renderer/index.html || { echo "::error:: index.html mudou vs 1.0.202"; exit 1; }
+          CR=$(git -C "$GITHUB_WORKSPACE" diff --name-only "$BASE_202_SHA" HEAD -- desktop/src/renderer | sed 's#desktop/src/renderer/##')
+          echo "renderer alterados: [$CR]"
+          for f in $CR; do
+            case "$f" in
+              slareminder.html) : ;;
+              *) echo "::error:: arquivo de renderer nao-autorizado: $f"; exit 1;;
+            esac
+          done
+          echo "RENDERER OK — so slareminder.html."
+
+      - name: Gate ISOLAMENTO — diff vs 1.0.202 SO nos arquivos autorizados F3.5.4M
+        run: |
+          set -e
+          git -C "$GITHUB_WORKSPACE" diff --name-only "$BASE_202_SHA" HEAD | tee /tmp/f354m-diff.txt
+          if grep -vE '^(desktop/src/renderer/slareminder\.html$|desktop/scripts/f354m-visual-fix\.test\.mjs$|desktop/scripts/f354m-qa-evidence\.mjs$|desktop/package\.json$|desktop/package-lock\.json$|docs/f354m-qa/|\.github/workflows/desktop-build-f354m\.yml$|\.github/workflows/desktop-release-f354m\.yml$)' /tmp/f354m-diff.txt | grep -q .; then
+            echo "::error:: diff vs 1.0.202 toca arquivo NAO autorizado"; exit 1; fi
+          echo "ISOLAMENTO OK — diff confinado aos arquivos autorizados F3.5.4M."
+
+      - name: PROVAS VISUAIS F3.5.4M — 13 evidencias reais (Chromium; sem IA)
+        working-directory: desktop
+        env:
+          NODE_PATH: ""
+        run: |
+          set -e
+          NODE_PATH="$(npm root -g)" node scripts/f354m-qa-evidence.mjs
+          N=$(ls -1 ../docs/f354m-qa/*.png 2>/dev/null | wc -l)
+          [ "$N" -ge 9 ] || { echo "::error:: esperado >=9 evidencias, geradas $N"; exit 1; }
+          echo "PROVAS VISUAIS OK ($N PNGs)."
+
+      - name: Upload evidencias reais F3.5.4M (artifact PRIVADO)
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-1.0.203-test-evidencias
+          path: docs/f354m-qa/*.png
+          if-no-files-found: error
+          retention-days: 30
+
+  build:
+    needs: verify
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      APP_DIR: desktop
+    steps:
+      - name: Forcar LF no checkout
+        run: git config --global core.autocrlf false
+
+      - name: Checkout (mesmo SHA do run)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Gate REF + ANCESTRIA (windows)
+        run: |
+          set -e
+          [ "${{ github.ref_name }}" = "$TEST_BRANCH" ] || { echo "::error:: ref != $TEST_BRANCH"; exit 1; }
+          git merge-base --is-ancestor "$BASE_202_SHA" HEAD || { echo "::error:: HEAD nao descende da 1.0.202"; exit 1; }
+
+      - name: Gate LINE ENDINGS LF
+        run: |
+          set -e
+          for f in desktop/src/renderer/slareminder.html; do
+            if grep -lU $'\r' "$f" >/dev/null 2>&1; then echo "::error:: CRLF em $f"; exit 1; fi
+          done
+          echo "LF OK."
+
+      - name: Derivar versao — exige 1.0.203 exato
+        run: |
+          APP_VERSION=$(node -p "require('./desktop/package.json').version")
+          [ "$APP_VERSION" = "1.0.203" ] || { echo "::error:: versao != 1.0.203 ($APP_VERSION)"; exit 1; }
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: npm ci
+        working-directory: desktop
+        run: npm ci --no-audit --no-fund
+
+      - name: TypeScript build
+        working-directory: desktop
+        run: npm run build
+
+      - name: electron-builder (NSIS + MSI; --publish never)
+        working-directory: desktop
+        run: npx electron-builder --win nsis msi --publish never
+
+      - name: Gate tray icon empacotado
+        working-directory: desktop
+        run: |
+          set -e
+          test -f dist-installer/win-unpacked/resources/icon.png || { echo "::error:: tray icon.png ausente em resources"; exit 1; }
+          echo "resources/icon.png OK"
+
+      - name: Gate prova-de-versao (asar == 1.0.203) + renderer/slareminder EMPACOTADOS == fonte (EOL-normalizado)
+        working-directory: desktop
+        run: |
+          set -e
+          ASAR="dist-installer/win-unpacked/resources/app.asar"; test -f "$ASAR" || { echo "::error:: app.asar ausente"; exit 1; }
+          EXDIR="$RUNNER_TEMP/asarx"; rm -rf "$EXDIR"; mkdir -p "$EXDIR"; npx --yes @electron/asar extract "$ASAR" "$EXDIR"
+          PKGV=$(P="$EXDIR/package.json" node -e 'console.log(JSON.parse(require("fs").readFileSync(process.env.P,"utf8")).version||"")')
+          [ "$PKGV" = "1.0.203" ] || { echo "::error:: package.json EMPACOTADO version=$PKGV != 1.0.203"; exit 1; }
+          cmp_norm() { EX="$1" SRC="$2" node -e 'const fs=require("fs");const n=s=>String(s).replace(/\r\n/g,"\n");if(n(fs.readFileSync(process.env.EX,"utf8"))!==n(fs.readFileSync(process.env.SRC,"utf8"))){console.error(process.env.SRC+" EMPACOTADO != fonte");process.exit(1);}'; }
+          cmp_norm "$EXDIR/src/renderer/index.html" "src/renderer/index.html"
+          cmp_norm "$EXDIR/src/renderer/slareminder.html" "src/renderer/slareminder.html"
+          echo "GATE prova-de-versao 1.0.203 + renderer/slareminder==fonte OK."
+
+      - name: Gate F3.5.4M EMPACOTADO — ajuste visual + logica 1.0.202 preservada no app.asar (20 gates)
+        working-directory: desktop
+        run: |
+          set -e
+          EXDIR="$RUNNER_TEMP/asarx"; DM="$EXDIR/dist/main"; DP="$EXDIR/dist/preload"; RR="$EXDIR/src/renderer"
+          MJS="$DM/main.js"; H="$RR/slareminder.html"
+          cmp_norm() { EX="$1" SRC="$2" node -e 'const fs=require("fs");const n=s=>String(s).replace(/\r\n/g,"\n");if(n(fs.readFileSync(process.env.EX,"utf8"))!==n(fs.readFileSync(process.env.SRC,"utf8"))){console.error(process.env.SRC+" EMPACOTADO != fonte");process.exit(1);}'; }
+          # ===== ACABAMENTO VISUAL F3.5.4M (no slareminder.html empacotado) =====
+          test -f "$H" || { echo "::error:: slareminder.html ausente no asar"; exit 1; }
+          # 1 — card com overflow:hidden (faixa encaixada nos cantos arredondados)
+          grep -q 'overflow:hidden' "$H" || { echo "::error:: card sem overflow:hidden (faixa poderia vazar)"; exit 1; }
+          # 2 — avatar posicionado com top:14px (>0 => 100% visivel, nao cortado pela janela)
+          grep -q 'top:14px' "$H" || { echo "::error:: avatar sem top:14px (reserva de topo)"; exit 1; }
+          # 3 — avatar e IRMAO do card (fora dele): o div id=av aparece DEPOIS do botao id=ok
+          AVL=$(grep -n 'id="av"' "$H" | head -1 | cut -d: -f1); OKL=$(grep -n 'id="ok"' "$H" | head -1 | cut -d: -f1)
+          [ -n "$AVL" ] && [ -n "$OKL" ] && [ "$AVL" -gt "$OKL" ] || { echo "::error:: avatar nao esta fora do card (deve vir depois do OK)"; exit 1; }
+          # 4 — anel/halo do avatar coerente com o tema (regra .av.red)
+          grep -q '.av.red' "$H" || { echo "::error:: avatar sem halo por tema (.av.red)"; exit 1; }
+          # 5 — resize mede o #wrap (inclui o espaco do avatar => janela nunca corta o avatar)
+          grep -q 'getElementById("wrap").getBoundingClientRect' "$H" || { echo "::error:: resize nao mede o #wrap"; exit 1; }
+          # 6 — faixa superior por nivel preservada (::before amber/vermelho) + identidade ATENCAO/URGENTE + OK
+          grep -q '.card::before' "$H" || { echo "::error:: faixa superior (::before) ausente"; exit 1; }
+          grep -q 'URGENTE' "$H" && grep -q 'ATEN' "$H" || { echo "::error:: identidade amarelo/vermelho ausente"; exit 1; }
+          grep -q 'id="ok"' "$H" || { echo "::error:: botao OK ausente"; exit 1; }
+          # ===== LOGICA 1.0.202 PRESERVADA (arquivos congelados, byte-identicos) =====
+          # 7 — controlador empacotado (fila/promocao/ack/persistencia/classificacao)
+          test -f "$DM/slaReminder.js" || { echo "::error:: slaReminder.js ausente"; exit 1; }
+          grep -q 'createSlaReminderController' "$DM/slaReminder.js" || { echo "::error:: createSlaReminderController ausente"; exit 1; }
+          grep -q 'classifyReminderLevel' "$DM/slaReminder.js" || { echo "::error:: classifyReminderLevel ausente"; exit 1; }
+          grep -q 'promote' "$DM/slaReminder.js" && grep -q 'LEVEL_RANK' "$DM/slaReminder.js" && grep -q 'markPending' "$DM/slaReminder.js" || { echo "::error:: controlador sem promocao/prioridade/persistencia"; exit 1; }
+          # 8 — janela: central, screen-saver, showInactive, focusable:false, multimonitor, Alt+F4 bloqueado, sons
+          test -f "$DM/slaReminderWindow.js" || { echo "::error:: slaReminderWindow.js ausente"; exit 1; }
+          grep -q 'screen-saver' "$DM/slaReminderWindow.js" || { echo "::error:: janela sem screen-saver"; exit 1; }
+          grep -q 'showInactive' "$DM/slaReminderWindow.js" || { echo "::error:: janela sem showInactive"; exit 1; }
+          grep -qE 'focusable: false|focusable:false' "$DM/slaReminderWindow.js" || { echo "::error:: janela sem focusable:false"; exit 1; }
+          grep -q 'getDisplayNearestPoint' "$DM/slaReminderWindow.js" || { echo "::error:: janela sem multimonitor"; exit 1; }
+          grep -q 'preventDefault' "$DM/slaReminderWindow.js" || { echo "::error:: Alt+F4 nao bloqueado"; exit 1; }
+          grep -q 'loadReminderSounds' "$DM/slaReminderWindow.js" || { echo "::error:: som local ausente"; exit 1; }
+          grep -q 'slareminder.html' "$DM/slaReminderWindow.js" || { echo "::error:: janela nao carrega slareminder.html"; exit 1; }
+          # 9 — store de recibo(OK)+pendentes
+          test -f "$DM/slaReminderStore.js" || { echo "::error:: slaReminderStore.js ausente"; exit 1; }
+          grep -q 'isAcked' "$DM/slaReminderStore.js" && grep -q 'markPending' "$DM/slaReminderStore.js" && grep -q 'markAck' "$DM/slaReminderStore.js" || { echo "::error:: store incompleto"; exit 1; }
+          # 10 — preload da janela + canal OK
+          test -f "$DP/slareminder-preload.js" || { echo "::error:: slareminder-preload.js ausente"; exit 1; }
+          grep -q 'slaAPI' "$DP/slareminder-preload.js" && grep -q 'slareminder-ok' "$DP/slareminder-preload.js" || { echo "::error:: preload sem slaAPI/slareminder-ok"; exit 1; }
+          # 11 — sons locais empacotados (RIFF/WAVE)
+          test -f "$RR/sounds/sla-warning.wav" && test -f "$RR/sounds/sla-critical.wav" || { echo "::error:: sons ausentes no asar"; exit 1; }
+          head -c 4 "$RR/sounds/sla-warning.wav" | grep -q 'RIFF' || { echo "::error:: sla-warning.wav nao e WAV"; exit 1; }
+          # 12 — HUB classifica SLA e roteia p/ a janela central
+          grep -q 'classifyReminderLevel' "$MJS" && grep -q 'slaReminderCtl' "$MJS" && grep -q 'createSlaReminderController' "$MJS" || { echo "::error:: main sem classificacao/controlador SLA"; exit 1; }
+          # 13 — lock→nativa / unlock reexibe / resume reconcile
+          grep -q 'onLockChange' "$MJS" && grep -qE 'slaReminderCtl\.reconcile' "$MJS" || { echo "::error:: main sem lock/reconcile"; exit 1; }
+          # 14 — 16 eventos sla.reminder.* sanitizados
+          for ev in sla.reminder.detected sla.reminder.queued sla.reminder.shown sla.reminder.sound.played sla.reminder.promoted sla.reminder.ack.start sla.reminder.ack.success sla.reminder.closed sla.reminder.native.sent sla.reminder.locked sla.reminder.unlock.reshown sla.reminder.dedup.skipped sla.reminder.cancelled.completed; do
+            grep -q "$ev" "$DM/slaReminder.js" || { echo "::error:: evento $ev ausente"; exit 1; }
+          done
+          # 15 — NAO altera destinatarios: notifEvents == fonte + Categoria A
+          cmp_norm "$DM/notifEvents.js" "src/main/notifEvents.js"
+          grep -q "recipientMode: 'all_active_users'" "$DM/notifEvents.js" || { echo "::error:: Categoria A alterada"; exit 1; }
+          grep -qF "recipientMode: 'assigned_designer'" "$DM/notifEvents.js" || { echo "::error:: assigned_designer ausente"; exit 1; }
+          # 16 — TEMPOS CONGELADOS: cardsRules T-30/T-10 + slaRules == fonte
+          cmp_norm "$DM/cardsRules.js" "src/main/cardsRules.js"
+          cmp_norm "$DM/slaRules.js" "src/main/slaRules.js"
+          grep -qF 'var CARDS_WARN_MS = 30 * 60000' "$DM/cardsRules.js" || { echo "::error:: T-30 alterada"; exit 1; }
+          grep -qF 'var CARDS_RED_MS  = 10 * 60000' "$DM/cardsRules.js" || { echo "::error:: T-10 alterada"; exit 1; }
+          # 17 — scheduler empacotado
+          grep -q 'startSlaScheduler' "$DM/slaScheduler.js" || { echo "::error:: slaScheduler nao empacotado"; exit 1; }
+          # 18 — COMUNS CONGELADAS: index.html == fonte + toast/monitor/sino + bgNotify premium
+          cmp_norm "$EXDIR/src/renderer/index.html" "src/renderer/index.html"
+          grep -q 'notifToastOnce' "$EXDIR/src/renderer/index.html" || { echo "::error:: toast comum ausente"; exit 1; }
+          grep -q 'f354gMonAlerts' "$EXDIR/src/renderer/index.html" || { echo "::error:: Monitor SLA ausente"; exit 1; }
+          grep -q 'function slaibToggle(' "$EXDIR/src/renderer/index.html" || { echo "::error:: sino ausente"; exit 1; }
+          grep -q 'showBgNotify' "$DM/bgNotify.js" || { echo "::error:: bgNotify premium ausente"; exit 1; }
+          test -f "$RR/bgnotify.html" || { echo "::error:: bgnotify.html ausente"; exit 1; }
+          # 19 — tray + updater channel latest + Cronograma preservados
+          grep -q 'ensureTray' "$MJS" || { echo "::error:: ensureTray ausente"; exit 1; }
+          grep -qE 'channel[[:space:]]*=[[:space:]]*"latest"' "$DM/updaterService.js" || { echo "::error:: updater channel != latest"; exit 1; }
+          grep -q 'function cronSanitizeDeep(' "$EXDIR/src/renderer/index.html" || { echo "::error:: cronSanitizeDeep (Cronograma) ausente"; exit 1; }
+          # 20 — Android NAO tocado
+          A2=$(git -C "$GITHUB_WORKSPACE" diff --name-only "$BASE_202_SHA" HEAD | grep -c '^android/' || true); [ "$A2" = "0" ] || { echo "::error:: diff toca android/ ($A2)"; exit 1; }
+          echo "GATE F3.5.4M EMPACOTADO (20 gates): VERIFIED"
+
+      - name: Empacotar bundle (EXE/MSI/latest.yml/blockmap/SBOM/SHA256SUMS/VERSAO-DESKTOP) + SHA256SUMS
+        working-directory: ${{ env.APP_DIR }}
+        env:
+          APP_VERSION: "1.0.203"
+        run: |
+          set -e
+          npx --yes @cyclonedx/cyclonedx-npm --omit dev --output-format JSON --output-file "$RUNNER_TEMP/sbom-cyclonedx.json" || echo '{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}' > "$RUNNER_TEMP/sbom-cyclonedx.json"
+          OUT="$GITHUB_WORKSPACE/dist-pkg"; mkdir -p "$OUT"
+          EXE=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe | head -1)
+          MSI=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.msi 2>/dev/null | head -1)
+          BM=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap | head -1)
+          cp "$EXE" "$OUT/"; [ -n "$MSI" ] && cp "$MSI" "$OUT/"; cp dist-installer/latest.yml "$OUT/"; cp "$BM" "$OUT/"
+          cp "$RUNNER_TEMP/sbom-cyclonedx.json" "$OUT/SBOM-cyclonedx.json"
+          EXE_NAME=$(basename "$EXE"); MSI_NAME=$([ -n "$MSI" ] && basename "$MSI" || echo ""); BM_NAME=$(basename "$BM")
+          ( cd "$OUT" && sha256sum "$EXE_NAME" ${MSI_NAME:+$MSI_NAME} latest.yml "$BM_NAME" SBOM-cyclonedx.json > SHA256SUMS )
+          {
+            echo "productName : Agenda ID Seven Desktop"
+            echo "versionName : $APP_VERSION"
+            echo "rotulo      : 1.0.203-sla-reminder-visual-fix (CANDIDATA — ajuste visual dos lembretes centrais de SLA)"
+            echo "channel     : latest (estrutura do updater; NADA publicado)"
+            echo "appId       : br.com.idseven.agenda.desktop"
+            echo "instalador  : $EXE_NAME"
+            echo "SHA-256 exe : $(sha256sum "$OUT/$EXE_NAME" | awk '{print $1}')"
+            [ -n "$MSI_NAME" ] && echo "instalador2 : $MSI_NAME" && echo "SHA-256 msi : $(sha256sum "$OUT/$MSI_NAME" | awk '{print $1}')"
+            echo "commit      : $GITHUB_SHA (branch $GITHUB_REF_NAME)"
+            echo "baseline    : Desktop 1.0.202 OFICIAL (commit 90a518b; tag v1.0.202 preservada; testada fisicamente)"
+            echo "origem      : F3.5.4M — ajuste VISUAL do lembrete central de SLA (avatar 100% visivel + faixa encaixada no card via overflow:hidden com avatar como irmao do card; anel/halo por tema; resize mede o #wrap). LOGICA da 1.0.202 INTOCADA: main/src/preload byte-identicos; unico arquivo de produto alterado = slareminder.html. Notificacoes comuns, tempos T-30/T-10, destinatarios, Card Premium/Cronograma/Monitor SLA/sino, updater e Android: INTOCADOS"
+            echo "assinatura  : mesmo processo da 1.0.202 (sem code-signing -> NotSigned)"
+            echo "distribuicao: CANDIDATA DE TESTE PRIVADA — SEM release, SEM tag, SEM stable/latest, SEM deploy; somente artifact p/ teste fisico do owner"
+          } > "$OUT/VERSAO-DESKTOP.txt"
+          echo "== SHA256SUMS =="; cat "$OUT/SHA256SUMS"
+
+      - name: Upload artifact — installer (EXE + MSI) PRIVADO
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-1.0.203-test-installer
+          path: |
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.msi
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload artifact — updatemeta (latest.yml + blockmap + SHA256SUMS + SBOM + VERSAO) PRIVADO
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-1.0.203-test-updatemeta
+          path: |
+            dist-pkg/latest.yml
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap
+            dist-pkg/SHA256SUMS
+            dist-pkg/SBOM-cyclonedx.json
+            dist-pkg/VERSAO-DESKTOP.txt
+          if-no-files-found: error
+          retention-days: 30
