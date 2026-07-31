@@ -24,10 +24,21 @@ export const fbApp = initializeApp(FIREBASE_CONFIG);
 // é só o transporte do cliente. (Mesma base do APK/Web; sem mudança de schema/escrita.)
 export const db = initializeFirestore(fbApp, { experimentalForceLongPolling: true });
 
+// F3.5.4N — OBSERVADOR DE SAÚDE (aditivo; NÃO altera a entrega/re-attach existentes). O main
+// (listenerWatchdog) assina para reagir a SINAIS REAIS do Firestore: attach/snapshot/error/rearm,
+// com a geração da assinatura. Nunca interrompe a assinatura; só observa. Falha do observador
+// jamais derruba a entrega (try/catch em cada emissão).
+export type ListenHealth = { col: string; event: "attach" | "snapshot" | "error" | "rearm"; attempt: number; generation: number; size?: number; changes?: number; err?: string };
+let _healthObserver: ((h: ListenHealth) => void) | null = null;
+export function setListenHealthObserver(cb: ((h: ListenHealth) => void) | null): void { _healthObserver = cb; }
+let _genCounter = 0;
+function _emitHealth(h: ListenHealth): void { try { if (_healthObserver) _healthObserver(h); } catch { /* observador nunca derruba a entrega */ } }
+
 export function listen<T extends DocumentData>(
   name: string,
   cb: (snap: QuerySnapshot<T>) => void
 ) {
+  const generation = ++_genCounter; // identidade REAL desta assinatura (nova a cada re-attach externo)
   // F3.3.10-DIAG — loga cada snapshot recebido pelo MAIN (prova se o realtime chega em background)
   // + erros de transporte.
   // F3.4.7 — AUTO-CURA: quando o callback de ERRO do onSnapshot dispara, o SDK do Firestore
@@ -43,21 +54,27 @@ export function listen<T extends DocumentData>(
   const attach = (): void => {
     if (stopped) return;
     diag("firestore.listen.attach", { col: name, attempt });
+    _emitHealth({ col: name, event: "attach", attempt, generation });
     unsub = onSnapshot(
       query(collection(db, name)) as any,
       (s: any) => {
         attempt = 0; // stream saudável ⇒ backoff volta ao início
-        try { diag("firestore.snapshot", { col: name, size: s.size, changes: (s.docChanges && s.docChanges() || []).length }); } catch { /* */ }
+        let changes = 0; try { changes = (s.docChanges && s.docChanges() || []).length; } catch { /* */ }
+        try { diag("firestore.snapshot", { col: name, size: s.size, changes }); } catch { /* */ }
+        _emitHealth({ col: name, event: "snapshot", attempt: 0, generation, size: Number(s.size) || 0, changes });
         cb(s as any);
       },
       (err: any) => {
-        try { diag("firestore.error", { col: name, err: String((err && err.message) || err) }); } catch { /* */ }
+        const emsg = String((err && err.message) || err);
+        try { diag("firestore.error", { col: name, err: emsg }); } catch { /* */ }
+        _emitHealth({ col: name, event: "error", attempt, generation, err: emsg });
         try { if (unsub) unsub(); } catch { /* */ }
         unsub = null;
         if (stopped) return;
         attempt++;
         const delayMs = Math.min(5000 * Math.pow(2, attempt - 1), 60000);
         try { diag("firestore.listen.rearm", { col: name, attempt, delayMs }); } catch { /* */ }
+        _emitHealth({ col: name, event: "rearm", attempt, generation });
         rearmTimer = setTimeout(attach, delayMs);
       }
     );
