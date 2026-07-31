@@ -1,0 +1,276 @@
+# =====================================================================
+# F3.5.4M — Publicacao da Desktop 1.0.203 no CANAL DO ATUALIZADOR INTERNO (Latest)
+# ---------------------------------------------------------------------
+# Publica a 1.0.203 (F3.5.4M: AJUSTE EXCLUSIVAMENTE VISUAL do lembrete central de SLA amarelo/vermelho):
+#   (1) avatar deixa de ser cortado no topo (agora e IRMAO do card, top:14px, 100% visivel, com anel
+#       branco + halo por tema e sombra premium; centralizado);
+#   (2) faixa superior colorida encaixada dentro do card (card com overflow:hidden clipa a ::before nos
+#       cantos arredondados; como o avatar saiu do card, o clip NAO o corta);
+#   (3) #wrap reserva o topo e o resize passa a medir o #wrap => a janela nunca corta o avatar.
+# TODA A LOGICA da 1.0.202 preservada: unico arquivo de produto alterado = src/renderer/slareminder.html;
+# desktop/src/main e desktop/src/preload byte-identicos a 1.0.202. Notificacoes comuns, tempos T-30/T-10,
+# destinatarios, Card Premium/Cronograma/Monitor SLA/sino, updater e Android: INTOCADOS.
+# USA EXCLUSIVAMENTE os BYTES do run de build F3.5.4M 30635472298 (gated, verde; --publish never):
+# NAO RECOMPILA — baixa os 2 artifacts e publica os MESMOS bytes. TUDO PINADO: run id, digests dos
+# artifacts, 5 hashes SHA-256, tag v1.0.203 no head EXATO da branch. 6 assets: EXE, MSI, latest.yml,
+# blockmap, SHA256SUMS, VERSAO-DESKTOP.txt.
+# ESCRITAS (tag + release + Latest) SO via token temporario do GitHub App "Agenda ID Seven Release
+# Bot" (expira sozinho); GITHUB_TOKEN permanece somente leitura; sem RELEASE_PAT.
+# Roda NA PROPRIA branch de teste (main INTOCAVEL): dispara no push DESTE arquivo + workflow_dispatch.
+# v1.0.202, v1.0.201, v1.0.200 e v1.0.199 permanecem PRESERVADAS (releases/tags intocadas).
+# A publicacao NAO significa aprovacao fisica — o teste fisico do owner vem depois, pelo atualizador.
+# =====================================================================
+name: "F3.5.4M Desktop Release — 1.0.203 no canal do updater (ajuste visual dos lembretes de SLA; sem build novo)"
+"on":
+  push:
+    branches:
+      - "desktop/f354m-sla-reminder-visual-fix-1.0.203"
+    paths:
+      - ".github/workflows/desktop-release-f354m.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: agidseven-lang/Agenda
+      # ── PINAGEM COMPLETA (F3.5.4M GO tecnico; run de build (pinado abaixo) verde nos 2 jobs) ──
+      RUN_ID: "30635472298"
+      STABLE_SHA: "12abeefe547f57700c8faba07b512204c2d24dec"
+      TEST_BRANCH: "desktop/f354m-sla-reminder-visual-fix-1.0.203"
+      BASE_202_SHA: "90a518b43b23fcb434a45f6f136dfdaccdad455d"
+      TAG: "v1.0.203"
+      TITLE: "Agenda ID Seven Desktop 1.0.203 — Ajuste Visual dos Lembretes Centrais de SLA"
+      ART_INST: "agenda-id-seven-desktop-1.0.203-test-installer"
+      ART_INST_DIGEST: "sha256:de61ab615087e24960dc774b9dd860ee6ed557c9171216291e9597928976734c"
+      ART_META: "agenda-id-seven-desktop-1.0.203-test-updatemeta"
+      ART_META_DIGEST: "sha256:b91d003f63b637918c90a75d10946da05a7cdf02fa8ddc5b020fa63ffcdc4fef"
+      EXE_NAME: "Agenda-ID-Seven-Desktop-1.0.203-x64.exe"
+      MSI_NAME: "Agenda-ID-Seven-Desktop-1.0.203-x64.msi"
+      BM_NAME: "Agenda-ID-Seven-Desktop-1.0.203-x64.exe.blockmap"
+      LY_NAME: "latest.yml"
+      EXP_EXE: "a733c460ef108fbac5a041c045ca469b5c165146c2fa288d7db63a964a6b9aee"
+      EXP_MSI: "96aae02e24eee8452b90646e0b83e6a8768648649b93507aff8ec121984ad67a"
+      EXP_LY: "bf2d9ed8b056eb766f3c4ac5544568d57db111ab015b2250e08d4fb1e875314d"
+      EXP_BM: "e775b44e0cd58e567662aaba5b8b78f899bf3e818ad0fa816950b674bd74c814"
+      EXP_SBOM: "2c39fbdc7e206483bcf2a6eb646b6b5190c59a1e982aa11298b16850c8578dbc"
+      PROD_PREV_TAG: "v1.0.202"
+      PROD_ROLLBACK_TAG: "v1.0.201"
+      PROD_HIST_TAG: "v1.0.200"
+      PROD_HIST2_TAG: "v1.0.199"
+    steps:
+      - name: "Gate 0 — contexto: branch de teste correta (publicacao autorizada F3.5.4M)"
+        run: |
+          set -euo pipefail
+          [ "${{ github.ref_name }}" = "$TEST_BRANCH" ] || { echo "::error::ref '${{ github.ref_name }}' != $TEST_BRANCH — nada publicado"; exit 1; }
+          echo "OK: rodando na branch de teste autorizada"
+
+      - name: "Gate 0a — token temporario do Release Bot (GitHub App; expira sozinho)"
+        id: release_bot
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: Agenda
+          permission-contents: write
+          permission-workflows: write
+
+      - name: "Gate 0b — token do Release Bot ATIVO + escopo SO Agenda"
+        env:
+          BOT_TOKEN: ${{ steps.release_bot.outputs.token }}
+        run: |
+          set -euo pipefail
+          [ -n "$BOT_TOKEN" ] || { echo "::error::token do Release Bot vazio — NADA publicado."; exit 1; }
+          FN="$(GH_TOKEN="$BOT_TOKEN" gh api "repos/$REPO" --jq '.full_name' 2>/dev/null || true)"
+          [ "$FN" = "$REPO" ] || { echo "::error::Release Bot sem acesso a $REPO."; exit 1; }
+          J="$(GH_TOKEN="$BOT_TOKEN" gh api /installation/repositories)"
+          N="$(echo "$J" | jq -r '.total_count')"; R="$(echo "$J" | jq -r '.repositories[0].full_name')"
+          { [ "$N" = "1" ] && [ "$R" = "$REPO" ]; } || { echo "::error::escopo do Release Bot != {1 repo, $REPO} ($N,$R)."; exit 1; }
+          echo "OK: Release Bot ativo, escopo restrito a $REPO"
+
+      - name: "Gate 1 — run de build F3.5.4M completed/success e head EXATO"
+        run: |
+          set -euo pipefail
+          J="$(gh api "repos/$REPO/actions/runs/$RUN_ID")"
+          ST="$(echo "$J" | jq -r '.status + "|" + .conclusion')"
+          HS="$(echo "$J" | jq -r '.head_sha')"
+          BR="$(echo "$J" | jq -r '.head_branch')"
+          echo "run $RUN_ID: $ST head=$HS branch=$BR"
+          [ "$ST" = "completed|success" ] || { echo "::error::run de build invalido"; exit 1; }
+          [ "$HS" = "$STABLE_SHA" ] || { echo "::error::head do run != STABLE_SHA"; exit 1; }
+          [ "$BR" = "$TEST_BRANCH" ] || { echo "::error::branch do run != branch de teste"; exit 1; }
+
+      - name: "Gate 2 — STABLE_SHA na linhagem do tip; commits alem dele SO o workflow de release"
+        run: |
+          set -euo pipefail
+          H="$(gh api "repos/$REPO/git/ref/heads/$TEST_BRANCH" --jq '.object.sha')"
+          CMP="$(gh api "repos/$REPO/compare/$STABLE_SHA...$H" --jq '.status')"
+          echo "compare $STABLE_SHA...$H: $CMP"
+          { [ "$CMP" = "identical" ] || [ "$CMP" = "ahead" ]; } || { echo "::error::STABLE_SHA fora da linhagem do tip ($CMP)"; exit 1; }
+          gh api "repos/$REPO/compare/$STABLE_SHA...$H" --jq '.files[].filename' | tee /tmp/extra.txt || true
+          if grep -vE '^\.github/workflows/desktop-release-f354m\.yml$' /tmp/extra.txt | grep -q .; then
+            echo "::error::commits pos-candidato tocam arquivos alem do workflow de release"; exit 1; fi
+          CMP2="$(gh api "repos/$REPO/compare/$BASE_202_SHA...$STABLE_SHA" --jq '.status')"
+          { [ "$CMP2" = "ahead" ] || [ "$CMP2" = "identical" ]; } || { echo "::error::STABLE_SHA nao descende da 1.0.202 ($CMP2)"; exit 1; }
+          echo "OK: STABLE_SHA ancestral do tip; extras = so o workflow de release; base 1.0.202 na linhagem"
+
+      - name: "Gate 3 — release v1.0.203 NAO existe; tag so pode preexistir apontando p/ STABLE_SHA"
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then echo "::error::release $TAG ja existe"; exit 1; fi
+          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            TS="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+            [ "$TS" = "$STABLE_SHA" ] || { echo "::error::tag $TAG aponta para outro sha ($TS)"; exit 1; }
+          fi
+          echo "OK: release/tag livres (ou tag ja em STABLE_SHA)"
+
+      - name: "Gate 4 — artifacts: ids+digests conferem (mesmos bytes do run verde)"
+        run: |
+          set -euo pipefail
+          json="$(gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts" --paginate)"
+          chk() { local d; d="$(echo "$json" | jq -r --arg n "$1" '.artifacts[]|select(.name==$n)|.digest')"; echo "$1: $d"; [ "$d" = "$2" ] || { echo "::error::digest $1 divergente"; exit 1; }; }
+          chk "$ART_INST" "$ART_INST_DIGEST"
+          chk "$ART_META" "$ART_META_DIGEST"
+
+      - name: "Baixar artifacts (installer + updatemeta) — SEM recompilar"
+        run: |
+          set -euo pipefail
+          gh run download "$RUN_ID" -R "$REPO" -n "$ART_INST" -D pacote
+          gh run download "$RUN_ID" -R "$REPO" -n "$ART_META" -D pacote
+          for f in "$EXE_NAME" "$MSI_NAME" "$LY_NAME" "$BM_NAME" SHA256SUMS SBOM-cyclonedx.json VERSAO-DESKTOP.txt; do
+            test -f "pacote/$f" || { echo "::error::arquivo ausente: $f"; exit 1; }
+          done
+          if [ -f pacote/canary.yml ]; then echo "::error::canary.yml presente — canal ambiguo"; exit 1; fi
+
+      - name: "Gate 5 — hashes SHA-256 + latest.yml (versao/EXE/sha512) + VERSAO-DESKTOP"
+        run: |
+          set -euo pipefail
+          declare -A EXP=( ["$EXE_NAME"]="$EXP_EXE" ["$MSI_NAME"]="$EXP_MSI" ["$LY_NAME"]="$EXP_LY" ["$BM_NAME"]="$EXP_BM" ["SBOM-cyclonedx.json"]="$EXP_SBOM" )
+          for f in "${!EXP[@]}"; do
+            H="$(sha256sum "pacote/$f" | awk '{print $1}')"; echo "$f=$H"
+            [ "$H" = "${EXP[$f]}" ] || { echo "::error::hash $f divergente"; exit 1; }
+          done
+          ( cd pacote && sha256sum -c SHA256SUMS ) || { echo "::error::SHA256SUMS nao confere"; exit 1; }
+          grep -q "version: 1.0.203" "pacote/$LY_NAME" || { echo "::error::latest.yml version != 1.0.203"; exit 1; }
+          grep -qE "^path: $EXE_NAME" "pacote/$LY_NAME" || { echo "::error::latest.yml path != EXE"; exit 1; }
+          META_SHA512=$(grep -E '^sha512:' "pacote/$LY_NAME" | head -1 | sed -E 's/^sha512:[[:space:]]*//' | tr -d '\r')
+          CALC_SHA512=$(openssl dgst -sha512 -binary "pacote/$EXE_NAME" | openssl base64 -A)
+          [ "$META_SHA512" = "$CALC_SHA512" ] || { echo "::error::sha512 do latest.yml != EXE (updater rejeitaria)"; exit 1; }
+          grep -q "versionName : 1.0.203" pacote/VERSAO-DESKTOP.txt || { echo "::error::VERSAO-DESKTOP sem 1.0.203"; exit 1; }
+          grep -q "1.0.203-sla-reminder-visual-fix" pacote/VERSAO-DESKTOP.txt || { echo "::error::rotulo da candidata ausente"; exit 1; }
+          echo "OK: 5 hashes + SHA256SUMS + latest.yml (1.0.203/EXE/sha512==EXE) + VERSAO-DESKTOP"
+
+      - name: "Release notes"
+        run: |
+          cat > notas.md <<'NOTAS'
+          Agenda ID Seven Desktop 1.0.203 — Ajuste Visual dos Lembretes Centrais de SLA
+
+          Atualização disponibilizada pelo ATUALIZADOR INTERNO do app (Configurações →
+          Atualizações → Verificar atualizações → Baixar → Instalar e reiniciar).
+          NENHUM download manual é necessário.
+
+          O QUE MUDA vs 1.0.202 (F3.5.4M — ajuste EXCLUSIVAMENTE VISUAL do lembrete central de SLA)
+          - AVATAR não é mais cortado no topo: a foto/avatar do responsável agora aparece 100% visível,
+            centralizada e sobreposta ao topo do card de forma elegante, com anel branco, halo na cor do
+            nível (âmbar/vermelho) e sombra — acabamento premium.
+          - FAIXA superior encaixada: a faixa colorida (amarela/vermelha) passa a ficar perfeitamente
+            dentro do card branco, acompanhando os cantos arredondados — sem “vazar” para fora do quadro.
+          - Cabeçalho do lembrete com encaixe limpo e profissional; o restante do cartão (ATENÇÃO/URGENTE,
+            nome, mensagem, tarefa, tempo restante, botão OK) permanece com o mesmo conceito visual.
+
+          CAUSA (provada) e CORREÇÃO
+          - O avatar era posicionado por dentro do card (top negativo), ficando ~12px acima da borda da
+            janela e sendo cortado; a faixa vazava porque o card não recortava (overflow) os cantos.
+          - Correção cirúrgica, apenas na tela do lembrete (slareminder.html): o avatar passou a ser um
+            elemento IRMÃO do card (fora dele), 100% visível; o card ganhou recorte nos cantos
+            (overflow:hidden), encaixando a faixa; e o topo passou a reservar espaço para o avatar, de
+            modo que a janela nunca mais o corta — inclusive em telas com escala 125%/150%.
+
+          PRESERVAÇÃO (provado por gates no build)
+          - Esta versão é EXCLUSIVAMENTE VISUAL. TODA a lógica aprovada na 1.0.202 foi mantida sem
+            alteração: o único arquivo de produto modificado é a tela do lembrete (slareminder.html).
+          - Lembretes centrais de SLA (amarelo/vermelho), fila, prioridade, promoção amarelo→vermelho,
+            botão OK, reconhecimento, persistência, som, lock-screen e fallback nativo: INTOCADOS
+            (código do processo principal e do preload byte-idêntico à 1.0.202).
+          - Notificações comuns no canto inferior direito, tempos T-30/T-10 (Cronograma, Edição de Vídeo,
+            Edição de Cards), destinatários, Monitor SLA, sino, Card Premium, Roteiro, atualizador,
+            login/logout e Android: INTOCADOS.
+          - Rollback: 1.0.202, 1.0.201, 1.0.200 e 1.0.199 PRESERVADAS (releases e tags intactas).
+
+          IMPORTANTE: esta versão ainda DEPENDE DE VALIDAÇÃO FÍSICA do owner (provocar um alerta amarelo
+          e um vermelho e confirmar que o avatar não está cortado, que a faixa está dentro do card, que o
+          acabamento está profissional e que toda a lógica continua funcionando). A publicação apenas
+          disponibiliza a atualização pelo mecanismo oficial.
+
+          Procedência: run de build F3.5.4M 30635472298 (success; --publish never; gates de verificação +
+          Windows verdes, incluindo os 20 gates F3.5.4M no app.asar) @ commit
+          12abeefe547f57700c8faba07b512204c2d24dec (branch desktop/f354m-sla-reminder-visual-fix-1.0.203
+          = tag v1.0.202 + commit da fase). Mesmos bytes; sem recompilar. Confira SHA-256 em SHA256SUMS.
+          NOTAS
+
+      - name: "Criar tag v1.0.203 pinada em STABLE_SHA — ESCRITA via Release Bot"
+        env:
+          GH_TOKEN: ${{ steps.release_bot.outputs.token }}
+        run: |
+          set -euo pipefail
+          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            TS="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+            [ "$TS" = "$STABLE_SHA" ] || { echo "::error::tag $TAG aponta para outro sha ($TS)"; exit 1; }
+          else
+            gh api -X POST "repos/$REPO/git/refs" -f ref="refs/tags/$TAG" -f sha="$STABLE_SHA" >/dev/null
+            echo "tag $TAG criada em $STABLE_SHA"
+          fi
+
+      - name: "Publicar release no canal do updater (latest=true, prerelease=false) — 6 assets — via Release Bot"
+        env:
+          GH_TOKEN: ${{ steps.release_bot.outputs.token }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" -R "$REPO" \
+            --target "$STABLE_SHA" --latest=true \
+            --title "$TITLE" --notes-file notas.md \
+            "pacote/$EXE_NAME" "pacote/$MSI_NAME" "pacote/$LY_NAME" "pacote/$BM_NAME" "pacote/SHA256SUMS" "pacote/VERSAO-DESKTOP.txt"
+          echo "publicado: $TAG (canal do electron-updater: release Latest com latest.yml)"
+
+      - name: "Pos-verificacao (Latest=1.0.203; 1.0.202 prev + 1.0.201/1.0.200/1.0.199 preservadas)"
+        run: |
+          set -euo pipefail
+          FLAGS="$(gh release view "$TAG" -R "$REPO" --json isPrerelease,isDraft --jq '(.isPrerelease|tostring)+"|"+(.isDraft|tostring)')"
+          [ "$FLAGS" = "false|false" ] || { echo "::error::flags incorretas: $FLAGS"; exit 1; }
+          N="$(gh release view "$TAG" -R "$REPO" --json assets --jq '.assets|length')"
+          [ "$N" = "6" ] || { echo "::error::esperado 6 assets, encontrados $N"; exit 1; }
+          for a in "$EXE_NAME" "$MSI_NAME" "$LY_NAME" "$BM_NAME" SHA256SUMS VERSAO-DESKTOP.txt; do
+            gh release view "$TAG" -R "$REPO" --json assets --jq '.assets[].name' | grep -qx "$a" || { echo "::error::asset $a ausente"; exit 1; }
+          done
+          if gh release view "$TAG" -R "$REPO" --json assets --jq '.assets[].name' | grep -qx "app-update.yml"; then echo "::error::app-update.yml nao pode ser asset"; exit 1; fi
+          TAGSHA="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+          [ "$TAGSHA" = "$STABLE_SHA" ] || { echo "::error::tag != STABLE_SHA"; exit 1; }
+          LATEST_TAG="$(gh api "repos/$REPO/releases/latest" --jq '.tag_name')"
+          [ "$LATEST_TAG" = "$TAG" ] || { echo "::error::Latest do repo != $TAG (got $LATEST_TAG)"; exit 1; }
+          for t in "$PROD_PREV_TAG" "$PROD_ROLLBACK_TAG" "$PROD_HIST_TAG" "$PROD_HIST2_TAG"; do
+            gh release view "$t" -R "$REPO" --json tagName --jq '.tagName' | grep -qx "$t" || { echo "::error::$t (preservacao/rollback) sumiu"; exit 1; }
+          done
+          echo "===== GO: 1.0.203 no canal do updater (Latest); 1.0.202/1.0.201/1.0.200/1.0.199 preservadas ====="
+
+      - name: "Smoke do FEED DO UPDATER — exatamente o que o electron-updater consome (sem instalar)"
+        run: |
+          set -euo pipefail
+          rm -rf smoke; mkdir -p smoke
+          curl -fsSL "https://github.com/$REPO/releases/latest/download/latest.yml" -o smoke/latest.yml
+          [ "$(sha256sum smoke/latest.yml | awk '{print $1}')" = "$EXP_LY" ] || { echo "::error::feed latest.yml hash divergente"; exit 1; }
+          grep -q "version: 1.0.203" smoke/latest.yml || { echo "::error::feed sem version 1.0.203"; exit 1; }
+          grep -qE "^path: $EXE_NAME" smoke/latest.yml || { echo "::error::feed sem path do EXE"; exit 1; }
+          curl -fsSL -o smoke/"$EXE_NAME" "https://github.com/$REPO/releases/latest/download/$EXE_NAME"
+          [ "$(sha256sum smoke/$EXE_NAME | awk '{print $1}')" = "$EXP_EXE" ] || { echo "::error::EXE do canal divergente"; exit 1; }
+          curl -fsSL -o smoke/"$BM_NAME" "https://github.com/$REPO/releases/latest/download/$BM_NAME"
+          [ "$(sha256sum smoke/$BM_NAME | awk '{print $1}')" = "$EXP_BM" ] || { echo "::error::blockmap do canal divergente"; exit 1; }
+          META_SHA512=$(grep -E '^sha512:' smoke/latest.yml | head -1 | sed -E 's/^sha512:[[:space:]]*//' | tr -d '\r')
+          CALC_SHA512=$(openssl dgst -sha512 -binary "smoke/$EXE_NAME" | openssl base64 -A)
+          [ "$META_SHA512" = "$CALC_SHA512" ] || { echo "::error::sha512 do feed != EXE do feed"; exit 1; }
+          echo "SMOKE DO UPDATER OK: 1.0.202/1.0.201 vao detectar/baixar a 1.0.203 (versao+path+sha512+blockmap integros). Nenhuma instalacao executada no CI."
