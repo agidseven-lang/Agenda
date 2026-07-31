@@ -4060,7 +4060,8 @@ function notifEnsureStack(){
      +'.ntf-resp-av{flex:0 0 auto;width:18px;height:18px;border-radius:50%;background-size:cover;background-position:center;box-shadow:0 0 0 1.5px rgba(91,108,255,.5)}'
      +'.ntf-resp-av.gen{display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#5B6CFF,#22D3EE);color:#fff;font-weight:800;font-size:9px}'
      +'.ntf-sev{flex:0 0 auto;width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--nac) 20%,transparent);color:var(--nac)}.ntf-sev svg{width:14px;height:14px}'
-     +'.ntf-x{position:absolute;top:8px;right:9px;width:20px;height:20px;border:0;border-radius:6px;background:transparent;color:#7f8aa0;font-size:15px;line-height:1;cursor:pointer}.ntf-x:hover{background:rgba(255,255,255,.08);color:#cdd6e6}';
+     +'.ntf-x{position:absolute;top:8px;right:9px;width:20px;height:20px;border:0;border-radius:6px;background:transparent;color:#7f8aa0;font-size:15px;line-height:1;cursor:pointer}.ntf-x:hover{background:rgba(255,255,255,.08);color:#cdd6e6}'
+     +'.ntf-glist{margin-top:7px;display:flex;flex-direction:column;gap:3px}.ntf-gi{color:#9fb0c8;font-size:12px;line-height:1.35;white-space:normal;overflow-wrap:anywhere;word-break:break-word}.ntf-gi b{color:#eef2f8;font-weight:700}.ntf-more{color:#7f8aa0;font-size:11px;margin-top:3px;font-weight:600}';
     document.head.appendChild(st);
   }
   return s;
@@ -4115,6 +4116,7 @@ function notifShowToast(p){
     if(!primIni&&primName) primIni=String(primName).trim().charAt(0).toUpperCase();
     var icon=sev==='critical'?'bell':(sev==='warning'?'clock':(sev==='success'?'check':'info'));
     var el=document.createElement('div'); el.className='ntf ntf-'+sev; if(p.action&&p.action.deep) el.setAttribute('data-deep',p.action.deep);
+    if(p.groupKey) el.setAttribute('data-group',String(p.groupKey)); // F3.5.4O — endereço p/ atualização de grupo comum
     // AVATAR: foto REAL → iniciais do NOME → genérico (só sem usuário). NUNCA a inicial do título.
     var av = primPhoto ? ('<div class="ntf-av" style="background-image:url(\''+esc(primPhoto)+'\')"></div>')
            : (primName ? ('<div class="ntf-av gen">'+esc(primIni||'?')+'</div>')
@@ -4159,10 +4161,50 @@ function notifShowToast(p){
     var xb=el.querySelector('.ntf-x'); if(xb) xb.addEventListener('click',function(ev){ ev.stopPropagation(); dismiss(); });
     var cd=el.querySelector('.ntf-card'); if(cd) cd.addEventListener('click',function(){ notifRoute(p.action&&p.action.deep); dismiss(); });
     if(p.sound!==false) notifSound(sev);
-    var ttl=sev==='critical'?11000:(sev==='warning'?8000:6000); setTimeout(dismiss,ttl);
+    var ttl=sev==='critical'?11000:(sev==='warning'?8000:6000);
+    // F3.5.4O — guarda dismiss/timer/1º instante no elemento p/ a atualização de grupo religar handlers
+    // e REFRESCAR o TTL com teto de permanência (caminho não-agrupado inalterado — mesmo ttl/dismiss).
+    el.__ntfDismiss=dismiss; el.__ntfFirstAt=Date.now(); el.__ntfTimer=setTimeout(dismiss,ttl);
     var all=stack.querySelectorAll('.ntf'); if(all.length>4){ for(var i=0;i<all.length-4;i++){ if(all[i]&&all[i].parentNode) all[i].parentNode.removeChild(all[i]); } }
     return el;
   }catch(_){ return null; }
+}
+/* F3.5.4O — ATUALIZAÇÃO DE GRUPO COMUM no TOAST in-app: morfa EM VIGOR o toast existente (data-group)
+   para o card agrupado "N atualizações em [task]" (até 5 itens + "+N outras atualizações"). SEM novo
+   toast, SEM re-animar a entrada, SEM repetir o som (nunca chama notifSound), SEM roubar foco. TTL
+   refrescado com TETO de permanência (15s desde o 1º evento). No-op se o toast do grupo já saiu da
+   tela (o evento segue no sino individualmente). NÃO altera o caminho não-agrupado (1.0.204). */
+function notifGroupUpdate(view){
+  try{
+    view=view||{}; var gk=String(view.groupKey||''); if(!gk) return;
+    var stack=document.getElementById('notif-stack'); if(!stack) return;
+    var el=null, kids=stack.querySelectorAll('.ntf[data-group]');
+    for(var i=0;i<kids.length;i++){ if(kids[i].getAttribute('data-group')===gk){ el=kids[i]; break; } }
+    if(!el) return;
+    var sev=view.severity||'info';
+    var primName=view.primaryName||''; var primPhoto=view.primaryAvatar||'';
+    var ini=''; try{ ini=(initials(primName)||'').toUpperCase(); }catch(_){}
+    var icon=sev==='critical'?'bell':(sev==='warning'?'clock':(sev==='success'?'check':'info'));
+    var av=primPhoto?('<div class="ntf-av" style="background-image:url(\''+esc(primPhoto)+'\')"></div>')
+          :(primName?('<div class="ntf-av gen">'+esc(ini||'?')+'</div>'):('<div class="ntf-av gen" title="Agenda ID Seven">'+(typeof svg==='function'?svg('bell'):'')+'</div>'));
+    var lines=''; var items=view.items||[];
+    for(var j=0;j<items.length;j++){ var it=items[j]||{}; var who=it.actorName?('<b>'+esc(it.actorName)+'</b> '):''; lines+='<div class="ntf-gi">'+who+esc(String(it.body||it.title||''))+'</div>'; }
+    if((view.extraCount||0)>0) lines+='<div class="ntf-more">+'+esc(String(view.extraCount))+' outras atualizações</div>';
+    el.className='ntf ntf-'+sev+' in';
+    var deep=String(view.deep||''); if(deep) el.setAttribute('data-deep',deep);
+    el.innerHTML='<div class="ntf-card">'+av
+      +'<div class="ntf-bd"><div class="ntf-hd"><b>'+esc(String(view.count||0))+' atualizações em ‘'+esc(view.taskTitle||'Tarefa')+'’</b><span class="ntf-tm">'+esc(notifNowHM())+'</span></div>'
+      +'<div class="ntf-glist">'+lines+'</div></div>'
+      +'<span class="ntf-sev" title="'+esc(sev)+'">'+(typeof svg==='function'?svg(icon):'')+'</span>'
+      +'<button class="ntf-x" title="Fechar" aria-label="Fechar">×</button></div>';
+    var dismiss=el.__ntfDismiss||function(){ try{ el.classList.remove('in'); setTimeout(function(){ if(el&&el.parentNode) el.parentNode.removeChild(el); },200); }catch(_){} };
+    var xb=el.querySelector('.ntf-x'); if(xb) xb.addEventListener('click',function(ev){ ev.stopPropagation(); dismiss(); });
+    var cd=el.querySelector('.ntf-card'); if(cd) cd.addEventListener('click',function(){ notifRoute(deep); dismiss(); });
+    try{ if(el.__ntfTimer) clearTimeout(el.__ntfTimer); }catch(_){}
+    var ttl=sev==='critical'?11000:(sev==='warning'?8000:6000);
+    var firstAt=el.__ntfFirstAt||Date.now(); var cap=15000-(Date.now()-firstAt); if(cap<1200)cap=1200;
+    el.__ntfTimer=setTimeout(dismiss, Math.min(ttl,cap));
+  }catch(_){}
 }
 /* F3.3.10-FIX — TOAST DE ATRIBUIÇÃO (Social → Designer). designer_assigned/task_assigned nasce no
    notifier do MAIN; em alguns casos o canal in-app (notif-toast) não renderiza o toast premium — o
@@ -4871,7 +4913,9 @@ function afterNotifCentral(){
   var cx=document.querySelector('[data-nc-close]'); if(cx) cx.onclick=function(){ notifDetailId=null; var c=document.getElementById('content'); if(c){ c.innerHTML=renderNotifCentral(); afterNotifCentral(); } };
 }
 /* registro do canal de captura 100% (hub do main → histórico local). Capture-only. */
-try{ if(window.desktopAPI&&typeof window.desktopAPI.onNotifHistory==='function'){ window.desktopAPI.onNotifHistory(function(p){ try{ notifHistoryAppend(p); }catch(_){} try{ if(typeof document==='undefined'||(typeof document.hasFocus==='function'?document.hasFocus():document.visibilityState!=='hidden')) notifToastOnce(p); }catch(_){} }); } }catch(_){}   /* F3.5.4K — compensação do toast in-app SÓ com FOCO real (não apenas "visível"): quando o Agenda está atrás de outro programa/minimizado, o MAIN já entrega pela JANELA PREMIUM always-on-top; sem foco NÃO se levanta um toast in-app invisível que duplicaria o overlay. O sino (notifHistoryAppend) continua SEMPRE. */
+try{ if(window.desktopAPI&&typeof window.desktopAPI.onNotifHistory==='function'){ window.desktopAPI.onNotifHistory(function(p){ try{ notifHistoryAppend(p); }catch(_){} try{ if(!(p&&p._groupUpdate)&&(typeof document==='undefined'||(typeof document.hasFocus==='function'?document.hasFocus():document.visibilityState!=='hidden'))) notifToastOnce(p); }catch(_){} }); } }catch(_){}   /* F3.5.4K — compensação do toast in-app SÓ com FOCO real (não apenas "visível"): quando o Agenda está atrás de outro programa/minimizado, o MAIN já entrega pela JANELA PREMIUM always-on-top; sem foco NÃO se levanta um toast in-app invisível que duplicaria o overlay. O sino (notifHistoryAppend) continua SEMPRE. F3.5.4O — eventos de ATUALIZAÇÃO de grupo (_groupUpdate) NÃO levantam 2º toast pela compensação: o main já envia notif-group-update que morfa o toast existente; o sino segue registrando CADA evento. */
+/* F3.5.4O — canal de ATUALIZAÇÃO de grupo comum (morfa o toast existente; sem novo toast/som/foco). */
+try{ if(window.desktopAPI&&typeof window.desktopAPI.onNotifGroupUpdate==='function'){ window.desktopAPI.onNotifGroupUpdate(function(v){ try{ if(typeof notifGroupUpdate==='function') notifGroupUpdate(v); }catch(_){} }); } }catch(_){}
 /* ════════════════════════ F3.3.10-NOTIF-CENTRAL END ════════════════════════ */
 
 /* ---- HOJE ---- */
@@ -8349,6 +8393,9 @@ function notifDiagCardHtml(d){
     notifDiagRow('Alerta de autocorreção', (d.selfHealAlerts?(notifDiagTs(d.selfHealLastAlertAt)+' · '+(d.selfHealLastReason||'')):'nenhum'), d.selfHealAlerts?'bad':'ok')+'<div class="divline"></div>'+
     notifDiagRow('Iniciar com o Windows', d.startupSupported===false?'Só no Windows':(d.startupWillLaunch?'Ativo':'Inativo'), d.startupWillLaunch?'ok':'')+'<div class="divline"></div>'+
     '<button class="settrow" data-cfgselfheal="'+(d.selfHealingEnabled===false?'on':'off')+'"><div class="icb">'+svg('gear')+'</div><div class="sm"><div class="sl">Autocorreção de notificações</div><div class="ss">'+(d.selfHealingEnabled===false?'Desligada — tocar para ligar':'Ligada — tocar para desligar')+'</div></div><div class="arr">'+svg('arr')+'</div></button><div class="divline"></div>'+
+    /* F3.5.4O — agrupamento das notificações comuns (mesma tarefa + mesmo destinatário) */
+    notifDiagRow('Agrupar atualizações comuns', d.groupingEnabled===false?'Desligado':('Ligado'+(d.groupingActive?(' · '+d.groupingActive+' ativo(s)'):'')), d.groupingEnabled===false?'':'ok')+'<div class="divline"></div>'+
+    '<button class="settrow" data-cfggrouping="'+(d.groupingEnabled===false?'on':'off')+'"><div class="icb">'+svg('gear')+'</div><div class="sm"><div class="sl">Agrupar atualizações comuns da mesma tarefa</div><div class="ss">'+(d.groupingEnabled===false?'Desligado — cada atualização vem separada. Tocar para ligar':'Ligado — atualizações comuns da mesma tarefa aparecem juntas (a 1ª em tempo real). Tocar para desligar')+'</div></div><div class="arr">'+svg('arr')+'</div></button><div class="divline"></div>'+
     notifDiagRow('Versão do aplicativo', d.version||'—')+'<div class="divline"></div>'+
     '<button class="settrow" data-cfgnotifdiag="1"><div class="icb">'+svg('send')+'</div><div class="sm"><div class="sl">Atualizar diagnóstico</div><div class="ss">Relê o estado técnico agora</div></div><div class="arr">'+svg('arr')+'</div></button>';
 }
@@ -9232,6 +9279,16 @@ document.addEventListener('click',async e=>{
       try{ if(window.desktopAPI&&window.desktopAPI.selfHealSet){ await window.desktopAPI.selfHealSet(_cfgSelfhealOn); } }catch(_){}
       try{ notifDiagFill(); }catch(_){}
       flashToast(_cfgSelfhealOn?'Autocorreção de notificações: ligada.':'Autocorreção de notificações: desligada.');
+    })();
+    return;
+  }
+  /* F3.5.4O — AGRUPAMENTO das notificações comuns: liga/desliga SOMENTE o agrupamento (OFF ⇒ 1.0.204). */
+  if(el=g('[data-cfggrouping]')){
+    var _cfgGroupingOn=el.getAttribute('data-cfggrouping')==='on';
+    (async function(){
+      try{ if(window.desktopAPI&&window.desktopAPI.groupingSet){ await window.desktopAPI.groupingSet(_cfgGroupingOn); } }catch(_){}
+      try{ notifDiagFill(); }catch(_){}
+      flashToast(_cfgGroupingOn?'Agrupar atualizações comuns: ligado.':'Agrupar atualizações comuns: desligado.');
     })();
     return;
   }

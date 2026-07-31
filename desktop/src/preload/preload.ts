@@ -23,6 +23,12 @@ contextBridge.exposeInMainWorld("desktopAPI", {
   onNotifToast: (cb: (payload: any) => void) => {
     ipcRenderer.on("notif-toast", (_e, p: any) => cb(p));
   },
+  // F3.5.4O — main -> renderer: ATUALIZAÇÃO de GRUPO comum. Morfa em vigor o toast existente
+  // (endereçado por data-group) para o card agrupado "N atualizações em [task]", SEM novo toast e
+  // SEM repetir o som. No-op se o toast do grupo não estiver na tela.
+  onNotifGroupUpdate: (cb: (view: any) => void) => {
+    ipcRenderer.on("notif-group-update", (_e, v: any) => cb(v));
+  },
   // F3.5.3 — renderer confirma o RENDER do toast (dedupKey): sem ACK, o main entrega pelo fallback.
   notifToastAck: (dedupKey: string) => { try { ipcRenderer.send("notif-toast-ack", String(dedupKey || "")); } catch { /* */ } },
   // F3.5.3 — COLAGEM explícita no formulário (Legenda/Tema/Observações): texto simples do clipboard
@@ -55,6 +61,10 @@ contextBridge.exposeInMainWorld("desktopAPI", {
   // F3.5.4N — AUTOCORREÇÃO do canal (item 17): ligar/desligar SOMENTE a autocorreção (firebase reconecta sempre).
   selfHealGet: (): Promise<any> => ipcRenderer.invoke("selfheal-get"),
   selfHealSet: (v: boolean): Promise<any> => ipcRenderer.invoke("selfheal-set", v),
+  // F3.5.4O — AGRUPAMENTO das notificações comuns (Configurações → Notificações): ligar/desligar
+  // SOMENTE o agrupamento (OFF ⇒ 1.0.204; a entrega individual continua idêntica).
+  groupingGet: (): Promise<any> => ipcRenderer.invoke("grouping-get"),
+  groupingSet: (v: boolean): Promise<any> => ipcRenderer.invoke("grouping-set", v),
   // abrir URL externa (WhatsApp app/web, browser) via shell.openExternal
   openExternal: (url: string): Promise<boolean> => ipcRenderer.invoke("open-external", url),
   // F3.3.73I6C18C — prepara/valida o Card Premium ANTES do WhatsApp (GET read-only no main,

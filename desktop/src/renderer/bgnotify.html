@@ -32,6 +32,11 @@
   .ntf-sev{position:absolute;right:30px;top:12px;width:24px;height:24px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--nac) 20%,transparent);color:var(--nac);font-size:13px;font-weight:900}
   .ntf-x{position:absolute;top:8px;right:9px;width:20px;height:20px;border:0;border-radius:6px;background:transparent;color:#7f8aa0;font-size:15px;line-height:1;cursor:pointer}
   .ntf-x:hover{background:rgba(255,255,255,.08);color:#cdd6e6}
+  /* F3.5.4O — card AGRUPADO (N atualizações em [task]): lista de itens + "+N outras atualizações". */
+  .ntf-glist{margin-top:7px;display:flex;flex-direction:column;gap:3px}
+  .ntf-gi{color:#9fb0c8;font-size:12px;line-height:1.35;overflow-wrap:anywhere;word-break:break-word}
+  .ntf-gi b{color:#eef2f8;font-weight:700}
+  .ntf-more{color:#7f8aa0;font-size:11px;margin-top:3px;font-weight:600}
 </style>
 </head>
 <body>
@@ -87,6 +92,7 @@
         +'<div class="ntf-cta" data-cta="1">Abrir tarefa</div></div>';
     }
     var el=document.createElement('div'); el.className='ntf '+sevClass(sev);
+    if(p.groupKey) el.setAttribute('data-group',String(p.groupKey)); // F3.5.4O — endereço p/ atualização de grupo (comum)
     el.innerHTML='<div class="ntf-card">'+av+inner
       +'<span class="ntf-sev">'+esc(sevIcon(sev))+'</span>'
       +'<button class="ntf-x" title="Fechar" aria-label="Fechar">×</button></div>';
@@ -98,13 +104,61 @@
     var cta=el.querySelector('[data-cta]'); if(cta)cta.addEventListener('click',function(ev){ ev.stopPropagation(); openTask(); });
     var card=el.querySelector('.ntf-card'); if(card)card.addEventListener('click',openTask);
     var ttl=sev==='critical'?11000:(sev==='warning'?8000:6000);
-    setTimeout(dismiss,ttl);
+    // F3.5.4O — guarda o dismiss/timer/1º instante no próprio elemento p/ a atualização de grupo poder
+    // religar handlers e REFRESCAR o TTL com TETO de permanência (sem alterar o caminho não-agrupado).
+    el.__ntfDismiss=dismiss; el.__ntfFirstAt=Date.now(); el.__ntfTimer=setTimeout(dismiss,ttl);
     // limita a 5 cards visíveis
     while(stack.children.length>5){ stack.removeChild(stack.firstChild); }
     try{ if(window.bgAPI)bgAPI.rendered({dedupKey:key,severity:sev,eventType:p.eventType||'',isAttr:isAttr,count:stack.children.length}); }catch(_){ }
   }
 
+  // F3.5.4O — ATUALIZAÇÃO DE GRUPO COMUM: morfa EM VIGOR o card existente (data-group) para o card
+  // agrupado "N atualizações em [task]" (até 5 itens + "+N outras atualizações"). SEM novo card, SEM
+  // re-animar a entrada, SEM som (a janela premium já é silenciosa), SEM roubar foco. TTL refrescado
+  // com TETO de permanência (GROUP_MAX_MS desde o 1º evento). No-op se o card já saiu (groupKey ausente).
+  var GROUP_MAX_MS=15000;
+  function groupInner(view){
+    var t=esc(view.taskTitle||'Tarefa');
+    var head='<b>'+esc(String(view.count||0))+' atualizações em ‘'+t+'’</b>';
+    var lines=''; var items=view.items||[];
+    for(var i=0;i<items.length;i++){ var it=items[i]||{}; var who=it.actorName?('<b>'+esc(it.actorName)+'</b> '):''; var txt=esc(String(it.body||it.title||'')); lines+='<div class="ntf-gi">'+who+txt+'</div>'; }
+    if((view.extraCount||0)>0) lines+='<div class="ntf-more">+'+esc(String(view.extraCount))+' outras atualizações</div>';
+    return '<div class="ntf-bd"><div class="ntf-hd">'+head+'<span class="ntf-tm">'+esc(nowHM())+'</span></div>'
+      +'<div class="ntf-glist">'+lines+'</div>'
+      +'<div class="ntf-cta" data-cta="1">Abrir tarefa</div></div>';
+  }
+  function renderGroupUpdate(view){
+    try{
+      view=view||{}; var gk=String(view.groupKey||''); if(!gk) return;
+      var el=null, kids=stack.children;
+      for(var i=0;i<kids.length;i++){ if(kids[i].getAttribute&&kids[i].getAttribute('data-group')===gk){ el=kids[i]; break; } }
+      if(!el) return; // card já sumiu (TTL) ⇒ no-op; o evento segue no sino individualmente
+      var sev=view.severity||'info';
+      var primName=view.primaryName||''; var primPhoto=view.primaryAvatar||'';
+      var ini=initials(primName);
+      var av=primPhoto?('<div class="ntf-av" style="background-image:url(\''+esc(primPhoto)+'\')"></div>')
+            :(primName?('<div class="ntf-av gen">'+esc(ini||'?')+'</div>'):('<div class="ntf-av gen">'+esc(sevIcon(sev))+'</div>'));
+      el.className='ntf '+sevClass(sev)+' in'; // mantém visível (sem re-animar entrada), só atualiza a cor
+      var deep=String(view.deep||'');
+      el.innerHTML='<div class="ntf-card">'+av+groupInner(view)
+        +'<span class="ntf-sev">'+esc(sevIcon(sev))+'</span>'
+        +'<button class="ntf-x" title="Fechar" aria-label="Fechar">×</button></div>';
+      var dismiss=el.__ntfDismiss||function(){ try{ el.classList.remove('in'); setTimeout(function(){ if(el.parentNode){el.parentNode.removeChild(el);} report(); },200); }catch(_){ } };
+      var openTask=function(){ try{ if(window.bgAPI)bgAPI.open(deep); }catch(_){ } dismiss(); };
+      var xb=el.querySelector('.ntf-x'); if(xb)xb.addEventListener('click',function(ev){ ev.stopPropagation(); dismiss(); });
+      var cta=el.querySelector('[data-cta]'); if(cta)cta.addEventListener('click',function(ev){ ev.stopPropagation(); openTask(); });
+      var card=el.querySelector('.ntf-card'); if(card)card.addEventListener('click',openTask);
+      try{ if(el.__ntfTimer) clearTimeout(el.__ntfTimer); }catch(_){ }
+      var ttl=sev==='critical'?11000:(sev==='warning'?8000:6000);
+      var firstAt=el.__ntfFirstAt||Date.now(); var cap=GROUP_MAX_MS-(Date.now()-firstAt); if(cap<1200) cap=1200;
+      el.__ntfTimer=setTimeout(dismiss, Math.min(ttl,cap));
+      report();
+    }catch(_){ }
+  }
+
   try{ if(window.bgAPI&&typeof bgAPI.onCard==='function'){ bgAPI.onCard(function(p){ try{ render(p); }catch(_){ } }); } }catch(_){ }
+  // F3.5.4O — canal de ATUALIZAÇÃO de grupo comum (morfa o card existente; sem novo card/som/foco).
+  try{ if(window.bgAPI&&typeof bgAPI.onGroupUpdate==='function'){ bgAPI.onGroupUpdate(function(v){ try{ renderGroupUpdate(v); }catch(_){ } }); } }catch(_){ }
 })();
 </script>
 </body>

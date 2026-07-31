@@ -4,6 +4,8 @@ import { contextBridge, ipcRenderer } from "electron";
 
 contextBridge.exposeInMainWorld("bgAPI", {
   onCard: (cb: (p: any) => void) => ipcRenderer.on("bg-card", (_e, p: any) => cb(p)),
+  // F3.5.4O — atualização de GRUPO comum: morfa em vigor o card existente (data-group), sem novo card.
+  onGroupUpdate: (cb: (view: any) => void) => ipcRenderer.on("bg-group-update", (_e, v: any) => cb(v)),
   resize: (h: number) => ipcRenderer.send("bgnotify-resize", h),
   empty: () => ipcRenderer.send("bgnotify-empty"),
   open: (deep: string) => ipcRenderer.send("bgnotify-open", deep),

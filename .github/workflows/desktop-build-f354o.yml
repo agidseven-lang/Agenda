@@ -1,0 +1,383 @@
+# =====================================================================
+# [push/manual] F3.5.4O — Desktop Build (candidata 1.0.205 — AGRUPAMENTO INTELIGENTE das notificações COMUNS)
+# ---------------------------------------------------------------------
+# Base 1.0.204 OFICIAL (@151cf65, tag v1.0.204, testada fisicamente). Delta F3.5.4O (produção, 100% real):
+#   - AGRUPAMENTO das notificações COMUNS da MESMA tarefa + MESMO destinatário: a 1ª aparece em TEMPO REAL
+#     (não espera 5s); as subsequentes, dentro de uma janela FIXA de 5s, ATUALIZAM a MESMA superfície
+#     (contador + até 5 itens + "+N outras atualizações") — sem 2ª janela, sem repetir o som, sem roubar foco.
+#     Controlador PURO (notificationGrouping.ts) no MAIN, APÓS o dedup individual e a captura no sino (por
+#     evento), ANTES da superfície visual comum. Chave common_group:<destinatário>:<taskId> (taskId é a
+#     autoridade). ALLOWLIST (task_moved/updated/assigned/reassigned/completed/reopened/designer_assigned) ∩
+#     ¬DENYLIST (sla_*/operational_block/crítico/event_new/flow_*/app_update/desconhecido). Flag
+#     notificationCommonGroupingEnabled (default ON) desliga SOMENTE o agrupamento (OFF ⇒ 1.0.204).
+# Arquivos autorizados: main.ts (wiring), bgNotify.ts (updateBgGroup), notificationGrouping.ts (novo),
+# index.html (toast agrupado + toggle), bgnotify.html (premium agrupada), preload.ts + bgnotify-preload.ts
+# (pontes), package(-lock).json, testes. TODO O RESTO byte-idêntico à 1.0.204 (notifierA/notifier/notifEvents/
+# slaScheduler/slaRules/cardsRules/slaReminder*/firebase/listenerWatchdog/startupPrefs/tray/autostart/updater;
+# T-30/T-10; destinatários; Card Premium/Cronograma/Monitor SLA/sino; Android/backend/Worker/Rules).
+# Roda no PRÓPRIO ref: `--publish never`, NADA publicado (artifacts privados).
+# =====================================================================
+name: "[push/manual] F3.5.4O Desktop Build (candidata 1.0.205 — agrupamento das notificações comuns)"
+"on":
+  push:
+    branches:
+      - "desktop/f354o-common-notification-grouping-1.0.205"
+    paths-ignore:
+      - ".github/workflows/desktop-release-f354o.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  BASE_203_SHA: "12abeefe547f57700c8faba07b512204c2d24dec" # Desktop 1.0.203 OFICIAL (referência histórica)
+  BASE_204_SHA: "151cf6545d15fcfd8c4ed56b017fcc925957bbfd" # Desktop 1.0.204 OFICIAL (tag v1.0.204; BASE do delta F3.5.4O)
+  TEST_BRANCH: "desktop/f354o-common-notification-grouping-1.0.205"
+  APP_DIR: "desktop"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout (SHA do push; history completo p/ baselines)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Gate REF + ANCESTRIA — branch correta e descendente da 1.0.204 pinada
+        run: |
+          set -e
+          [ "${{ github.ref_name }}" = "$TEST_BRANCH" ] || { echo "::error:: ref '${{ github.ref_name }}' != $TEST_BRANCH"; exit 1; }
+          git merge-base --is-ancestor "$BASE_204_SHA" HEAD || { echo "::error:: HEAD nao descende da base 1.0.204 ($BASE_204_SHA)"; exit 1; }
+          echo "ref=$TEST_BRANCH head=$(git rev-parse HEAD) base=$BASE_204_SHA OK"
+
+      - name: Derivar versao — exige 1.0.205 exato, sem sufixo
+        run: |
+          APP_VERSION=$(node -p "require('./desktop/package.json').version")
+          echo "versao=$APP_VERSION"
+          [ "$APP_VERSION" = "1.0.205" ] || { echo "::error:: versao != 1.0.205"; exit 1; }
+          case "$APP_VERSION" in *-*) echo "::error:: versao com sufixo proibido ($APP_VERSION)"; exit 1;; esac
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: npm ci
+        working-directory: desktop
+        run: npm ci --no-audit --no-fund
+
+      - name: TypeScript build (main + preload + renderer + modulos .js)
+        working-directory: desktop
+        run: npm run build
+
+      - name: Lint (tsc --noEmit)
+        working-directory: desktop
+        run: node ./node_modules/typescript/lib/tsc.js -p tsconfig.json --noEmit
+
+      - name: Gate F3.5.4O AGRUPAMENTO — controlador + rajada + separação + wiring/superfícies (>=50)
+        working-directory: desktop
+        run: |
+          set -e
+          node scripts/f354o-common-notification-grouping.test.mjs || { echo "::error:: f354o-common-notification-grouping vermelho"; exit 1; }
+
+      - name: Gate REGRESSAO — HUB/entrega/SLA/Categoria A/reminder/clock/updater/watchdog/startup (delta ZERO vs 1.0.204)
+        working-directory: desktop
+        run: |
+          set -e
+          for t in \
+            f354n-watchdog \
+            f354n-startup \
+            f354k-notification-all-window-states \
+            f354l-sla-central-persistent-reminders \
+            f354h-red-notification-boundary \
+            f354i-cronograma-save-send-client \
+            f354-notifications-reliability \
+            f354f-task-edit-update-notification \
+            f354f-sla-designer-live-timer \
+            f353-durable-notifications \
+            f353a-actor-photo \
+            f343-delivery-channel \
+            f343-operational-block \
+            f343-main-scheduler \
+            f343-sla-golden-master \
+            f343-preservation \
+            f347-immediate-visual-delivery \
+            f347-independent-behavior \
+            f352-cards-notify \
+            f352-cards-channel-substitution \
+            f3377a-r4b-http-date-clock \
+            f33A-notif-central \
+            f33F-bg-notify \
+            f341a-updater-state-machine; do
+            node "scripts/$t.test.mjs" || { echo "::error:: regressao vermelha em $t"; exit 1; }
+          done
+          echo "REGRESSAO OK (delta zero vs 1.0.204)."
+
+      - name: Gate CONGELADOS — comportamento byte-idêntico à 1.0.204 (tudo exceto o delta F3.5.4O)
+        run: |
+          set -e
+          # main.ts / bgNotify.ts / notificationGrouping.ts(novo) / index.html / preload.ts / bgnotify.html /
+          # bgnotify-preload.ts sao o DELTA AUTORIZADO F3.5.4O (fora deste gate). firebase.ts / listenerWatchdog.ts /
+          # startupPrefs.ts (delta da 1.0.204) agora CONGELADOS.
+          FROZEN="desktop/src/main/slaScheduler.ts desktop/src/main/slaRules.js desktop/src/main/cardsRules.js desktop/src/main/notifEvents.js desktop/src/main/notifier.ts desktop/src/main/notifierA.ts desktop/src/main/notifStore.ts desktop/src/main/slaSeenUser.ts desktop/src/main/toastAck.ts desktop/src/main/reminder.ts desktop/src/main/tray.ts desktop/src/main/autostart.ts desktop/src/main/updaterService.ts desktop/src/main/clockSync.ts desktop/src/main/actorProfile.js desktop/src/main/auth.ts desktop/src/main/auth-core.ts desktop/src/main/prewarm.ts desktop/src/main/diag.ts desktop/src/main/slaReminder.ts desktop/src/main/slaReminderWindow.ts desktop/src/main/slaReminderStore.ts desktop/src/main/firebase.ts desktop/src/main/listenerWatchdog.ts desktop/src/main/startupPrefs.ts desktop/src/preload/slareminder-preload.ts desktop/src/renderer/slareminder.html desktop/src/renderer/sounds/sla-warning.wav desktop/src/renderer/sounds/sla-critical.wav desktop/electron-builder.yml desktop/scripts/copy-renderer.js desktop/tsconfig.json"
+          for f in $FROZEN; do
+            if ! git -C "$GITHUB_WORKSPACE" diff --quiet "$BASE_204_SHA" HEAD -- "$f"; then
+              echo "::error:: arquivo CONGELADO alterado vs 1.0.204: $f"; git -C "$GITHUB_WORKSPACE" diff --stat "$BASE_204_SHA" HEAD -- "$f"; exit 1; fi
+          done
+          echo "CONGELADOS byte-identicos a 1.0.204 OK."
+
+      - name: Gate DIFF CONTROLADO — o delta F3.5.4O é ADITIVO (adições presentes + contrato 1.0.204 preservado)
+        working-directory: desktop
+        run: |
+          set -e
+          # main.ts — agrupamento presente E contrato de entrega/dedup/sino/SLA/locked/toast/bg PRESERVADO
+          M=src/main/main.ts
+          grep -q 'notificationGrouping.route(p)' "$M" && grep -q 'notif-group-update' "$M" && grep -q 'updateBgGroup(__group.view)' "$M" && grep -q '_groupUpdate = true' "$M" || { echo "::error:: main.ts sem wiring de agrupamento"; exit 1; }
+          grep -q '"grouping-get"' "$M" && grep -q '"grouping-set"' "$M" || { echo "::error:: main.ts sem IPC do agrupamento"; exit 1; }
+          grep -q 'typeof notificationGrouping !== "undefined"' "$M" || { echo "::error:: main.ts sem typeof-guard (harness-safe)"; exit 1; }
+          grep -q 'function deliverNotification' "$M" && grep -q '_notifSeen.has(key)' "$M" && grep -q 'send("notif-history", p)' "$M" || { echo "::error:: main.ts: contrato dedup/sino removido"; exit 1; }
+          grep -q 'classifyReminderLevel(p)' "$M" && grep -q 'if (sessionLocked)' "$M" && grep -q 'if (windowActive())' "$M" && grep -q 'showBgNotify(p' "$M" || { echo "::error:: main.ts: contrato SLA/locked/toast/bg removido"; exit 1; }
+          # ordem: dedup < route < captura-sino (route marca a superfície antes do sino)
+          node -e 'const s=require("fs").readFileSync("src/main/main.ts","utf8");const d=s.indexOf("_notifSeen.has(key)"),r=s.indexOf("notificationGrouping.route(p)"),h=s.indexOf("send(\"notif-history\", p)");if(!(d>0&&r>d&&h>r)){console.error("::error:: ordem dedup<route<sino violada");process.exit(1);}'
+          # bgNotify.ts — updateBgGroup ADITIVO; showBgNotify/ACK/init/stop PRESERVADOS
+          B=src/main/bgNotify.ts
+          grep -q 'export function updateBgGroup' "$B" && grep -q 'send("bg-group-update", view)' "$B" || { echo "::error:: bgNotify.ts sem updateBgGroup"; exit 1; }
+          grep -q 'export function showBgNotify' "$B" && grep -q 'export function initBgNotify' "$B" && grep -q 'export function stopBgNotify' "$B" && grep -q 'ackArm' "$B" || { echo "::error:: bgNotify.ts: contrato premium/ACK removido"; exit 1; }
+          # index.html — toast agrupado + toggle ADITIVOS; toast/sino/som comuns PRESERVADOS
+          I=src/renderer/index.html
+          grep -q 'function notifGroupUpdate(' "$I" && grep -q "setAttribute('data-group',String(p.groupKey))" "$I" && grep -q 'onNotifGroupUpdate' "$I" && grep -q 'data-cfggrouping' "$I" || { echo "::error:: index.html sem toast agrupado/toggle"; exit 1; }
+          grep -q '_groupUpdate' "$I" || { echo "::error:: index.html: compensação nao pula _groupUpdate"; exit 1; }
+          grep -q 'function notifShowToast(' "$I" && grep -q 'function notifSound(' "$I" && grep -q 'function notifHistoryAppend(' "$I" && grep -q 'notifToastOnce' "$I" || { echo "::error:: index.html: toast/sino comum removido"; exit 1; }
+          # bgnotify.html — grupo ADITIVO; render/seen/TTL individuais PRESERVADOS
+          H=src/renderer/bgnotify.html
+          grep -q 'renderGroupUpdate' "$H" && grep -q "setAttribute('data-group'" "$H" && grep -q 'onGroupUpdate' "$H" || { echo "::error:: bgnotify.html sem grupo"; exit 1; }
+          grep -q 'function render(p)' "$H" && grep -q 'seen\[key\]' "$H" && grep -q 'bgAPI.rendered' "$H" || { echo "::error:: bgnotify.html: render individual removido"; exit 1; }
+          # preloads — pontes novas ADITIVAS; pontes 1.0.204 PRESERVADAS
+          P=src/preload/preload.ts
+          grep -q 'onNotifGroupUpdate:' "$P" && grep -q 'groupingGet:' "$P" && grep -q 'groupingSet:' "$P" || { echo "::error:: preload.ts sem pontes de agrupamento"; exit 1; }
+          grep -q 'onNotifToast:' "$P" && grep -q 'onNotifHistory:' "$P" && grep -q 'notifToastAck:' "$P" || { echo "::error:: preload.ts: pontes 1.0.204 removidas"; exit 1; }
+          grep -q 'onGroupUpdate:' src/preload/bgnotify-preload.ts && grep -q 'onCard:' src/preload/bgnotify-preload.ts && grep -q 'rendered:' src/preload/bgnotify-preload.ts || { echo "::error:: bgnotify-preload.ts sem ponte de grupo"; exit 1; }
+          echo "DIFF CONTROLADO F3.5.4O OK (aditivo; contrato 1.0.204 preservado)."
+
+      - name: Gate ISOLAMENTO — diff vs 1.0.204 SÓ nos arquivos autorizados F3.5.4O
+        run: |
+          set -e
+          git -C "$GITHUB_WORKSPACE" diff --name-only "$BASE_204_SHA" HEAD | tee /tmp/f354o-diff.txt
+          if grep -vE '^(desktop/src/main/main\.ts$|desktop/src/main/bgNotify\.ts$|desktop/src/main/notificationGrouping\.ts$|desktop/src/preload/preload\.ts$|desktop/src/preload/bgnotify-preload\.ts$|desktop/src/renderer/index\.html$|desktop/src/renderer/bgnotify\.html$|desktop/scripts/f354o-common-notification-grouping\.test\.mjs$|desktop/package\.json$|desktop/package-lock\.json$|docs/f354o-qa/|\.github/workflows/desktop-build-f354o\.yml$|\.github/workflows/desktop-release-f354o\.yml$)' /tmp/f354o-diff.txt | grep -q .; then
+            echo "::error:: diff vs 1.0.204 toca arquivo NAO autorizado"; exit 1; fi
+          echo "ISOLAMENTO OK — diff confinado aos arquivos autorizados F3.5.4O."
+
+      - name: Gate ANDROID/BACKEND intactos — diff nao toca android/ nem functions/ nem worker/ nem Rules
+        run: |
+          set -e
+          BAD=$(git -C "$GITHUB_WORKSPACE" diff --name-only "$BASE_204_SHA" HEAD | grep -cE '^(android/|functions/|worker/|presence-service/|firestore\.rules)' || true)
+          [ "$BAD" = "0" ] || { echo "::error:: diff toca backend/android ($BAD)"; git -C "$GITHUB_WORKSPACE" diff --name-only "$BASE_204_SHA" HEAD | grep -E '^(android/|functions/|worker/|presence-service/|firestore\.rules)' || true; exit 1; }
+          echo "ANDROID/BACKEND intactos OK."
+
+  build:
+    needs: verify
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      APP_DIR: desktop
+    steps:
+      - name: Forcar LF no checkout
+        run: git config --global core.autocrlf false
+
+      - name: Checkout (mesmo SHA do run)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Gate REF + ANCESTRIA (windows)
+        run: |
+          set -e
+          [ "${{ github.ref_name }}" = "$TEST_BRANCH" ] || { echo "::error:: ref != $TEST_BRANCH"; exit 1; }
+          git merge-base --is-ancestor "$BASE_204_SHA" HEAD || { echo "::error:: HEAD nao descende da 1.0.204"; exit 1; }
+
+      - name: Gate LINE ENDINGS LF (fontes do delta)
+        run: |
+          set -e
+          for f in desktop/src/main/main.ts desktop/src/main/bgNotify.ts desktop/src/main/notificationGrouping.ts desktop/src/preload/preload.ts desktop/src/preload/bgnotify-preload.ts desktop/src/renderer/index.html desktop/src/renderer/bgnotify.html; do
+            if grep -lU $'\r' "$f" >/dev/null 2>&1; then echo "::error:: CRLF em $f"; exit 1; fi
+          done
+          echo "LF OK."
+
+      - name: Derivar versao — exige 1.0.205 exato
+        run: |
+          APP_VERSION=$(node -p "require('./desktop/package.json').version")
+          [ "$APP_VERSION" = "1.0.205" ] || { echo "::error:: versao != 1.0.205 ($APP_VERSION)"; exit 1; }
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: npm ci
+        working-directory: desktop
+        run: npm ci --no-audit --no-fund
+
+      - name: TypeScript build
+        working-directory: desktop
+        run: npm run build
+
+      - name: electron-builder (NSIS + MSI; --publish never)
+        working-directory: desktop
+        run: npx electron-builder --win nsis msi --publish never
+
+      - name: Gate tray icon empacotado
+        working-directory: desktop
+        run: |
+          set -e
+          test -f dist-installer/win-unpacked/resources/icon.png || { echo "::error:: tray icon.png ausente em resources"; exit 1; }
+          echo "resources/icon.png OK"
+
+      - name: Gate prova-de-versao (asar == 1.0.205) + renderer EMPACOTADO == fonte (EOL-normalizado)
+        working-directory: desktop
+        run: |
+          set -e
+          ASAR="dist-installer/win-unpacked/resources/app.asar"; test -f "$ASAR" || { echo "::error:: app.asar ausente"; exit 1; }
+          EXDIR="$RUNNER_TEMP/asarx"; rm -rf "$EXDIR"; mkdir -p "$EXDIR"; npx --yes @electron/asar extract "$ASAR" "$EXDIR"
+          PKGV=$(P="$EXDIR/package.json" node -e 'console.log(JSON.parse(require("fs").readFileSync(process.env.P,"utf8")).version||"")')
+          [ "$PKGV" = "1.0.205" ] || { echo "::error:: package.json EMPACOTADO version=$PKGV != 1.0.205"; exit 1; }
+          cmp_norm() { EX="$1" SRC="$2" node -e 'const fs=require("fs");const n=s=>String(s).replace(/\r\n/g,"\n");if(n(fs.readFileSync(process.env.EX,"utf8"))!==n(fs.readFileSync(process.env.SRC,"utf8"))){console.error(process.env.SRC+" EMPACOTADO != fonte");process.exit(1);}'; }
+          cmp_norm "$EXDIR/src/renderer/index.html" "src/renderer/index.html"
+          cmp_norm "$EXDIR/src/renderer/bgnotify.html" "src/renderer/bgnotify.html"
+          cmp_norm "$EXDIR/src/renderer/slareminder.html" "src/renderer/slareminder.html"
+          echo "GATE prova-de-versao 1.0.205 + renderer==fonte OK."
+
+      - name: Gate F3.5.4O EMPACOTADO — agrupamento presente; comportamento 1.0.204 preservado (20 gates)
+        working-directory: desktop
+        run: |
+          set -e
+          EXDIR="$RUNNER_TEMP/asarx"; DM="$EXDIR/dist/main"; DP="$EXDIR/dist/preload"; RR="$EXDIR/src/renderer"
+          MJS="$DM/main.js"
+          cmp_norm() { EX="$1" SRC="$2" node -e 'const fs=require("fs");const n=s=>String(s).replace(/\r\n/g,"\n");if(n(fs.readFileSync(process.env.EX,"utf8"))!==n(fs.readFileSync(process.env.SRC,"utf8"))){console.error(process.env.SRC+" EMPACOTADO != fonte");process.exit(1);}'; }
+          # ===== AGRUPAMENTO DAS NOTIFICAÇÕES COMUNS (F3.5.4O) =====
+          # 1 — controlador PURO empacotado
+          test -f "$DM/notificationGrouping.js" || { echo "::error:: notificationGrouping.js ausente no asar"; exit 1; }
+          grep -q 'createNotificationGrouping' "$DM/notificationGrouping.js" || { echo "::error:: createNotificationGrouping ausente"; exit 1; }
+          grep -q 'common_group:' "$DM/notificationGrouping.js" || { echo "::error:: chave common_group ausente"; exit 1; }
+          # 2 — allowlist/denylist no controlador empacotado
+          grep -q 'GROUPABLE_EVENT_TYPES' "$DM/notificationGrouping.js" || { echo "::error:: allowlist ausente"; exit 1; }
+          grep -q 'operational_block' "$DM/notificationGrouping.js" && grep -q 'isDenylisted' "$DM/notificationGrouping.js" || { echo "::error:: denylist ausente"; exit 1; }
+          # 3 — main liga o agrupamento (após dedup, antes da superfície) + IPC + reset por sessão
+          grep -q 'notificationGrouping' "$MJS" && grep -q 'notif-group-update' "$MJS" && grep -q 'updateBgGroup' "$MJS" || { echo "::error:: main nao liga o agrupamento"; exit 1; }
+          grep -q '"grouping-get"' "$MJS" && grep -q '"grouping-set"' "$MJS" || { echo "::error:: IPC grouping-get/set ausente"; exit 1; }
+          grep -q 'notificationCommonGroupingEnabled' "$MJS" || { echo "::error:: flag de agrupamento ausente"; exit 1; }
+          # 4 — sino individual preservado: notif-history por evento + dedup _notifSeen
+          grep -q 'notif-history' "$MJS" && grep -q '_notifSeen' "$MJS" || { echo "::error:: sino/dedup individual removido"; exit 1; }
+          # 5 — bgNotify empacotado com updateBgGroup + premium preservada
+          grep -q 'updateBgGroup' "$DM/bgNotify.js" && grep -q 'bg-group-update' "$DM/bgNotify.js" || { echo "::error:: bgNotify sem updateBgGroup"; exit 1; }
+          grep -q 'showBgNotify' "$DM/bgNotify.js" || { echo "::error:: bgNotify premium removida"; exit 1; }
+          # 6 — preload expõe pontes novas + pontes 1.0.204
+          test -f "$DP/preload.js" || { echo "::error:: preload.js ausente"; exit 1; }
+          grep -q 'onNotifGroupUpdate' "$DP/preload.js" && grep -q 'groupingGet' "$DP/preload.js" && grep -q 'groupingSet' "$DP/preload.js" || { echo "::error:: preload sem pontes de agrupamento"; exit 1; }
+          grep -q 'onGroupUpdate' "$DP/bgnotify-preload.js" || { echo "::error:: bgnotify-preload sem ponte de grupo"; exit 1; }
+          # 7 — renderer: toast agrupado + toggle + compensação pula _groupUpdate
+          grep -q 'notifGroupUpdate' "$RR/index.html" && grep -q 'data-cfggrouping' "$RR/index.html" && grep -q '_groupUpdate' "$RR/index.html" || { echo "::error:: renderer sem toast agrupado/toggle"; exit 1; }
+          # 8 — premium: card agrupado + morfar (bgnotify.html)
+          grep -q 'renderGroupUpdate' "$RR/bgnotify.html" && grep -q 'data-group' "$RR/bgnotify.html" || { echo "::error:: premium sem card agrupado"; exit 1; }
+          # 9 — premium continua SEM som (sem <audio>/play)
+          if grep -qE '<audio|\.play\(\)' "$RR/bgnotify.html"; then echo "::error:: premium ganhou som (nao pode)"; exit 1; fi
+          # ===== COMPORTAMENTO 1.0.204 PRESERVADO (arquivos congelados byte-idênticos) =====
+          # 10 — HUB de entrega comum (toast/nativa/bg-window/lock-native) intacto no main
+          grep -q 'function deliverNotification' "$MJS" && grep -q 'notif-toast' "$MJS" && grep -q 'showBgNotify' "$MJS" || { echo "::error:: deliverNotification/roteamento removido"; exit 1; }
+          # 11 — AUTOCORREÇÃO F3.5.4N (firebase 1º reconectador + watchdog) congelada e empacotada
+          grep -q 'setListenHealthObserver' "$DM/firebase.js" && grep -q 'experimentalForceLongPolling' "$DM/firebase.js" || { echo "::error:: firebase (autocorreção) ausente"; exit 1; }
+          grep -q 'createListenerWatchdog' "$DM/listenerWatchdog.js" && grep -q 'IDLE_HEALTHY' "$DM/listenerWatchdog.js" || { echo "::error:: watchdog ausente"; exit 1; }
+          # 12 — INICIALIZAÇÃO COM O WINDOWS F3.5.4N congelada e empacotada
+          grep -q 'createStartupPrefs' "$DM/startupPrefs.js" && grep -q -- '--hidden' "$DM/startupPrefs.js" || { echo "::error:: startupPrefs ausente"; exit 1; }
+          # 13 — LEMBRETE CENTRAL de SLA (F3.5.4L/M) intacto
+          grep -q 'createSlaReminderController' "$DM/slaReminder.js" && grep -q 'classifyReminderLevel' "$DM/slaReminder.js" || { echo "::error:: lembrete central ausente"; exit 1; }
+          grep -q 'showInactive' "$DM/slaReminderWindow.js" && grep -q 'slareminder.html' "$DM/slaReminderWindow.js" || { echo "::error:: janela central ausente"; exit 1; }
+          test -f "$RR/sounds/sla-warning.wav" && head -c 4 "$RR/sounds/sla-warning.wav" | grep -q 'RIFF' || { echo "::error:: som local do lembrete ausente/invalido"; exit 1; }
+          # 14 — DESTINATARIOS: notifEvents == fonte + Categoria A (grupo NÃO alterou destinatários)
+          cmp_norm "$DM/notifEvents.js" "src/main/notifEvents.js"
+          grep -q "recipientMode: 'all_active_users'" "$DM/notifEvents.js" || { echo "::error:: Categoria A alterada"; exit 1; }
+          grep -qF "recipientMode: 'assigned_designer'" "$DM/notifEvents.js" || { echo "::error:: assigned_designer ausente"; exit 1; }
+          # 15 — TEMPOS CONGELADOS: cardsRules T-30/T-10 + slaRules == fonte
+          cmp_norm "$DM/cardsRules.js" "src/main/cardsRules.js"
+          cmp_norm "$DM/slaRules.js" "src/main/slaRules.js"
+          grep -qF 'var CARDS_WARN_MS = 30 * 60000' "$DM/cardsRules.js" || { echo "::error:: T-30 alterada"; exit 1; }
+          grep -qF 'var CARDS_RED_MS  = 10 * 60000' "$DM/cardsRules.js" || { echo "::error:: T-10 alterada"; exit 1; }
+          # 16 — scheduler + Categoria A duravel + notifier empacotados
+          grep -q 'startSlaScheduler' "$DM/slaScheduler.js" || { echo "::error:: slaScheduler nao empacotado"; exit 1; }
+          grep -q 'startNotifierA' "$DM/notifierA.js" || { echo "::error:: notifierA nao empacotado"; exit 1; }
+          grep -q 'event_new' "$DM/notifier.js" || { echo "::error:: notifier (event_new) nao empacotado"; exit 1; }
+          # 17 — COMUNS no renderer: toast + Monitor SLA + sino + Cronograma preservados
+          grep -q 'notifToastOnce' "$RR/index.html" || { echo "::error:: toast comum ausente"; exit 1; }
+          grep -q 'f354gMonAlerts' "$RR/index.html" || { echo "::error:: Monitor SLA ausente"; exit 1; }
+          grep -q 'function slaibToggle(' "$RR/index.html" || { echo "::error:: sino ausente"; exit 1; }
+          grep -q 'function cronSanitizeDeep(' "$RR/index.html" || { echo "::error:: Cronograma (cronSanitizeDeep) ausente"; exit 1; }
+          # 18 — tray + updater channel latest preservados
+          grep -q 'ensureTray' "$MJS" || { echo "::error:: ensureTray ausente"; exit 1; }
+          grep -qE 'channel[[:space:]]*=[[:space:]]*"latest"' "$DM/updaterService.js" || { echo "::error:: updater channel != latest"; exit 1; }
+          # 19 — startupPrefs/watchdog/net wiring do main (F3.5.4N) preservado
+          grep -q 'createStartupPrefs' "$MJS" && grep -q 'createListenerWatchdog' "$MJS" && grep -q '"net-status"' "$MJS" || { echo "::error:: wiring F3.5.4N ausente no main"; exit 1; }
+          # 20 — Android NAO tocado
+          A2=$(git -C "$GITHUB_WORKSPACE" diff --name-only "$BASE_204_SHA" HEAD | grep -c '^android/' || true); [ "$A2" = "0" ] || { echo "::error:: diff toca android/ ($A2)"; exit 1; }
+          echo "GATE F3.5.4O EMPACOTADO: VERIFIED"
+
+      - name: Empacotar bundle (EXE/MSI/latest.yml/blockmap/SBOM/SHA256SUMS/VERSAO-DESKTOP) + SHA256SUMS
+        working-directory: ${{ env.APP_DIR }}
+        env:
+          APP_VERSION: "1.0.205"
+        run: |
+          set -e
+          npx --yes @cyclonedx/cyclonedx-npm --omit dev --output-format JSON --output-file "$RUNNER_TEMP/sbom-cyclonedx.json" || echo '{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}' > "$RUNNER_TEMP/sbom-cyclonedx.json"
+          OUT="$GITHUB_WORKSPACE/dist-pkg"; mkdir -p "$OUT"
+          EXE=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe | head -1)
+          MSI=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.msi 2>/dev/null | head -1)
+          BM=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap | head -1)
+          cp "$EXE" "$OUT/"; [ -n "$MSI" ] && cp "$MSI" "$OUT/"; cp dist-installer/latest.yml "$OUT/"; cp "$BM" "$OUT/"
+          cp "$RUNNER_TEMP/sbom-cyclonedx.json" "$OUT/SBOM-cyclonedx.json"
+          EXE_NAME=$(basename "$EXE"); MSI_NAME=$([ -n "$MSI" ] && basename "$MSI" || echo ""); BM_NAME=$(basename "$BM")
+          ( cd "$OUT" && sha256sum "$EXE_NAME" ${MSI_NAME:+$MSI_NAME} latest.yml "$BM_NAME" SBOM-cyclonedx.json > SHA256SUMS )
+          {
+            echo "productName : Agenda ID Seven Desktop"
+            echo "versionName : $APP_VERSION"
+            echo "rotulo      : 1.0.205-common-notification-grouping (CANDIDATA — agrupamento inteligente das notificacoes comuns)"
+            echo "channel     : latest (estrutura do updater; NADA publicado neste build)"
+            echo "appId       : br.com.idseven.agenda.desktop"
+            echo "instalador  : $EXE_NAME"
+            echo "SHA-256 exe : $(sha256sum "$OUT/$EXE_NAME" | awk '{print $1}')"
+            [ -n "$MSI_NAME" ] && echo "instalador2 : $MSI_NAME" && echo "SHA-256 msi : $(sha256sum "$OUT/$MSI_NAME" | awk '{print $1}')"
+            echo "commit      : $GITHUB_SHA (branch $GITHUB_REF_NAME)"
+            echo "baseline    : Desktop 1.0.204 OFICIAL (commit 151cf65; tag v1.0.204 preservada; testada fisicamente)"
+            echo "origem      : F3.5.4O — AGRUPAMENTO INTELIGENTE DAS NOTIFICACOES COMUNS (1a em tempo real; subsequentes da MESMA tarefa+destinatario dentro de 5s atualizam a MESMA superficie com contador + ate 5 itens + \"+N\"; sem 2a janela/som/foco; sino individual; allowlist/denylist; taskId autoridade; flag default ON). Notificacoes individuais, tempos T-30/T-10, destinatarios, Card Premium/Cronograma/Monitor SLA/sino, lembrete central de SLA, autocorrecao/inicializacao (F3.5.4N), updater e Android: INTOCADOS"
+            echo "assinatura  : mesmo processo da 1.0.204 (sem code-signing -> NotSigned)"
+            echo "distribuicao: CANDIDATA — build gated; publicacao no Latest ocorre no workflow desktop-release-f354o.yml (mesmos bytes deste run)"
+          } > "$OUT/VERSAO-DESKTOP.txt"
+          echo "== SHA256SUMS =="; cat "$OUT/SHA256SUMS"
+
+      - name: Upload artifact — installer (EXE + MSI) PRIVADO
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-1.0.205-installer
+          path: |
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.msi
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload artifact — updatemeta (latest.yml + blockmap + SHA256SUMS + SBOM + VERSAO) PRIVADO
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-1.0.205-updatemeta
+          path: |
+            dist-pkg/latest.yml
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap
+            dist-pkg/SHA256SUMS
+            dist-pkg/SBOM-cyclonedx.json
+            dist-pkg/VERSAO-DESKTOP.txt
+          if-no-files-found: error
+          retention-days: 30

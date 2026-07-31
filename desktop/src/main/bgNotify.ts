@@ -113,6 +113,22 @@ export function showBgNotify(p: any, onNoRender?: () => void): boolean {
   } catch (e) { diag("bg.error", { err: String(((e as any) && (e as any).message) || e) }); return false; }
 }
 
+/** F3.5.4O — ATUALIZA um card de GRUPO comum já exibido (mesmo destinatário+tarefa dentro da janela
+ *  de 5s). NÃO cria nova janela, NÃO toca som, NÃO rouba foco: envia o novo "view" do grupo p/ o
+ *  renderer MORFAR em vigor o card existente (endereçado por data-group). No-op se a janela premium
+ *  não existe ou se o card já sumiu (o renderer ignora um groupKey ausente). A janela auto-redimensiona
+ *  via bgnotify-resize quando o conteúdo cresce. Read-side puro (sem Firestore/rede/write). */
+export function updateBgGroup(view: any): void {
+  try {
+    if (!view || !view.groupKey) return;
+    const win = bgWin;
+    if (!win || win.isDestroyed()) return; // sem janela premium viva ⇒ nada a atualizar (1º evento caiu p/ nativa/toast)
+    const send = () => { try { if (!win.isDestroyed()) win.webContents.send("bg-group-update", view); } catch { /* */ } };
+    if (win.webContents.isLoading()) win.webContents.once("did-finish-load", send); else send();
+    diag("bg.group.update", { groupKey: String(view.groupKey || "").slice(0, 8) + "…", count: view.count, visible: view.items ? view.items.length : 0, extra: view.extraCount });
+  } catch (e) { diag("bg.group.update.error", { err: String(((e as any) && (e as any).message) || e) }); }
+}
+
 export function stopBgNotify(): void {
   try { pendingAck.forEach((v) => { try { clearTimeout(v.timer); } catch { /* */ } }); pendingAck.clear(); } catch { /* */ } // F3.4.7 — nenhum fallback tardio após teardown
   try { if (bgWin && !bgWin.isDestroyed()) bgWin.destroy(); } catch { /* */ }

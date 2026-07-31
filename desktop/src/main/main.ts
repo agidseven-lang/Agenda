@@ -18,13 +18,14 @@ import { diag, diagPath } from "./diag"; // F3.3.10-DIAG (logger local; build in
 import { startReminder } from "./reminder";
 import { startSlaScheduler } from "./slaScheduler"; // F3.4.3 — produtor AUTORITATIVO de SLA no main (amarelo/vermelho/crítico), sobrevive à janela oculta
 import { createUserSlaSeen } from "./slaSeenUser"; // F3.5.4-C3 — seen de SLA POR USUÁRIO (uid|dedupKey; legado honrado) injetado SEM tocar no scheduler
-import { initBgNotify, showBgNotify, stopBgNotify, bgStatus } from "./bgNotify"; // F3.3.10-BG (janela premium própria)
+import { initBgNotify, showBgNotify, stopBgNotify, bgStatus, updateBgGroup } from "./bgNotify"; // F3.3.10-BG (janela premium própria); F3.5.4O — updateBgGroup (atualização de grupo comum)
 import { registerAuthIpc, getAuthUser } from "./auth"; // F3.3.56-G2 — auth server-side (token confinado ao main); F3.4.3 — papel autenticado p/ operational_block
 import { registerPrewarmIpc } from "./prewarm"; // F3.3.73I6C18C — prewarm do Card Premium (IPC restrito ao /share)
 import { createClockSync } from "./clockSync"; // F3.3.77A-R4B — relógio canônico via cabeçalho HTTP Date (Cloud Run read-only)
 import { listen as fbListen, setListenHealthObserver } from "./firebase"; // F3.5.4L — escuta read-only p/ "tarefa concluída com modal aberto" (sessão); F3.5.4N — observador de saúde do listener
 import { createListenerWatchdog } from "./listenerWatchdog"; // F3.5.4N — SUPERVISOR + ÚLTIMO RECURSO (firebase.ts é o 1º reconectador)
 import { createStartupPrefs } from "./startupPrefs"; // F3.5.4N — iniciar com o Windows (default-ON 1x; SO é a verdade; verify)
+import { createNotificationGrouping } from "./notificationGrouping"; // F3.5.4O — AGRUPAMENTO das notificações COMUNS (controlador puro; após dedup individual, antes da superfície comum)
 import { createSlaReminderController, classifyReminderLevel } from "./slaReminder"; // F3.5.4L — lembrete CENTRAL persistente de SLA (amarelo/vermelho)
 import { createSlaReminderSurface, loadReminderSounds } from "./slaReminderWindow"; // F3.5.4L — superfície Electron (janela central, som local)
 import { createSlaReminderStore } from "./slaReminderStore"; // F3.5.4L — recibo de reconhecimento (OK) + pendentes persistentes
@@ -64,6 +65,16 @@ let startupPrefs: ReturnType<typeof createStartupPrefs> | null = null;
 let netOnline = true;
 let selfHealingEnabled = true;
 const selfHealTele = { lastAlertAt: 0, lastReasonCode: "", alerts: 0, lastRestartAt: 0, restarts: 0, lastReconcileAt: 0, reconciles: 0 };
+// F3.5.4O — AGRUPAMENTO INTELIGENTE DAS NOTIFICAÇÕES COMUNS. Controlador PURO (autoridade no
+// MAIN). A 1ª notificação comum de <destinatário+tarefa> aparece em tempo real; as seguintes,
+// dentro da janela de 5s, ATUALIZAM a MESMA superfície (contador + lista) — sem 2ª janela, sem
+// repetir o som, sem roubar foco. Roda APÓS o dedup individual (_notifSeen) e a captura no sino
+// (notif-history, POR EVENTO), e ANTES da superfície visual comum (toast/premium). SLA/locked/
+// crítico/desconhecido ⇒ passthrough (1.0.204). Flag notificationCommonGroupingEnabled (default
+// ON): OFF ⇒ passthrough sempre. Telemetria SANITIZADA p/ o painel Configurações → Notificações.
+let notificationGrouping: ReturnType<typeof createNotificationGrouping> | null = null;
+let groupingEnabled = true;
+const groupTele = { updates: 0, lastUpdateAt: 0, lastOpenAt: 0, opens: 0 };
 // F3.3.70D3R10U — opts do tray centralizados (usados por startup, session-login,
 // heartbeat e IPC tray-recreate; a recriacao usa SEMPRE o mesmo menu/quit).
 const trayWin = () => mainWin;
@@ -197,6 +208,19 @@ function deliverNotification(p: NotifPayload): { ok: boolean; channel: string } 
     const key = String(p.dedupKey || `${p.eventType || "evt"}:${p.taskId || ""}:${p.createdAt || ""}`);
     if (_notifSeen.has(key)) { diag("deliver.dedup", { key }); nlog("notify.dedup.skipped", { dedupKey: key, taskId: nmask(p.taskId) }); return { ok: true, channel: "dedup" }; }
     diag("deliver.begin", { eventType: p.eventType, taskId: p.taskId, targetUserId: p.targetUserId, actorId: p.actorId, responsibleId: p.responsibleId, dedupKey: key, windowActive: windowActive(), visible: !!(mainWin && !mainWin.isDestroyed() && mainWin.isVisible()), minimized: !!(mainWin && !mainWin.isDestroyed() && mainWin.isMinimized()) });
+    // F3.5.4O — AGRUPAMENTO DAS NOTIFICAÇÕES COMUNS. Decisão TOMADA AQUI (após o dedup individual,
+    // antes da captura no sino) para poder MARCAR a superfície: groupKey no 1º evento e _groupUpdate
+    // nos subsequentes. A marca _groupUpdate só instrui o renderer a NÃO levantar um 2º toast pela
+    // compensação (F3.5.4K) — NUNCA altera o histórico (o sino registra CADA evento individualmente,
+    // logo abaixo). Locked ⇒ nunca agrupa (nativa individual; limitação documentada). SLA/crítico/
+    // desconhecido ⇒ route=passthrough (comportamento 1.0.204 byte-a-byte). Flag OFF ⇒ passthrough.
+    // typeof-guard (padrão slaReminderCtl/toastAck): as fixtures f343/f352/f354k extraem SÓ o corpo do
+    // deliverNotification e rodam sem o escopo de módulo — o typeof evita ReferenceError e mantém o
+    // comportamento 1.0.204 byte-a-byte quando o controlador não existe (passthrough).
+    let __group = { action: "passthrough", groupKey: "", view: null as any };
+    try { if (typeof notificationGrouping !== "undefined" && notificationGrouping && !sessionLocked) __group = notificationGrouping.route(p); } catch { __group = { action: "passthrough", groupKey: "", view: null as any }; }
+    if (__group.action === "first" || __group.action === "update") { (p as any).groupKey = __group.groupKey; }
+    if (__group.action === "update") { (p as any)._groupUpdate = true; }
     // F3.3.10 — CAPTURA p/ a Central (histórico local no renderer). CAPTURE-ONLY: encaminha o MESMO
     // payload já deduplicado, sem alterar roteamento/toast/nativa/dedup/som/severidade/destino. Nunca
     // pode impedir a entrega — por isso vem em try/catch isolado e ANTES da decisão toast×nativa.
@@ -212,6 +236,22 @@ function deliverNotification(p: NotifPayload): { ok: boolean; channel: string } 
       _notifSeen.add(key);
       if (_notifSeen.size > 4000) { const it = _notifSeen.values(); for (let i = 0; i < 1000; i++) { const v = it.next(); if (v.done) break; _notifSeen.delete(v.value); } }
     };
+    // F3.5.4O — EVENTO DE ATUALIZAÇÃO DE GRUPO: já existe uma superfície do MESMO destinatário+tarefa
+    // dentro da janela de 5s. Em vez de criar 2ª janela/toast, ATUALIZA a superfície existente (toast
+    // in-app E janela premium) com o card agrupado (contador + até 5 itens + "+N") — SEM som, SEM roubar
+    // foco. Não passa por SLA/locked/toast/premium abaixo (denylist já é passthrough; locked nunca chega
+    // aqui como update). O sino já registrou ESTE evento individualmente (captura acima). markSeen grava
+    // o dedup ⇒ o notifierA recebe ok:true, adiciona recibo e avança o cursor (sem reentrega/duplicação).
+    if (__group.action === "update") {
+      try { mainWin?.webContents.send("notif-group-update", __group.view); } catch { /* atualização do toast é best-effort */ }
+      try { if (typeof updateBgGroup === "function") updateBgGroup(__group.view); } catch { /* atualização da premium é best-effort */ }
+      markSeen();
+      notifTele.lastAt = Date.now(); notifTele.lastChannel = "grouped"; notifTele.lastEventType = String(p.eventType || "");
+      try { if (typeof groupTele !== "undefined") { groupTele.updates++; groupTele.lastUpdateAt = Date.now(); } } catch { /* */ }
+      nlog("notify.group.updated", { dedupKey: key, taskId: nmask(p.taskId), recipientUid: nmask(p.targetUserId), count: (__group.view && __group.view.count) || 0 });
+      return { ok: true, channel: "grouped" };
+    }
+    if (__group.action === "first") { try { if (typeof groupTele !== "undefined") { groupTele.opens++; groupTele.lastOpenAt = Date.now(); } } catch { /* */ } nlog("notify.group.opened", { dedupKey: key, taskId: nmask(p.taskId), recipientUid: nmask(p.targetUserId) }); }
     // F3.5.4L — LEMBRETE CENTRAL DE SLA: os alertas AMARELO/VERMELHO do Monitor SLA (eventType /^sla_/
     // ou operational_block) NÃO usam o toast/premium efêmero — vão para a JANELA CENTRAL PERSISTENTE que
     // só fecha no OK (fila, promoção amarelo→vermelho, som local, lock→nativa, persistência). As comuns
@@ -461,6 +501,10 @@ function jsonStore(file: string) {
 // recurso do watchdog; o re-attach do firebase.ts continua SEMPRE (não é "autocorreção" opcional).
 function loadSelfHealingFlag(): boolean { try { return (jsonStore("f354n-notify.json").read() || {}).selfHealingEnabled !== false; } catch { return true; } }
 function saveSelfHealingFlag(v: boolean): void { try { const s = jsonStore("f354n-notify.json"); const raw = s.read() || {}; raw.selfHealingEnabled = !!v; s.write(raw); } catch { /* */ } }
+// F3.5.4O — flag do AGRUPAMENTO das notificações COMUNS. Default ON (undefined ⇒ true). OFF ⇒
+// passthrough sempre (comportamento 1.0.204 byte-a-byte). Constante local; NÃO é remota/configurável.
+function loadGroupingFlag(): boolean { try { return (jsonStore("f354o-notify.json").read() || {}).notificationCommonGroupingEnabled !== false; } catch { return true; } }
+function saveGroupingFlag(v: boolean): void { try { const s = jsonStore("f354o-notify.json"); const raw = s.read() || {}; raw.notificationCommonGroupingEnabled = !!v; s.write(raw); } catch { /* */ } }
 
 // F3.5.4N — reconciliação IDEMPOTENTE dos produtores de rede (recibos do notifierA + seen persistente
 // do slaScheduler impedem duplicação). Chamada pelo watchdog em reconexão/resume/unlock — 1 passada por
@@ -638,6 +682,22 @@ app.whenReady().then(() => {
     diag("listener.watchdog.ready", { selfHealingEnabled });
   } catch (e) { diag("listener.watchdog.init.error", { err: String(((e as any) && (e as any).message) || e) }); }
 
+  // F3.5.4O — AGRUPAMENTO INTELIGENTE DAS NOTIFICAÇÕES COMUNS. Controlador PURO no MAIN. Chave
+  // common_group:<destinatário>:<taskId>; janela FIXA de 5s a partir do 1º evento (não desliza; não
+  // atrasa a 1ª entrega). Flag notificationCommonGroupingEnabled (default ON) desliga SOMENTE o
+  // agrupamento (OFF ⇒ 1.0.204). Observabilidade SANITIZADA (notification.group.*).
+  groupingEnabled = loadGroupingFlag();
+  try {
+    notificationGrouping = createNotificationGrouping({
+      now: () => Date.now(),
+      groupWindowMs: 5000,
+      maxVisibleItems: 5,
+      isEnabled: () => groupingEnabled,
+      onLog: (t, d) => { try { diag(t, d as any); } catch { /* */ } },
+    });
+    diag("notification.grouping.ready", { enabled: groupingEnabled, windowMs: 5000, maxItems: 5 });
+  } catch (e) { diag("notification.grouping.init.error", { err: String(((e as any) && (e as any).message) || e) }); }
+
   // F3.3.10-BG — registra a janela premium de background + callback de "Abrir tarefa"
   // (reabre a mainWindow minimizada/oculta e navega via deep link). NÃO rouba foco do SO.
   initBgNotify((deep: string) => {
@@ -695,6 +755,12 @@ app.whenReady().then(() => {
       startupOpenAtLogin: sv ? !!sv.osOpenAtLogin : false,
       startupWillLaunch: sv ? !!sv.willLaunch : false,
       wasOpenedAtLogin,
+      // F3.5.4O — agrupamento das notificações comuns (SANITIZADO; sem conteúdo/uid|taskId integral)
+      groupingEnabled,
+      groupingWindowMs: (() => { try { return notificationGrouping ? notificationGrouping.windowMs : 5000; } catch { return 5000; } })(),
+      groupingActive: (() => { try { return notificationGrouping ? notificationGrouping.activeCount() : 0; } catch { return 0; } })(),
+      groupingUpdates: groupTele.updates, groupingLastUpdateAt: groupTele.lastUpdateAt,
+      groupingOpens: groupTele.opens, groupingLastOpenAt: groupTele.lastOpenAt,
     };
   });
   // F3.5.4N — REDE: o renderer reporta navigator.onLine + eventos online/offline (sinal REAL do SO). O
@@ -722,6 +788,10 @@ app.whenReady().then(() => {
   // F3.5.4N — AUTOCORREÇÃO (item 17): flag que desliga SOMENTE a autocorreção (firebase segue reconectando).
   ipcMain.handle("selfheal-get", () => ({ enabled: selfHealingEnabled }));
   ipcMain.handle("selfheal-set", (_e, v: boolean) => { selfHealingEnabled = !!v; saveSelfHealingFlag(selfHealingEnabled); diag("notify.selfheal.flag", { enabled: selfHealingEnabled }); return { enabled: selfHealingEnabled }; });
+  // F3.5.4O — AGRUPAMENTO (Configurações → Notificações): liga/desliga SOMENTE o agrupamento das
+  // notificações comuns (OFF ⇒ 1.0.204; a entrega individual continua idêntica). Persistente e local.
+  ipcMain.handle("grouping-get", () => ({ enabled: groupingEnabled }));
+  ipcMain.handle("grouping-set", (_e, v: boolean) => { groupingEnabled = !!v; saveGroupingFlag(groupingEnabled); try { if (notificationGrouping && !groupingEnabled) notificationGrouping.reset(); } catch { /* */ } diag("notification.group.flag", { enabled: groupingEnabled }); return { enabled: groupingEnabled }; });
   // F3.5.3 — leitura de texto da área de transferência p/ o pipeline explícito de COLAGEM do
   // formulário (Legenda/Tema/Observações). SOMENTE texto simples; nunca HTML executável.
   ipcMain.handle("clipboard-read-text", () => { try { return String(clipboard.readText() || ""); } catch { return ""; } });
@@ -816,6 +886,7 @@ app.whenReady().then(() => {
     if (uid) {
       currentUid = uid; // F3.5.4N — ANTES de iniciar os listeners (restartAll/isAuthValid dependem do uid)
       try { if (listenerWatchdog) listenerWatchdog.resetForLogin(); } catch { /* */ } // F3.5.4N — novo episódio de supervisão
+      try { if (notificationGrouping) notificationGrouping.reset(); } catch { /* */ } // F3.5.4O — grupos são POR SESSÃO de usuário (troca de usuário zera a memória de grupos)
       // F3.5.3/F3.5.4N — INÍCIO dos listeners Firestore (notifier de eventos + Categoria A DURÁVEL p/
       // TODOS os usuários ativos + produtor AUTORITATIVO de SLA + escuta de conclusão). Extraído p/
       // startUserListeners: é o MESMO caminho reusado pelo ÚLTIMO RECURSO do watchdog (para a geração
@@ -850,6 +921,7 @@ app.whenReady().then(() => {
     // o próximo login reexibe os pendentes do novo usuário). currentUid zerado.
     currentUid = "";
     try { if (listenerWatchdog) listenerWatchdog.onLogout(); } catch { /* */ } // F3.5.4N — encerra supervisão (limpa timer de último recurso)
+    try { if (notificationGrouping) notificationGrouping.reset(); } catch { /* */ } // F3.5.4O — limpa grupos em memória (não afeta sino/recibos)
     try { if (stopSlaWatch) { stopSlaWatch(); stopSlaWatch = null; } } catch { /* */ }
     try { if (slaReminderCtl) slaReminderCtl.clearActive(); } catch { /* */ }
   });
