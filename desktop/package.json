@@ -1,7 +1,7 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.205",
-  "description": "Agenda ID Seven Desktop — Golden Master integrado: link estável + Card Premium só com resolved/type/HIT comprovados",
+  "version": "1.0.206",
+  "description": "Agenda ID Seven Desktop 1.0.206-sla-decision-actions — Golden Master integrado + alertas de SLA com decisão do responsável (transação Firestore)",
   "main": "dist/main/main.js",
   "private": true,
   "scripts": {

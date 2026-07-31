@@ -5399,6 +5399,83 @@ function socialOf(t){
   return null;
 }
 function socialUsers(){return state.users.filter(u=>u&&!['pendente','removido','excluido'].includes(u.status||'')&&isSocialUser(u));}
+/* ═══════════════════════════════════════════════════════════════════════════════════════════════
+   F3.5.4P — DECISÃO DO RESPONSÁVEL nos alertas de SLA (ponte main→renderer via executeJavaScript).
+   O main (janela do lembrete) chama window.__slaPersistDecision(req) para PERSISTIR a decisão por
+   TRANSAÇÃO Firestore real sobre tasks/{id} (primeiro dispositivo vence; 2º ⇒ already_decided) e
+   window.__slaResolveHelp(req) para resolver o destinatário do "Preciso de ajuda" a partir dos campos
+   REAIS (criador t.by / Social socialOf) + diretório state.users. SEM backend novo: reusa history[].
+   ═══════════════════════════════════════════════════════════════════════════════════════════════ */
+window.__slaResolveHelp = function(req){
+  try{
+    req = req || {};
+    var t = (state.tasks||[]).find(function(x){ return x && x.id===String(req.taskId||""); });
+    if(!t) return { eligible: [], reason: "none" };
+    var me = (state.user&&state.user.id)||"";
+    var isActive = function(u){ return u && !['pendente','removido','excluido'].includes(u.status||''); };
+    var byId = function(id){ return (state.users||[]).find(function(u){ return u&&u.id===id; }); };
+    // Prioridade REPRESENTÁVEL (C5): criador/Social Media únicos e ativos (o solicitante é o responsável,
+    // logo o tier "responsável direto" recai nele e é excluído). Tier "líder de setor" NÃO existe no modelo.
+    var cands = [];
+    var socId = socialOf(t); var socU = socId ? byId(socId) : null;
+    if(isActive(socU) && socU.id!==me) cands.push({ id: socU.id, name: socU.name||'' });
+    var byU = t.by ? byId(t.by) : null;
+    if(isActive(byU) && byU.id!==me && !cands.some(function(c){ return c.id===byU.id; })) cands.push({ id: byU.id, name: byU.name||'' });
+    if(cands.length===1) return { preselect: cands[0], eligible: cands, reason: "preselected" };
+    if(cands.length>1) return { eligible: cands, reason: "ambiguous" };
+    // Indeterminado ⇒ seleção manual entre elegíveis (nunca escolher em silêncio; nunca enviar a todos).
+    var elig = (state.users||[]).filter(function(u){ return isActive(u) && u.id!==me; }).map(function(u){ return { id: u.id, name: u.name||'' }; });
+    elig.sort(function(a,b){ return String(a.name).localeCompare(String(b.name)); });
+    return { eligible: elig, reason: elig.length ? "ambiguous" : "none" };
+  }catch(e){ return { eligible: [], reason: "none" }; }
+};
+window.__slaPersistDecision = async function(req){
+  try{
+    req = req || {};
+    var taskId = String(req.taskId||""); var decisionKey = String(req.decisionKey||"");
+    if(!taskId || !decisionKey) return { status:"error", error:"bad-req" };
+    var me = (state.user&&state.user.id)||"";
+    // Camada de segurança (renderer): o solicitante logado é o destinatário do alerta? (revalidado na transação)
+    if(req.recipientUid && me && String(req.recipientUid)!==me) return { status:"not_authorized", error:"uid-mismatch" };
+    var ref = db.collection('tasks').doc(taskId);
+    var out = await db.runTransaction(async function(tx){
+      var snap = await tx.get(ref);
+      if(!snap || !snap.exists) return { status:"task_deleted" };                          // 3/4 existe e não excluída
+      var data = snap.data() || {};
+      var completed = (typeof isTaskCompleted==='function') ? isTaskCompleted(data)
+        : (String(data.status||'')==='concluido' || ['concluido','entregue'].indexOf(String(data.designerFlowStatus||data.designerWorkflowStage||''))>=0);
+      if(completed) return { status:"task_completed" };                                     // 5 não concluída
+      // 10 responsabilidade ATUAL: quem responde ainda é o responsável da tarefa?
+      var curResp = (data.designerAssignment&&data.designerAssignment.designerId) || data.assigneeId || '';
+      if(req.recipientUid && curResp && String(curResp)!==String(req.recipientUid)) return { status:"not_authorized", error:"resp-changed" };
+      // 8 boundaryVersion: está embutido na decisionKey; a checagem 9 (decisionKey ausente) confirma o marco.
+      // 9 decisionKey ainda não registrada? (idempotência POR alerta; 1ª transação vence, 2ª ⇒ already_decided)
+      var hist = Array.isArray(data.history) ? data.history : [];
+      for(var i=0;i<hist.length;i++){ if(hist[i] && String(hist[i].decisionKey||"")===decisionKey) return { status:"already_decided" }; }
+      // 11 acrescenta EXATAMENTE UMA entrada sla_decision (aditiva; leitores toleram kind heterogêneo)
+      var _now = Date.now();
+      var entry = { kind:'sla_decision', decisionKey: decisionKey, decisionType: String(req.decisionType||''),
+        alertLevel: String(req.alertLevel||''), boundaryVersion: String(req.boundaryVersion||''),
+        at:_now, atMs:_now, byId: me||null, byUid: me||null, by:(state.user&&state.user.name)||'', source:'desktop-1.0.206' };
+      if(req.etaMinutes) entry.etaMinutes = Number(req.etaMinutes)||0;
+      if(req.reasonCode) entry.reasonCode = String(req.reasonCode);
+      if(req.reasonText) entry.reasonText = String(req.reasonText).slice(0,300);
+      if(String(req.decisionType||'')==='help_requested'){ entry.forId = String(req.helpRecipientId||''); entry.forName = String(req.helpRecipientName||''); if(req.helpText) entry.helpText = String(req.helpText).slice(0,300); }
+      if(String(req.decisionType||'')==='blocked'){
+        // Destinatários da regra AUDITADA (criador/Social Media) — campos REAIS; NUNCA todos os admins.
+        var brecs=[]; var soc=socialOf(data); if(soc && String(soc)!==me) brecs.push(String(soc));
+        if(data.by && String(data.by)!==me && brecs.indexOf(String(data.by))<0) brecs.push(String(data.by));
+        entry.blockedRecipientIds = brecs;
+      }
+      tx.update(ref, { history: firebase.firestore.FieldValue.arrayUnion(entry) });
+      return { status:"committed", deep:"detail/"+taskId };
+    });
+    return out || { status:"offline", error:"no-result" };
+  }catch(e){
+    // Offline/transiente: a fila durável do main re-tenta com a MESMA decisionKey (sem duplicar).
+    return { status:"offline", error: String((e&&e.message)||e||"").slice(0,120) };
+  }
+};
 // Coluna do quadro da Social Media: cronograma deriva do eixo do cliente; demais usam status.
 function socialCol(t){
   // Fase Produção 1 — D2: conclusão final canônica reflete imediatamente na coluna da Social.
@@ -8396,6 +8473,8 @@ function notifDiagCardHtml(d){
     /* F3.5.4O — agrupamento das notificações comuns (mesma tarefa + mesmo destinatário) */
     notifDiagRow('Agrupar atualizações comuns', d.groupingEnabled===false?'Desligado':('Ligado'+(d.groupingActive?(' · '+d.groupingActive+' ativo(s)'):'')), d.groupingEnabled===false?'':'ok')+'<div class="divline"></div>'+
     '<button class="settrow" data-cfggrouping="'+(d.groupingEnabled===false?'on':'off')+'"><div class="icb">'+svg('gear')+'</div><div class="sm"><div class="sl">Agrupar atualizações comuns da mesma tarefa</div><div class="ss">'+(d.groupingEnabled===false?'Desligado — cada atualização vem separada. Tocar para ligar':'Ligado — atualizações comuns da mesma tarefa aparecem juntas (a 1ª em tempo real). Tocar para desligar')+'</div></div><div class="arr">'+svg('arr')+'</div></button><div class="divline"></div>'+
+    /* F3.5.4P — opções de ação (decisão do responsável) nos alertas de prazo */
+    '<button class="settrow" data-cfgsladecision="'+(d.slaDecisionActionsEnabled===false?'on':'off')+'"><div class="icb">'+svg('gear')+'</div><div class="sm"><div class="sl">Mostrar opções de ação nos alertas de prazo</div><div class="ss">'+(d.slaDecisionActionsEnabled===false?'Desligado — o alerta mostra apenas OK. Tocar para ligar':'Ligado — o responsável informa o que fará (Iniciar, Finalizando, Bloqueado, Ajuda). Tocar para desligar')+'</div></div><div class="arr">'+svg('arr')+'</div></button><div class="divline"></div>'+
     notifDiagRow('Versão do aplicativo', d.version||'—')+'<div class="divline"></div>'+
     '<button class="settrow" data-cfgnotifdiag="1"><div class="icb">'+svg('send')+'</div><div class="sm"><div class="sl">Atualizar diagnóstico</div><div class="ss">Relê o estado técnico agora</div></div><div class="arr">'+svg('arr')+'</div></button>';
 }
@@ -9289,6 +9368,16 @@ document.addEventListener('click',async e=>{
       try{ if(window.desktopAPI&&window.desktopAPI.groupingSet){ await window.desktopAPI.groupingSet(_cfgGroupingOn); } }catch(_){}
       try{ notifDiagFill(); }catch(_){}
       flashToast(_cfgGroupingOn?'Agrupar atualizações comuns: ligado.':'Agrupar atualizações comuns: desligado.');
+    })();
+    return;
+  }
+  /* F3.5.4P — AÇÕES DE DECISÃO nos alertas de prazo: liga/desliga SOMENTE as opções (OFF ⇒ só OK, 1.0.205). */
+  if(el=g('[data-cfgsladecision]')){
+    var _cfgSlaDecOn=el.getAttribute('data-cfgsladecision')==='on';
+    (async function(){
+      try{ if(window.desktopAPI&&window.desktopAPI.slaDecisionSet){ await window.desktopAPI.slaDecisionSet(_cfgSlaDecOn); } }catch(_){}
+      try{ notifDiagFill(); }catch(_){}
+      flashToast(_cfgSlaDecOn?'Opções de ação nos alertas: ligado.':'Opções de ação nos alertas: desligado.');
     })();
     return;
   }

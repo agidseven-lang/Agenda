@@ -41,12 +41,44 @@ export type ReminderAckMeta = {
   windowState?: string;
 };
 
+/**
+ * F3.5.4P — RECIBO/FILA DURÁVEL DE DECISÃO DE SLA (idempotência local + fila offline).
+ * decisionKey := sla_decision:<taskId>:<alertLevel>:<boundaryVersion>:<recipientUid> — POR ALERTA+DESTINATÁRIO
+ * (NÃO inclui o tipo: uma ÚNICA decisão por alerta). Este registro é APENAS controle LOCAL de idempotência e
+ * fila offline; a decisão COMPARTILHADA é a entrada sla_decision gravada por TRANSAÇÃO no history[] da tarefa
+ * (fonte da verdade real, tempo real, para todos). Nunca declaramos "compartilhada" com base neste arquivo.
+ *   - pending_sync : decidida localmente, aguardando a confirmação da TRANSAÇÃO no Firestore (fila offline);
+ *   - synced       : transação confirmada (este dispositivo venceu / gravou o marco);
+ *   - superseded   : a transação retornou already_decided (outro dispositivo já respondeu) — local superada.
+ */
+export type SlaDecisionState = "pending_sync" | "synced" | "superseded";
+export type SlaDecisionRec = {
+  decisionKey: string;
+  state: SlaDecisionState;
+  decisionType: string;
+  alertLevel: "warning" | "critical";
+  boundaryVersion: string;
+  recipientUid: string;
+  taskId: string;
+  payload: any;            // decisão + destinatário (help/blocked) p/ re-dirigir a MESMA transação offline
+  meta?: any;
+  createdAt: number;
+  updatedAt: number;
+};
+
 export type SlaReminderStore = {
   isAcked: (key: string) => boolean;
   markPending: (rec: ReminderPendingRec) => void;
   removePending: (key: string) => void;
   markAck: (key: string, meta?: ReminderAckMeta) => void;
   listPending: () => ReminderPendingRec[];
+  // F3.5.4P — decisão durável (idempotência local + fila offline; NÃO é a decisão compartilhada)
+  getDecision: (decisionKey: string) => SlaDecisionRec | null;
+  isDecisionSettled: (decisionKey: string) => boolean;   // synced || superseded (estado final)
+  markDecisionPending: (rec: SlaDecisionRec) => void;     // enfileira p/ sincronizar (offline)
+  markDecisionSynced: (decisionKey: string, meta?: any) => void;
+  markDecisionSuperseded: (decisionKey: string) => void;
+  listDecisionsPendingSync: () => SlaDecisionRec[];
   _peek?: () => any;
 };
 
@@ -54,10 +86,12 @@ type Shape = {
   acked?: Record<string, number>;
   ackMeta?: Record<string, ReminderAckMeta & { ackAt: number }>;
   pending?: Record<string, ReminderPendingRec>;
+  decisions?: Record<string, SlaDecisionRec>;
 };
 
 const ACK_CAP = 5000, ACK_EVICT = 1500;
 const PENDING_CAP = 400, PENDING_EVICT = 100;
+const DECISION_CAP = 5000, DECISION_EVICT = 1500;
 
 export function createSlaReminderStore(opts?: { file?: string; log?: (t: string, d?: unknown) => void }): SlaReminderStore {
   const log = (opts && opts.log) || (() => { /* */ });
@@ -80,10 +114,20 @@ export function createSlaReminderStore(opts?: { file?: string; log?: (t: string,
     if (!mem.acked || typeof mem.acked !== "object") mem.acked = {};
     if (!mem.ackMeta || typeof mem.ackMeta !== "object") mem.ackMeta = {};
     if (!mem.pending || typeof mem.pending !== "object") mem.pending = {};
+    if (!mem.decisions || typeof mem.decisions !== "object") mem.decisions = {};
   }
   function save(): void {
     try { const f = resolveFile(); if (f) fs.writeFileSync(f, JSON.stringify(mem)); }
     catch (e) { try { log("sla.reminder.store.save.error", { err: String((e as any) && (e as any).message || e) }); } catch { /* */ } }
+  }
+  function evictDecisions(): void {
+    const d = mem.decisions!; const ks = Object.keys(d);
+    if (ks.length <= DECISION_CAP) return;
+    let toEvict = ks.length - (DECISION_CAP - DECISION_EVICT);
+    // Descartar SETTLED mais antigos primeiro; nunca perder pending_sync enquanto houver settled a remover.
+    const settled = ks.filter((k) => d[k] && d[k].state !== "pending_sync").sort((a, b) => (d[a].updatedAt || 0) - (d[b].updatedAt || 0));
+    for (const k of settled) { if (toEvict <= 0) break; delete d[k]; toEvict--; }
+    if (toEvict > 0) { const rest = Object.keys(d).sort((a, b) => (d[a].updatedAt || 0) - (d[b].updatedAt || 0)); for (const k of rest) { if (toEvict <= 0) break; delete d[k]; toEvict--; } }
   }
 
   return {
@@ -120,6 +164,42 @@ export function createSlaReminderStore(opts?: { file?: string; log?: (t: string,
     listPending(): ReminderPendingRec[] {
       load();
       return Object.keys(mem.pending!).map((k) => mem.pending![k]).filter((r) => r && !mem.acked![r.key]).sort((a, b) => (a.shownAt || 0) - (b.shownAt || 0));
+    },
+    getDecision(decisionKey: string): SlaDecisionRec | null {
+      load(); const k = String(decisionKey || ""); return (k && mem.decisions![k]) ? mem.decisions![k] : null;
+    },
+    isDecisionSettled(decisionKey: string): boolean {
+      load(); const r = mem.decisions![String(decisionKey || "")];
+      return !!(r && (r.state === "synced" || r.state === "superseded"));
+    },
+    markDecisionPending(rec: SlaDecisionRec): void {
+      load();
+      const k = String(rec && rec.decisionKey || ""); if (!k) return;
+      const cur = mem.decisions![k];
+      if (cur && (cur.state === "synced" || cur.state === "superseded")) return;   // já final: nunca reabrir
+      const nowMs = Date.now();
+      mem.decisions![k] = Object.assign({}, rec, {
+        decisionKey: k, state: "pending_sync" as SlaDecisionState,
+        createdAt: (cur && cur.createdAt) || rec.createdAt || nowMs, updatedAt: nowMs,
+      });
+      evictDecisions();
+      save();
+    },
+    markDecisionSynced(decisionKey: string, meta?: any): void {
+      load(); const k = String(decisionKey || ""); if (!k) return;
+      const cur = mem.decisions![k] || ({} as SlaDecisionRec);
+      mem.decisions![k] = Object.assign({}, cur, { decisionKey: k, state: "synced" as SlaDecisionState, meta: (meta !== undefined ? meta : (cur as any).meta), updatedAt: Date.now() });
+      save();
+    },
+    markDecisionSuperseded(decisionKey: string): void {
+      load(); const k = String(decisionKey || ""); if (!k) return;
+      const cur = mem.decisions![k] || ({} as SlaDecisionRec);
+      mem.decisions![k] = Object.assign({}, cur, { decisionKey: k, state: "superseded" as SlaDecisionState, updatedAt: Date.now() });
+      save();
+    },
+    listDecisionsPendingSync(): SlaDecisionRec[] {
+      load();
+      return Object.keys(mem.decisions!).map((k) => mem.decisions![k]).filter((r) => r && r.state === "pending_sync").sort((a, b) => (a.updatedAt || 0) - (b.updatedAt || 0));
     },
     _peek(): any { load(); return mem; },
   };

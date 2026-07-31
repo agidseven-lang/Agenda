@@ -5,7 +5,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data: https: http:; media-src data:; font-src 'none'; connect-src 'none'" />
 <title>Agenda ID Seven — Lembrete de SLA</title>
 <style>
-  :root{ --amber:#F59E0B; --amber-d:#B45309; --red:#DC2626; --red-d:#991B1B; --ink:#0F172A; --muted:#64748B; }
+  :root{ --amber:#F59E0B; --amber-d:#B45309; --red:#DC2626; --red-d:#991B1B; --ink:#0F172A; --muted:#64748B; --line:rgba(15,23,42,.12); }
   *{ box-sizing:border-box; margin:0; padding:0; }
   html,body{ background:transparent; overflow:hidden; -webkit-user-select:none; user-select:none; font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif; }
   /* #wrap reserva 46px no topo p/ o avatar transbordar SEM ser cortado pela borda da janela.
@@ -18,8 +18,7 @@
     padding:52px 22px 20px; text-align:center; border:1px solid rgba(15,23,42,.06); }
   .card::before{ content:""; position:absolute; left:0; right:0; top:0; height:6px; background:var(--amber); }
   .card.red::before{ background:var(--red); }
-  /* avatar: irmão do card, sobreposto ao topo; top:14px (>0) garante 100% visível na janela;
-     transborda 32px acima do card (card em y=46) e encaixa 40px dentro (padding-top 52 dá folga). */
+  /* avatar: irmão do card, sobreposto ao topo; top:14px (>0) garante 100% visível na janela. */
   .av{ position:absolute; top:14px; left:50%; transform:translateX(-50%); z-index:3; width:72px; height:72px; border-radius:50%;
     border:4px solid #fff; box-shadow:0 10px 24px -4px rgba(2,6,23,.34), 0 0 0 3px rgba(245,158,11,.22); background:#E2E8F0 center/cover no-repeat;
     display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:26px; overflow:hidden; }
@@ -29,12 +28,56 @@
   .name{ font-size:15px; font-weight:700; color:var(--ink); margin-bottom:10px; }
   .msg{ font-size:15px; color:var(--ink); line-height:1.4; margin:0 4px 8px; }
   .task{ font-size:14px; font-weight:600; color:var(--ink); margin:6px 8px 2px; }
-  .ctx{ font-size:12.5px; color:var(--muted); margin:0 8px 16px; }
+  .ctx{ font-size:12.5px; color:var(--muted); margin:0 8px 14px; }
+  /* Botão OK (flag OFF = 1.0.205 idêntico) */
   .ok{ display:block; width:100%; border:none; border-radius:12px; padding:13px 16px; font-size:15px; font-weight:800;
     letter-spacing:.5px; color:#fff; cursor:pointer; background:var(--amber); box-shadow:0 8px 18px -6px rgba(245,158,11,.7); }
   .card.red .ok{ background:var(--red); box-shadow:0 8px 18px -6px rgba(220,38,38,.7); }
   .ok:active{ transform:translateY(1px); }
   .pend{ margin-top:10px; font-size:11.5px; color:var(--muted); min-height:14px; }
+  /* ── F3.5.4P — área de decisão ── */
+  #foot{ margin-top:2px; }
+  .decisions{ display:flex; flex-direction:column; gap:8px; }
+  .dbtn{ display:flex; align-items:center; justify-content:center; gap:8px; width:100%; border-radius:11px; padding:11px 14px;
+    font-size:14px; font-weight:700; cursor:pointer; border:1.5px solid var(--line); background:#fff; color:var(--ink); text-align:center; }
+  .dbtn:active{ transform:translateY(1px); }
+  .dbtn.primary{ border:none; color:#fff; background:var(--amber); box-shadow:0 8px 18px -8px rgba(245,158,11,.7); }
+  .card.red .dbtn.primary{ background:var(--red); box-shadow:0 8px 18px -8px rgba(220,38,38,.7); }
+  .dbtn.ghost{ border:none; background:transparent; color:var(--muted); font-weight:600; font-size:13px; padding:8px; }
+  .dbtn .ic{ font-size:15px; line-height:1; }
+  .subpanel{ text-align:left; border:1px solid var(--line); border-radius:12px; padding:12px; background:#F8FAFC; }
+  .sp-title{ font-size:13px; font-weight:800; color:var(--ink); margin-bottom:8px; }
+  .sp-note{ font-size:11.5px; color:var(--muted); margin:8px 2px 0; line-height:1.35; }
+  .chips{ display:flex; flex-wrap:wrap; gap:7px; }
+  .chip{ border:1.5px solid var(--line); background:#fff; border-radius:9px; padding:8px 12px; font-size:13px; font-weight:700; color:var(--ink); cursor:pointer; }
+  .chip.sel{ border-color:var(--amber); background:rgba(245,158,11,.12); color:var(--amber-d); }
+  .card.red .chip.sel{ border-color:var(--red); background:rgba(220,38,38,.10); color:var(--red-d); }
+  .stepper{ display:flex; align-items:center; gap:10px; margin-top:10px; }
+  .stepper button{ width:34px; height:34px; border-radius:9px; border:1.5px solid var(--line); background:#fff; font-size:18px; font-weight:800; color:var(--ink); cursor:pointer; }
+  .stepper .val{ font-size:15px; font-weight:800; color:var(--ink); min-width:70px; text-align:center; }
+  .reason-list{ display:flex; flex-direction:column; gap:2px; max-height:210px; overflow-y:auto; }
+  .rrow{ display:flex; align-items:center; gap:9px; padding:7px 6px; border-radius:8px; cursor:pointer; font-size:13px; color:var(--ink); }
+  .rrow:hover{ background:rgba(15,23,42,.04); }
+  .rrow .dot{ width:15px; height:15px; border-radius:50%; border:2px solid var(--line); flex:0 0 auto; }
+  .rrow.sel .dot{ border-color:var(--amber); background:radial-gradient(circle,var(--amber) 0 5px, transparent 6px); }
+  .card.red .rrow.sel .dot{ border-color:var(--red); background:radial-gradient(circle,var(--red) 0 5px, transparent 6px); }
+  textarea, input[type=text]{ width:100%; margin-top:9px; border:1.5px solid var(--line); border-radius:9px; padding:9px 10px; font:inherit; font-size:13px; color:var(--ink); resize:none; background:#fff; }
+  textarea:focus, input[type=text]:focus{ outline:none; border-color:var(--amber); }
+  .recip{ font-size:13px; color:var(--ink); margin-bottom:6px; }
+  .recip b{ color:var(--amber-d); } .card.red .recip b{ color:var(--red-d); }
+  .picker{ display:flex; flex-direction:column; gap:2px; max-height:150px; overflow-y:auto; margin-top:4px; }
+  .confirm-row{ display:flex; gap:9px; margin-top:12px; }
+  .btn2{ flex:1; border-radius:11px; padding:11px 12px; font-size:14px; font-weight:800; cursor:pointer; border:1.5px solid var(--line); background:#fff; color:var(--ink); }
+  .btn2.go{ border:none; color:#fff; background:var(--amber); }
+  .card.red .btn2.go{ background:var(--red); }
+  .btn2[disabled]{ opacity:.5; cursor:default; }
+  .busy{ display:flex; align-items:center; justify-content:center; gap:10px; padding:14px; font-size:14px; font-weight:700; color:var(--muted); }
+  .spin{ width:18px; height:18px; border-radius:50%; border:3px solid rgba(100,116,139,.25); border-top-color:var(--amber); animation:spin .8s linear infinite; }
+  .card.red .spin{ border-top-color:var(--red); }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .statebox{ text-align:center; }
+  .statebox .txt{ font-size:14px; color:var(--ink); line-height:1.4; margin:4px 6px 12px; }
+  .errbanner{ margin-top:10px; font-size:12.5px; color:var(--red-d); background:rgba(220,38,38,.08); border:1px solid rgba(220,38,38,.25); border-radius:9px; padding:9px 10px; text-align:left; }
 </style>
 </head>
 <body>
@@ -45,7 +88,7 @@
     <div class="msg" id="msg"></div>
     <div class="task" id="task"></div>
     <div class="ctx" id="ctx"></div>
-    <button class="ok" id="ok" type="button">OK</button>
+    <div id="foot"></div>
     <div class="pend" id="pend"></div>
   </div>
   <div class="av" id="av"></div>
@@ -57,6 +100,23 @@
   var cur = null;            // view atual
   var lastSoundKey = "";     // toca 1x por chave (abrir) e na promoção (chave muda de nível)
   var audio = null;
+  var mode = "idle";         // idle | finishing | blocked | help | busy | msg
+  var busy = false;
+  var lastError = "";        // banner de erro (retry preservando dados)
+  var draft = { decisionType:"", etaMinutes:0, reasonCode:"", reasonText:"", helpText:"", helpRecipientId:"", helpRecipientName:"" };
+  var help = { loading:false, reason:"", preselect:null, eligible:[] };
+
+  var REASONS = [
+    ["material","Aguardando material"],
+    ["social","Aguardando Social Media"],
+    ["cliente","Aguardando cliente"],
+    ["aprovacao","Aguardando aprovação"],
+    ["tecnico","Problema técnico"],
+    ["informacao","Falta de informação"],
+    ["dependencia","Dependência de outra tarefa"],
+    ["demanda","Demanda maior que o previsto"],
+    ["outro","Outro (especificar)"]
+  ];
 
   function initials(name){
     var n = String(name||"").trim(); if(!n) return "?";
@@ -67,8 +127,19 @@
     var s = String(name||""); var h = 0; for(var i=0;i<s.length;i++){ h=(h*31 + s.charCodeAt(i))>>>0; }
     var hues=[210,265,330,20,150,190]; return "hsl("+hues[h%hues.length]+" 55% 55%)";
   }
-  function render(v){
-    if(!v) return; cur = v;
+  function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,function(c){ return ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]; }); }
+  function resizeSelf(){ try{ var h = document.getElementById("wrap").getBoundingClientRect().height; api.resize && api.resize(Math.ceil(h)); }catch(_e){} }
+  function taskIdOf(v){ return String((v&&v.taskId) || ((v&&v.deep)||"").replace(/^detail\//,"") || ""); }
+
+  function playSound(v){
+    if(v.soundDataUri && v.key && v.key !== lastSoundKey){
+      lastSoundKey = v.key;
+      try { audio = new Audio(v.soundDataUri); audio.play().catch(function(){}); } catch(_e){}
+    }
+  }
+
+  // ── header (comum a todos os estados) ──
+  function renderHeader(v){
     var card = document.getElementById("card");
     var red = (v.level === "critical");
     card.className = "card" + (red ? " red" : "");
@@ -84,22 +155,215 @@
     document.getElementById("ctx").textContent = v.context || "";
     var pend = document.getElementById("pend");
     pend.textContent = (Number(v.queueLen)>1) ? (v.queueLen + " alertas pendentes") : "";
-    // som: 1x ao abrir/promover (nunca em loop, nunca a cada render)
-    if(v.soundDataUri && v.key && v.key !== lastSoundKey){
-      lastSoundKey = v.key;
-      try { audio = new Audio(v.soundDataUri); audio.play().catch(function(){}); } catch(_e){}
+  }
+
+  function bind(id, ev, fn){ var e=document.getElementById(id); if(e) e.addEventListener(ev, fn); }
+
+  // ── footer por estado ──
+  function renderFoot(v){
+    var foot = document.getElementById("foot");
+    var html = "";
+    if(mode === "msg"){ html = footMsg(); }
+    else if(busy){ html = '<div class="busy"><span class="spin"></span><span>Registrando…</span></div>'; }
+    else if(!v.decisionsEnabled){ html = '<button class="ok" id="ok" type="button">OK</button>'; }   // FLAG OFF = 1.0.205
+    else if(mode === "idle"){ html = footDecisions(); }
+    else if(mode === "finishing"){ html = footFinishing(); }
+    else if(mode === "blocked"){ html = footBlocked(); }
+    else if(mode === "help"){ html = footHelp(); }
+    if(lastError && mode !== "msg" && !busy){ html += '<div class="errbanner">'+esc(lastError)+'</div>'; }
+    foot.innerHTML = html;
+    wire(v);
+  }
+
+  function footDecisions(){
+    return '<div class="decisions">'
+      + '<button class="dbtn primary" id="d_start" type="button"><span class="ic">▶</span>Iniciar agora</button>'
+      + '<button class="dbtn" id="d_fin" type="button"><span class="ic">⏱</span>Estou finalizando</button>'
+      + '<button class="dbtn" id="d_blk" type="button"><span class="ic">⛔</span>Estou bloqueado</button>'
+      + '<button class="dbtn" id="d_help" type="button"><span class="ic">🆘</span>Preciso de ajuda</button>'
+      + '<button class="dbtn ghost" id="d_ack" type="button">Apenas reconhecer</button>'
+      + '</div>';
+  }
+
+  function footFinishing(){
+    var presets=[10,20,30]; var chips="";
+    for(var i=0;i<presets.length;i++){ var m=presets[i]; chips += '<div class="chip'+(draft.etaMinutes===m?' sel':'')+'" data-eta="'+m+'">+'+m+' min</div>'; }
+    var isOutro = draft.etaMinutes>0 && presets.indexOf(draft.etaMinutes)<0;
+    chips += '<div class="chip'+(isOutro?' sel':'')+'" id="eta_outro">Outro…</div>';
+    var stepper = isOutro ? ('<div class="stepper"><button type="button" id="eta_dec">−</button><span class="val" id="eta_val">+'+draft.etaMinutes+' min</span><button type="button" id="eta_inc">+</button></div>') : "";
+    return '<div class="subpanel"><div class="sp-title">Em quanto tempo você prevê finalizar?</div>'
+      + '<div class="chips">'+chips+'</div>'+stepper
+      + '<div class="sp-note">É uma PREVISÃO — não altera o prazo, o SLA nem os avisos.</div></div>'
+      + confirmRow("Confirmar previsão", draft.etaMinutes>0);
+  }
+
+  function footBlocked(){
+    var rows="";
+    for(var i=0;i<REASONS.length;i++){ var r=REASONS[i]; rows += '<div class="rrow'+(draft.reasonCode===r[0]?' sel':'')+'" data-rc="'+r[0]+'"><span class="dot"></span><span>'+esc(r[1])+'</span></div>'; }
+    var obs = (draft.reasonCode==="outro") ? ('<textarea id="blk_obs" rows="2" maxlength="200" placeholder="Descreva o motivo (obrigatório)">'+esc(draft.reasonText)+'</textarea>') : "";
+    var valid = !!draft.reasonCode && (draft.reasonCode!=="outro" || (draft.reasonText||"").trim().length>0);
+    return '<div class="subpanel"><div class="sp-title">Qual o motivo do bloqueio?</div>'
+      + '<div class="reason-list">'+rows+'</div>'+obs
+      + '<div class="sp-note">O bloqueio é registrado; o SLA e o prazo NÃO são pausados.</div></div>'
+      + confirmRow("Registrar bloqueio", valid);
+  }
+
+  function footHelp(){
+    var body="";
+    if(help.loading){ body = '<div class="busy"><span class="spin"></span><span>Localizando destinatário…</span></div>'; }
+    else if(help.reason==="preselected" && help.preselect){
+      body = '<div class="recip">Seu pedido será enviado para: <b>'+esc(help.preselect.name)+'</b></div>';
+    } else if(help.reason==="ambiguous" && help.eligible.length){
+      var opts="";
+      for(var i=0;i<help.eligible.length;i++){ var u=help.eligible[i]; opts += '<div class="rrow'+(draft.helpRecipientId===u.id?' sel':'')+'" data-uid="'+esc(u.id)+'" data-uname="'+esc(u.name)+'"><span class="dot"></span><span>'+esc(u.name)+'</span></div>'; }
+      body = '<div class="recip">Para quem enviar o pedido?</div><div class="picker">'+opts+'</div>';
+    } else {
+      body = '<div class="recip">Nenhum destinatário elegível foi encontrado automaticamente.</div>';
+      if(help.eligible.length){ var o2=""; for(var j=0;j<help.eligible.length;j++){ var u2=help.eligible[j]; o2 += '<div class="rrow'+(draft.helpRecipientId===u2.id?' sel':'')+'" data-uid="'+esc(u2.id)+'" data-uname="'+esc(u2.name)+'"><span class="dot"></span><span>'+esc(u2.name)+'</span></div>'; } body += '<div class="picker">'+o2+'</div>'; }
     }
-    // altura -> centraliza no main; prova de render p/ fallback nativo.
-    // Mede o #wrap (inclui o espaço reservado do avatar no topo) => janela nunca corta o avatar.
-    try{ var h = document.getElementById("wrap").getBoundingClientRect().height; api.resize && api.resize(Math.ceil(h)); }catch(_e){}
+    var desc = '<textarea id="help_txt" rows="2" maxlength="200" placeholder="Descreva rapidamente (opcional)">'+esc(draft.helpText)+'</textarea>';
+    var valid = !help.loading && !!draft.helpRecipientId;
+    return '<div class="subpanel"><div class="sp-title">Pedir ajuda</div>'+body+desc
+      + '<div class="sp-note">Notificação individual e imediata ao destinatário.</div></div>'
+      + confirmRow("Enviar pedido", valid);
+  }
+
+  function confirmRow(goLabel, enabled){
+    return '<div class="confirm-row"><button class="btn2" id="c_back" type="button">Voltar</button>'
+      + '<button class="btn2 go" id="c_go" type="button"'+(enabled?"":" disabled")+'>'+esc(goLabel)+'</button></div>';
+  }
+
+  function footMsg(){
+    var s = msgState || {};
+    var actions = "";
+    if(s.action==="dismiss"){ actions = '<button class="ok" id="m_dismiss" type="button">Fechar</button>'; }
+    else if(s.action==="ackonly"){ actions = '<button class="ok" id="m_ack" type="button">OK</button>'; }
+    else if(s.action==="back"){ actions = '<button class="ok" id="m_back" type="button">Voltar</button>'; }
+    return '<div class="statebox"><div class="txt">'+esc(s.text||"")+'</div>'+actions+'</div>';
+  }
+
+  var msgState = null;
+  function showMsg(text, action){ mode="msg"; busy=false; lastError=""; msgState={ text:text, action:action }; if(cur) renderFoot(cur); resizeSelf(); }
+  function showError(text){ lastError=text; busy=false; if(cur) renderFoot(cur); resizeSelf(); }
+
+  // ── wiring por estado (após innerHTML) ──
+  function wire(v){
+    if(mode==="msg"){
+      bind("m_dismiss","click",function(){ try{ api.dismiss && api.dismiss(cur.key); }catch(_e){} });
+      bind("m_ack","click",function(){ try{ api.ok && api.ok(cur.key); }catch(_e){} });
+      bind("m_back","click",function(){ mode="idle"; lastError=""; renderFoot(cur); resizeSelf(); });
+      return;
+    }
+    if(busy) return;
+    if(!v.decisionsEnabled){ bind("ok","click",function(){ if(cur&&cur.key){ try{ api.ok && api.ok(cur.key); }catch(_e){} } }); return; }
+
+    if(mode==="idle"){
+      bind("d_start","click",function(){ sendDecision({ decisionType:"start_now" }); });
+      bind("d_ack","click",function(){ sendDecision({ decisionType:"acknowledge_only" }); });
+      bind("d_fin","click",function(){ mode="finishing"; lastError=""; if(!draft.etaMinutes) draft.etaMinutes=0; renderFoot(cur); resizeSelf(); });
+      bind("d_blk","click",function(){ mode="blocked"; lastError=""; renderFoot(cur); resizeSelf(); });
+      bind("d_help","click",function(){ startHelp(); });
+      return;
+    }
+    // confirm-row comum
+    bind("c_back","click",function(){ mode="idle"; lastError=""; renderFoot(cur); resizeSelf(); });
+
+    if(mode==="finishing"){
+      var chips=document.querySelectorAll(".chip[data-eta]");
+      for(var i=0;i<chips.length;i++){ (function(c){ c.addEventListener("click",function(){ draft.etaMinutes=parseInt(c.getAttribute("data-eta"),10)||0; renderFoot(cur); resizeSelf(); }); })(chips[i]); }
+      bind("eta_outro","click",function(){ if(!(draft.etaMinutes>0 && [10,20,30].indexOf(draft.etaMinutes)<0)) draft.etaMinutes=45; renderFoot(cur); resizeSelf(); });
+      bind("eta_dec","click",function(){ draft.etaMinutes=Math.max(5,(draft.etaMinutes||45)-5); renderFoot(cur); resizeSelf(); });
+      bind("eta_inc","click",function(){ draft.etaMinutes=Math.min(480,(draft.etaMinutes||45)+5); renderFoot(cur); resizeSelf(); });
+      bind("c_go","click",function(){ if(draft.etaMinutes>0) sendDecision({ decisionType:"finishing", etaMinutes:draft.etaMinutes }); });
+      return;
+    }
+    if(mode==="blocked"){
+      var rows=document.querySelectorAll(".rrow[data-rc]");
+      for(var j=0;j<rows.length;j++){ (function(r){ r.addEventListener("click",function(){ draft.reasonCode=r.getAttribute("data-rc"); renderFoot(cur); resizeSelf(); }); })(rows[j]); }
+      var obs=document.getElementById("blk_obs"); if(obs){ obs.addEventListener("input",function(){ draft.reasonText=obs.value; var go=document.getElementById("c_go"); if(go){ if((obs.value||"").trim().length>0) go.removeAttribute("disabled"); else go.setAttribute("disabled","disabled"); } }); }
+      bind("c_go","click",function(){ var valid = !!draft.reasonCode && (draft.reasonCode!=="outro" || (draft.reasonText||"").trim().length>0); if(valid) sendDecision({ decisionType:"blocked", reasonCode:draft.reasonCode, reasonText:(draft.reasonCode==="outro"?draft.reasonText.trim():"") }); });
+      return;
+    }
+    if(mode==="help"){
+      var picks=document.querySelectorAll(".rrow[data-uid]");
+      for(var k=0;k<picks.length;k++){ (function(p){ p.addEventListener("click",function(){ draft.helpRecipientId=p.getAttribute("data-uid"); draft.helpRecipientName=p.getAttribute("data-uname"); renderFoot(cur); resizeSelf(); }); })(picks[k]); }
+      var ht=document.getElementById("help_txt"); if(ht){ ht.addEventListener("input",function(){ draft.helpText=ht.value; }); }
+      bind("c_go","click",function(){ if(draft.helpRecipientId) sendDecision({ decisionType:"help_requested", helpText:(draft.helpText||"").trim(), helpRecipientId:draft.helpRecipientId, helpRecipientName:draft.helpRecipientName }); });
+      return;
+    }
+  }
+
+  function startHelp(){
+    mode="help"; lastError=""; help={ loading:true, reason:"", preselect:null, eligible:[] };
+    draft.helpRecipientId=""; draft.helpRecipientName="";
+    renderFoot(cur); resizeSelf();
+    try{ api.resolveHelp && api.resolveHelp({ key:cur.key, taskId:taskIdOf(cur) }); }catch(_e){}
+  }
+
+  function sendDecision(extra){
+    if(busy) return;             // idempotência de UI: bloqueia duplo-clique
+    busy = true; lastError=""; mode = (mode==="idle"?mode:mode);
+    var payload = { key: (cur&&cur.key)||"", decisionType: extra.decisionType };
+    if(extra.etaMinutes) payload.etaMinutes = extra.etaMinutes;
+    if(extra.reasonCode) payload.reasonCode = extra.reasonCode;
+    if(extra.reasonText) payload.reasonText = extra.reasonText;
+    if(extra.helpText) payload.helpText = extra.helpText;
+    if(extra.helpRecipientId){ payload.helpRecipientId = extra.helpRecipientId; payload.helpRecipientName = extra.helpRecipientName||""; }
+    renderFoot(cur); resizeSelf();
+    try{ api.decide && api.decide(payload); }catch(_e){ busy=false; showError("Não foi possível registrar a resposta. Tente novamente."); }
+  }
+
+  // ── entrada do card (main → janela) ──
+  function render(v){
+    if(!v) return; cur = v;
+    renderHeader(v);
+    renderFoot(v);
+    resizeSelf();
     try{ api.rendered && api.rendered(v.key); }catch(_e){}
   }
-  if(api.onCard) api.onCard(render);
-  document.getElementById("ok").addEventListener("click", function(){
-    if(cur && cur.key){ try{ api.ok && api.ok(cur.key); }catch(_e){} }
+
+  if(api.onCard) api.onCard(function(v){
+    if(!v) return;
+    var prev = cur;
+    var promoted = !!(prev && taskIdOf(prev)===taskIdOf(v) && prev.level!=="critical" && v.level==="critical");
+    var sameKey = !!(prev && prev.key===v.key);
+    if(promoted){
+      // Promoção amarelo→vermelho: PRESERVA rascunho/painel aberto; exige decisão do vermelho (cancela busy).
+      busy=false; if(mode==="msg") mode="idle"; lastError="";
+    } else if(!sameKey){
+      // Novo alerta (não é promoção nem re-render do mesmo): reset total.
+      mode="idle"; busy=false; lastError=""; msgState=null;
+      draft={ decisionType:"", etaMinutes:0, reasonCode:"", reasonText:"", helpText:"", helpRecipientId:"", helpRecipientName:"" };
+      help={ loading:false, reason:"", preselect:null, eligible:[] };
+    }
+    cur = v;
+    render(v);
+    playSound(v);
   });
-  // clique no cartão (fora do OK) NÃO fecha e NÃO abre nada por engano; só o OK reconhece.
-  // ESC/clique-fora não têm efeito aqui (janela focusable:false; sem handler de ESC).
+
+  if(api.onResult) api.onResult(function(r){
+    r = r || {}; busy = false;
+    if(r.status==="already_decided"){ showMsg("Este alerta já foi respondido neste ou em outro dispositivo.","dismiss"); }
+    else if(r.status==="task_completed"){ showMsg("Esta tarefa foi concluída enquanto o alerta estava aberto.","ackonly"); }
+    else if(r.status==="task_deleted"){ showMsg("Esta tarefa foi excluída — nada a registrar.","dismiss"); }
+    else if(r.status==="queued"){ showMsg("Resposta salva neste computador e aguardando sincronização.","dismiss"); }
+    else if(r.status==="error"){
+      if(r.error==="not_authorized"){ showMsg("Você não é o responsável atual por esta tarefa.","back"); }
+      else { showError("Não foi possível registrar a resposta. Verifique e tente novamente."); }
+    }
+    // committed ⇒ a janela é fechada pelo main; nada a fazer aqui.
+  });
+
+  if(api.onHelpCandidates) api.onHelpCandidates(function(c){
+    c = c || {}; if(mode!=="help") return;
+    help.loading=false; help.reason=String(c.reason||"none");
+    help.preselect = c.preselect || null;
+    help.eligible = Array.isArray(c.eligible) ? c.eligible : [];
+    if(c.preselect && c.reason==="preselected"){ draft.helpRecipientId=String(c.preselect.id||""); draft.helpRecipientName=String(c.preselect.name||""); }
+    renderFoot(cur); resizeSelf();
+  });
+
+  // clique no cartão (fora dos botões) NÃO fecha nada. Sem ESC/click-fora.
 })();
 </script>
 </body>

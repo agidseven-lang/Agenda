@@ -115,6 +115,49 @@ function deriveTaskEvents(t, o) {
     });
   }
 
+  // 1c) F3.5.4P — DECISÃO DE SLA que gera notificação INDIVIDUAL: help_requested + blocked. Derivada das
+  // entradas history[] {kind:'sla_decision', decisionType, forId (help), blockedRecipientIds (blocked)}
+  // gravadas pela TRANSAÇÃO. start_now/finishing/acknowledge_only NÃO notificam ninguém (contrato).
+  // Recipient-targeted (notifierA filtra por uid): help ⇒ forId (destinatário escolhido/visível, C5);
+  // blocked ⇒ cada blockedRecipientId (criador/Social — regra auditada; NÃO todos os admins). eventId
+  // determinístico (nunca Date.now()); NUNCA agrupada (allowlist exclui + denylist reforça).
+  for (var q = 0; q < hs.length; q++) {
+    var de = hs[q] || {};
+    if (str(de.kind) !== 'sla_decision') continue;
+    var dAt = num(de.at) || num(de.atMs);
+    if (!dAt || (minAt && dAt < minAt)) continue;
+    var dBy = str(de.byId || de.byUid);
+    var dType = str(de.decisionType);
+    if (dType === 'help_requested') {
+      var hRec = str(de.forId);
+      if (!hRec) continue;
+      out.push({
+        eventId: 'help_requested:' + taskId + ':' + dAt + ':' + hRec,
+        type: 'help_requested', recipientMode: 'assigned_designer', recipientId: hRec,
+        taskId: taskId, taskTitle: title, sector: sector,
+        actorId: dBy, actorNameDenorm: (typeof de.by === 'string' ? de.by : ''), actorPhotoDenorm: '',
+        assignedDesignerId: '', assignedDesignerNameDenorm: '', assignedDesignerPhotoDenorm: '',
+        fromStatus: '', toStatus: '', at: dAt,
+        helpText: (typeof de.helpText === 'string' ? de.helpText.slice(0, 140) : '')
+      });
+    } else if (dType === 'blocked') {
+      var bRecs = Array.isArray(de.blockedRecipientIds) ? de.blockedRecipientIds : [];
+      for (var b = 0; b < bRecs.length; b++) {
+        var bRec = str(bRecs[b]);
+        if (!bRec || bRec === dBy) continue;
+        out.push({
+          eventId: 'blocked:' + taskId + ':' + dAt + ':' + bRec,
+          type: 'blocked', recipientMode: 'assigned_designer', recipientId: bRec,
+          taskId: taskId, taskTitle: title, sector: sector,
+          actorId: dBy, actorNameDenorm: (typeof de.by === 'string' ? de.by : ''), actorPhotoDenorm: '',
+          assignedDesignerId: '', assignedDesignerNameDenorm: '', assignedDesignerPhotoDenorm: '',
+          fromStatus: '', toStatus: '', at: dAt,
+          reasonCode: str(de.reasonCode)
+        });
+      }
+    }
+  }
+
   // 2) ATRIBUIÇÃO (cronograma/designer) — designerAssignment do próprio doc (assignedAt carimba).
   var da = (t.designerAssignment && typeof t.designerAssignment === 'object') ? t.designerAssignment : null;
   if (da && da.designerId && num(da.assignedAt) && (!minAt || num(da.assignedAt) >= minAt)) {
@@ -165,7 +208,14 @@ function evTitle(type) {
   if (type === 'task_completed') return 'Tarefa concluída';
   if (type === 'task_reopened') return 'Tarefa reaberta';
   if (type === 'task_updated') return 'Tarefa atualizada';   // F3.5.4F
+  if (type === 'help_requested') return 'Pedido de ajuda';   // F3.5.4P
+  if (type === 'blocked') return 'Tarefa bloqueada';         // F3.5.4P
   return 'Agenda ID Seven';
+}
+// F3.5.4P — rótulo humano do reasonCode (enum), p/ o corpo do bloqueio. NUNCA usa o texto livre.
+function reasonLabelNE(rc) {
+  var m = { material: 'aguardando material', social: 'aguardando Social Media', cliente: 'aguardando cliente', aprovacao: 'aguardando aprovação', tecnico: 'problema técnico', informacao: 'falta de informação', dependencia: 'dependência', demanda: 'demanda maior', outro: 'outro motivo' };
+  return m[str(rc)] || 'motivo';
 }
 function evBody(ev, ator, designer) {
   var T = '‘' + (ev.taskTitle || 'Tarefa') + '’'; // ‘{TAREFA}’
@@ -183,11 +233,16 @@ function evBody(ev, ator, designer) {
     if (ev.dueChanged) return A + ' atualizou o prazo: ' + fmtBRDT(ev.prevDueDate, ev.prevDueTime) + ' → ' + fmtBRDT(ev.newDueDate, ev.newDueTime);
     return A + ' atualizou ' + T + '.';
   }
+  // F3.5.4P — pedido de ajuda: nome do solicitante + motivo resumido (sem dados sensíveis).
+  if (ev.type === 'help_requested') return A + ' pediu ajuda em ' + T + (ev.helpText ? ': ' + ev.helpText : '.');
+  // F3.5.4P — bloqueio: nome do responsável + rótulo do motivo (enum), nunca o texto livre.
+  if (ev.type === 'blocked') return A + ' informou bloqueio em ' + T + (ev.reasonCode ? ' (' + reasonLabelNE(ev.reasonCode) + ').' : '.');
   return T;
 }
 function evSeverity(type) {
   if (type === 'task_completed') return 'success';
   if (type === 'task_reopened') return 'warning';
+  if (type === 'help_requested' || type === 'blocked') return 'warning';   // F3.5.4P — distinto do SLA (vermelho)
   return 'info';
 }
 
@@ -214,6 +269,8 @@ function buildCategoryAPayload(ev, uid, resolveProfile) {
   // F3.5.4F — contexto do task_updated: prazo anterior → novo quando o prazo mudou.
   var ctx = ev.fromStatus ? (columnLabel(ev.fromStatus) + ' → ' + columnLabel(ev.toStatus)) : 'Tarefas';
   if (ev.type === 'task_updated') ctx = ev.dueChanged ? ('Prazo: ' + fmtBRDT(ev.prevDueDate, ev.prevDueTime) + ' → ' + fmtBRDT(ev.newDueDate, ev.newDueTime)) : 'Tarefa atualizada';
+  if (ev.type === 'help_requested') ctx = 'Pedido de ajuda';   // F3.5.4P
+  if (ev.type === 'blocked') ctx = 'Bloqueio informado';       // F3.5.4P
   return {
     eventId: ev.eventId, dedupKey: ev.eventId,
     eventType: ev.type, notificationType: (ev.recipientMode === 'assigned_designer' ? 'assigned_designer' : 'all_active_users'),

@@ -75,6 +75,9 @@ const selfHealTele = { lastAlertAt: 0, lastReasonCode: "", alerts: 0, lastRestar
 let notificationGrouping: ReturnType<typeof createNotificationGrouping> | null = null;
 let groupingEnabled = true;
 const groupTele = { updates: 0, lastUpdateAt: 0, lastOpenAt: 0, opens: 0 };
+// F3.5.4P — AÇÕES DE DECISÃO no alerta de SLA. Flag default ON; OFF ⇒ só OK (1.0.205). Telemetria SANITIZADA.
+let slaDecisionActionsEnabled = true;
+const slaDecisionTele = { committed: 0, alreadyDecided: 0, queued: 0, failed: 0, lastAt: 0, lastType: "" };
 // F3.3.70D3R10U — opts do tray centralizados (usados por startup, session-login,
 // heartbeat e IPC tray-recreate; a recriacao usa SEMPRE o mesmo menu/quit).
 const trayWin = () => mainWin;
@@ -505,6 +508,57 @@ function saveSelfHealingFlag(v: boolean): void { try { const s = jsonStore("f354
 // passthrough sempre (comportamento 1.0.204 byte-a-byte). Constante local; NÃO é remota/configurável.
 function loadGroupingFlag(): boolean { try { return (jsonStore("f354o-notify.json").read() || {}).notificationCommonGroupingEnabled !== false; } catch { return true; } }
 function saveGroupingFlag(v: boolean): void { try { const s = jsonStore("f354o-notify.json"); const raw = s.read() || {}; raw.notificationCommonGroupingEnabled = !!v; s.write(raw); } catch { /* */ } }
+// F3.5.4P — flag das AÇÕES DE DECISÃO nos alertas de prazo. Default ON (undefined ⇒ true). OFF ⇒ só OK
+// (1.0.205), preserva tudo, NÃO apaga decisões, NÃO altera backend. Constante local; NÃO remota.
+function loadSlaDecisionFlag(): boolean { try { return (jsonStore("f354p-notify.json").read() || {}).slaDecisionActionsEnabled !== false; } catch { return true; } }
+function saveSlaDecisionFlag(v: boolean): void { try { const s = jsonStore("f354p-notify.json"); const raw = s.read() || {}; raw.slaDecisionActionsEnabled = !!v; s.write(raw); } catch { /* */ } }
+// F3.5.4P — texto humano (LOCAL, sino) por tipo de decisão. Usa rótulo do reasonCode (enum) e etaMinutes;
+// NUNCA o texto livre (reasonText/helpText) — mesma sanitização das notificações.
+function slaReasonLabel(rc: string): string {
+  const m: Record<string, string> = { material: "aguardando material", social: "aguardando Social Media", cliente: "aguardando cliente", aprovacao: "aguardando aprovação", tecnico: "problema técnico", informacao: "falta de informação", dependencia: "dependência", demanda: "demanda maior", outro: "outro motivo" };
+  return m[String(rc || "")] || "motivo";
+}
+function slaDecisionSinoText(info: any): string {
+  const nm = String((info && info.actorName) || "").trim(); const who = nm ? nm + " " : "";
+  const t = String((info && info.taskTitle) || ""); const suf = t ? " da tarefa " + t : "";
+  switch (String((info && info.decisionType) || "")) {
+    case "start_now": return who + "vai iniciar agora" + suf + ".";
+    case "finishing": return who + "informou que está finalizando" + suf + (info && info.etaMinutes ? " — previsão de +" + info.etaMinutes + " min." : ".");
+    case "blocked": return who + "informou bloqueio" + suf + (info && info.reasonCode ? " (" + slaReasonLabel(info.reasonCode) + ")." : ".");
+    case "help_requested": return who + "pediu ajuda" + suf + (info && info.recipientName ? " para " + info.recipientName + "." : ".");
+    case "acknowledge_only": return who + "reconheceu o alerta" + suf + ".";
+    default: return who + "registrou uma decisão" + suf + ".";
+  }
+}
+// F3.5.4P — PERSISTÊNCIA OFICIAL da decisão: TRANSAÇÃO Firestore executada no RENDERER principal (único
+// com o cliente db + state.user/tasks/users). O main obtém o resultado via executeJavaScript (req/resp),
+// com timeout ⇒ offline (a decisão fica na fila durável e sincroniza depois). SEM backend novo: reusa o
+// caminho de escrita em tasks/{id}, agora sob transação (relê+valida+append único).
+async function persistSlaDecisionViaRenderer(req: any): Promise<any> {
+  try {
+    const w = mainWin;
+    if (!w || w.isDestroyed() || !w.webContents || w.webContents.isLoading()) return { status: "offline", error: "no-renderer" };
+    const arg = JSON.stringify(JSON.stringify(req || {}));
+    const code = "(window.__slaPersistDecision ? window.__slaPersistDecision(JSON.parse(" + arg + ")) : {status:'offline',error:'no-fn'})";
+    const p = w.webContents.executeJavaScript(code, true);
+    const to = new Promise((resolve) => setTimeout(() => resolve({ status: "offline", error: "timeout" }), 15000));
+    const res: any = await Promise.race([p, to]);
+    if (!res || typeof res !== "object" || !res.status) return { status: "offline", error: "bad-result" };
+    return res;
+  } catch (e) { nlog("sla.decision.relay.error", { err: String(((e as any) && (e as any).message) || e) }); return { status: "offline", error: "relay-throw" }; }
+}
+async function resolveSlaHelpViaRenderer(taskId: string, key: string): Promise<any> {
+  try {
+    const w = mainWin;
+    if (!w || w.isDestroyed() || !w.webContents || w.webContents.isLoading()) return { eligible: [], reason: "none" };
+    const arg = JSON.stringify(JSON.stringify({ taskId: String(taskId || ""), key: String(key || "") }));
+    const code = "(window.__slaResolveHelp ? window.__slaResolveHelp(JSON.parse(" + arg + ")) : {eligible:[],reason:'none'})";
+    const p = w.webContents.executeJavaScript(code, true);
+    const to = new Promise((resolve) => setTimeout(() => resolve({ eligible: [], reason: "none" }), 8000));
+    const res: any = await Promise.race([p, to]);
+    return (res && typeof res === "object" && Array.isArray(res.eligible)) ? res : { eligible: [], reason: "none" };
+  } catch { return { eligible: [], reason: "none" }; }
+}
 
 // F3.5.4N — reconciliação IDEMPOTENTE dos produtores de rede (recibos do notifierA + seen persistente
 // do slaScheduler impedem duplicação). Chamada pelo watchdog em reconexão/resume/unlock — 1 passada por
@@ -512,6 +566,9 @@ function saveGroupingFlag(v: boolean): void { try { const s = jsonStore("f354o-n
 function reconcileAllProducers(reason: string): void {
   try { if (notifierAHandle) notifierAHandle.reconcile(reason); } catch { /* */ }
   try { if (slaScheduler) slaScheduler.reconcile(reason); } catch { /* */ }
+  // F3.5.4P — no RETORNO DE REDE, sincroniza decisões de SLA pendentes (fila offline) com a MESMA transação
+  // (idempotente por decisionKey: já-decidida ⇒ superseded; sem duplicação). Não bloqueia (fire-and-forget).
+  try { if (slaReminderCtl) void slaReminderCtl.syncPendingDecisions(reason); } catch { /* */ }
   selfHealTele.lastReconcileAt = Date.now(); selfHealTele.reconciles++;
 }
 
@@ -600,7 +657,7 @@ app.whenReady().then(() => {
     // resume/unlock segue nos handlers aprovados (F3.4.3/F3.5.4K, acima/abaixo); o watchdog cobre a
     // recuperação por RETORNO DE REDE (setNetwork → reconcileAll) e o último recurso, sem 2º reconcile.
     powerMonitor.on("suspend", () => { diag("power.suspend"); try { if (listenerWatchdog) listenerWatchdog.onSuspend(); } catch { /* */ } });
-    powerMonitor.on("resume", () => { try { if (notifierAHandle) notifierAHandle.reconcile("resume"); } catch { /* */ } try { if (slaReminderCtl) slaReminderCtl.reconcile("resume"); } catch { /* */ } });
+    powerMonitor.on("resume", () => { try { if (notifierAHandle) notifierAHandle.reconcile("resume"); } catch { /* */ } try { if (slaReminderCtl) slaReminderCtl.reconcile("resume"); } catch { /* */ } try { if (slaReminderCtl) void slaReminderCtl.syncPendingDecisions("resume"); } catch { /* */ } });
   } catch { /* powerMonitor pode não existir em todas as plataformas */ }
 
   // F3.5.4L — LEMBRETE CENTRAL PERSISTENTE DE SLA (amarelo/vermelho). Superfície do MAIN (sobrevive a
@@ -610,18 +667,38 @@ app.whenReady().then(() => {
   // altera as notificações COMUNS (1.0.201) nem o produtor/tempos/destinatários de SLA (congelados).
   try {
     slaReminderSounds = loadReminderSounds();
+    slaDecisionActionsEnabled = loadSlaDecisionFlag();   // F3.5.4P — flag persistida (default ON)
     const slaReminderStore = createSlaReminderStore({ log: (t: string, d?: unknown) => { try { diag(t, d as any); } catch { /* */ } } });
     const slaSurface = createSlaReminderSurface({
       onAck: (key, windowState) => { try { if (slaReminderCtl) slaReminderCtl.ack(key, windowState); } catch { /* */ } },
       onOpenTask: (deep) => { nlog("notify.click.received", { via: "sla-reminder", deep }); bringToFrontAndOpen(deep); },
       nativeNotify: (view) => nativeNotify({ title: view.title + " — " + (view.taskTitle || "SLA"), body: view.body || "", eventType: "sla_reminder_native", taskId: (view.deep || "").replace(/^detail\//, ""), action: { type: "detail", deep: view.deep }, sound: true } as any, view.key, view.deep),
       onLog: (t, d) => { try { diag(t, d as any); } catch { /* */ } },
+      // F3.5.4P — decisão do responsável: a janela envia a decisão → controlador (transação); dismiss fecha
+      // após mensagem informativa; resolveHelp resolve o destinatário da ajuda no renderer (state.users).
+      onDecide: async (input) => { try { return slaReminderCtl ? await slaReminderCtl.onDecide(input) : { status: "ignored" }; } catch (e) { diag("sla.decision.ondecide.error", { err: String(((e as any) && (e as any).message) || e) }); return { status: "error", error: "onDecide" }; } },
+      onDismiss: (key) => { try { if (slaReminderCtl) slaReminderCtl.dismiss(key); } catch { /* */ } },
+      onResolveHelp: (taskId, key) => resolveSlaHelpViaRenderer(taskId, key),
     });
     slaReminderCtl = createSlaReminderController({
       surface: slaSurface, store: slaReminderStore, now: () => Date.now(),
       appVersion: (() => { try { return app.getVersion(); } catch { return "dev"; } })(),
       isLocked: () => sessionLocked, getUid: () => currentUid,
       soundFor: (lvl) => (lvl === "critical" ? slaReminderSounds.critical : slaReminderSounds.warning),
+      // F3.5.4P — persistência OFICIAL por TRANSAÇÃO no renderer; flag; sino/observabilidade pós-commit.
+      persistDecision: (req) => persistSlaDecisionViaRenderer(req),
+      decisionsEnabled: () => slaDecisionActionsEnabled,
+      onDecided: (info) => {
+        try {
+          slaDecisionTele.committed++; slaDecisionTele.lastAt = Date.now(); slaDecisionTele.lastType = String(info.decisionType || "");
+          mainWin?.webContents.send("notif-history", {
+            eventType: "sla_decision", severity: "info", taskId: info.taskId, dedupKey: "sla_decision_ack:" + info.key,
+            title: "Decisão registrada no alerta de SLA", body: slaDecisionSinoText(info),
+            context: "", createdAt: Date.now(), source: "sla-reminder", providerCalled: false,
+            action: { type: "detail", deep: info.taskId ? "detail/" + info.taskId : "" },
+          });
+        } catch { /* sino local nunca derruba o commit */ }
+      },
       onAcked: (info) => {
         try {
           const lvlTxt = info.level === "critical" ? "vermelho" : "amarelo";
@@ -761,6 +838,8 @@ app.whenReady().then(() => {
       groupingActive: (() => { try { return notificationGrouping ? notificationGrouping.activeCount() : 0; } catch { return 0; } })(),
       groupingUpdates: groupTele.updates, groupingLastUpdateAt: groupTele.lastUpdateAt,
       groupingOpens: groupTele.opens, groupingLastOpenAt: groupTele.lastOpenAt,
+      // F3.5.4P — decisão do responsável (telemetria SANITIZADA: sem conteúdo/uid/reasonText)
+      slaDecisionActionsEnabled, slaDecisionCommitted: slaDecisionTele.committed, slaDecisionLastType: slaDecisionTele.lastType, slaDecisionLastAt: slaDecisionTele.lastAt,
     };
   });
   // F3.5.4N — REDE: o renderer reporta navigator.onLine + eventos online/offline (sinal REAL do SO). O
@@ -792,6 +871,10 @@ app.whenReady().then(() => {
   // notificações comuns (OFF ⇒ 1.0.204; a entrega individual continua idêntica). Persistente e local.
   ipcMain.handle("grouping-get", () => ({ enabled: groupingEnabled }));
   ipcMain.handle("grouping-set", (_e, v: boolean) => { groupingEnabled = !!v; saveGroupingFlag(groupingEnabled); try { if (notificationGrouping && !groupingEnabled) notificationGrouping.reset(); } catch { /* */ } diag("notification.group.flag", { enabled: groupingEnabled }); return { enabled: groupingEnabled }; });
+  // F3.5.4P — AÇÕES DE DECISÃO (Configurações → Notificações): liga/desliga SOMENTE as opções de ação nos
+  // alertas de prazo. OFF ⇒ só OK (1.0.205), preserva tudo, NÃO apaga decisões já gravadas, NÃO altera backend.
+  ipcMain.handle("sla-decision-get", () => ({ enabled: slaDecisionActionsEnabled }));
+  ipcMain.handle("sla-decision-set", (_e, v: boolean) => { slaDecisionActionsEnabled = !!v; saveSlaDecisionFlag(slaDecisionActionsEnabled); diag("sla.decision.flag", { enabled: slaDecisionActionsEnabled }); return { enabled: slaDecisionActionsEnabled }; });
   // F3.5.3 — leitura de texto da área de transferência p/ o pipeline explícito de COLAGEM do
   // formulário (Legenda/Tema/Observações). SOMENTE texto simples; nunca HTML executável.
   ipcMain.handle("clipboard-read-text", () => { try { return String(clipboard.readText() || ""); } catch { return ""; } });
@@ -906,6 +989,7 @@ app.whenReady().then(() => {
       // entre reinícios). uid corrente (getUid) já foi setado acima; a escuta de conclusão foi ligada
       // dentro de startUserListeners.
       try { if (slaReminderCtl) slaReminderCtl.reconcile("login"); } catch { /* */ }
+      try { if (slaReminderCtl) void slaReminderCtl.syncPendingDecisions("login"); } catch { /* */ } // F3.5.4P — sincroniza fila offline do usuário logado
       // UPDATER:BEGIN (F3.4.1A — política de verificação item 2: após restauração da sessão)
       if (updater) updater.checkAuto("session-restore");
       // UPDATER:END

@@ -79,11 +79,16 @@ const GROUPABLE_EVENT_TYPES: Record<string, true> = {
 // F3.5.4O — denylist EXPLÍCITA (defesa em profundidade; a allowlist já exclui, mas isto
 // documenta e blinda contra reintrodução acidental de um eventType sensível).
 function isDenylisted(eventType: string, severity: string): boolean {
-  if (/^sla_/.test(eventType)) return true;               // amarelo/vermelho de SLA
+  if (/^sla_/.test(eventType)) return true;               // amarelo/vermelho de SLA (inclui sla_decision)
   if (eventType === "operational_block") return true;     // bloqueio operacional
   if (eventType === "event_new") return true;             // Agenda (id único)
   if (/^flow_/.test(eventType)) return true;              // transições de etapa distintas
   if (eventType === "app_update") return true;            // updater
+  // F3.5.4P — pedido de ajuda / bloqueio / decisão / confirmação crítica: SEMPRE individuais (nunca agrupar).
+  if (eventType === "help_requested") return true;        // pedido de ajuda (individual/imediato)
+  if (eventType === "blocked") return true;               // aviso de bloqueio ao criador/Social
+  if (eventType === "sla_decision") return true;          // confirmação de decisão (reforço; já casa /^sla_/)
+  if (eventType === "critical_confirmation") return true; // confirmação crítica (por nome, além do severity)
   if (severity === "critical") return true;               // nunca agrupar crítico
   return false;
 }

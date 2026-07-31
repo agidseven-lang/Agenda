@@ -35,7 +35,56 @@ export type ReminderView = {
   deep: string;
   queueLen: number;
   soundDataUri: string;
+  decisionsEnabled: boolean;   // F3.5.4P — exibe as 5 decisões (true) ou só OK (false = 1.0.205)
+  taskId: string;              // F3.5.4P — p/ resolver destinatário da ajuda no renderer
 };
+
+/**
+ * F3.5.4P — DECISÃO DO RESPONSÁVEL no alerta de SLA. A persistência OFICIAL é uma TRANSAÇÃO Firestore
+ * (opts.persistDecision) sobre tasks/{taskId}: relê a tarefa, valida com os dados ATUAIS, confirma que a
+ * decisionKey ainda não foi registrada e acrescenta EXATAMENTE UMA entrada sla_decision ao history[].
+ * A primeira transação confirmada vence; a segunda recebe already_decided. O controlador é PURO: recebe
+ * persistDecision injetável (produção = renderer; teste = simulador OCC).
+ */
+export type DecisionType = "start_now" | "finishing" | "blocked" | "help_requested" | "acknowledge_only";
+
+export type DecisionInput = {
+  key: string;                 // dedupKey do alerta ATIVO (a decisão é sobre o que está na tela)
+  decisionType: DecisionType;
+  etaMinutes?: number;         // finishing (PREVISÃO — não altera prazo)
+  reasonCode?: string;         // blocked
+  reasonText?: string;         // blocked 'outro' / observação curta
+  helpText?: string;           // help (descrição curta)
+  helpRecipientId?: string;    // help — destinatário já resolvido/escolhido no renderer (C5)
+  helpRecipientName?: string;
+};
+
+export type DecisionPersistStatus =
+  "committed" | "already_decided" | "task_completed" | "task_deleted" | "not_authorized" | "offline" | "error";
+export type DecisionPersistResult = { status: DecisionPersistStatus; error?: string; deep?: string };
+
+export type DecisionPersistRequest = {
+  decisionKey: string;
+  taskId: string;
+  alertLevel: ReminderLevel;
+  boundaryVersion: string;
+  recipientUid: string;
+  decisionType: DecisionType;
+  etaMinutes?: number;
+  reasonCode?: string;
+  reasonText?: string;
+  helpText?: string;
+  helpRecipientId?: string;
+  helpRecipientName?: string;
+  actorId: string;
+  actorName: string;
+  taskTitle: string;
+};
+
+/** Resultado devolvido à janela (a janela mapeia status → texto exibido; controlador só decide o status). */
+export type DecisionPublicResult =
+  { status: "committed" | "already_decided" | "task_completed" | "task_deleted" | "queued" | "error" | "ignored";
+    decisionType?: DecisionType; deep?: string; error?: string };
 
 /** Superfície injetável (produção = Electron; teste = fake que registra chamadas). */
 export type ReminderSurface = {
@@ -57,6 +106,12 @@ export type SlaReminderControllerOpts = {
     removePending: (k: string) => void;
     markAck: (k: string, meta?: any) => void;
     listPending: () => any[];
+    // F3.5.4P — decisão durável (idempotência local + fila offline)
+    isDecisionSettled: (decisionKey: string) => boolean;
+    markDecisionPending: (rec: any) => void;
+    markDecisionSynced: (decisionKey: string, meta?: any) => void;
+    markDecisionSuperseded: (decisionKey: string) => void;
+    listDecisionsPendingSync: () => any[];
   };
   now?: () => number;
   onLog?: (tag: string, data?: unknown) => void;
@@ -66,6 +121,10 @@ export type SlaReminderControllerOpts = {
   soundFor?: (level: ReminderLevel) => string;                    // data URI do som (main lê o .wav)
   getUid?: () => string;                                          // usuário logado (filtra reexibição de pendentes)
   onAcked?: (info: { key: string; level: ReminderLevel; actorName: string; taskTitle: string; taskId: string }) => void; // pós-OK (histórico do sino)
+  // F3.5.4P — DECISÃO DO RESPONSÁVEL
+  persistDecision?: (req: DecisionPersistRequest) => Promise<DecisionPersistResult>; // TRANSAÇÃO real (renderer); teste injeta simulador OCC
+  onDecided?: (info: { decisionType: DecisionType; key: string; level: ReminderLevel; actorName: string; taskTitle: string; taskId: string; etaMinutes?: number; reasonCode?: string; recipientName?: string }) => void; // sino/observabilidade pós-commit
+  decisionsEnabled?: () => boolean; // feature flag slaDecisionActionsEnabled (default ON); OFF ⇒ controlador ignora decisões (só OK)
 };
 
 const LEVEL_RANK: Record<ReminderLevel, number> = { critical: 0, warning: 1 };
@@ -93,9 +152,19 @@ export function createSlaReminderController(opts: SlaReminderControllerOpts) {
   const completedTasks = new Set<string>();   // tarefas concluídas com modal aberto ⇒ suprime vermelho futuro
   let active: QueueItem | null = null;   // item atualmente exibido (ou em nativa quando locked)
   let stopped = false;
+  // F3.5.4P — decisão do responsável
+  const inFlight = new Set<string>();         // idempotência: decisionKeys em processamento (bloqueia duplo-clique/reentrância)
+  const persistDecision = opts.persistDecision || (async () => ({ status: "offline" as DecisionPersistStatus }));
+  const decisionsEnabled = opts.decisionsEnabled || (() => true);
 
   function baseOf(p: any): string { return String((p && p.taskId) || "") + ":" + String((p && p.targetUserId) || (p && p.recipientUid) || ""); }
   function recipientOf(p: any): string { return String((p && p.targetUserId) || (p && p.recipientUid) || ""); }
+  // F3.5.4P — boundaryVersion = finishMs (marco do prazo) extraído da dedupKey (epoch-ms de 12+ dígitos),
+  // independente do produtor (SLA idx2 / cards|dedupByDesigner idx3) — SEM tocar os produtores congelados.
+  function boundaryOf(dedupKey: string): string { const m = String(dedupKey || "").match(/(\d{12,})/); return m ? m[1] : ""; }
+  function buildDecisionKey(taskId: string, level: ReminderLevel, boundary: string, uid: string): string {
+    return "sla_decision:" + String(taskId || "") + ":" + String(level || "") + ":" + String(boundary || "") + ":" + String(uid || "");
+  }
 
   function buildView(p: any, level: ReminderLevel, queueLen: number): ReminderView {
     const title = level === "critical" ? "URGENTE" : "ATENÇÃO";
@@ -113,6 +182,8 @@ export function createSlaReminderController(opts: SlaReminderControllerOpts) {
       deep: String((p && p.action && p.action.deep) || (p && p.taskId ? "detail/" + p.taskId : "")),
       queueLen,
       soundDataUri: soundFor(level),
+      decisionsEnabled: decisionsEnabled(),
+      taskId: String((p && p.taskId) || ""),
     };
   }
 
@@ -237,6 +308,131 @@ export function createSlaReminderController(opts: SlaReminderControllerOpts) {
       log("sla.reminder.closed", { key: mask(k) });
       showNext();
       return true;
+    },
+
+    /**
+     * F3.5.4P — DECISÃO do responsável. Fluxo (REGRA DE FECHAMENTO + C1/C2): idempotência (in-flight +
+     * recibo durável) → fila durável ANTES da tentativa → TRANSAÇÃO real (persistDecision) → confirmar →
+     * só então fechar/side-effects. Primeira transação vence; a 2ª recebe already_decided. Offline ⇒ fica
+     * na fila (queued) e sincroniza depois. Falha de persistência local ⇒ mantém modal aberto + retry.
+     */
+    async onDecide(input: DecisionInput): Promise<DecisionPublicResult> {
+      if (stopped) return { status: "ignored" };
+      if (!decisionsEnabled()) { log("sla.decision.disabled.ignored", {}); return { status: "ignored" }; }
+      const k = String((input && input.key) || "");
+      if (!k || !active || active.key !== k) { log("sla.decision.stale.ignored", { key: mask(k) }); return { status: "ignored" }; }
+      const cur = active;   // item ATIVO no momento da decisão (estável ao longo do await; active pode mudar)
+      const decisionType = String((input && input.decisionType) || "") as DecisionType;
+      const recipientUid = cur.base.split(":")[1] || "";
+      const boundary = boundaryOf(cur.key);
+      const decisionKey = buildDecisionKey(cur.taskId, cur.level, boundary, recipientUid);
+
+      // idempotência 1: duplo-clique / reentrância (mesma decisionKey em voo)
+      if (inFlight.has(decisionKey)) { log("sla.decision.inflight.ignored", { key: mask(decisionKey) }); return { status: "ignored" }; }
+      inFlight.add(decisionKey);
+      try {
+        // idempotência 2: já resolvida localmente (synced/superseded) ⇒ nunca 2ª decisão
+        if (store.isDecisionSettled(decisionKey)) { log("sla.decision.already.local", { key: mask(decisionKey) }); return { status: "already_decided" }; }
+
+        const req: DecisionPersistRequest = {
+          decisionKey, taskId: cur.taskId, alertLevel: cur.level, boundaryVersion: boundary, recipientUid,
+          decisionType, etaMinutes: input.etaMinutes, reasonCode: input.reasonCode, reasonText: input.reasonText,
+          helpText: input.helpText, helpRecipientId: input.helpRecipientId, helpRecipientName: input.helpRecipientName,
+          actorId: getUid() || recipientUid, actorName: cur.view.actorName, taskTitle: cur.view.taskTitle,
+        };
+        // fila durável ANTES da tentativa (sobrevive a queda/offline). Falha aqui ⇒ NÃO fecha (retry).
+        try {
+          store.markDecisionPending({ decisionKey, state: "pending_sync", decisionType, alertLevel: cur.level,
+            boundaryVersion: boundary, recipientUid, taskId: cur.taskId, payload: req, createdAt: now(), updatedAt: now() });
+        } catch (e) { log("sla.decision.persist.local.failed", { key: mask(decisionKey), err: errMsg(e) }); return { status: "error", error: "persist-local" }; }
+        log("sla.decision.attempt", { key: mask(decisionKey), decisionType, level: cur.level });
+
+        let res: DecisionPersistResult;
+        try { res = await persistDecision(req); }
+        catch (e) { log("sla.decision.tx.threw", { key: mask(decisionKey), err: errMsg(e) }); res = { status: "offline" }; }
+
+        const rememberReceipt = (state: string) => { try { store.markAck(cur.key, { recipientUid, taskId: cur.taskId, eventId: cur.key, level: cur.level, appVersion, windowState: state }); } catch { /* */ } store.removePending(cur.key); };
+        const closeIfStillActive = () => { if (active === cur) { active = null; try { surface.close(); } catch { /* */ } showNext(); } };
+
+        switch (res.status) {
+          case "committed": {
+            store.markDecisionSynced(decisionKey, { appVersion, syncedAt: now() });
+            log("sla.decision.committed", { key: mask(decisionKey), decisionType, level: cur.level });
+            try { if (opts.onDecided) opts.onDecided({ decisionType, key: cur.key, level: cur.level, actorName: cur.view.actorName, taskTitle: cur.view.taskTitle, taskId: cur.taskId, etaMinutes: input.etaMinutes, reasonCode: input.reasonCode, recipientName: input.helpRecipientName }); } catch { /* sino nunca derruba o commit */ }
+            rememberReceipt("decision:" + decisionType);
+            closeIfStillActive();
+            log("sla.decision.closed", { key: mask(decisionKey) });
+            return { status: "committed", decisionType, deep: cur.view.deep };
+          }
+          case "already_decided": {
+            store.markDecisionSuperseded(decisionKey);
+            rememberReceipt("already_decided");
+            log("sla.decision.already.remote", { key: mask(decisionKey) });
+            return { status: "already_decided" };   // janela mostra a mensagem e chama dismiss
+          }
+          case "task_completed": {
+            completedTasks.add(cur.taskId);
+            cur.view = Object.assign({}, cur.view, { body: "Esta tarefa foi concluída enquanto o alerta estava aberto.", context: "" });
+            if (active === cur) { try { surface.show(cur.view); } catch { /* */ } }
+            store.markDecisionSuperseded(decisionKey);
+            log("sla.decision.task.completed", { key: mask(decisionKey) });
+            return { status: "task_completed" };    // janela vira "só reconhecer" (OK ⇒ ack)
+          }
+          case "task_deleted": {
+            store.markDecisionSuperseded(decisionKey);
+            rememberReceipt("task_deleted");
+            log("sla.decision.task.deleted", { key: mask(decisionKey) });
+            return { status: "task_deleted" };
+          }
+          case "not_authorized": {
+            store.markDecisionSuperseded(decisionKey);
+            log("sla.decision.not.authorized", { key: mask(decisionKey) });
+            return { status: "error", error: "not_authorized" };   // mantém modal aberto (mensagem real)
+          }
+          case "offline":
+          default: {
+            // fica pending_sync (durável). O usuário RESPONDEU ⇒ o lembrete não deve reaparecer; a decisão
+            // sincroniza depois com a MESMA transação/decisionKey (C2). NÃO declara "compartilhada" ainda.
+            rememberReceipt("queued");
+            log("sla.decision.queued.offline", { key: mask(decisionKey) });
+            return { status: "queued" };
+          }
+        }
+      } finally { inFlight.delete(decisionKey); }
+    },
+
+    /** Fecha a janela após uma mensagem informativa (already_decided/task_deleted/queued); recibo já gravado. */
+    dismiss(key: string): void {
+      const kk = String(key || "");
+      if (active && active.key === kk) { active = null; try { surface.close(); } catch { /* */ } log("sla.reminder.dismissed", { key: mask(kk) }); showNext(); }
+      else { try { if (surface.isOpen()) surface.close(); } catch { /* */ } }
+    },
+
+    /** Reconexão/resume/boot: re-dirige a MESMA transação p/ decisões pendentes de sync (sem duplicar). */
+    async syncPendingDecisions(reason?: string): Promise<void> {
+      if (stopped) return;
+      const pend = store.listDecisionsPendingSync() || [];
+      if (!pend.length) return;
+      const uid = getUid();
+      log("sla.decision.sync.start", { reason: reason || "reconnect", count: pend.length });
+      for (const rec of pend) {
+        if (!rec || !rec.payload) continue;
+        if (uid && String(rec.recipientUid || "") !== uid) continue;   // só do usuário logado
+        if (inFlight.has(rec.decisionKey)) continue;
+        inFlight.add(rec.decisionKey);
+        try {
+          let res: DecisionPersistResult;
+          try { res = await persistDecision(rec.payload); } catch { res = { status: "offline" }; }
+          if (res.status === "committed") {
+            store.markDecisionSynced(rec.decisionKey, { appVersion, syncedAt: now(), viaSync: true });
+            log("sla.decision.sync.committed", { key: mask(rec.decisionKey) });
+            try { if (opts.onDecided) opts.onDecided({ decisionType: rec.decisionType as DecisionType, key: rec.decisionKey, level: rec.alertLevel, actorName: String((rec.payload && rec.payload.actorName) || ""), taskTitle: String((rec.payload && rec.payload.taskTitle) || ""), taskId: rec.taskId, etaMinutes: rec.payload && rec.payload.etaMinutes, reasonCode: rec.payload && rec.payload.reasonCode, recipientName: rec.payload && rec.payload.helpRecipientName }); } catch { /* */ }
+          } else if (res.status === "already_decided" || res.status === "task_completed" || res.status === "task_deleted" || res.status === "not_authorized") {
+            store.markDecisionSuperseded(rec.decisionKey);
+            log("sla.decision.sync.superseded", { key: mask(rec.decisionKey), reason: res.status });
+          } else { log("sla.decision.sync.stillPending", { key: mask(rec.decisionKey) }); /* permanece pending_sync */ }
+        } finally { inFlight.delete(rec.decisionKey); }
+      }
     },
 
     /** Boot/unlock/resume: reexibe pendentes não reconhecidos ainda válidos, sem duplicar. */

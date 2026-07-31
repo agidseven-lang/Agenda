@@ -17,7 +17,7 @@ import { app, BrowserWindow, ipcMain, screen, Notification } from "electron";
 import path from "path";
 import fs from "fs";
 import { diag } from "./diag";
-import type { ReminderSurface, ReminderView } from "./slaReminder";
+import type { ReminderSurface, ReminderView, DecisionInput, DecisionPublicResult } from "./slaReminder";
 
 const WIDTH = 460;
 const ACK_TIMEOUT_MS = 4000;
@@ -38,6 +38,10 @@ export type SlaReminderSurfaceDeps = {
   onOpenTask: (deep: string) => void;                  // clique "Abrir tarefa" (traz Agenda + abre)
   nativeNotify?: (view: ReminderView) => boolean;      // fallback nativo (injeta o do main)
   onLog?: (tag: string, data?: unknown) => void;
+  // F3.5.4P — decisão do responsável
+  onDecide?: (input: DecisionInput) => Promise<DecisionPublicResult>;  // decisão → transação (renderer)
+  onDismiss?: (key: string) => void;                                   // fecha após mensagem informativa
+  onResolveHelp?: (taskId: string, key: string) => Promise<any>;       // resolve destinatário da ajuda (renderer)
 };
 
 export function createSlaReminderSurface(deps: SlaReminderSurfaceDeps): ReminderSurface & { destroy: () => void; ackState: () => string } {
@@ -100,6 +104,10 @@ export function createSlaReminderSurface(deps: SlaReminderSurfaceDeps): Reminder
   function push(view: ReminderView): void {
     const w = ensure();
     curKey = view.key;
+    // F3.5.4P: com decisões ON a janela precisa ser focável (inputs de texto de bloqueio/ajuda). showInactive
+    // continua evitando roubo de foco NA EXIBIÇÃO; o foco só ocorre se o usuário CLICAR para digitar.
+    // Flag OFF ⇒ focusable:false (idêntico à 1.0.205).
+    try { w.setFocusable(!!(view && (view as any).decisionsEnabled)); } catch { /* */ }
     const send = () => { try { w.webContents.send("slareminder-card", view); } catch { /* */ } };
     if (w.webContents.isLoading()) { w.webContents.once("did-finish-load", send); } else { send(); }
     try { w.showInactive(); } catch { /* */ }
@@ -141,6 +149,25 @@ export function createSlaReminderSurface(deps: SlaReminderSurfaceDeps): Reminder
   ipcMain.on("slareminder-resize", (_e, h) => { center(Number(h) || 260); });
   ipcMain.on("slareminder-ok", (_e, key) => { const k = String(key || ""); log("sla.reminder.ok.click", { key: mask(k) }); try { deps.onAck(k, winState()); } catch (e) { log("sla.reminder.ok.error", { err: String((e as any) && (e as any).message || e) }); } });
   ipcMain.on("slareminder-open", (_e, deep) => { try { deps.onOpenTask(String(deep || "")); } catch { /* */ } });
+
+  // F3.5.4P — decisão do responsável (transação), dismiss e resolução de destinatário da ajuda.
+  ipcMain.on("slareminder-decide", async (_e, payload) => {
+    if (!deps.onDecide) return;
+    let result: DecisionPublicResult;
+    try { result = await deps.onDecide((payload || {}) as DecisionInput); }
+    catch (e) { log("sla.decision.handler.error", { err: String((e as any) && (e as any).message || e) }); result = { status: "error", error: "handler" }; }
+    try { if (win && !win.isDestroyed()) win.webContents.send("slareminder-result", result); } catch { /* */ }
+    // INICIAR AGORA: abre a tarefa SÓ após o commit confirmado (nunca antes).
+    try { if (result && result.status === "committed" && result.decisionType === "start_now" && result.deep) deps.onOpenTask(String(result.deep)); } catch { /* */ }
+  });
+  ipcMain.on("slareminder-dismiss", (_e, key) => { try { if (deps.onDismiss) deps.onDismiss(String(key || "")); } catch { /* */ } });
+  ipcMain.on("slareminder-resolve-help", async (_e, req) => {
+    if (!deps.onResolveHelp) return;
+    const taskId = String((req && req.taskId) || ""); const key = String((req && req.key) || "");
+    let cands: any = { eligible: [], reason: "none" };
+    try { cands = await deps.onResolveHelp(taskId, key); } catch (e) { log("sla.decision.help.resolve.error", { err: String((e as any) && (e as any).message || e) }); }
+    try { if (win && !win.isDestroyed()) win.webContents.send("slareminder-help-candidates", cands || { eligible: [], reason: "none" }); } catch { /* */ }
+  });
 
   return surface;
 }
