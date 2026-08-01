@@ -307,7 +307,18 @@ ok(f354oIndexControlledDiff(), "49 index.html — DIFF CONTROLADO F3.5.4N+F3.5.4
 ok(bytesIdenticalVs201("src/main/slaScheduler.ts"), "50 slaScheduler.ts (tempos/boundaries) byte-idêntico a 1.0.201");
 ok(bytesIdenticalVs201("src/main/slaRules.js"), "51 slaRules.js (T-30/T-10/destinatários/dedup) byte-idêntico");
 ok(bytesIdenticalVs201("src/main/cardsRules.js"), "52 cardsRules.js (T-30/T-10 cards) byte-idêntico");
-ok(bytesIdenticalVs201("src/main/notifEvents.js"), "53 notifEvents.js (Categoria A/destinatários) byte-idêntico");
+// F3.5.4P — notifEvents.js SAIU dos byte-congelados: recebe a derivação ADITIVA de help_requested/blocked
+// (Categoria A/destinatários da 1.0.201 preservados; ZERO remoção). Passa a DIFF CONTROLADO.
+function f354pNotifEventsAdditive() {
+  let d = "";
+  try { d = execSync("git -C " + JSON.stringify(DESK) + " diff 047261b7587951e0496d5f4eff0cda5998269161 HEAD -- src/main/notifEvents.js", { encoding: "utf8" }); } catch { return false; }
+  const add = new Set(d.split("\n").filter((l) => l.startsWith("+") && !l.startsWith("+++")).map((l) => l.slice(1).trim()));
+  const netRem = d.split("\n").filter((l) => l.startsWith("-") && !l.startsWith("---")).map((l) => l.slice(1).trim()).filter((l) => l && !add.has(l));
+  const A = [...add];
+  const hasF354p = A.some((l) => /help_requested/.test(l)) && A.some((l) => /\bblocked\b/.test(l)) && A.some((l) => /assigned_designer/.test(l));
+  return netRem.length === 0 && hasF354p;
+}
+ok(f354pNotifEventsAdditive(), "53 notifEvents.js — DIFF CONTROLADO F3.5.4P (help_requested/blocked aditivos; Categoria A/destinatários preservados, ZERO remoção)");
 ok(bytesIdenticalVs201("src/main/notifier.ts") && bytesIdenticalVs201("src/main/notifierA.ts"), "54 notifier/notifierA byte-idênticos (comuns 1.0.201 intactas)");
 // F3.5.4O — a janela premium das comuns recebe o AGRUPAMENTO (aditivo): bgNotify.ts ganha updateBgGroup
 // (canal bg-group-update) e bgnotify.html ganha o card agrupado (renderGroupUpdate/data-group). O overlay
