@@ -1,7 +1,7 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.207",
-  "description": "Agenda ID Seven Desktop 1.0.207-task-idle-detection — Golden Master integrado + detecção automática de tarefas paradas (check-in de atividade por transação Firestore)",
+  "version": "1.0.208",
+  "description": "Agenda ID Seven Desktop 1.0.208-priority-assistant — Assistente Inteligente de Prioridades (painel Minhas Prioridades: camada derivada, somente leitura, determinística; não altera tarefas nem notificações)",
   "main": "dist/main/main.js",
   "private": true,
   "scripts": {

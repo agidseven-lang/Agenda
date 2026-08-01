@@ -1,0 +1,436 @@
+# =====================================================================
+# [push/manual] F3.5.4R — Desktop Build (candidata 1.0.208 — ASSISTENTE INTELIGENTE DE PRIORIDADES)
+# ---------------------------------------------------------------------
+# Base 1.0.207 OFICIAL (@17c8ef5, tag v1.0.207, testada fisicamente). Delta F3.5.4R (produção, 100% real):
+#   - PAINEL "Minhas Prioridades" (aba nova): camada DERIVADA e SOMENTE LEITURA que organiza, em tempo real,
+#     as tarefas que precisam da atenção de cada usuário primeiro. Consultivo/explicativo/determinístico.
+#   - MOTOR PURO priorityEngine.js (NOVO, UMD): opera sobre FATOS injetados pelo renderer (calculados com os
+#     helpers congelados existentes — kbv2SlaLiveData/f354fSlaLiveState/deriveCanonicalTaskState/flowClient
+#     ChangesSignal/designerOf/socialOf/respOf/isTaskCompleted/canSeeTask/dtMs/canonicalNowMs). NÃO duplica
+#     lógica de SLA. Hierarquia N1/N2/N3 + 7 desempates determinísticos. SEM previsão/IA/ML/score/ranking.
+#   - HIERARQUIA (owner): N1 = alerta VERMELHO real direcionado ao usuário OU prazo oficial VENCIDO e pendente;
+#     N2 = alerta AMARELO real OU termina HOJE OU alteração pendente OU ação/aprovação direcionada; N3 = em
+#     andamento · A Fazer · futura · sem prazo. Ocorrências (ajuda/bloqueio) NUNCA elevam sozinhas — só
+#     enriquecem quando OUTRO fato atual comprovado já colocou a tarefa no ranking. Texto honesto:
+#     "Pedido de ajuda registrado" / "Bloqueio reportado" (nunca "não resolvido"/"bloqueada agora").
+#   - SÓ LÊ/CLASSIFICA/EXPLICA/ABRE (deep-link openDetails). NUNCA escreve no Firestore, NUNCA emite/duplica/
+#     altera notificação, NUNCA toca som, NUNCA move/conclui/reatribui/redistribui, NUNCA altera prazo/
+#     responsável/histórico/recibos/dedup, NUNCA mexe no Monitor SLA/sino/filas. Flag LOCAL
+#     priorityAssistantEnabled (default ON) + preferências visuais locais (localStorage). Reutiliza o
+#     onSnapshot(tasks) EXISTENTE (nenhum listener/scheduler/produtor novo; tick de UI só refresca texto).
+# Arquivos autorizados: src/renderer/index.html, src/renderer/priorityEngine.js (NOVO), package(-lock).json,
+#   teste f354r (NOVO), workflows f354r. TODO O RESTO byte-idêntico à 1.0.207 (TODO o main/*.ts + preload +
+#   notificações: notifier/notifierA/slaScheduler/slaRules/cardsRules/slaReminder*/taskIdle*/notifEvents/
+#   notificationGrouping/bgNotify/firebase/watchdog/startup/tray/updater; bgnotify.html/slareminder.html;
+#   Card Premium/Cronograma/Monitor SLA/sino; Android/backend/Worker/Rules). `--publish never`, NADA publicado.
+# =====================================================================
+name: "[push/manual] F3.5.4R Desktop Build (candidata 1.0.208 — assistente inteligente de prioridades)"
+"on":
+  push:
+    branches:
+      - "desktop/f354r-priority-assistant-1.0.208"
+    paths-ignore:
+      - ".github/workflows/desktop-release-f354r.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  BASE_206_SHA: "35262e5f20f318dda7fa1618e6fe1107210611e7" # Desktop 1.0.206 OFICIAL (referência histórica)
+  BASE_207_SHA: "17c8ef507206cc92dab5b1fcc1da9d9df7194ed0" # Desktop 1.0.207 OFICIAL (tag v1.0.207; BASE do delta F3.5.4R)
+  TEST_BRANCH: "desktop/f354r-priority-assistant-1.0.208"
+  APP_DIR: "desktop"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout (SHA do push; history completo p/ baselines)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Gate REF + ANCESTRIA — branch correta e descendente da 1.0.207 pinada
+        run: |
+          set -e
+          [ "${{ github.ref_name }}" = "$TEST_BRANCH" ] || { echo "::error:: ref != $TEST_BRANCH"; exit 1; }
+          git merge-base --is-ancestor "$BASE_207_SHA" HEAD || { echo "::error:: HEAD nao descende da base 1.0.207 ($BASE_207_SHA)"; exit 1; }
+          echo "ref=$TEST_BRANCH head=$(git rev-parse HEAD) base=$BASE_207_SHA OK"
+
+      - name: Derivar versao — exige 1.0.208 exato, sem sufixo (package + lock)
+        run: |
+          set -e
+          APP_VERSION=$(node -p "require('./desktop/package.json').version")
+          [ "$APP_VERSION" = "1.0.208" ] || { echo "::error:: versao != 1.0.208 ($APP_VERSION)"; exit 1; }
+          LOCKV=$(node -p "require('./desktop/package-lock.json').version")
+          [ "$LOCKV" = "1.0.208" ] || { echo "::error:: package-lock version != 1.0.208 ($LOCKV)"; exit 1; }
+          LOCKV2=$(node -p "require('./desktop/package-lock.json').packages[''].version")
+          [ "$LOCKV2" = "1.0.208" ] || { echo "::error:: package-lock packages[''] version != 1.0.208 ($LOCKV2)"; exit 1; }
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: npm ci
+        working-directory: desktop
+        run: npm ci --no-audit --no-fund
+
+      - name: TypeScript build (main + preload + renderer + modulos .js)
+        working-directory: desktop
+        run: npm run build
+
+      - name: Lint (tsc --noEmit)
+        working-directory: desktop
+        run: npx tsc --noEmit -p tsconfig.json
+
+      - name: Gate SINTAXE DO RENDERER — o <script> inline principal do index.html DEVE parsear (um erro aqui aborta TODO o app)
+        working-directory: desktop
+        run: |
+          set -e
+          node -e '
+            const fs=require("fs");
+            const idx=fs.readFileSync("src/renderer/index.html","utf8").replace(/\r\n/g,"\n");
+            const anchor=idx.indexOf("priorityEngine.js");
+            const mark="\n<script>\n"; const open=idx.indexOf(mark, anchor>=0?anchor:0);
+            const close=open>=0?idx.indexOf("\n</script>", open):-1;
+            if(open<0||close<0){ console.error("::error:: <script> inline principal nao localizado"); process.exit(1); }
+            const body=idx.slice(open+mark.length, close);
+            if(body.length<50000){ console.error("::error:: <script> inline muito curto ("+body.length+")"); process.exit(1); }
+            try{ new Function(body); }catch(e){ console.error("::error:: SyntaxError no <script> inline do renderer: "+(e&&e.message||e)); process.exit(1); }
+            console.log("SINTAXE do <script> inline OK ("+body.length+" bytes).");
+          '
+
+      - name: Gate F3.5.4R — motor puro + painel + ocorrências + hierarquia + desempate + isolamento + benchmark + sintaxe (89 asserts)
+        working-directory: desktop
+        run: |
+          set -e
+          node scripts/f354r-priority-assistant.test.mjs || { echo "::error:: f354r-priority-assistant vermelho"; exit 1; }
+
+      - name: Gate REGRESSAO — HUB/entrega/SLA/decisão/detecção-idle/Categoria A/reminder/agrupamento/clock/updater/watchdog/startup/renderer (delta ZERO vs 1.0.207)
+        working-directory: desktop
+        run: |
+          set -e
+          for t in \
+            f354q-task-idle-detection \
+            f354o-common-notification-grouping \
+            f354n-watchdog \
+            f354n-startup \
+            f354k-notification-all-window-states \
+            f354l-sla-central-persistent-reminders \
+            f354h-red-notification-boundary \
+            f354i-cronograma-save-send-client \
+            f354-notifications-reliability \
+            f354f-task-edit-update-notification \
+            f354f-sla-designer-live-timer \
+            f353-durable-notifications \
+            f353a-actor-photo \
+            f343-delivery-channel \
+            f343-operational-block \
+            f343-main-scheduler \
+            f343-sla-golden-master \
+            f344-flow-golden-master \
+            f345-sla-timestamp-golden-master \
+            f343-preservation \
+            f347-immediate-visual-delivery \
+            f347-independent-behavior \
+            f352-cards-notify \
+            f352-cards-channel-substitution \
+            f3377a-r4b-http-date-clock \
+            f33A-notif-central \
+            f33F-bg-notify \
+            f33B-form-typing \
+            f33C-assignment-toast \
+            f33L-account-anchor \
+            f341a-updater-state-machine; do
+            node "scripts/$t.test.mjs" || { echo "::error:: regressao vermelha em $t"; exit 1; }
+          done
+          echo "REGRESSAO OK (delta zero vs 1.0.207; renderer carrega — f33B/f33C/f33L verdes)."
+
+      - name: Gate DECISÃO-SLA/idle preservados — f354p verde EXCETO o auto-ID de versão (X18 1.0.206→1.0.208)
+        working-directory: desktop
+        run: |
+          set -e
+          # f354p (fase F3.5.4P) fixa a versão 1.0.206 no auto-ID (X18). Na 1.0.208 esse ÚNICO assert fica
+          # obsoleto (padrão dos testes de versão do projeto). Exigimos: TODO o resto verde e a ÚNICA falha ser X18.
+          set +e; OUT=$(node scripts/f354p-sla-decision-actions.test.mjs 2>&1); CODE=$?; set -e
+          echo "$OUT" | tail -3
+          FAILS=$(echo "$OUT" | grep -cE '^[[:space:]]*✗' || true)
+          X18ONLY=$(echo "$OUT" | grep -E '^[[:space:]]*✗' | grep -cvE 'X18 vers' || true)
+          [ "$FAILS" = "1" ] && [ "$X18ONLY" = "0" ] || { echo "::error:: f354p regrediu além do auto-ID de versão (falhas=$FAILS, nao-X18=$X18ONLY)"; echo "$OUT" | grep -E '^[[:space:]]*✗'; exit 1; }
+          echo "DECISÃO-SLA/idle 1.0.207 preservados (só o auto-ID de versão de f354p ficou obsoleto — esperado)."
+
+      - name: Gate CONGELADOS — TODO o main/preload/notificações byte-idêntico à 1.0.207 (F3.5.4R é renderer-only)
+        run: |
+          set -e
+          # DELTA AUTORIZADO F3.5.4R (fora deste gate): src/renderer/index.html, src/renderer/priorityEngine.js (NOVO),
+          # package(-lock).json, teste f354r (NOVO), workflows f354r. TODO O RESTO CONGELADO.
+          FROZEN="desktop/src/main/main.ts desktop/src/main/slaScheduler.ts desktop/src/main/slaRules.js desktop/src/main/cardsRules.js desktop/src/main/slaReminder.ts desktop/src/main/slaReminderWindow.ts desktop/src/main/slaReminderStore.ts desktop/src/main/taskIdle.ts desktop/src/main/taskIdleScheduler.ts desktop/src/main/taskIdleStore.ts desktop/src/main/notifier.ts desktop/src/main/notifierA.ts desktop/src/main/notifStore.ts desktop/src/main/notifEvents.js desktop/src/main/notificationGrouping.ts desktop/src/main/slaSeenUser.ts desktop/src/main/toastAck.ts desktop/src/main/reminder.ts desktop/src/main/tray.ts desktop/src/main/autostart.ts desktop/src/main/updaterService.ts desktop/src/main/clockSync.ts desktop/src/main/actorProfile.js desktop/src/main/auth.ts desktop/src/main/auth-core.ts desktop/src/main/prewarm.ts desktop/src/main/diag.ts desktop/src/main/firebase.ts desktop/src/main/listenerWatchdog.ts desktop/src/main/startupPrefs.ts desktop/src/main/bgNotify.ts desktop/src/preload/preload.ts desktop/src/preload/bgnotify-preload.ts desktop/src/preload/slareminder-preload.ts desktop/src/renderer/bgnotify.html desktop/src/renderer/slareminder.html desktop/src/renderer/sounds/sla-warning.wav desktop/src/renderer/sounds/sla-critical.wav desktop/electron-builder.yml desktop/scripts/copy-renderer.js desktop/tsconfig.json"
+          for f in $FROZEN; do
+            if ! git -C "$GITHUB_WORKSPACE" diff --quiet "$BASE_207_SHA" HEAD -- "$f"; then
+              echo "::error:: arquivo CONGELADO alterado vs 1.0.207: $f"; git -C "$GITHUB_WORKSPACE" diff --stat "$BASE_207_SHA" HEAD -- "$f"; exit 1; fi
+          done
+          echo "CONGELADOS byte-identicos a 1.0.207 OK ($(echo $FROZEN | wc -w) arquivos)."
+
+      - name: Gate DIFF CONTROLADO — o delta F3.5.4R é ADITIVO (motor puro + painel read-only presentes; contrato 1.0.207 preservado)
+        working-directory: desktop
+        run: |
+          set -e
+          # priorityEngine.js (NOVO) — motor PURO UMD; sem electron/firestore/ipc/Date.now/Math.random; sem escrita/notify
+          PE=src/renderer/priorityEngine.js
+          test -f "$PE" || { echo "::error:: priorityEngine.js ausente"; exit 1; }
+          grep -q 'buildUserPriorityList' "$PE" && grep -q 'resolvePriorityLevel' "$PE" && grep -q 'resolvePriorityReasons' "$PE" && grep -q 'comparePriorities' "$PE" && grep -q 'buildOccurrences' "$PE" || { echo "::error:: priorityEngine.js sem API do motor"; exit 1; }
+          grep -qE 'module\.exports|PriorityEngine' "$PE" || { echo "::error:: priorityEngine.js nao e UMD (node+renderer)"; exit 1; }
+          if grep -iE "require\('electron'\)|firebase|firestore|ipcRenderer|new Notification|\.play\(|Date\.now\(|Math\.random\(" "$PE"; then echo "::error:: priorityEngine.js NAO e puro (electron/firestore/ipc/notify/som/Date.now/Math.random)"; exit 1; fi
+          # PROIBIÇÃO: nada de previsão/IA/ML/score/ranking de pessoas
+          if grep -iE 'delayPredict|riskScore|productivity|machineLearning|\bML\b|tensorflow|gamif|ranking' "$PE"; then echo "::error:: priorityEngine.js contem previsao/IA/score/ranking (proibido)"; exit 1; fi
+          # hierarquia N1/N2/N3 + ocorrências NUNCA elevam sozinhas + texto honesto
+          grep -qF "x.alert === 'red' || x.deadlineKind === 'overdue'" "$PE" || { echo "::error:: N1 (vermelho/vencido) ausente"; exit 1; }
+          grep -qF "x.alert === 'amber' || x.deadlineKind === 'today'" "$PE" || { echo "::error:: N2 (amarelo/hoje) ausente"; exit 1; }
+          grep -qF 'Pedido de ajuda registrado' "$PE" && grep -qF 'Bloqueio reportado' "$PE" || { echo "::error:: texto honesto de ocorrência ausente"; exit 1; }
+          if grep -qiE 'não resolvido|nao resolvido|bloqueada agora|bloqueando outra|impedindo outra' "$PE"; then echo "::error:: priorityEngine.js contem texto proibido de ocorrência/dependência"; exit 1; fi
+          # index.html — painel read-only ADITIVO (bloco F3.5.4R + motor + aba + deep-link + flag + toggle); contrato 1.0.207 preservado
+          I=src/renderer/index.html
+          grep -q 'F3.5.4R:START' "$I" && grep -q 'F3.5.4R:END' "$I" || { echo "::error:: index.html sem bloco F3.5.4R delimitado"; exit 1; }
+          grep -q '<script src="priorityEngine.js">' "$I" && grep -q 'window.PriorityEngine' "$I" || { echo "::error:: index.html nao carrega/usa o motor puro"; exit 1; }
+          grep -qF "k:'prioridades'" "$I" && grep -q "state.tab==='prioridades'" "$I" && grep -q 'function renderPrioridades(' "$I" && grep -q 'function priBuildItems(' "$I" || { echo "::error:: aba/painel Minhas Prioridades ausentes"; exit 1; }
+          grep -q 'priorityAssistantEnabled' "$I" && grep -q 'data-cfgpriorityassistant' "$I" || { echo "::error:: flag/toggle priorityAssistantEnabled ausente"; exit 1; }
+          # ISOLAMENTO do bloco F3.5.4R — não escreve, não notifica, não toca som, não cria listener de dados
+          node -e '
+            const fs=require("fs");const s=fs.readFileSync("src/renderer/index.html","utf8").replace(/\r\n/g,"\n");
+            const blk=s.split("F3.5.4R:START").slice(1).map(x=>x.split("F3.5.4R:END")[0]).join("\n");
+            if(!blk){console.error("::error:: bloco F3.5.4R vazio");process.exit(1);}
+            const bad=[[/runTransaction|arrayUnion|\.doc\([^)]*\)\.(update|set|delete)\(/,"escrita Firestore"],[/new Notification|showBgNotify|notif-toast/,"notificacao"],[/\.play\(|new Audio/,"som"],[/onSnapshot\(|db\.collection\(/,"listener de dados"],[/moveStatus\(|__slaPersistDecision|__idlePersistResponse|ackReminder/,"mutacao/decisao/ack"]];
+            for(const [re,lbl] of bad){ if(re.test(blk)){ console.error("::error:: bloco F3.5.4R contem "+lbl+" (proibido)"); process.exit(1);} }
+            if(!/openDetails\(/.test(blk)){ console.error("::error:: painel nao abre por openDetails (deep-link)"); process.exit(1); }
+            console.log("ISOLAMENTO do bloco F3.5.4R OK (read-only; deep-link).");
+          '
+          # contrato 1.0.207 preservado no renderer (decisão SLA + check-in idle + Cronograma + Card)
+          grep -q 'window.__slaPersistDecision' "$I" && grep -q 'window.__idlePersistResponse' "$I" && grep -q 'function cronSanitizeDeep(' "$I" && grep -q 'function buildClientMessage(' "$I" || { echo "::error:: index.html: contrato 1.0.207 (decisão SLA/idle/Cronograma/Card) removido"; exit 1; }
+          echo "DIFF CONTROLADO F3.5.4R OK (aditivo; motor puro; painel read-only; contrato 1.0.207 preservado)."
+
+      - name: Gate ISOLAMENTO — diff vs 1.0.207 SÓ nos arquivos autorizados F3.5.4R
+        run: |
+          set -e
+          git -C "$GITHUB_WORKSPACE" diff --name-only "$BASE_207_SHA" HEAD | tee /tmp/f354r-diff.txt
+          if grep -vE '^(desktop/src/renderer/index\.html$|desktop/src/renderer/priorityEngine\.js$|desktop/scripts/f354r-priority-assistant\.test\.mjs$|desktop/package\.json$|desktop/package-lock\.json$|docs/f354r-qa/|\.github/workflows/desktop-build-f354r\.yml$|\.github/workflows/desktop-release-f354r\.yml$)' /tmp/f354r-diff.txt | grep -q .; then
+            echo "::error:: diff vs 1.0.207 toca arquivo NAO autorizado"; grep -vE '^(desktop/src/renderer/index\.html$|desktop/src/renderer/priorityEngine\.js$|desktop/scripts/f354r-priority-assistant\.test\.mjs$|desktop/package\.json$|desktop/package-lock\.json$|docs/f354r-qa/|\.github/workflows/desktop-build-f354r\.yml$|\.github/workflows/desktop-release-f354r\.yml$)' /tmp/f354r-diff.txt || true; exit 1; fi
+          echo "ISOLAMENTO OK — diff confinado aos arquivos autorizados F3.5.4R."
+
+      - name: Gate ANDROID/BACKEND intactos — diff nao toca android/ nem functions/ nem worker/ nem Rules
+        run: |
+          set -e
+          BAD=$(git -C "$GITHUB_WORKSPACE" diff --name-only "$BASE_207_SHA" HEAD | grep -cE '^(android/|android-native/|functions/|worker/|worker-deploy/|presence-service/|firestore\.rules|cloudflare-worker\.js)' || true)
+          [ "$BAD" = "0" ] || { echo "::error:: diff toca backend/android ($BAD)"; git -C "$GITHUB_WORKSPACE" diff --name-only "$BASE_207_SHA" HEAD | grep -E '^(android/|android-native/|functions/|worker/|worker-deploy/|presence-service/|firestore\.rules|cloudflare-worker\.js)' || true; exit 1; }
+          echo "ANDROID/BACKEND intactos OK."
+
+  build:
+    needs: verify
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      APP_DIR: desktop
+    steps:
+      - name: Forcar LF no checkout
+        run: git config --global core.autocrlf false
+
+      - name: Checkout (mesmo SHA do run)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Gate REF + ANCESTRIA (windows)
+        run: |
+          set -e
+          [ "${{ github.ref_name }}" = "$TEST_BRANCH" ] || { echo "::error:: ref != $TEST_BRANCH"; exit 1; }
+          git merge-base --is-ancestor "$BASE_207_SHA" HEAD || { echo "::error:: HEAD nao descende da 1.0.207"; exit 1; }
+
+      - name: Gate LINE ENDINGS LF (fontes do delta)
+        run: |
+          set -e
+          for f in desktop/src/renderer/index.html desktop/src/renderer/priorityEngine.js; do
+            if grep -lU $'\r' "$f" >/dev/null 2>&1; then echo "::error:: CRLF em $f"; exit 1; fi
+          done
+          echo "LF OK."
+
+      - name: Derivar versao — exige 1.0.208 exato
+        run: |
+          APP_VERSION=$(node -p "require('./desktop/package.json').version")
+          [ "$APP_VERSION" = "1.0.208" ] || { echo "::error:: versao != 1.0.208 ($APP_VERSION)"; exit 1; }
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: npm ci
+        working-directory: desktop
+        run: npm ci --no-audit --no-fund
+
+      - name: TypeScript build
+        working-directory: desktop
+        run: npm run build
+
+      - name: electron-builder (NSIS + MSI; --publish never)
+        working-directory: desktop
+        run: npx electron-builder --win nsis msi --publish never
+
+      - name: Gate tray icon empacotado
+        working-directory: desktop
+        run: |
+          set -e
+          test -f dist-installer/win-unpacked/resources/icon.png || { echo "::error:: tray icon.png ausente em resources"; exit 1; }
+          echo "resources/icon.png OK"
+
+      - name: Gate prova-de-versao (asar == 1.0.208) + renderer EMPACOTADO == fonte (EOL-normalizado)
+        working-directory: desktop
+        run: |
+          set -e
+          ASAR="dist-installer/win-unpacked/resources/app.asar"; test -f "$ASAR" || { echo "::error:: app.asar ausente"; exit 1; }
+          EXDIR="$RUNNER_TEMP/asarx"; rm -rf "$EXDIR"; mkdir -p "$EXDIR"; npx --yes @electron/asar extract "$ASAR" "$EXDIR"
+          PKGV=$(P="$EXDIR/package.json" node -e 'console.log(JSON.parse(require("fs").readFileSync(process.env.P,"utf8")).version||"")')
+          [ "$PKGV" = "1.0.208" ] || { echo "::error:: package.json EMPACOTADO version=$PKGV != 1.0.208"; exit 1; }
+          cmp_norm() { EX="$1" SRC="$2" node -e 'const fs=require("fs");const n=s=>String(s).replace(/\r\n/g,"\n");if(n(fs.readFileSync(process.env.EX,"utf8"))!==n(fs.readFileSync(process.env.SRC,"utf8"))){console.error(process.env.SRC+" EMPACOTADO != fonte");process.exit(1);}'; }
+          cmp_norm "$EXDIR/src/renderer/index.html" "src/renderer/index.html"
+          cmp_norm "$EXDIR/src/renderer/priorityEngine.js" "src/renderer/priorityEngine.js"
+          cmp_norm "$EXDIR/src/renderer/bgnotify.html" "src/renderer/bgnotify.html"
+          cmp_norm "$EXDIR/src/renderer/slareminder.html" "src/renderer/slareminder.html"
+          echo "GATE prova-de-versao 1.0.208 + renderer(+motor)==fonte OK."
+
+      - name: Gate F3.5.4R EMPACOTADO — painel/motor presentes (read-only + puro + sintaxe); comportamento 1.0.207 preservado (25 gates)
+        working-directory: desktop
+        run: |
+          set -e
+          EXDIR="$RUNNER_TEMP/asarx"; DM="$EXDIR/dist/main"; DP="$EXDIR/dist/preload"; RR="$EXDIR/src/renderer"
+          MJS="$DM/main.js"
+          cmp_norm() { EX="$1" SRC="$2" node -e 'const fs=require("fs");const n=s=>String(s).replace(/\r\n/g,"\n");if(n(fs.readFileSync(process.env.EX,"utf8"))!==n(fs.readFileSync(process.env.SRC,"utf8"))){console.error(process.env.SRC+" EMPACOTADO != fonte");process.exit(1);}'; }
+          # ===== ASSISTENTE DE PRIORIDADES (F3.5.4R) — camada derivada, read-only, motor puro =====
+          # 1 — motor puro empacotado (API completa + UMD)
+          grep -q 'buildUserPriorityList' "$RR/priorityEngine.js" && grep -q 'resolvePriorityLevel' "$RR/priorityEngine.js" && grep -q 'comparePriorities' "$RR/priorityEngine.js" && grep -q 'buildOccurrences' "$RR/priorityEngine.js" || { echo "::error:: priorityEngine.js empacotado sem API do motor"; exit 1; }
+          # 2 — motor puro empacotado (sem electron/firestore/ipc/notify/som/Date.now/Math.random)
+          if grep -iE "require\('electron'\)|firebase|firestore|ipcRenderer|new Notification|\.play\(|Date\.now\(|Math\.random\(" "$RR/priorityEngine.js"; then echo "::error:: priorityEngine.js empacotado NAO e puro"; exit 1; fi
+          # 3 — motor sem previsão/IA/score/ranking
+          if grep -iE 'delayPredict|riskScore|productivity|tensorflow|gamif|ranking' "$RR/priorityEngine.js"; then echo "::error:: priorityEngine.js empacotado contem previsao/IA/score/ranking (proibido)"; exit 1; fi
+          # 4 — hierarquia N1/N2/N3 + ocorrências NUNCA elevam sozinhas (texto honesto)
+          grep -qF "x.alert === 'red' || x.deadlineKind === 'overdue'" "$RR/priorityEngine.js" || { echo "::error:: N1 ausente no asar"; exit 1; }
+          grep -qF 'Pedido de ajuda registrado' "$RR/priorityEngine.js" && grep -qF 'Bloqueio reportado' "$RR/priorityEngine.js" || { echo "::error:: texto honesto de ocorrência ausente no asar"; exit 1; }
+          if grep -qiE 'não resolvido|nao resolvido|bloqueada agora|bloqueando outra|impedindo outra' "$RR/priorityEngine.js"; then echo "::error:: texto proibido no motor empacotado"; exit 1; fi
+          # 5 — index.html empacotado: bloco F3.5.4R + motor + aba + painel + deep-link + flag/toggle
+          grep -q 'F3.5.4R:START' "$RR/index.html" && grep -q '<script src="priorityEngine.js">' "$RR/index.html" && grep -q 'window.PriorityEngine' "$RR/index.html" || { echo "::error:: index.html empacotado sem bloco/motor F3.5.4R"; exit 1; }
+          grep -qF "k:'prioridades'" "$RR/index.html" && grep -q 'function renderPrioridades(' "$RR/index.html" && grep -q 'function priBuildItems(' "$RR/index.html" && grep -q 'priorityAssistantEnabled' "$RR/index.html" && grep -q 'data-cfgpriorityassistant' "$RR/index.html" || { echo "::error:: painel/aba/flag ausentes no asar"; exit 1; }
+          # 6 — CRUX SINTAXE: o <script> inline EMPACOTADO parseia (um erro aqui aborta o app real)
+          RR="$RR" node -e 'const fs=require("fs");const idx=fs.readFileSync(process.env.RR+"/index.html","utf8").replace(/\r\n/g,"\n");const a=idx.indexOf("priorityEngine.js");const m="\n<script>\n";const o=idx.indexOf(m,a>=0?a:0);const c=o>=0?idx.indexOf("\n</script>",o):-1;if(o<0||c<0){console.error("::error:: <script> inline empacotado nao localizado");process.exit(1);}const b=idx.slice(o+m.length,c);try{new Function(b);}catch(e){console.error("::error:: SyntaxError no <script> inline EMPACOTADO: "+(e&&e.message||e));process.exit(1);}'
+          # 7 — CRUX ISOLAMENTO: bloco F3.5.4R EMPACOTADO nao escreve/notifica/toca som/cria listener de dados; abre por openDetails
+          RR="$RR" node -e 'const fs=require("fs");const s=fs.readFileSync(process.env.RR+"/index.html","utf8").replace(/\r\n/g,"\n");const blk=s.split("F3.5.4R:START").slice(1).map(x=>x.split("F3.5.4R:END")[0]).join("\n");const bad=[[/runTransaction|arrayUnion/,"escrita"],[/new Notification|showBgNotify|notif-toast/,"notificacao"],[/\.play\(|new Audio/,"som"],[/onSnapshot\(|db\.collection\(/,"listener"]];for(const [re,lbl] of bad){if(re.test(blk)){console.error("::error:: bloco F3.5.4R empacotado contem "+lbl);process.exit(1);}}if(!/openDetails\(/.test(blk)){console.error("::error:: painel empacotado nao abre por openDetails");process.exit(1);}'
+          # ===== COMPORTAMENTO 1.0.207 PRESERVADO (tudo byte-idêntico à fonte congelada) =====
+          # 8 — detecção de tarefa parada (F3.5.4Q) intacta e empacotada
+          grep -q 'IDLE_MS_BY_SECTOR' "$DM/taskIdle.js" && grep -q 'startTaskIdleScheduler' "$DM/taskIdleScheduler.js" && grep -q 'createTaskIdleStore' "$DM/taskIdleStore.js" || { echo "::error:: detecção idle 1.0.207 ausente"; exit 1; }
+          grep -qF 'idle-v1:em120|cr90|ec90|ro90|df90' "$DM/taskIdle.js" || { echo "::error:: thresholdVersion idle alterada"; exit 1; }
+          # 9 — check-in + transação idle no renderer (F3.5.4Q) intactos
+          grep -q 'window.__idlePersistResponse' "$RR/index.html" && grep -q 'function buildReturnToTodoPatch' "$RR/index.html" && grep -q 'data-cfgtaskidle' "$RR/index.html" || { echo "::error:: check-in/transação idle 1.0.207 ausentes"; exit 1; }
+          # 10 — DECISÃO DE SLA (F3.5.4P) intacta e empacotada (onDecide + transação __slaPersistDecision)
+          grep -q 'onDecide' "$DM/slaReminder.js" && grep -q 'sla_decision:' "$DM/slaReminder.js" || { echo "::error:: decisão de SLA 1.0.207 ausente"; exit 1; }
+          grep -q 'window.__slaPersistDecision' "$RR/index.html" && grep -q 'runTransaction' "$RR/index.html" || { echo "::error:: transação de decisão SLA 1.0.207 ausente"; exit 1; }
+          # 11 — store de decisão SLA (F3.5.4P) empacotado + durável
+          grep -q 'markDecisionPending' "$DM/slaReminderStore.js" && grep -q 'isDecisionSettled' "$DM/slaReminderStore.js" || { echo "::error:: slaReminderStore.js sem decisão durável"; exit 1; }
+          # 12 — lembrete central (F3.5.4L/M) intacto (controlador + janela + som local)
+          grep -q 'createSlaReminderController' "$DM/slaReminder.js" && grep -q 'classifyReminderLevel' "$DM/slaReminder.js" || { echo "::error:: lembrete central ausente"; exit 1; }
+          grep -q 'slareminder-ok' "$DM/slaReminderWindow.js" || { echo "::error:: janela central / OK ausente"; exit 1; }
+          test -f "$RR/sounds/sla-warning.wav" && head -c 4 "$RR/sounds/sla-warning.wav" | grep -q 'RIFF' || { echo "::error:: som local do lembrete ausente/invalido"; exit 1; }
+          # 13 — AGRUPAMENTO das comuns (F3.5.4O) intacto e ligado no main
+          grep -q 'createNotificationGrouping' "$DM/notificationGrouping.js" && grep -q 'common_group:' "$DM/notificationGrouping.js" || { echo "::error:: agrupamento F3.5.4O ausente"; exit 1; }
+          grep -q 'notificationGrouping' "$MJS" && grep -q 'notif-group-update' "$MJS" || { echo "::error:: main nao liga o agrupamento 1.0.207"; exit 1; }
+          # 14 — notifEvents empacotado == fonte (Categoria A + destinatários + derivação idle) CONGELADO
+          cmp_norm "$DM/notifEvents.js" "src/main/notifEvents.js"
+          grep -qF "recipientMode: 'all_active_users'" "$DM/notifEvents.js" && grep -qF "recipientMode: 'assigned_designer'" "$DM/notifEvents.js" || { echo "::error:: Categoria A/destinatários alterados"; exit 1; }
+          # 15 — HUB de entrega comum (toast/nativa/bg-window) + sino/dedup individual intactos
+          grep -q 'function deliverNotification' "$MJS" && grep -q 'notif-toast' "$MJS" && grep -q 'showBgNotify' "$MJS" && grep -q 'notif-history' "$MJS" && grep -q '_notifSeen' "$MJS" || { echo "::error:: HUB/sino/dedup removido"; exit 1; }
+          # 16 — TEMPOS CONGELADOS: cardsRules T-30/T-10 + slaRules == fonte
+          cmp_norm "$DM/cardsRules.js" "src/main/cardsRules.js"
+          cmp_norm "$DM/slaRules.js" "src/main/slaRules.js"
+          grep -qF 'var CARDS_WARN_MS = 30 * 60000' "$DM/cardsRules.js" || { echo "::error:: T-30 alterada"; exit 1; }
+          grep -qF 'var CARDS_RED_MS  = 10 * 60000' "$DM/cardsRules.js" || { echo "::error:: T-10 alterada"; exit 1; }
+          # 17 — scheduler SLA + Categoria A duravel + notifier empacotados (produtores congelados)
+          grep -q 'startSlaScheduler' "$DM/slaScheduler.js" && grep -q 'startNotifierA' "$DM/notifierA.js" && grep -q 'event_new' "$DM/notifier.js" || { echo "::error:: produtores SLA/notif nao empacotados"; exit 1; }
+          # 18 — AUTOCORREÇÃO/INICIALIZAÇÃO (F3.5.4N) congeladas e empacotadas
+          grep -q 'setListenHealthObserver' "$DM/firebase.js" && grep -q 'createListenerWatchdog' "$DM/listenerWatchdog.js" && grep -q 'createStartupPrefs' "$DM/startupPrefs.js" || { echo "::error:: autocorreção/inicialização ausentes"; exit 1; }
+          # 19 — janela de check-in/SLA com IPC intactos (idle + SLA)
+          grep -q 'slareminder-checkin-decide' "$DM/slaReminderWindow.js" && grep -q 'slareminder-decide' "$DM/slaReminderWindow.js" || { echo "::error:: IPC de check-in/decisão SLA ausente"; exit 1; }
+          # 20 — COMUNS no renderer + premium sem som + Monitor SLA/Cronograma/Card
+          grep -q 'notifToastOnce' "$RR/index.html" && grep -q 'f354gMonAlerts' "$RR/index.html" && grep -q 'function cronSanitizeDeep(' "$RR/index.html" && grep -q 'function buildClientMessage(' "$RR/index.html" || { echo "::error:: comuns/Monitor/Cronograma/Card ausentes"; exit 1; }
+          grep -q 'renderGroupUpdate' "$RR/bgnotify.html" || { echo "::error:: premium bgnotify ausente"; exit 1; }
+          if grep -qE '<audio|\.play\(\)' "$RR/bgnotify.html"; then echo "::error:: premium ganhou som (nao pode)"; exit 1; fi
+          # 21 — tray + updater channel latest
+          grep -q 'ensureTray' "$MJS" && grep -qE 'channel[[:space:]]*=[[:space:]]*"latest"' "$DM/updaterService.js" || { echo "::error:: tray/updater channel latest ausente"; exit 1; }
+          # 22 — preload empacotado: pontes 1.0.207 (detecção idle + decisão SLA + agrupamento) intactas
+          grep -q 'taskIdleGet' "$DP/preload.js" && grep -q 'slaDecisionGet' "$DP/preload.js" && grep -q 'groupingGet' "$DP/preload.js" || { echo "::error:: preload.js: pontes 1.0.207 removidas"; exit 1; }
+          # 23 — flags 1.0.207 preservadas no main (idle + decisão SLA)
+          grep -q 'taskIdleDetectionEnabled' "$MJS" && grep -q 'f354q-notify.json' "$MJS" && grep -q 'f354p-notify.json' "$MJS" || { echo "::error:: flags de detecção/decisão 1.0.207 ausentes"; exit 1; }
+          # 24 — nenhum listener/scheduler NOVO no main por causa do painel (F3.5.4R é renderer-only): main.js == fonte congelada
+          cmp_norm "$MJS" "dist/main/main.js"
+          # 25 — Android NAO tocado
+          A2=$(git -C "$GITHUB_WORKSPACE" diff --name-only "$BASE_207_SHA" HEAD | grep -c '^android' || true); [ "$A2" = "0" ] || { echo "::error:: diff toca android ($A2)"; exit 1; }
+          echo "GATE F3.5.4R EMPACOTADO: VERIFIED (25 gates; painel read-only + motor puro; sintaxe OK; 1.0.207 preservado)"
+
+      - name: Empacotar bundle (EXE/MSI/latest.yml/blockmap/SBOM/SHA256SUMS/VERSAO-DESKTOP) + SHA256SUMS
+        working-directory: ${{ env.APP_DIR }}
+        env:
+          APP_VERSION: "1.0.208"
+        run: |
+          set -e
+          npx --yes @cyclonedx/cyclonedx-npm --omit dev --output-format JSON --output-file "$RUNNER_TEMP/sbom-cyclonedx.json" || echo '{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}' > "$RUNNER_TEMP/sbom-cyclonedx.json"
+          OUT="$GITHUB_WORKSPACE/dist-pkg"; mkdir -p "$OUT"
+          EXE=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe | head -1)
+          MSI=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.msi 2>/dev/null | head -1)
+          BM=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap | head -1)
+          cp "$EXE" "$OUT/"; [ -n "$MSI" ] && cp "$MSI" "$OUT/"; cp dist-installer/latest.yml "$OUT/"; cp "$BM" "$OUT/"
+          cp "$RUNNER_TEMP/sbom-cyclonedx.json" "$OUT/SBOM-cyclonedx.json"
+          EXE_NAME=$(basename "$EXE"); MSI_NAME=$([ -n "$MSI" ] && basename "$MSI" || echo ""); BM_NAME=$(basename "$BM")
+          ( cd "$OUT" && sha256sum "$EXE_NAME" ${MSI_NAME:+$MSI_NAME} latest.yml "$BM_NAME" SBOM-cyclonedx.json > SHA256SUMS )
+          {
+            echo "productName : Agenda ID Seven Desktop"
+            echo "versionName : $APP_VERSION"
+            echo "rotulo      : 1.0.208-priority-assistant (CANDIDATA — assistente inteligente de prioridades / painel Minhas Prioridades)"
+            echo "channel     : latest (estrutura do updater; NADA publicado neste build)"
+            echo "appId       : br.com.idseven.agenda.desktop"
+            echo "instalador  : $EXE_NAME"
+            echo "SHA-256 exe : $(sha256sum "$OUT/$EXE_NAME" | awk '{print $1}')"
+            [ -n "$MSI_NAME" ] && echo "instalador2 : $MSI_NAME" && echo "SHA-256 msi : $(sha256sum "$OUT/$MSI_NAME" | awk '{print $1}')"
+            echo "commit      : $GITHUB_SHA (branch $GITHUB_REF_NAME)"
+            echo "baseline    : Desktop 1.0.207 OFICIAL (commit 17c8ef5; tag v1.0.207 preservada; testada fisicamente)"
+            echo "origem      : F3.5.4R — ASSISTENTE INTELIGENTE DE PRIORIDADES (painel Minhas Prioridades: camada DERIVADA, SOMENTE LEITURA, deterministica; motor PURO priorityEngine.js sobre fatos calculados com helpers congelados; hierarquia N1 vermelho/vencido, N2 amarelo/hoje/alteracao/aprovacao, N3 andamento/afazer/futura/sem-prazo; ocorrencias ajuda/bloqueio NUNCA elevam sozinhas e usam texto honesto registrado/reportado; abre por deep-link openDetails; flag LOCAL priorityAssistantEnabled default ON; reutiliza o onSnapshot existente. NAO escreve no Firestore, NAO emite/altera notificacao, NAO toca som, NAO move/conclui/reatribui, NAO altera prazo/responsavel/historico, NAO mexe no Monitor SLA/sino. SEM previsao/IA/score/ranking). Tempos T-30/T-10, destinatarios, deteccao de tarefa parada (1.0.207), decisao de SLA, agrupamento, lembrete central, Card Premium/Cronograma/Monitor SLA/sino, updater e Android: INTOCADOS"
+            echo "assinatura  : mesmo processo da 1.0.207 (sem code-signing -> NotSigned)"
+            echo "distribuicao: CANDIDATA — build gated; publicacao no Latest ocorre no workflow desktop-release-f354r.yml (mesmos bytes deste run)"
+          } > "$OUT/VERSAO-DESKTOP.txt"
+          echo "== SHA256SUMS =="; cat "$OUT/SHA256SUMS"
+
+      - name: Upload artifact — installer (EXE + MSI) PRIVADO
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-1.0.208-installer
+          path: |
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.msi
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload artifact — updatemeta (latest.yml + blockmap + SHA256SUMS + SBOM + VERSAO) PRIVADO
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-1.0.208-updatemeta
+          path: |
+            dist-pkg/latest.yml
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap
+            dist-pkg/SHA256SUMS
+            dist-pkg/SBOM-cyclonedx.json
+            dist-pkg/VERSAO-DESKTOP.txt
+          if-no-files-found: error
+          retention-days: 30

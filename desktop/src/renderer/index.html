@@ -2424,6 +2424,7 @@ body.desktop .kbv2-name{ white-space:normal; display:-webkit-box; -webkit-box-or
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="priorityEngine.js"></script>
 <script>
 /* WEB PREVIEW 1.0.65 — Paridade com o APK nativo.
    Espelha o app Android (Compose) e usa o MESMO Firestore.
@@ -2939,7 +2940,7 @@ function openAdminEmailModal(){
 }
 
 /* ---- APP RENDER ---- */
-const TABS=[{k:'hoje',l:'Hoje',i:'today'},{k:'agenda',l:'Agenda',i:'calendar'},{k:'tarefas',l:'Tarefas',i:'checklist'},{k:'equipe',l:'Equipe',i:'group'},{k:'perfil',l:'Perfil',i:'person'},{k:'exec',l:'Executivo',i:'gauge'},{k:'relatorios',l:'Relatórios',i:'bars'},{k:'notificacoes',l:'Notificações',i:'bell'}];
+const TABS=[{k:'prioridades',l:'Minhas Prioridades',i:'gauge'},{k:'hoje',l:'Hoje',i:'today'},{k:'agenda',l:'Agenda',i:'calendar'},{k:'tarefas',l:'Tarefas',i:'checklist'},{k:'equipe',l:'Equipe',i:'group'},{k:'perfil',l:'Perfil',i:'person'},{k:'exec',l:'Executivo',i:'gauge'},{k:'relatorios',l:'Relatórios',i:'bars'},{k:'notificacoes',l:'Notificações',i:'bell'}];
 // 1.0.119-form-unlock-hotfix — CAUSA RAIZ do "nada responde": um snapshot do Firestore
 // (users/events/tasks) chegava enquanto o WIZARD de criação estava aberto e RECONSTRUÍA o
 // #content por baixo do usuário — destruindo o campo/clique/foco a cada atualização de dados
@@ -4513,7 +4514,7 @@ function render(){
       '<div class="sb-brand"><div class="logo sm brandlogo"></div><div><div class="nm">ID Seven</div><div class="sy"><span class="dot"></span>sincronizado</div></div></div>'+
       '<button class="new-task-btn" data-fab="1"><span class="new-task-icon">'+svg('plus')+'</span><span class="new-task-label">Nova tarefa</span></button>'+
       '<div class="sb-sect">Workspace</div>'+
-      TABS.map(sbItem).join('')+
+      TABS.filter(function(t){return typeof priTabVisible==='function'?priTabVisible(t):true;}).map(sbItem).join('')+
       '<div class="sb-sect">Sistema</div>'+
       sbItem({k:'config',l:'Configurações',i:'gear'})+
       // F3.3.17-R2 — âncora GLOBAL de conta/perfil/logout no rodapé da sidebar (Desktop). Sempre
@@ -4523,7 +4524,7 @@ function render(){
       '<button class="sb-user" data-tab="perfil" title="Conta — abrir Perfil / Sair da conta">'+avatar(state.user,34)+'<span class="su-m"><span class="su-n">'+esc(state.user.name||'Conta')+'</span><span class="su-r">'+esc(state.user.role||'Equipe')+(state.user.admin?' · admin':'')+'</span></span></button>'+
       '<div class="sb-footer"><span class="ver">Desktop '+APP_VER.desktop+' · '+APP_VER.tag+'</span><i class="sbf-dot"></i><br>ID Seven · produção</div>';
   }else{
-    nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
+    var _navTabs=TABS.filter(function(t){return typeof priTabVisible==='function'?priTabVisible(t):true;}); nav.innerHTML=_navTabs.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+_navTabs.slice(3).map(navBtn).join('');
   }
   const c=document.getElementById('content');
   c.classList.remove('board-mode');
@@ -4554,7 +4555,271 @@ function render(){
   else if(state.tab==='exec'){c.innerHTML=renderExecPanel();afterExecPanel();}
   else if(state.tab==='relatorios'){c.innerHTML=renderReports();afterReports();}
   else if(state.tab==='notificacoes'){c.innerHTML=renderNotifCentral();afterNotifCentral();}
+  else if(state.tab==='prioridades'){c.innerHTML=renderPrioridades();afterPrioridades();}
 }
+/* F3.5.4R:START — ASSISTENTE DE PRIORIDADES ("Minhas Prioridades"): camada DERIVADA e SOMENTE LEITURA.
+   Lê state.tasks/state.users/history (já sincronizados) + helpers puros congelados (kbv2SlaLiveData /
+   f354fSlaLiveState / deriveCanonicalTaskState / flowClientChangesSignal / designerOf/socialOf/respOf /
+   isTaskCompleted / canSeeTask / dtMs / canonicalNowMs). Classifica via o motor PURO window.PriorityEngine.
+   NUNCA escreve no Firestore, NUNCA emite notificação, NUNCA toca som, NUNCA move/conclui/reconhece,
+   NUNCA altera prazo/responsável/estado/histórico. Abre a tarefa pelo deep-link existente (openDetails).
+   Flag LOCAL priorityAssistantEnabled (default ON) + preferências visuais locais. Removível sem efeito. */
+var PRI_FLAG_KEY='f354r_priority_assistant_v1', PRI_UI_KEY='f354r_priority_ui_v1', PRI_DISMISS_KEY='f354r_priority_dismissed_v1';
+var priLiveTimer=null, priLastSig='';
+function priLS(k,d){ try{ var v=localStorage.getItem(k); return v==null?d:v; }catch(_){ return d; } }
+function priLSset(k,v){ try{ localStorage.setItem(k,v); }catch(_){} }
+function priIsEnabled(){ return priLS(PRI_FLAG_KEY,'on')!=='off'; }                 // default ON
+function priSetEnabled(b){ priLSset(PRI_FLAG_KEY, b?'on':'off'); }
+function priTabVisible(t){ return t.k!=='prioridades' || priIsEnabled(); }
+function priUi(){ try{ return JSON.parse(priLS(PRI_UI_KEY,'{}'))||{}; }catch(_){ return {}; } }
+function priUiSet(p){ var u=priUi(); Object.assign(u,p||{}); priLSset(PRI_UI_KEY, JSON.stringify(u)); }
+function priDismissed(){ try{ return JSON.parse(priLS(PRI_DISMISS_KEY,'{}'))||{}; }catch(_){ return {}; } }
+function priDismiss(key){ var d=priDismissed(); d[key]=1; priLSset(PRI_DISMISS_KEY, JSON.stringify(d)); }
+function priNow(){ try{ return (typeof canonicalNowMs==='function')?canonicalNowMs():Date.now(); }catch(_){ return Date.now(); } }
+/* Observabilidade SANITIZADA — anel local em memória; sem título/cliente/uid/token/conteúdo. */
+var priObsRing=[]; function priMask(id){ id=String(id||''); return id?(id.slice(0,4)+'…'):''; }
+function priObs(ev, extra){ try{ var e=Object.assign({ev:ev, ts:priNow(), userId:priMask(state.user&&state.user.id), appVersion:(APP_VER&&APP_VER.desktop)||''}, extra||{}); priObsRing.push(e); if(priObsRing.length>50) priObsRing.shift(); if(window&&window.__PRI_OBS_LOG) try{ console.debug('[priority]', ev, extra||{}); }catch(_){} }catch(_){} }
+var PRI_REASON_LBL={material:'Material',social:'Social',cliente:'Cliente',aprovacao:'Aprovação',tecnico:'Técnico',informacao:'Informação',dependencia:'Dependência',demanda:'Demanda',outro:'Outro'};
+function pri2(n){ n=n|0; return (n<10?'0':'')+n; }
+function priFmtWhen(ms, kind){
+  try{ var d=new Date(ms), hm=pri2(d.getHours())+':'+pri2(d.getMinutes()), dm=pri2(d.getDate())+'/'+pri2(d.getMonth()+1);
+    if(kind==='today') return 'hoje às '+hm;
+    if(kind==='tomorrow') return 'amanhã às '+hm;
+    if(kind==='overdue') return 'venceu '+dm+' às '+hm;
+    return dm+' às '+hm;
+  }catch(_){ return ''; }
+}
+/* Prazo determinístico: SLA real quando existe; senão data/hora oficial. Buckets fixos. */
+function priDeadlineFacts(t, now){
+  var f=(typeof dtMs==='function'?dtMs:null), marks=null;
+  try{ marks=kbv2SlaLiveData(t); }catch(_){ marks=null; }
+  var ms=0, hasSla=false;
+  if(marks && marks.dueMs>0){ ms=marks.dueMs; hasSla=true; }
+  else { var dd=t.dueDate||t.due; if(dd && f){ ms=Number(f(dd, t.dueTime||'23:59'))||0; } }
+  if(!(ms>0)) return {deadlineMs:0, deadlineKind:'none', deadlineText:'', hasSla:hasSla};
+  var day=function(x){ var d=new Date(x); return d.getFullYear()*10000+d.getMonth()*100+d.getDate(); };
+  var kind; if(ms<now) kind='overdue'; else if(day(ms)===day(now)) kind='today'; else if(day(ms)===day(now+86400000)) kind='tomorrow'; else kind='future';
+  return {deadlineMs:ms, deadlineKind:kind, deadlineText:priFmtWhen(ms,kind), hasSla:hasSla};
+}
+/* Alerta SLA REAL direcionado ao usuário (SLA é pessoal → só o responsável). Sem emitir. */
+function priAlertFacts(t, now, me){
+  try{ var marks=kbv2SlaLiveData(t); if(!marks) return {alert:null,alertText:''};
+    if(String(designerOf(t)||'')!==String(me)) return {alert:null,alertText:''};   // recipient gate (pessoal)
+    var st=f354fSlaLiveState(marks, now); if(!st||!st.vis) return {alert:null,alertText:''};
+    return {alert:(st.lvl==='red'?'red':'amber'), alertText:String(st.text||'')};
+  }catch(_){ return {alert:null,alertText:''}; }
+}
+/* Ajuda registrada / bloqueio reportado DIRECIONADOS a mim (history[]; sem marcador de "resolvido"). */
+function priOccFacts(t, me){
+  var help=null, blk=null; var h=Array.isArray(t.history)?t.history:[];
+  for(var i=0;i<h.length;i++){ var e=h[i]||{}; var k=String(e.kind||''), at=Number(e.at||e.atMs)||0;
+    var dt=String(e.decisionType||''), rt=String(e.responseType||'');
+    var isHelp=(k==='sla_decision'&&dt==='help_requested')||(k==='task_idle_response'&&rt==='help_requested');
+    var isBlk=(k==='sla_decision'&&dt==='blocked')||(k==='task_idle_response'&&rt==='blocked');
+    if(isHelp){ var hr=String(e.helpRecipientId||e.forId||''); if(hr===String(me) && at>0 && (!help||at>help.atMs)) help={atMs:at, fromName:String(e.by||'')}; }
+    if(isBlk){ var br=Array.isArray(e.blockedRecipientIds)?e.blockedRecipientIds.map(String):[]; if(br.indexOf(String(me))>=0 && at>0 && (!blk||at>blk.atMs)) blk={atMs:at, reasonLabel:(PRI_REASON_LBL[String(e.reasonCode||'')]||'')}; }
+  }
+  return {helpForMe:help, blockedForMe:blk};
+}
+/* Coluna canônica sob a ótica do usuário + concluído. */
+function priColOf(t, me){ try{ if(isTaskCompleted(t)) return 'concluido';
+  var c = (String(designerOf(t)||'')===String(me) && (typeof isDesignerFlow==='function'?isDesignerFlow(t):false)) ? designerCol(t) : socialCol(t);
+  c=String(c||'afazer'); return (c==='entregue')?'concluido':c; }catch(_){ return 'afazer'; } }
+/* Alteração pendente / ação-aprovação direcionada a mim (fatos por-tarefa; sem dependência cruzada). */
+function priFlowFacts(t, me){
+  var out={changeRequestForMe:false, awaitingMyAction:false, awaitingText:''};
+  try{
+    var isMineSocial = (String(socialOf(t)||'')===String(me)) || (String(t.by||'')===String(me)) || (function(){var r=respOf(t);return r&&String(r.id||'')===String(me);})();
+    if((typeof flowClientChangesSignal==='function') && flowClientChangesSignal(t) && isMineSocial) out.changeRequestForMe=true;
+    if(typeof deriveCanonicalTaskState==='function'){
+      var d=deriveCanonicalTaskState(t); var ph=d&&d.phase;
+      if(isMineSocial && (ph===TASK_PHASE.DESIGNER_DELIVERED || ph===TASK_PHASE.THEMES_APPROVED)){ out.awaitingMyAction=true; out.awaitingText='Aguardando sua ação'; }
+    }
+  }catch(_){}
+  return out;
+}
+/* Constrói os ITENS (fatos por tarefa) para o motor. Inclui tarefas com vínculo real p/ a lista OU
+   tarefas em que sou destinatário de ajuda/bloqueio (p/ a seção de ocorrências). */
+function priBuildItems(tasks, me){
+  var now=priNow(), items=[];
+  var arr=Array.isArray(tasks)?tasks:[];
+  for(var i=0;i<arr.length;i++){ var t=arr[i]; if(!t||!t.id) continue;
+    try{ if(typeof canSeeTask==='function' && state.user && !canSeeTask(state.user,t)) continue; }catch(_){}
+    var gone = (function(){ var s=String(t.status||''); return s==='removido'||s==='cancelado'; })();
+    var completed=false; try{ completed=!!isTaskCompleted(t); }catch(_){}
+    var col=priColOf(t, me);
+    var al=priAlertFacts(t, now, me);
+    var dl=priDeadlineFacts(t, now);
+    var fl=priFlowFacts(t, me);
+    var oc=priOccFacts(t, me);
+    var isResp = (String(designerOf(t)||'')===String(me)) || (String(socialOf(t)||'')===String(me)) || (String(t.assigneeId||'')===String(me));
+    var linked = isResp || fl.awaitingMyAction || fl.changeRequestForMe || !!al.alert;
+    var relevant = linked || !!oc.helpForMe || !!oc.blockedForMe;
+    if(!relevant) continue;
+    var resp=null; try{ resp=respOf(t); }catch(_){}
+    items.push({
+      taskId:t.id, title:String(t.title||'Tarefa'), client:String(t.client||''),
+      sector:(function(){ try{ return secOf(t.sector).key; }catch(_){ return String(t.sector||''); } })(),
+      etapaLabel:(function(){ try{ var d=deriveCanonicalTaskState(t); return (FLOW_LABELS[d.phase]&&FLOW_LABELS[d.phase].social&&FLOW_LABELS[d.phase].social.label)||''; }catch(_){ return ''; } })(),
+      responsibleName:(resp&&resp.name)||'',
+      facts:{ nowMs:now, isCompleted:completed, isGone:gone, linked:linked, col:col,
+        alert:al.alert, alertText:al.alertText, deadlineMs:dl.deadlineMs, deadlineKind:dl.deadlineKind, deadlineText:dl.deadlineText, hasSla:dl.hasSla,
+        changeRequestForMe:fl.changeRequestForMe, awaitingMyAction:fl.awaitingMyAction, awaitingText:fl.awaitingText,
+        helpForMe:oc.helpForMe, blockedForMe:oc.blockedForMe,
+        createdAtMs:Number(t.createdAt)||0, updatedAtMs:Number(t.updatedAt)||0 }
+    });
+  }
+  return items;
+}
+var PRI_LVL_COLOR={1:'#EF4444',2:'#F2A93B',3:'#7C83FF'};
+var PRI_FILTERS=[['all','Todas'],['crit','Críticas'],['today','Para hoje'],['help','Pedidos de ajuda'],['blocked','Bloqueadas'],['andamento','Em andamento'],['afazer','A Fazer']];
+function priFilterMatch(fk, it){
+  var x=it.facts||{};
+  if(fk==='all') return true;
+  if(fk==='crit') return it.level===1;
+  if(fk==='today') return x.deadlineKind==='today'||x.deadlineKind==='overdue';
+  if(fk==='help') return !!x.helpForMe;
+  if(fk==='blocked') return !!x.blockedForMe;
+  if(fk==='andamento') return String(x.col)==='andamento';
+  if(fk==='afazer') return String(x.col)==='afazer';
+  return true;
+}
+function priListSig(list){ return list.map(function(it){ return it.taskId+'|'+it.level+'|'+(it.facts&&it.facts.deadlineKind)+'|'+(it.facts&&it.facts.alert); }).join(';'); }
+function renderPrioridades(){
+  if(!priIsEnabled()){ priObs('priority.feature_disabled');
+    return '<div class="scr" style="padding:16px"><div class="lbl">Minhas Prioridades</div><div class="card" style="padding:18px"><div class="sl">Assistente desativado</div><div class="ss" style="margin-top:6px">Reative em Configurações → Produtividade para ver suas prioridades. Nenhuma tarefa é alterada por este painel.</div></div></div>'; }
+  var me=(state.user&&state.user.id)||'';
+  var PE=window.PriorityEngine; if(!PE){ return '<div class="scr" style="padding:16px"><div class="card" style="padding:18px">Assistente indisponível nesta versão.</div></div>'; }
+  var items=priBuildItems(state.tasks, me);
+  var list=PE.buildUserPriorityList(items);
+  var occ=PE.buildOccurrences(items, priDismissed());
+  var sum=PE.summarize(list);
+  var ui=priUi(); var fk=ui.filter||'all'; var minimized=(ui.min==='1');
+  priObs('priority.list.calculated', {itemCount:list.length, criticalCount:sum.critical, warningCount:sum.attention, helpCount:occ.filter(function(o){return o.kind==='help';}).length, blockedCount:occ.filter(function(o){return o.kind==='blocked';}).length, filter:fk});
+  var online=(typeof navigator!=='undefined')?navigator.onLine!==false:true;
+  var first=(state.user&&state.user.name?String(state.user.name).split(' ')[0]:'');
+  // cabeçalho + resumo discreto
+  var h='<div class="scr pri-wrap" style="padding:14px 16px 40px">';
+  h+='<div class="pri-head" style="display:flex;align-items:center;gap:12px;margin-bottom:6px"><div class="cfg-ic">'+svg('gauge')+'</div>'+
+     '<div style="flex:1"><div class="h-title">Minhas Prioridades</div><div class="h-sub">'+(first?('Bom trabalho, '+esc(first)+'. '):'')+'O que merece sua atenção primeiro · tempo real · somente leitura</div></div>'+
+     '<button class="chip" data-primin="'+(minimized?'0':'1')+'" title="'+(minimized?'Expandir':'Minimizar')+'">'+(minimized?'Expandir':'Minimizar')+'</button></div>';
+  if(!online) h+='<div class="card" style="padding:10px 14px;margin:8px 0;border-color:#F2A93B55;color:var(--soft)"><b>Sem conexão.</b> As informações podem estar desatualizadas — atualizam sozinhas ao reconectar.</div>';
+  // resumo
+  h+='<div class="pri-summary" style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 14px">'+
+     priPill('Críticas', sum.critical, PRI_LVL_COLOR[1])+priPill('Atenção', sum.attention, PRI_LVL_COLOR[2])+
+     priPill('Para hoje', sum.today, '#34D399')+priPill('Em andamento', sum.andamento, '#7C83FF')+
+     priPill('Ocorrências', occ.length, '#A78BFA')+'</div>';
+  if(minimized){ h+='<div class="ss">Painel minimizado — clique em Expandir para ver a lista.</div></div>'; return h; }
+  // filtros
+  h+='<div class="pri-filters" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">'+
+     PRI_FILTERS.map(function(f){ var on=(fk===f[0]); return '<button class="chip'+(on?' on':'')+'" data-prifilter="'+f[0]+'" style="'+(on?'background:var(--accent);border-color:transparent;color:#fff':'')+'">'+esc(f[1])+'</button>'; }).join('')+'</div>';
+  // lista
+  var shown=list.filter(function(it){ return priFilterMatch(fk,it); });
+  if(!shown.length){
+    priObs('priority.empty_state',{filter:fk});
+    h+='<div class="card" style="padding:22px;text-align:center"><div class="sl" style="font-size:16px">Tudo certo por aqui</div><div class="ss" style="margin-top:6px">Nenhuma tarefa exige sua atenção imediata neste momento.</div></div>';
+  } else {
+    h+='<div class="pri-list" style="display:flex;flex-direction:column;gap:10px">';
+    for(var i=0;i<shown.length;i++){ h+=priCard(shown[i], i+1); }
+    h+='</div>';
+  }
+  // ocorrências recentes
+  h+='<div style="height:22px"></div><div class="lbl">Ações e ocorrências recentes</div>';
+  if(!occ.length){ h+='<div class="card" style="padding:14px"><div class="ss">Sem pedidos de ajuda ou bloqueios registrados para você.</div></div>'; }
+  else { h+='<div class="pri-occ" style="display:flex;flex-direction:column;gap:8px">'; for(var j=0;j<occ.length;j++){ h+=priOccRow(occ[j]); } h+='</div>'; }
+  // visão por setor (somente autorizados) — sem ranking de pessoas
+  var canAll=false; try{ canAll=canSeeAll(state.user); }catch(_){}
+  if(canAll){ h+='<div style="height:22px"></div><div class="lbl">Visão geral por setor</div>'+priSectorOverview(me); }
+  h+='</div>';
+  return h;
+}
+function priPill(l,n,c){ return '<span class="pill" style="background:'+withAlpha(c,.14)+';color:'+c+';border:1px solid '+withAlpha(c,.4)+';font-weight:800">'+esc(l)+': '+(n|0)+'</span>'; }
+function priCard(it, pos){
+  var x=it.facts||{}, c=PRI_LVL_COLOR[it.level]||'#7C83FF';
+  var lvlTxt=it.level===1?'Crítico':(it.level===2?'Atenção':'Normal');
+  var live=(x.alert&&x.alertText)?('<span data-prilive="'+esc(it.taskId)+'" style="color:'+c+';font-weight:700">'+esc(x.alertText)+'</span>'):'';
+  var reasons=(it.reasons||[]).map(function(r){ return '<li>'+esc(r)+'</li>'; }).join('');
+  var h='<div class="card pri-card" data-pri-task="'+esc(it.taskId)+'" style="padding:0;overflow:hidden;display:flex">';
+  h+='<div style="width:5px;flex:none;background:'+c+'"></div>';
+  h+='<div style="flex:1;min-width:0;padding:12px 14px">';
+  h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'+
+     '<span class="pill" style="background:'+withAlpha(c,.16)+';color:'+c+';font-weight:800;flex:none">'+pos+'ª · '+esc(lvlTxt)+'</span>'+
+     (it.sector?'<span class="ss" style="flex:none">'+esc(it.sector)+'</span>':'')+
+     (live?'<span style="margin-left:auto;flex:none">'+live+'</span>':'')+'</div>';
+  h+='<div class="sl" style="font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(it.title)+(it.client?(' <span class="ss">· '+esc(it.client)+'</span>'):'')+'</div>';
+  if(it.responsibleName) h+='<div class="ss" style="margin-top:1px">Responsável: '+esc(it.responsibleName)+(it.etapaLabel?(' · '+esc(it.etapaLabel)):'')+'</div>';
+  h+='<ul class="pri-reasons" style="margin:8px 0 0;padding-left:16px;color:var(--soft);font-size:12.5px;line-height:1.5">'+reasons+'</ul>';
+  h+='<div style="margin-top:10px"><button class="chip" data-priopen="'+esc(it.taskId)+'" style="font-weight:800">Abrir tarefa</button></div>';
+  h+='</div></div>';
+  return h;
+}
+function priOccRow(o){
+  var c=o.kind==='blocked'?'#F59E0B':'#7C83FF';
+  var when=priFmtWhen(o.atMs, (function(){ var day=function(x){var d=new Date(x);return d.getFullYear()*10000+d.getMonth()*100+d.getDate();}; return day(o.atMs)===day(priNow())?'today':'future'; })());
+  var h='<div class="card" style="padding:10px 14px;display:flex;align-items:center;gap:10px;border-left:4px solid '+c+'">';
+  h+='<div style="flex:1;min-width:0"><div class="sl" style="font-size:13.5px;color:'+c+'">'+esc(o.text)+'</div>'+
+     '<div class="ss" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(o.title)+(o.client?(' · '+esc(o.client)):'')+' · '+esc(when)+'</div></div>';
+  h+='<button class="chip" data-priopen="'+esc(o.taskId)+'" style="flex:none">Abrir</button>';
+  h+='<button class="chip" data-pridismiss="'+esc(o.key)+'" title="Ocultar só neste painel (não altera a tarefa)" style="flex:none">Dispensar</button>';
+  h+='</div>';
+  return h;
+}
+function priSectorOverview(me){
+  var now=priNow(), byS={};
+  var arr=Array.isArray(state.tasks)?state.tasks:[];
+  for(var i=0;i<arr.length;i++){ var t=arr[i]; if(!t||!t.id) continue;
+    try{ if(!canSeeTask(state.user,t)) continue; }catch(_){}
+    var s=(function(){ try{ return secOf(t.sector).label; }catch(_){ return String(t.sector||'—'); } })();
+    var comp=false; try{ comp=!!isTaskCompleted(t); }catch(_){}
+    if(comp) continue;
+    var b=byS[s]||(byS[s]={crit:0,amber:0,blocked:0,help:0,today:0,andamento:0,afazer:0});
+    var marks=null; try{ marks=kbv2SlaLiveData(t); }catch(_){}
+    if(marks){ var st=f354fSlaLiveState(marks,now); if(st&&st.vis){ if(st.lvl==='red') b.crit++; else b.amber++; } }
+    var dl=priDeadlineFacts(t, now); if(dl.deadlineKind==='overdue') b.crit++; else if(dl.deadlineKind==='today') b.today++;
+    var col=priColOf(t, me); if(col==='andamento') b.andamento++; else if(col==='afazer') b.afazer++;
+    var h=Array.isArray(t.history)?t.history:[]; for(var k=0;k<h.length;k++){ var e=h[k]||{}; var kk=String(e.kind||''), dt=String(e.decisionType||''), rt=String(e.responseType||'');
+      if((kk==='sla_decision'&&dt==='help_requested')||(kk==='task_idle_response'&&rt==='help_requested')) { b.help++; break; } }
+    for(var k2=0;k2<h.length;k2++){ var e2=h[k2]||{}; var kk2=String(e2.kind||''), dt2=String(e2.decisionType||''), rt2=String(e2.responseType||'');
+      if((kk2==='sla_decision'&&dt2==='blocked')||(kk2==='task_idle_response'&&rt2==='blocked')) { b.blocked++; break; } }
+  }
+  var keys=Object.keys(byS).sort();
+  if(!keys.length) return '<div class="card" style="padding:14px"><div class="ss">Sem tarefas em aberto.</div></div>';
+  var h='<div class="card" style="padding:6px 0">';
+  keys.forEach(function(s,idx){ var b=byS[s];
+    h+=(idx?'<div class="divline"></div>':'')+'<div class="settrow" style="cursor:default"><div class="sm"><div class="sl">'+esc(s)+'</div>'+
+       '<div class="ss" style="margin-top:3px">Críticas '+b.crit+' · Atenção '+b.amber+' · Hoje '+b.today+' · Em andamento '+b.andamento+' · A Fazer '+b.afazer+' · Ajuda '+b.help+' · Bloqueios '+b.blocked+'</div></div></div>';
+  });
+  h+='</div>'; return h;
+}
+function priLiveTick(){
+  if(state.tab!=='prioridades' || !priIsEnabled() || state.form) return;
+  try{
+    var me=(state.user&&state.user.id)||''; var PE=window.PriorityEngine; if(!PE) return;
+    var items=priBuildItems(state.tasks, me); var list=PE.buildUserPriorityList(items);
+    var ui=priUi(); var fk=ui.filter||'all'; var shown=list.filter(function(it){ return priFilterMatch(fk,it); });
+    var sig=priListSig(shown);
+    if(sig!==priLastSig){ priLastSig=sig; priObs('priority.realtime_updated',{itemCount:shown.length}); render(); return; }   // ordem/estado mudou ⇒ re-render limpo
+    // ordem igual ⇒ só atualiza o texto "tempo restante" (sem reflow, preserva scroll)
+    var byId={}; shown.forEach(function(it){ byId[it.taskId]=it; });
+    var nodes=document.querySelectorAll('[data-prilive]');
+    for(var i=0;i<nodes.length;i++){ var id=nodes[i].getAttribute('data-prilive'); var it=byId[id]; if(it&&it.facts&&it.facts.alertText) nodes[i].textContent=it.facts.alertText; }
+  }catch(_){}
+}
+function afterPrioridades(){
+  priObs('priority.panel.opened');
+  var root=document.getElementById('content'); if(!root) return;
+  root.addEventListener('click', function(ev){
+    var el=ev.target.closest?ev.target.closest('[data-priopen],[data-pridismiss],[data-prifilter],[data-primin]'):null; if(!el) return;
+    if(el.hasAttribute('data-priopen')){ var id=el.getAttribute('data-priopen'); priObs('priority.task.opened',{}); try{ openDetails(id); }catch(_){} return; }
+    if(el.hasAttribute('data-pridismiss')){ priDismiss(el.getAttribute('data-pridismiss')); render(); return; }
+    if(el.hasAttribute('data-prifilter')){ priUiSet({filter:el.getAttribute('data-prifilter')}); priObs('priority.filter.changed',{filter:el.getAttribute('data-prifilter')}); render(); return; }
+    if(el.hasAttribute('data-primin')){ priUiSet({min:el.getAttribute('data-primin')}); render(); return; }
+  });
+  priLastSig='';
+  if(priLiveTimer){ try{ clearInterval(priLiveTimer); }catch(_){} priLiveTimer=null; }
+  priLiveTimer=setInterval(priLiveTick, 1000);   // refresh de UI (countdown/reordenação); NÃO é listener de dados nem scheduler de SLA
+}
+/* F3.5.4R:END */
 function navBtn(t){const on=state.tab===t.k&&!state.form;return '<button class="'+(on?'on':'')+'" data-tab="'+t.k+'">'+svg(t.i)+(typeof notifNavBadge==='function'?notifNavBadge(t.k):'')+'<span>'+t.l+'</span></button>';}
 function sbItem(t){const on=state.tab===t.k&&!state.form;return '<button class="sb-item '+(on?'on':'')+'" data-tab="'+t.k+'">'+svg(t.i)+(typeof notifNavBadge==='function'?notifNavBadge(t.k):'')+'<span>'+t.l+'</span></button>';}
 
@@ -8512,6 +8777,10 @@ function renderConfig(){
       settRow('gear','Segurança da sessão','Sessão protegida por autenticação server-side','seguranca')+'<div class="divline"></div>'+info('Dados coletados','Apenas dados de uso da equipe (tarefas/agenda)')+'</div>';
   h+='<div style="height:18px"></div><div class="lbl">Preferências de Notificação</div><div class="card">'+
       act('send','Testar notificação','Dispara um toast nativo agora','data-cfgnotiftest="1"')+'<div class="divline"></div>'+info('Lembretes','Aviso 1h antes do compromisso (bandeja)')+'<div class="divline"></div>'+info('Versão do aplicativo',(window.desktopAPI&&window.desktopAPI.version)||'—')+'</div>';
+  /* F3.5.4R — PRODUTIVIDADE: liga/desliga o Assistente de Prioridades (painel "Minhas Prioridades").
+     Preferência LOCAL (localStorage); não altera tarefas, notificações, SLA nem afeta outros usuários. */
+  h+='<div style="height:18px"></div><div class="lbl">Produtividade</div><div class="card">'+
+      '<button class="settrow" data-cfgpriorityassistant="'+(priIsEnabled()?'on':'off')+'"><div class="icb">'+svg('gauge')+'</div><div class="sm"><div class="sl">Mostrar o Assistente de Prioridades</div><div class="ss">'+(priIsEnabled()?'Ligado — organiza suas tarefas por prazos, alertas, pedidos de ajuda e ações pendentes. O sistema não movimenta nem altera tarefas automaticamente. Tocar para desligar':'Desligado — o painel “Minhas Prioridades” fica oculto. Tocar para ligar')+'</div></div><div class="arr">'+svg('arr')+'</div></button></div>';
   /* F3.5.4K — DIAGNÓSTICO DE NOTIFICAÇÕES (Configurações → Notificações): status técnico SANITIZADO
      (listener do main, nativas suportadas, sessão bloqueada/desbloqueada, estado da janela, janela
      premium pronta, última entrega/canal, última falha/motivo, versão). Sem token/uid/conteúdo. */
@@ -9494,6 +9763,16 @@ document.addEventListener('click',async e=>{
       try{ notifDiagFill(); }catch(_){}
       flashToast(_cfgIdleOn?'Verificação de tarefas paradas: ligada.':'Verificação de tarefas paradas: desligada.');
     })();
+    return;
+  }
+  /* F3.5.4R — Assistente de Prioridades: liga/desliga LOCAL (localStorage). Só oculta/mostra o painel;
+     não altera tarefas, notificações, SLA, nem afeta outros usuários. */
+  if(el=g('[data-cfgpriorityassistant]')){
+    var _priOn=el.getAttribute('data-cfgpriorityassistant')==='on';
+    priSetEnabled(!_priOn);                       // estado atual 'on' ⇒ desligar; 'off' ⇒ ligar
+    if(_priOn && state.tab==='prioridades') state.tab='hoje';   // ao desligar estando no painel, sai dele
+    flashToast(!_priOn?'Assistente de Prioridades: ligado.':'Assistente de Prioridades: desligado.');
+    render();
     return;
   }
   // F3.3.70D3R10U — "Recriar ícone da bandeja": IPC tray-recreate + re-render p/ o status novo
