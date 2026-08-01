@@ -69,6 +69,10 @@ contextBridge.exposeInMainWorld("desktopAPI", {
   // SOMENTE as opções de ação (OFF ⇒ só OK, 1.0.205; não apaga decisões; não altera backend).
   slaDecisionGet: (): Promise<any> => ipcRenderer.invoke("sla-decision-get"),
   slaDecisionSet: (v: boolean): Promise<any> => ipcRenderer.invoke("sla-decision-set", v),
+  // F3.5.4Q — DETECÇÃO DE TAREFA PARADA (Configurações → Notificações): ligar/desligar SOMENTE o
+  // check-in de inatividade (OFF ⇒ nenhum novo check-in; não apaga histórico; não altera SLA/backend).
+  taskIdleGet: (): Promise<any> => ipcRenderer.invoke("task-idle-get"),
+  taskIdleSet: (v: boolean): Promise<any> => ipcRenderer.invoke("task-idle-set", v),
   // abrir URL externa (WhatsApp app/web, browser) via shell.openExternal
   openExternal: (url: string): Promise<boolean> => ipcRenderer.invoke("open-external", url),
   // F3.3.73I6C18C — prepara/valida o Card Premium ANTES do WhatsApp (GET read-only no main,

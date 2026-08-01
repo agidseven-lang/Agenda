@@ -158,6 +158,49 @@ function deriveTaskEvents(t, o) {
     }
   }
 
+  // 1d) F3.5.4Q — RESPOSTA de CHECK-IN de tarefa parada que gera notificação INDIVIDUAL: help + blocked.
+  // Derivada de history[] {kind:'task_idle_response', responseType, helpRecipientId (help), blockedRecipientIds
+  // (blocked)} gravadas pela TRANSAÇÃO do check-in. working/return_to_todo NÃO notificam aqui (o
+  // return_to_todo grava também a movimentação canônica → a notificação de movimentação existente cobre isso,
+  // sem duplicar). REUSA os MESMOS tipos help_requested/blocked (mesma entrega/toast/sino/never-group da
+  // 1.0.206) — sem novo tipo de payload. eventId determinístico; NUNCA agrupada.
+  for (var qi = 0; qi < hs.length; qi++) {
+    var ie = hs[qi] || {};
+    if (str(ie.kind) !== 'task_idle_response') continue;
+    var iAt = num(ie.at) || num(ie.atMs);
+    if (!iAt || (minAt && iAt < minAt)) continue;
+    var iBy = str(ie.byId || ie.byUid);
+    var iType = str(ie.responseType);
+    if (iType === 'help_requested') {
+      var ihRec = str(ie.helpRecipientId || ie.forId);
+      if (!ihRec) continue;
+      out.push({
+        eventId: 'help_requested:' + taskId + ':' + iAt + ':' + ihRec,
+        type: 'help_requested', recipientMode: 'assigned_designer', recipientId: ihRec,
+        taskId: taskId, taskTitle: title, sector: sector,
+        actorId: iBy, actorNameDenorm: (typeof ie.by === 'string' ? ie.by : ''), actorPhotoDenorm: '',
+        assignedDesignerId: '', assignedDesignerNameDenorm: '', assignedDesignerPhotoDenorm: '',
+        fromStatus: '', toStatus: '', at: iAt,
+        helpText: (typeof ie.helpText === 'string' ? ie.helpText.slice(0, 140) : '')
+      });
+    } else if (iType === 'blocked') {
+      var ibRecs = Array.isArray(ie.blockedRecipientIds) ? ie.blockedRecipientIds : [];
+      for (var ib = 0; ib < ibRecs.length; ib++) {
+        var ibRec = str(ibRecs[ib]);
+        if (!ibRec || ibRec === iBy) continue;
+        out.push({
+          eventId: 'blocked:' + taskId + ':' + iAt + ':' + ibRec,
+          type: 'blocked', recipientMode: 'assigned_designer', recipientId: ibRec,
+          taskId: taskId, taskTitle: title, sector: sector,
+          actorId: iBy, actorNameDenorm: (typeof ie.by === 'string' ? ie.by : ''), actorPhotoDenorm: '',
+          assignedDesignerId: '', assignedDesignerNameDenorm: '', assignedDesignerPhotoDenorm: '',
+          fromStatus: '', toStatus: '', at: iAt,
+          reasonCode: str(ie.reasonCode)
+        });
+      }
+    }
+  }
+
   // 2) ATRIBUIÇÃO (cronograma/designer) — designerAssignment do próprio doc (assignedAt carimba).
   var da = (t.designerAssignment && typeof t.designerAssignment === 'object') ? t.designerAssignment : null;
   if (da && da.designerId && num(da.assignedAt) && (!minAt || num(da.assignedAt) >= minAt)) {

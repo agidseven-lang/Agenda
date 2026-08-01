@@ -78,6 +78,19 @@
   .statebox{ text-align:center; }
   .statebox .txt{ font-size:14px; color:var(--ink); line-height:1.4; margin:4px 6px 12px; }
   .errbanner{ margin-top:10px; font-size:12.5px; color:var(--red-d); background:rgba(220,38,38,.08); border:1px solid rgba(220,38,38,.25); border-radius:9px; padding:9px 10px; text-align:left; }
+  /* ── F3.5.4Q — CHECK-IN DE TAREFA PARADA (identidade AZUL/neutra, NÃO acusatória) ── */
+  :root{ --blue:#2563EB; --blue-d:#1E40AF; }
+  .card.checkin::before{ background:var(--blue); }
+  .card.checkin .kicker{ color:var(--blue-d); }
+  .av.checkin{ box-shadow:0 10px 24px -4px rgba(2,6,23,.34), 0 0 0 3px rgba(37,99,235,.22); }
+  .card.checkin .dbtn.primary{ background:var(--blue); box-shadow:0 8px 18px -8px rgba(37,99,235,.7); }
+  .card.checkin .chip.sel{ border-color:var(--blue); background:rgba(37,99,235,.12); color:var(--blue-d); }
+  .card.checkin .rrow.sel .dot{ border-color:var(--blue); background:radial-gradient(circle,var(--blue) 0 5px, transparent 6px); }
+  .card.checkin .btn2.go{ background:var(--blue); }
+  .card.checkin .recip b{ color:var(--blue-d); }
+  .card.checkin .spin{ border-top-color:var(--blue); }
+  .card.checkin .ok{ background:var(--blue); box-shadow:0 8px 18px -6px rgba(37,99,235,.7); }
+  .dbtn.danger{ border:1.5px solid rgba(220,38,38,.4); color:var(--red-d); }
 </style>
 </head>
 <body>
@@ -324,6 +337,24 @@
 
   if(api.onCard) api.onCard(function(v){
     if(!v) return;
+    // F3.5.4Q — CHECK-IN de tarefa parada usa a MESMA janela central (view AZUL, kind:'checkin').
+    if(v.kind==="checkin"){
+      var cprev=ccur;
+      if(!cprev || cprev.key!==v.key){   // ciclo novo ⇒ reset total
+        cmode="idle"; cbusy=false; cerr=""; cmsgState=null;
+        cdraft={ reasonCode:"", reasonText:"", helpText:"", helpRecipientId:"", helpRecipientName:"" };
+        chelp={ loading:false, reason:"", preselect:null, eligible:[] };
+      }
+      if(v.draft && typeof v.draft==="object"){   // RESTORE após suspensão pelo SLA: rehidrata o rascunho
+        cdraft.reasonCode=v.draft.reasonCode||""; cdraft.reasonText=v.draft.reasonText||"";
+        cdraft.helpText=v.draft.helpText||""; cdraft.helpRecipientId=v.draft.helpRecipientId||""; cdraft.helpRecipientName=v.draft.helpRecipientName||"";
+        var dm=String(v.draft.responseType||"idle");
+        if(["blocked","help","return","idle"].indexOf(dm)>=0) cmode=dm;
+        if(cmode==="help" && !chelp.eligible.length){ chelp={ loading:true, reason:"", preselect:null, eligible:[] }; try{ api.checkinResolveHelp && api.checkinResolveHelp({ key:v.key, taskId:taskIdOf(v) }); }catch(_e){} }
+      }
+      renderCheckin(v);
+      return;
+    }
     var prev = cur;
     var promoted = !!(prev && taskIdOf(prev)===taskIdOf(v) && prev.level!=="critical" && v.level==="critical");
     var sameKey = !!(prev && prev.key===v.key);
@@ -361,6 +392,122 @@
     help.eligible = Array.isArray(c.eligible) ? c.eligible : [];
     if(c.preselect && c.reason==="preselected"){ draft.helpRecipientId=String(c.preselect.id||""); draft.helpRecipientName=String(c.preselect.name||""); }
     renderFoot(cur); resizeSelf();
+  });
+
+  // ═══════════════════════════ F3.5.4Q — CHECK-IN DE TAREFA PARADA (view AZUL) ═══════════════════════════
+  var ccur=null, cmode="idle", cbusy=false, cerr="", cmsgState=null;
+  var cdraft={ reasonCode:"", reasonText:"", helpText:"", helpRecipientId:"", helpRecipientName:"" };
+  var chelp={ loading:false, reason:"", preselect:null, eligible:[] };
+  function cPushDraft(){ try{ api.checkinDraft && api.checkinDraft({ key:(ccur&&ccur.key)||"", draft:{ responseType:cmode, reasonCode:cdraft.reasonCode, reasonText:cdraft.reasonText, helpText:cdraft.helpText, helpRecipientId:cdraft.helpRecipientId, helpRecipientName:cdraft.helpRecipientName } }); }catch(_e){} }
+
+  function renderCheckinHeader(v){
+    var card=document.getElementById("card"); card.className="card checkin";
+    document.getElementById("kicker").textContent="CHECK-IN DE ATIVIDADE";
+    var av=document.getElementById("av"); av.className="av checkin";
+    if(v.actorAvatar){ av.style.background="#E2E8F0 center/cover no-repeat"; av.style.backgroundImage="url('"+String(v.actorAvatar).replace(/'/g,"")+"')"; av.textContent=""; }
+    else { av.style.backgroundImage=""; av.style.background=colorFor(v.actorName); av.textContent=initials(v.actorName); }
+    document.getElementById("name").textContent=v.actorName||"";
+    document.getElementById("msg").textContent="A tarefa permanece sem uma atualização registrada há "+(v.sinceText||"")+". Esta tarefa ainda está sendo executada?";
+    var tk=v.taskTitle||"Tarefa"; if(v.clientName) tk+=" — "+v.clientName;
+    document.getElementById("task").textContent=tk;
+    document.getElementById("ctx").textContent=(v.etapa||"Em andamento");
+    document.getElementById("pend").textContent="";
+  }
+  function cConfirmRow(goLabel, enabled){ return '<div class="confirm-row"><button class="btn2" id="cc_back" type="button">Voltar</button><button class="btn2 go" id="cc_go" type="button"'+(enabled?"":" disabled")+'>'+esc(goLabel)+'</button></div>'; }
+  function cFootMsg(){ var s=cmsgState||{}; var a=""; if(s.action==="dismiss"){ a='<button class="ok" id="cm_dismiss" type="button">Fechar</button>'; } else if(s.action==="back"){ a='<button class="ok" id="cm_back" type="button">Voltar</button>'; } return '<div class="statebox"><div class="txt">'+esc(s.text||"")+'</div>'+a+'</div>'; }
+  function renderCheckinFoot(v){
+    var foot=document.getElementById("foot"); var html="";
+    if(cmode==="msg"){ html=cFootMsg(); }
+    else if(cbusy){ html='<div class="busy"><span class="spin"></span><span>Registrando…</span></div>'; }
+    else if(cmode==="idle"){
+      html='<div class="decisions">'
+        +'<button class="dbtn primary" id="c_work" type="button"><span class="ic">✅</span>Sim, estou trabalhando</button>'
+        +'<button class="dbtn" id="c_blk" type="button"><span class="ic">⛔</span>Estou bloqueado</button>'
+        +'<button class="dbtn" id="c_help" type="button"><span class="ic">🆘</span>Preciso de ajuda</button>'
+        +'<button class="dbtn danger" id="c_ret" type="button"><span class="ic">↩</span>Devolver para A Fazer</button>'
+        +'<button class="dbtn ghost" id="c_open" type="button">Abrir tarefa</button>'
+        +'</div>';
+    }
+    else if(cmode==="blocked"){
+      var rows=""; for(var i=0;i<REASONS.length;i++){ var r=REASONS[i]; rows+='<div class="rrow'+(cdraft.reasonCode===r[0]?' sel':'')+'" data-crc="'+r[0]+'"><span class="dot"></span><span>'+esc(r[1])+'</span></div>'; }
+      var obs=(cdraft.reasonCode==="outro")?('<textarea id="cblk_obs" rows="2" maxlength="200" placeholder="Descreva o motivo (obrigatório)">'+esc(cdraft.reasonText)+'</textarea>'):"";
+      var bvalid=!!cdraft.reasonCode && (cdraft.reasonCode!=="outro" || (cdraft.reasonText||"").trim().length>0);
+      html='<div class="subpanel"><div class="sp-title">Qual o motivo do bloqueio?</div><div class="reason-list">'+rows+'</div>'+obs+'<div class="sp-note">O bloqueio é registrado; o SLA e o prazo NÃO são pausados.</div></div>'+cConfirmRow("Registrar bloqueio", bvalid);
+    }
+    else if(cmode==="help"){
+      var body="";
+      if(chelp.loading){ body='<div class="busy"><span class="spin"></span><span>Localizando destinatário…</span></div>'; }
+      else if(chelp.reason==="preselected" && chelp.preselect){ body='<div class="recip">Seu pedido será enviado para: <b>'+esc(chelp.preselect.name)+'</b></div>'; }
+      else if(chelp.reason==="ambiguous" && chelp.eligible.length){ var opts=""; for(var h=0;h<chelp.eligible.length;h++){ var u=chelp.eligible[h]; opts+='<div class="rrow'+(cdraft.helpRecipientId===u.id?' sel':'')+'" data-cuid="'+esc(u.id)+'" data-cuname="'+esc(u.name)+'"><span class="dot"></span><span>'+esc(u.name)+'</span></div>'; } body='<div class="recip">Para quem enviar o pedido?</div><div class="picker">'+opts+'</div>'; }
+      else { body='<div class="recip">Nenhum destinatário elegível foi encontrado automaticamente.</div>'; if(chelp.eligible.length){ var o2=""; for(var h2=0;h2<chelp.eligible.length;h2++){ var u2=chelp.eligible[h2]; o2+='<div class="rrow'+(cdraft.helpRecipientId===u2.id?' sel':'')+'" data-cuid="'+esc(u2.id)+'" data-cuname="'+esc(u2.name)+'"><span class="dot"></span><span>'+esc(u2.name)+'</span></div>'; } body+='<div class="picker">'+o2+'</div>'; } }
+      var cdesc='<textarea id="chelp_txt" rows="2" maxlength="200" placeholder="Descreva rapidamente (opcional)">'+esc(cdraft.helpText)+'</textarea>';
+      var hvalid=!chelp.loading && !!cdraft.helpRecipientId;
+      html='<div class="subpanel"><div class="sp-title">Pedir ajuda</div>'+body+cdesc+'<div class="sp-note">Notificação individual e imediata ao destinatário.</div></div>'+cConfirmRow("Enviar pedido", hvalid);
+    }
+    else if(cmode==="return"){
+      html='<div class="subpanel"><div class="sp-title">Devolver esta tarefa para “A Fazer”?</div><div class="sp-note">A tarefa volta para a coluna “A Fazer”. Não altera o prazo. Todos os dispositivos são atualizados em tempo real.</div></div>'+cConfirmRow("Sim, devolver", true);
+    }
+    if(cerr && cmode!=="msg" && !cbusy){ html+='<div class="errbanner">'+esc(cerr)+'</div>'; }
+    foot.innerHTML=html; cwire(v);
+  }
+  function cShowMsg(text, action){ cmode="msg"; cbusy=false; cerr=""; cmsgState={text:text,action:action}; if(ccur) renderCheckinFoot(ccur); resizeSelf(); }
+  function cShowError(text){ cerr=text; cbusy=false; if(ccur) renderCheckinFoot(ccur); resizeSelf(); }
+  function cwire(v){
+    if(cmode==="msg"){ bind("cm_dismiss","click",function(){ try{ api.checkinDismiss && api.checkinDismiss(ccur.key); }catch(_e){} }); bind("cm_back","click",function(){ cmode="idle"; cerr=""; cPushDraft(); renderCheckinFoot(ccur); resizeSelf(); }); return; }
+    if(cbusy) return;
+    if(cmode==="idle"){
+      bind("c_work","click",function(){ cSend({ responseType:"working" }); });
+      bind("c_blk","click",function(){ cmode="blocked"; cerr=""; cPushDraft(); renderCheckinFoot(ccur); resizeSelf(); });
+      bind("c_help","click",function(){ cStartHelp(); });
+      bind("c_ret","click",function(){ cmode="return"; cerr=""; cPushDraft(); renderCheckinFoot(ccur); resizeSelf(); });
+      bind("c_open","click",function(){ try{ api.open && api.open((ccur&&ccur.deep)||""); }catch(_e){} });   // abre a tarefa; NÃO resolve o check-in (exige uma das 4 decisões)
+      return;
+    }
+    bind("cc_back","click",function(){ cmode="idle"; cerr=""; cPushDraft(); renderCheckinFoot(ccur); resizeSelf(); });
+    if(cmode==="blocked"){
+      var brows=document.querySelectorAll(".rrow[data-crc]");
+      for(var i=0;i<brows.length;i++){ (function(rr){ rr.addEventListener("click",function(){ cdraft.reasonCode=rr.getAttribute("data-crc"); cPushDraft(); renderCheckinFoot(ccur); resizeSelf(); }); })(brows[i]); }
+      var obs=document.getElementById("cblk_obs"); if(obs){ obs.addEventListener("input",function(){ cdraft.reasonText=obs.value; cPushDraft(); var go=document.getElementById("cc_go"); if(go){ if((obs.value||"").trim().length>0) go.removeAttribute("disabled"); else go.setAttribute("disabled","disabled"); } }); }
+      bind("cc_go","click",function(){ var valid=!!cdraft.reasonCode && (cdraft.reasonCode!=="outro" || (cdraft.reasonText||"").trim().length>0); if(valid) cSend({ responseType:"blocked", reasonCode:cdraft.reasonCode, reasonText:(cdraft.reasonCode==="outro"?cdraft.reasonText.trim():"") }); });
+      return;
+    }
+    if(cmode==="help"){
+      var picks=document.querySelectorAll(".rrow[data-cuid]");
+      for(var k=0;k<picks.length;k++){ (function(p){ p.addEventListener("click",function(){ cdraft.helpRecipientId=p.getAttribute("data-cuid"); cdraft.helpRecipientName=p.getAttribute("data-cuname"); cPushDraft(); renderCheckinFoot(ccur); resizeSelf(); }); })(picks[k]); }
+      var ht=document.getElementById("chelp_txt"); if(ht){ ht.addEventListener("input",function(){ cdraft.helpText=ht.value; cPushDraft(); }); }
+      bind("cc_go","click",function(){ if(cdraft.helpRecipientId) cSend({ responseType:"help_requested", helpText:(cdraft.helpText||"").trim(), helpRecipientId:cdraft.helpRecipientId, helpRecipientName:cdraft.helpRecipientName }); });
+      return;
+    }
+    if(cmode==="return"){ bind("cc_go","click",function(){ cSend({ responseType:"return_to_todo", confirmReturn:true }); }); return; }
+  }
+  function cStartHelp(){ cmode="help"; cerr=""; chelp={ loading:true, reason:"", preselect:null, eligible:[] }; cdraft.helpRecipientId=""; cdraft.helpRecipientName=""; cPushDraft(); renderCheckinFoot(ccur); resizeSelf(); try{ api.checkinResolveHelp && api.checkinResolveHelp({ key:ccur.key, taskId:taskIdOf(ccur) }); }catch(_e){} }
+  function cSend(extra){
+    if(cbusy) return; cbusy=true; cerr="";
+    var payload={ key:(ccur&&ccur.key)||"", responseType:extra.responseType };
+    if(extra.reasonCode) payload.reasonCode=extra.reasonCode;
+    if(extra.reasonText) payload.reasonText=extra.reasonText;
+    if(extra.helpText) payload.helpText=extra.helpText;
+    if(extra.helpRecipientId){ payload.helpRecipientId=extra.helpRecipientId; payload.helpRecipientName=extra.helpRecipientName||""; }
+    if(extra.confirmReturn) payload.confirmReturn=true;
+    renderCheckinFoot(ccur); resizeSelf();
+    try{ api.checkinDecide && api.checkinDecide(payload); }catch(_e){ cbusy=false; cShowError("Não foi possível registrar a resposta. Tente novamente."); }
+  }
+  function renderCheckin(v){ ccur=v; renderCheckinHeader(v); renderCheckinFoot(v); resizeSelf(); try{ api.rendered && api.rendered(v.key); }catch(_e){} playSound(v); }
+  if(api.onCheckinResult) api.onCheckinResult(function(r){
+    r=r||{}; cbusy=false;
+    if(r.status==="already_answered"){ cShowMsg("Este check-in já foi respondido neste ou em outro dispositivo.","dismiss"); }
+    else if(r.status==="activity_changed"){ cShowMsg("A tarefa recebeu uma nova atualização. Este check-in não é mais necessário.","dismiss"); }
+    else if(r.status==="task_completed"){ cShowMsg("Esta tarefa foi concluída — nada a registrar.","dismiss"); }
+    else if(r.status==="task_deleted"){ cShowMsg("Esta tarefa foi excluída — nada a registrar.","dismiss"); }
+    else if(r.status==="queued"){ cShowMsg("Resposta salva neste computador e aguardando sincronização.","dismiss"); }
+    else if(r.status==="error"){ if(r.error==="not_authorized"){ cShowMsg("Você não é o responsável atual por esta tarefa.","back"); } else { cShowError("Não foi possível registrar a resposta. Verifique e tente novamente."); } }
+    // committed ⇒ o main fecha a janela (e abre a tarefa em working/return_to_todo).
+  });
+  if(api.onCheckinHelpCandidates) api.onCheckinHelpCandidates(function(c){
+    c=c||{}; if(cmode!=="help") return;
+    chelp.loading=false; chelp.reason=String(c.reason||"none"); chelp.preselect=c.preselect||null; chelp.eligible=Array.isArray(c.eligible)?c.eligible:[];
+    if(c.preselect && c.reason==="preselected"){ cdraft.helpRecipientId=String(c.preselect.id||""); cdraft.helpRecipientName=String(c.preselect.name||""); }
+    renderCheckinFoot(ccur); resizeSelf();
   });
 
   // clique no cartão (fora dos botões) NÃO fecha nada. Sem ESC/click-fora.

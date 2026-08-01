@@ -17,7 +17,7 @@ import { app, BrowserWindow, ipcMain, screen, Notification } from "electron";
 import path from "path";
 import fs from "fs";
 import { diag } from "./diag";
-import type { ReminderSurface, ReminderView, DecisionInput, DecisionPublicResult } from "./slaReminder";
+import type { ReminderSurface, ReminderView, CentralView, DecisionInput, DecisionPublicResult, CheckinDecisionInput, CheckinPublicResult } from "./slaReminder";
 
 const WIDTH = 460;
 const ACK_TIMEOUT_MS = 4000;
@@ -36,12 +36,17 @@ export function loadReminderSounds(): { warning: string; critical: string } {
 export type SlaReminderSurfaceDeps = {
   onAck: (key: string, windowState: string) => void;   // OK do usuário
   onOpenTask: (deep: string) => void;                  // clique "Abrir tarefa" (traz Agenda + abre)
-  nativeNotify?: (view: ReminderView) => boolean;      // fallback nativo (injeta o do main)
+  nativeNotify?: (view: CentralView) => boolean;       // fallback nativo (injeta o do main)
   onLog?: (tag: string, data?: unknown) => void;
   // F3.5.4P — decisão do responsável
   onDecide?: (input: DecisionInput) => Promise<DecisionPublicResult>;  // decisão → transação (renderer)
   onDismiss?: (key: string) => void;                                   // fecha após mensagem informativa
   onResolveHelp?: (taskId: string, key: string) => Promise<any>;       // resolve destinatário da ajuda (renderer)
+  // F3.5.4Q — check-in de tarefa parada
+  onCheckinDecide?: (input: CheckinDecisionInput) => Promise<CheckinPublicResult>; // 4 decisões → transação (renderer)
+  onCheckinDraft?: (key: string, draft: any) => void;                  // rascunho (suspend/restore)
+  onCheckinDismiss?: (key: string) => void;                            // fecha o check-in após mensagem
+  onCheckinResolveHelp?: (taskId: string, key: string) => Promise<any>; // resolve destinatário da ajuda (reusa 1.0.206)
 };
 
 export function createSlaReminderSurface(deps: SlaReminderSurfaceDeps): ReminderSurface & { destroy: () => void; ackState: () => string } {
@@ -101,13 +106,13 @@ export function createSlaReminderSurface(deps: SlaReminderSurfaceDeps): Reminder
   }
   function clearRenderProof(): void { if (renderTimer) { try { clearTimeout(renderTimer); } catch { /* */ } renderTimer = null; } }
 
-  function push(view: ReminderView): void {
+  function push(view: CentralView): void {
     const w = ensure();
     curKey = view.key;
     // F3.5.4P: com decisões ON a janela precisa ser focável (inputs de texto de bloqueio/ajuda). showInactive
     // continua evitando roubo de foco NA EXIBIÇÃO; o foco só ocorre se o usuário CLICAR para digitar.
-    // Flag OFF ⇒ focusable:false (idêntico à 1.0.205).
-    try { w.setFocusable(!!(view && (view as any).decisionsEnabled)); } catch { /* */ }
+    // Flag OFF ⇒ focusable:false (idêntico à 1.0.205). F3.5.4Q: o check-in SEMPRE é focável (tem inputs).
+    try { w.setFocusable(!!(view && ((view as any).decisionsEnabled || (view as any).kind === "checkin"))); } catch { /* */ }
     const send = () => { try { w.webContents.send("slareminder-card", view); } catch { /* */ } };
     if (w.webContents.isLoading()) { w.webContents.once("did-finish-load", send); } else { send(); }
     try { w.showInactive(); } catch { /* */ }
@@ -115,7 +120,7 @@ export function createSlaReminderSurface(deps: SlaReminderSurfaceDeps): Reminder
   }
 
   const surface: ReminderSurface & { destroy: () => void; ackState: () => string } = {
-    show(view: ReminderView): void {
+    show(view: CentralView): void {
       // guarda o foco atual só p/ garantir que NÃO roubamos foco (showInactive já garante)
       try { lastFocusedBefore = BrowserWindow.getFocusedWindow(); void lastFocusedBefore; } catch { /* */ }
       push(view);
@@ -129,10 +134,17 @@ export function createSlaReminderSurface(deps: SlaReminderSurfaceDeps): Reminder
       win = null;
     },
     isOpen(): boolean { return !!(win && !win.isDestroyed() && win.isVisible()); },
-    native(view: ReminderView): boolean {
+    native(view: CentralView): boolean {
       if (deps.nativeNotify) { try { return deps.nativeNotify(view); } catch { return false; } }
       try {
-        const n = new Notification({ title: view.title + " — " + (view.taskTitle || "SLA"), body: view.body || "", silent: false });
+        const isCheckin = (view as any).kind === "checkin";
+        const title = isCheckin
+          ? ("Check-in de atividade — " + ((view as any).taskTitle || "Tarefa"))
+          : ((view as ReminderView).title + " — " + (view.taskTitle || "SLA"));
+        const body = isCheckin
+          ? ("A tarefa permanece sem uma atualização registrada há " + ((view as any).sinceText || "") + ". Esta tarefa ainda está sendo executada?")
+          : ((view as ReminderView).body || "");
+        const n = new Notification({ title, body, silent: false });
         n.on("click", () => { try { deps.onOpenTask(view.deep); } catch { /* */ } });
         (n as any).on && (n as any).on("close", () => { /* nativa fechada não reconhece: modal exigido no unlock */ });
         n.show();
@@ -167,6 +179,27 @@ export function createSlaReminderSurface(deps: SlaReminderSurfaceDeps): Reminder
     let cands: any = { eligible: [], reason: "none" };
     try { cands = await deps.onResolveHelp(taskId, key); } catch (e) { log("sla.decision.help.resolve.error", { err: String((e as any) && (e as any).message || e) }); }
     try { if (win && !win.isDestroyed()) win.webContents.send("slareminder-help-candidates", cands || { eligible: [], reason: "none" }); } catch { /* */ }
+  });
+
+  // F3.5.4Q — CHECK-IN DE TAREFA PARADA: 4 decisões (transação), rascunho, dismiss, resolução de ajuda.
+  // ("Abrir tarefa" reusa 'slareminder-open' — abre a tarefa SEM encerrar o ciclo; o card se recolhe no renderer.)
+  ipcMain.on("slareminder-checkin-decide", async (_e, payload) => {
+    if (!deps.onCheckinDecide) return;
+    let result: CheckinPublicResult;
+    try { result = await deps.onCheckinDecide((payload || {}) as CheckinDecisionInput); }
+    catch (e) { log("task.idle.handler.error", { err: String((e as any) && (e as any).message || e) }); result = { status: "error", error: "handler" }; }
+    try { if (win && !win.isDestroyed()) win.webContents.send("slareminder-checkin-result", result); } catch { /* */ }
+    // "SIM, estou trabalhando" e "Devolver para A Fazer": abre a tarefa SÓ após o commit confirmado.
+    try { if (result && result.status === "committed" && (result.responseType === "working" || result.responseType === "return_to_todo") && result.deep) deps.onOpenTask(String(result.deep)); } catch { /* */ }
+  });
+  ipcMain.on("slareminder-checkin-draft", (_e, req) => { try { if (deps.onCheckinDraft) deps.onCheckinDraft(String((req && req.key) || ""), (req && req.draft) || {}); } catch { /* */ } });
+  ipcMain.on("slareminder-checkin-dismiss", (_e, key) => { try { if (deps.onCheckinDismiss) deps.onCheckinDismiss(String(key || "")); } catch { /* */ } });
+  ipcMain.on("slareminder-checkin-resolve-help", async (_e, req) => {
+    if (!deps.onCheckinResolveHelp) return;
+    const taskId = String((req && req.taskId) || ""); const key = String((req && req.key) || "");
+    let cands: any = { eligible: [], reason: "none" };
+    try { cands = await deps.onCheckinResolveHelp(taskId, key); } catch (e) { log("task.idle.help.resolve.error", { err: String((e as any) && (e as any).message || e) }); }
+    try { if (win && !win.isDestroyed()) win.webContents.send("slareminder-checkin-help-candidates", cands || { eligible: [], reason: "none" }); } catch { /* */ }
   });
 
   return surface;

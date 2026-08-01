@@ -89,6 +89,8 @@ function isDenylisted(eventType: string, severity: string): boolean {
   if (eventType === "blocked") return true;               // aviso de bloqueio ao criador/Social
   if (eventType === "sla_decision") return true;          // confirmação de decisão (reforço; já casa /^sla_/)
   if (eventType === "critical_confirmation") return true; // confirmação crítica (por nome, além do severity)
+  // F3.5.4Q — check-in de tarefa parada e respostas derivadas: SEMPRE individuais (nunca agrupar).
+  if (/^task_idle/.test(eventType)) return true;          // task_idle_checkin / task_idle_help / task_idle_blocked / task_idle_*
   if (severity === "critical") return true;               // nunca agrupar crítico
   return false;
 }

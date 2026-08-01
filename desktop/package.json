@@ -1,7 +1,7 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.206",
-  "description": "Agenda ID Seven Desktop 1.0.206-sla-decision-actions — Golden Master integrado + alertas de SLA com decisão do responsável (transação Firestore)",
+  "version": "1.0.207",
+  "description": "Agenda ID Seven Desktop 1.0.207-task-idle-detection — Golden Master integrado + detecção automática de tarefas paradas (check-in de atividade por transação Firestore)",
   "main": "dist/main/main.js",
   "private": true,
   "scripts": {

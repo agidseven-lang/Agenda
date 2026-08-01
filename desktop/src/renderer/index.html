@@ -5476,6 +5476,96 @@ window.__slaPersistDecision = async function(req){
     return { status:"offline", error: String((e&&e.message)||e||"").slice(0,120) };
   }
 };
+/* ═══════════════════════════════════════════════════════════════════════════════════════════════
+   F3.5.4Q — CHECK-IN DE TAREFA PARADA (ponte main→renderer).
+   buildReturnToTodoPatch: helper PURO e CANÔNICO da transição "Devolver para A Fazer" (newStatus='afazer').
+   É a MESMA fonte usada por moveStatus (fluxo do menu Mover) e pela transação do check-in — NÃO duplica
+   regras divergentes. Reproduz EXATAMENTE o patch que moveStatus construía inline para 'afazer' nos 3 eixos
+   (edicao_cards / designer geral / social), a partir de "Em andamento" (única origem do 'afazer' no menu e
+   único estado elegível ao check-in). NÃO altera prazo/dueAt/startAt/planStartAt; NÃO apaga campos (a origem
+   é sempre andamento ⇒ leavingDone=false). Paridade provada por golden-master (antes × depois).
+   ─────────────────────────────────────────────────────────────────────────────────────────────── */
+function buildReturnToTodoPatch(t, now, uid){
+  now = Number(now) || Date.now();
+  var byUid = uid || (state.user&&state.user.id) || null;
+  var isDes = isDesignerAxisMove(t);
+  if(isDes && secOf(t.sector).key==='edicao_cards'){
+    var ocC = designerCol(t);
+    return { axis:'cards', fields:{ designerFlowStatus:'afazer', designerWorkflowStage:'afazer', status:'afazer' },
+      historyEntry:{ kind:'designer_moved', axis:'designerFlowStatus', from:ocC, to:'afazer', byUid:byUid, byId:byUid, at:now, atMs:now, source:'desktop' } };
+  }
+  if(isDes){
+    var ocD = designerCol(t);
+    return { axis:'designer', fields:{ designerFlowStatus:'afazer', designerWorkflowStage:'afazer' },
+      historyEntry:{ kind:'designer_moved', axis:'designerFlowStatus', from:ocD, to:'afazer', byUid:byUid, byId:byUid, at:now, atMs:now, source:'desktop' } };
+  }
+  var ocS = (t.status||'afazer');
+  return { axis:'social', fields:{ status:'afazer' },
+    historyEntry:{ kind:'moved', at:now, byId:byUid, from:ocS, to:'afazer' } };
+}
+window.__idleResolveHelp = window.__slaResolveHelp;   // check-in REUSA a MESMA recipient policy da 1.0.206
+window.__idlePersistResponse = async function(req){
+  try{
+    req = req || {};
+    var taskId = String(req.taskId||""); var idleCheckKey = String(req.idleCheckKey||"");
+    if(!taskId || !idleCheckKey) return { status:"error", error:"bad-req" };
+    var me = (state.user&&state.user.id)||"";
+    if(req.recipientUid && me && String(req.recipientUid)!==me) return { status:"not_authorized", error:"uid-mismatch" };
+    var responseType = String(req.responseType||"");
+    var boundary = Number(req.activityBoundaryVersion)||0;
+    var ref = db.collection('tasks').doc(taskId);
+    var out = await db.runTransaction(async function(tx){
+      var snap = await tx.get(ref);
+      if(!snap || !snap.exists) return { status:"task_deleted" };
+      var data = snap.data() || {};
+      var completed = (typeof isTaskCompleted==='function') ? isTaskCompleted(data)
+        : (String(data.status||'')==='concluido' || ['concluido','entregue'].indexOf(String(data.designerFlowStatus||data.designerWorkflowStage||''))>=0);
+      if(completed) return { status:"task_completed" };
+      var col = (typeof designerCol==='function') ? designerCol(data) : (data.status||'afazer');
+      if(String(col)!=='andamento') return { status:"activity_changed" };                 // saiu de "Em andamento" ⇒ ciclo obsoleto
+      var curResp = (data.designerAssignment&&data.designerAssignment.designerId) || data.assigneeId || '';
+      if(req.recipientUid && curResp && String(curResp)!==String(req.recipientUid)) return { status:"not_authorized", error:"resp-changed" };
+      var hist = Array.isArray(data.history) ? data.history : [];
+      // idempotência por idleCheckKey (1ª resposta vence; 2ª ⇒ already_answered)
+      for(var i=0;i<hist.length;i++){ if(hist[i] && String(hist[i].idleCheckKey||"")===idleCheckKey) return { status:"already_answered" }; }
+      // atividade NOVA real após o cálculo (exclui ack e a própria resposta de check-in) ⇒ activity_changed
+      for(var j=0;j<hist.length;j++){ var he=hist[j]||{}; var hat=Number(he.at||he.atMs)||0;
+        if(hat>boundary){ var k=String(he.kind||''); var ty=String(he.type||'');
+          if(k==='task_idle_response') continue;
+          if(k==='sla_decision' && String(he.decisionType||'')==='acknowledge_only') continue;
+          if(k==='moved'||k==='designer_moved'||k==='edited'||k==='sla_decision'||(ty && !k)) return { status:"activity_changed" };
+        }
+      }
+      var ca=(data.clientActions&&typeof data.clientActions==='object')?data.clientActions:{};
+      for(var ck in ca){ if(ca[ck] && Number(ca[ck].at)>boundary) return { status:"activity_changed" }; }
+      // acrescenta EXATAMENTE UMA entrada task_idle_response (aditiva; leitores toleram kind heterogêneo)
+      var _now = Date.now();
+      var entry = { kind:'task_idle_response', idleCheckKey: idleCheckKey, responseType: responseType,
+        activityBoundaryVersion: boundary, statusVersion: String(req.statusVersion||''), thresholdVersion: String(req.thresholdVersion||''),
+        at:_now, atMs:_now, byId: me||null, byUid: me||null, by:(state.user&&state.user.name)||'', source:'desktop-1.0.207' };
+      if(responseType==='blocked'){
+        if(req.reasonCode) entry.reasonCode=String(req.reasonCode);
+        if(req.reasonText) entry.reasonText=String(req.reasonText).slice(0,300);
+        var brecs=[]; var soc=socialOf(data); if(soc && String(soc)!==me) brecs.push(String(soc));
+        if(data.by && String(data.by)!==me && brecs.indexOf(String(data.by))<0) brecs.push(String(data.by));
+        entry.blockedRecipientIds = brecs;
+      }
+      if(responseType==='help_requested'){ entry.helpRecipientId=String(req.helpRecipientId||''); entry.helpRecipientName=String(req.helpRecipientName||''); if(req.helpText) entry.helpText=String(req.helpText).slice(0,300); }
+      var upd = {};
+      if(responseType==='return_to_todo'){
+        // transição canônica ÚNICA (mesma do moveStatus 'afazer'): campos + 2ª entrada de histórico no MESMO update
+        var rtt = buildReturnToTodoPatch(Object.assign({ id: taskId }, data), _now, me);
+        for(var f in rtt.fields){ upd[f]=rtt.fields[f]; }
+        upd.history = firebase.firestore.FieldValue.arrayUnion(entry, rtt.historyEntry);
+      } else {
+        upd.history = firebase.firestore.FieldValue.arrayUnion(entry);
+      }
+      tx.update(ref, upd);
+      return { status:"committed", deep:"detail/"+taskId };
+    });
+    return out || { status:"offline", error:"no-result" };
+  }catch(e){ return { status:"offline", error: String((e&&e.message)||e||"").slice(0,120) }; }
+};
 // Coluna do quadro da Social Media: cronograma deriva do eixo do cliente; demais usam status.
 function socialCol(t){
   // Fase Produção 1 — D2: conclusão final canônica reflete imediatamente na coluna da Social.
@@ -6604,6 +6694,19 @@ function openMove(taskId){
 async function moveStatus(taskId,newStatus){
   if(slaGuardBlocked(taskId))return;   // FASE 5: atraso crítico bloqueia avançar/concluir OUTRAS tarefas
   const t=state.tasks.find(x=>x.id===taskId);if(!t)return;const now=Date.now();
+  // F3.5.4Q — 'Devolver para A Fazer' passa pelo helper canônico ÚNICO buildReturnToTodoPatch (mesma
+  // transição usada pela transação do check-in). Paridade byte-a-byte com o inline anterior nos 3 eixos
+  // (golden-master antes×depois); origem sempre 'andamento' (leavingDone=false ⇒ não apaga campos).
+  if(newStatus==='afazer'){
+    const _uid=(state.user&&state.user.id)||null;
+    const _rtt=buildReturnToTodoPatch(t, now, _uid);
+    const _patch=Object.assign({}, _rtt.fields, { history: firebase.firestore.FieldValue.arrayUnion(_rtt.historyEntry) });
+    Object.assign(t, _rtt.fields);   // otimismo local (sem o arrayUnion, que não pode ser mesclado direto)
+    closeModal();render();
+    try{ await db.collection('tasks').doc(taskId).update(_patch); }
+    catch(e){ console.warn('moveStatus(afazer):',e); }
+    return;
+  }
   if(isDesignerAxisMove(t)){
     if(secOf(t.sector).key==='edicao_cards'){
       /* F3.5.2C — Edição de Cards: eixo do designer ISOLADO e BIDIRECIONAL. Sincroniza t.status em
@@ -8475,6 +8578,8 @@ function notifDiagCardHtml(d){
     '<button class="settrow" data-cfggrouping="'+(d.groupingEnabled===false?'on':'off')+'"><div class="icb">'+svg('gear')+'</div><div class="sm"><div class="sl">Agrupar atualizações comuns da mesma tarefa</div><div class="ss">'+(d.groupingEnabled===false?'Desligado — cada atualização vem separada. Tocar para ligar':'Ligado — atualizações comuns da mesma tarefa aparecem juntas (a 1ª em tempo real). Tocar para desligar')+'</div></div><div class="arr">'+svg('arr')+'</div></button><div class="divline"></div>'+
     /* F3.5.4P — opções de ação (decisão do responsável) nos alertas de prazo */
     '<button class="settrow" data-cfgsladecision="'+(d.slaDecisionActionsEnabled===false?'on':'off')+'"><div class="icb">'+svg('gear')+'</div><div class="sm"><div class="sl">Mostrar opções de ação nos alertas de prazo</div><div class="ss">'+(d.slaDecisionActionsEnabled===false?'Desligado — o alerta mostra apenas OK. Tocar para ligar':'Ligado — o responsável informa o que fará (Iniciar, Finalizando, Bloqueado, Ajuda). Tocar para desligar')+'</div></div><div class="arr">'+svg('arr')+'</div></button><div class="divline"></div>'+
+    /* F3.5.4Q — verificar tarefas paradas em "Em andamento" (check-in de atividade) */
+    '<button class="settrow" data-cfgtaskidle="'+(d.taskIdleDetectionEnabled===false?'on':'off')+'"><div class="icb">'+svg('gear')+'</div><div class="sm"><div class="sl">Verificar tarefas paradas em “Em andamento”</div><div class="ss">'+(d.taskIdleDetectionEnabled===false?'Desligado — nenhum check-in de atividade. Tocar para ligar':'Ligado — pergunta ao responsável se a tarefa continua sendo executada quando fica sem atualização pelo período configurado. Tocar para desligar')+'</div></div><div class="arr">'+svg('arr')+'</div></button><div class="divline"></div>'+
     notifDiagRow('Versão do aplicativo', d.version||'—')+'<div class="divline"></div>'+
     '<button class="settrow" data-cfgnotifdiag="1"><div class="icb">'+svg('send')+'</div><div class="sm"><div class="sl">Atualizar diagnóstico</div><div class="ss">Relê o estado técnico agora</div></div><div class="arr">'+svg('arr')+'</div></button>';
 }
@@ -9378,6 +9483,16 @@ document.addEventListener('click',async e=>{
       try{ if(window.desktopAPI&&window.desktopAPI.slaDecisionSet){ await window.desktopAPI.slaDecisionSet(_cfgSlaDecOn); } }catch(_){}
       try{ notifDiagFill(); }catch(_){}
       flashToast(_cfgSlaDecOn?'Opções de ação nos alertas: ligado.':'Opções de ação nos alertas: desligado.');
+    })();
+    return;
+  }
+  /* F3.5.4Q — DETECÇÃO DE TAREFA PARADA (check-in): liga/desliga SOMENTE os novos check-ins (não apaga histórico/SLA). */
+  if(el=g('[data-cfgtaskidle]')){
+    var _cfgIdleOn=el.getAttribute('data-cfgtaskidle')==='on';
+    (async function(){
+      try{ if(window.desktopAPI&&window.desktopAPI.taskIdleSet){ await window.desktopAPI.taskIdleSet(_cfgIdleOn); } }catch(_){}
+      try{ notifDiagFill(); }catch(_){}
+      flashToast(_cfgIdleOn?'Verificação de tarefas paradas: ligada.':'Verificação de tarefas paradas: desligada.');
     })();
     return;
   }

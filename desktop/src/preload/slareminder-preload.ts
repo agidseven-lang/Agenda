@@ -16,4 +16,11 @@ contextBridge.exposeInMainWorld("slaAPI", {
   dismiss: (key: string) => ipcRenderer.send("slareminder-dismiss", key),
   resolveHelp: (req: unknown) => ipcRenderer.send("slareminder-resolve-help", req),
   onHelpCandidates: (cb: (cands: unknown) => void) => ipcRenderer.on("slareminder-help-candidates", (_e, c) => cb(c)),
+  // F3.5.4Q — check-in de tarefa parada (4 decisões, rascunho, dismiss, resolução de ajuda)
+  checkinDecide: (payload: unknown) => ipcRenderer.send("slareminder-checkin-decide", payload),
+  onCheckinResult: (cb: (result: unknown) => void) => ipcRenderer.on("slareminder-checkin-result", (_e, r) => cb(r)),
+  checkinDraft: (req: unknown) => ipcRenderer.send("slareminder-checkin-draft", req),
+  checkinDismiss: (key: string) => ipcRenderer.send("slareminder-checkin-dismiss", key),
+  checkinResolveHelp: (req: unknown) => ipcRenderer.send("slareminder-checkin-resolve-help", req),
+  onCheckinHelpCandidates: (cb: (cands: unknown) => void) => ipcRenderer.on("slareminder-checkin-help-candidates", (_e, c) => cb(c)),
 });

@@ -28,6 +28,8 @@ import { createStartupPrefs } from "./startupPrefs"; // F3.5.4N — iniciar com 
 import { createNotificationGrouping } from "./notificationGrouping"; // F3.5.4O — AGRUPAMENTO das notificações COMUNS (controlador puro; após dedup individual, antes da superfície comum)
 import { createSlaReminderController, classifyReminderLevel } from "./slaReminder"; // F3.5.4L — lembrete CENTRAL persistente de SLA (amarelo/vermelho)
 import { createSlaReminderSurface, loadReminderSounds } from "./slaReminderWindow"; // F3.5.4L — superfície Electron (janela central, som local)
+import { createTaskIdleStore } from "./taskIdleStore"; // F3.5.4Q — store durável do check-in (recibo de ciclo + fila offline, isolado)
+import { startTaskIdleScheduler } from "./taskIdleScheduler"; // F3.5.4Q — produtor ISOLADO do check-in de tarefa parada
 import { createSlaReminderStore } from "./slaReminderStore"; // F3.5.4L — recibo de reconhecimento (OK) + pendentes persistentes
 // UPDATER:BEGIN (F3.4.1A — atualizador nativo, processo main)
 import { createUpdaterService } from "./updaterService";
@@ -78,6 +80,11 @@ const groupTele = { updates: 0, lastUpdateAt: 0, lastOpenAt: 0, opens: 0 };
 // F3.5.4P — AÇÕES DE DECISÃO no alerta de SLA. Flag default ON; OFF ⇒ só OK (1.0.205). Telemetria SANITIZADA.
 let slaDecisionActionsEnabled = true;
 const slaDecisionTele = { committed: 0, alreadyDecided: 0, queued: 0, failed: 0, lastAt: 0, lastType: "" };
+// F3.5.4Q — DETECÇÃO DE TAREFA PARADA (check-in): produtor isolado + store durável + flag (default ON) + telemetria sanitizada
+let taskIdleScheduler: ReturnType<typeof startTaskIdleScheduler> | null = null;
+let taskIdleStore: ReturnType<typeof createTaskIdleStore> | null = null;
+let taskIdleDetectionEnabled = true;
+const taskIdleTele = { shown: 0, working: 0, blocked: 0, help: 0, returned: 0, lastAt: 0, lastType: "" };
 // F3.3.70D3R10U — opts do tray centralizados (usados por startup, session-login,
 // heartbeat e IPC tray-recreate; a recriacao usa SEMPRE o mesmo menu/quit).
 const trayWin = () => mainWin;
@@ -512,6 +519,22 @@ function saveGroupingFlag(v: boolean): void { try { const s = jsonStore("f354o-n
 // (1.0.205), preserva tudo, NÃO apaga decisões, NÃO altera backend. Constante local; NÃO remota.
 function loadSlaDecisionFlag(): boolean { try { return (jsonStore("f354p-notify.json").read() || {}).slaDecisionActionsEnabled !== false; } catch { return true; } }
 function saveSlaDecisionFlag(v: boolean): void { try { const s = jsonStore("f354p-notify.json"); const raw = s.read() || {}; raw.slaDecisionActionsEnabled = !!v; s.write(raw); } catch { /* */ } }
+// F3.5.4Q — flag da DETECÇÃO DE TAREFA PARADA (check-in). Default ON (undefined ⇒ true). OFF ⇒ nenhum novo
+// check-in; não apaga histórico; não altera SLA/backend/agrupamento/watchdog. Constante local; NÃO remota.
+function loadTaskIdleFlag(): boolean { try { return (jsonStore("f354q-notify.json").read() || {}).taskIdleDetectionEnabled !== false; } catch { return true; } }
+function saveTaskIdleFlag(v: boolean): void { try { const s = jsonStore("f354q-notify.json"); const raw = s.read() || {}; raw.taskIdleDetectionEnabled = !!v; s.write(raw); } catch { /* */ } }
+// F3.5.4Q — texto humano (LOCAL, sino) da resposta de check-in (enum; NUNCA texto livre — mesma sanitização).
+function taskIdleSinoText(info: any): string {
+  const nm = String((info && info.actorName) || "").trim(); const who = nm ? nm + " " : "";
+  const t = String((info && info.taskTitle) || ""); const suf = t ? " da tarefa " + t : "";
+  switch (String((info && info.responseType) || "")) {
+    case "working": return who + "confirmou que está trabalhando" + suf + ".";
+    case "blocked": return who + "informou bloqueio no check-in" + suf + (info && info.reasonCode ? " (" + slaReasonLabel(info.reasonCode) + ")." : ".");
+    case "help_requested": return who + "pediu ajuda no check-in" + suf + (info && info.recipientName ? " para " + info.recipientName + "." : ".");
+    case "return_to_todo": return who + "devolveu para A Fazer" + suf + ".";
+    default: return who + "respondeu ao check-in" + suf + ".";
+  }
+}
 // F3.5.4P — texto humano (LOCAL, sino) por tipo de decisão. Usa rótulo do reasonCode (enum) e etaMinutes;
 // NUNCA o texto livre (reasonText/helpText) — mesma sanitização das notificações.
 function slaReasonLabel(rc: string): string {
@@ -559,6 +582,24 @@ async function resolveSlaHelpViaRenderer(taskId: string, key: string): Promise<a
     return (res && typeof res === "object" && Array.isArray(res.eligible)) ? res : { eligible: [], reason: "none" };
   } catch { return { eligible: [], reason: "none" }; }
 }
+// F3.5.4Q — PERSISTÊNCIA OFICIAL da resposta de check-in: TRANSAÇÃO Firestore no RENDERER (__idlePersistResponse).
+// Mesmo padrão da decisão de SLA (executeJavaScript req/resp; timeout ⇒ offline ⇒ fila durável). SEM backend novo:
+// reusa o caminho de escrita em tasks/{id} sob transação (relê+valida+append único; return_to_todo aplica a
+// transição canônica via buildReturnToTodoPatch, no MESMO tx.update). A resolução de destinatário da ajuda REUSA
+// __slaResolveHelp (resolveSlaHelpViaRenderer) — mesma recipient policy da 1.0.206.
+async function persistIdleResponseViaRenderer(req: any): Promise<any> {
+  try {
+    const w = mainWin;
+    if (!w || w.isDestroyed() || !w.webContents || w.webContents.isLoading()) return { status: "offline", error: "no-renderer" };
+    const arg = JSON.stringify(JSON.stringify(req || {}));
+    const code = "(window.__idlePersistResponse ? window.__idlePersistResponse(JSON.parse(" + arg + ")) : {status:'offline',error:'no-fn'})";
+    const p = w.webContents.executeJavaScript(code, true);
+    const to = new Promise((resolve) => setTimeout(() => resolve({ status: "offline", error: "timeout" }), 15000));
+    const res: any = await Promise.race([p, to]);
+    if (!res || typeof res !== "object" || !res.status) return { status: "offline", error: "bad-result" };
+    return res;
+  } catch (e) { nlog("task.idle.relay.error", { err: String(((e as any) && (e as any).message) || e) }); return { status: "offline", error: "relay-throw" }; }
+}
 
 // F3.5.4N — reconciliação IDEMPOTENTE dos produtores de rede (recibos do notifierA + seen persistente
 // do slaScheduler impedem duplicação). Chamada pelo watchdog em reconexão/resume/unlock — 1 passada por
@@ -569,6 +610,9 @@ function reconcileAllProducers(reason: string): void {
   // F3.5.4P — no RETORNO DE REDE, sincroniza decisões de SLA pendentes (fila offline) com a MESMA transação
   // (idempotente por decisionKey: já-decidida ⇒ superseded; sem duplicação). Não bloqueia (fire-and-forget).
   try { if (slaReminderCtl) void slaReminderCtl.syncPendingDecisions(reason); } catch { /* */ }
+  // F3.5.4Q — sincroniza respostas de check-in pendentes (fila offline) com a MESMA transação (idempotente por idleCheckKey).
+  try { if (slaReminderCtl) void slaReminderCtl.syncPendingIdleResponses(reason); } catch { /* */ }
+  try { if (taskIdleScheduler) taskIdleScheduler.reconcile(reason); } catch { /* */ }
   selfHealTele.lastReconcileAt = Date.now(); selfHealTele.reconciles++;
 }
 
@@ -583,7 +627,7 @@ function startUserListeners(uid: string): void {
   // stopNotifier COMPÕE os teardowns aprovados. _notifSeen.clear()/toastAck.clear() são POR SESSÃO DE
   // USUÁRIO (troca de usuário); num restart do MESMO usuário isso é inofensivo — a dedup REAL está nos
   // recibos persistentes (notifierA), no seen persistente (slaScheduler) e no gate sinceMs (eventos).
-  stopNotifier = () => { try { _stopEventNew(); } catch { /* */ } try { _notifierA.stop(); } catch { /* */ } notifierAHandle = null; try { toastAck.clear(); } catch { /* */ } try { _notifSeen.clear(); } catch { /* */ } };
+  stopNotifier = () => { try { _stopEventNew(); } catch { /* */ } try { _notifierA.stop(); } catch { /* */ } notifierAHandle = null; try { toastAck.clear(); } catch { /* */ } try { _notifSeen.clear(); } catch { /* */ } try { if (taskIdleScheduler) { taskIdleScheduler.stop(); taskIdleScheduler = null; } } catch { /* */ } };
   // F3.4.3/R4B — PRODUTOR AUTORITATIVO de SLA no MAIN (amarelo/vermelho/crítico), MESMO "agora" canônico
   // do renderer (slaNow → offset do clockSync), entrega pelo MESMO HUB (deliverNotification). authUser =
   // papel AUTENTICADO (só p/ o gate canSeeAll do operational_block). F3.5.4-C3 — seen POR USUÁRIO (opts.seen)
@@ -591,6 +635,24 @@ function startUserListeners(uid: string): void {
   //   slaScheduler = startSlaScheduler(() => uid, deliverNotification, { now: slaNow, authUser: getAuthUser });
   slaScheduler = startSlaScheduler(() => uid, deliverNotification, { now: slaNow, authUser: getAuthUser, seen: createUserSlaSeen(uid) });
   slaScheduler.reconcile("boot");
+  // F3.5.4Q — PRODUTOR ISOLADO do check-in de tarefa parada: listener/timer PRÓPRIOS (NÃO toca slaScheduler/
+  // notifierA congelados). Emite para a MESMA janela central (enqueueCheckin, prioridade abaixo do SLA); só as
+  // tarefas DO usuário logado; gated por flag + sem amarelo/vermelho ativo (isCentralBusy). Reinicia com esta
+  // geração (restartAll do watchdog para stopNotifier→startUserListeners). Sem 2º watchdog/fila.
+  try { if (taskIdleScheduler) { taskIdleScheduler.stop(); taskIdleScheduler = null; } } catch { /* */ }
+  if (taskIdleStore) {
+    taskIdleScheduler = startTaskIdleScheduler(
+      () => uid,
+      (p) => { const r: any = slaReminderCtl ? slaReminderCtl.enqueueCheckin(p) : { ok: false, channel: "no-ctl" }; try { if (r && r.channel === "idle-central") taskIdleTele.shown++; } catch { /* */ } return r; },
+      {
+        now: slaNow,
+        isEnabled: () => taskIdleDetectionEnabled,
+        isCentralBusy: () => { try { return !!(slaReminderCtl && slaReminderCtl.hasPendingSla()); } catch { return false; } },
+        store: taskIdleStore,
+        onLog: (t, d) => { try { diag(t, d as any); } catch { /* */ } },
+      },
+    );
+  }
   // F3.5.4L — escuta READ-ONLY de conclusão (tarefa concluída com o modal aberto ⇒ mantém OK/suprime o
   // vermelho futuro). Aditiva; não toca scheduler/notifierA. Encerrada no logout/quit/restart.
   try {
@@ -652,12 +714,12 @@ app.whenReady().then(() => {
   // desbloquear/retomar). suspend ⇒ só diagnóstico. Vários listeners coexistem (EventEmitter).
   try {
     powerMonitor.on("lock-screen", () => { sessionLocked = true; nlog("notify.session.locked", {}); try { if (slaReminderCtl) slaReminderCtl.onLockChange(true); } catch { /* */ } });
-    powerMonitor.on("unlock-screen", () => { sessionLocked = false; nlog("notify.session.unlocked", {}); try { if (notifierAHandle) notifierAHandle.reconcile("unlock"); } catch { /* */ } try { if (slaReminderCtl) slaReminderCtl.onLockChange(false); } catch { /* */ } });
+    powerMonitor.on("unlock-screen", () => { sessionLocked = false; nlog("notify.session.unlocked", {}); try { if (notifierAHandle) notifierAHandle.reconcile("unlock"); } catch { /* */ } try { if (slaReminderCtl) slaReminderCtl.onLockChange(false); } catch { /* */ } try { if (taskIdleScheduler) taskIdleScheduler.reconcile("unlock"); } catch { /* */ } });
     // F3.5.4N — suspend PAUSA o timer de último recurso do watchdog (suspend NÃO é falha). O reconcile de
     // resume/unlock segue nos handlers aprovados (F3.4.3/F3.5.4K, acima/abaixo); o watchdog cobre a
     // recuperação por RETORNO DE REDE (setNetwork → reconcileAll) e o último recurso, sem 2º reconcile.
     powerMonitor.on("suspend", () => { diag("power.suspend"); try { if (listenerWatchdog) listenerWatchdog.onSuspend(); } catch { /* */ } });
-    powerMonitor.on("resume", () => { try { if (notifierAHandle) notifierAHandle.reconcile("resume"); } catch { /* */ } try { if (slaReminderCtl) slaReminderCtl.reconcile("resume"); } catch { /* */ } try { if (slaReminderCtl) void slaReminderCtl.syncPendingDecisions("resume"); } catch { /* */ } });
+    powerMonitor.on("resume", () => { try { if (notifierAHandle) notifierAHandle.reconcile("resume"); } catch { /* */ } try { if (slaReminderCtl) slaReminderCtl.reconcile("resume"); } catch { /* */ } try { if (slaReminderCtl) void slaReminderCtl.syncPendingDecisions("resume"); } catch { /* */ } try { if (slaReminderCtl) void slaReminderCtl.syncPendingIdleResponses("resume"); } catch { /* */ } try { if (taskIdleScheduler) taskIdleScheduler.reconcile("resume"); } catch { /* */ } });
   } catch { /* powerMonitor pode não existir em todas as plataformas */ }
 
   // F3.5.4L — LEMBRETE CENTRAL PERSISTENTE DE SLA (amarelo/vermelho). Superfície do MAIN (sobrevive a
@@ -668,17 +730,30 @@ app.whenReady().then(() => {
   try {
     slaReminderSounds = loadReminderSounds();
     slaDecisionActionsEnabled = loadSlaDecisionFlag();   // F3.5.4P — flag persistida (default ON)
+    taskIdleDetectionEnabled = loadTaskIdleFlag();       // F3.5.4Q — flag persistida (default ON)
+    taskIdleStore = createTaskIdleStore({ log: (t: string, d?: unknown) => { try { diag(t, d as any); } catch { /* */ } } });
     const slaReminderStore = createSlaReminderStore({ log: (t: string, d?: unknown) => { try { diag(t, d as any); } catch { /* */ } } });
     const slaSurface = createSlaReminderSurface({
       onAck: (key, windowState) => { try { if (slaReminderCtl) slaReminderCtl.ack(key, windowState); } catch { /* */ } },
       onOpenTask: (deep) => { nlog("notify.click.received", { via: "sla-reminder", deep }); bringToFrontAndOpen(deep); },
-      nativeNotify: (view) => nativeNotify({ title: view.title + " — " + (view.taskTitle || "SLA"), body: view.body || "", eventType: "sla_reminder_native", taskId: (view.deep || "").replace(/^detail\//, ""), action: { type: "detail", deep: view.deep }, sound: true } as any, view.key, view.deep),
+      nativeNotify: (view) => {
+        const anyv = view as any;
+        const isCheckin = anyv.kind === "checkin";
+        const title = isCheckin ? ("Check-in de atividade — " + (anyv.taskTitle || "Tarefa")) : ((anyv.title || "SLA") + " — " + (anyv.taskTitle || "SLA"));
+        const body = isCheckin ? ("A tarefa permanece sem uma atualização registrada há " + (anyv.sinceText || "") + ". Esta tarefa ainda está sendo executada?") : (anyv.body || "");
+        return nativeNotify({ title, body, eventType: isCheckin ? "task_idle_native" : "sla_reminder_native", taskId: (view.deep || "").replace(/^detail\//, ""), action: { type: "detail", deep: view.deep }, sound: true } as any, view.key, view.deep);
+      },
       onLog: (t, d) => { try { diag(t, d as any); } catch { /* */ } },
       // F3.5.4P — decisão do responsável: a janela envia a decisão → controlador (transação); dismiss fecha
       // após mensagem informativa; resolveHelp resolve o destinatário da ajuda no renderer (state.users).
       onDecide: async (input) => { try { return slaReminderCtl ? await slaReminderCtl.onDecide(input) : { status: "ignored" }; } catch (e) { diag("sla.decision.ondecide.error", { err: String(((e as any) && (e as any).message) || e) }); return { status: "error", error: "onDecide" }; } },
       onDismiss: (key) => { try { if (slaReminderCtl) slaReminderCtl.dismiss(key); } catch { /* */ } },
       onResolveHelp: (taskId, key) => resolveSlaHelpViaRenderer(taskId, key),
+      // F3.5.4Q — check-in de tarefa parada: 4 decisões (transação), rascunho (suspend/restore), dismiss, ajuda (reusa 1.0.206).
+      onCheckinDecide: async (input) => { try { return slaReminderCtl ? await slaReminderCtl.onCheckinDecide(input) : { status: "ignored" }; } catch (e) { diag("task.idle.oncheckin.error", { err: String(((e as any) && (e as any).message) || e) }); return { status: "error", error: "onCheckinDecide" }; } },
+      onCheckinDraft: (key, draft) => { try { if (slaReminderCtl) slaReminderCtl.onCheckinDraft(key, draft); } catch { /* */ } },
+      onCheckinDismiss: (key) => { try { if (slaReminderCtl) slaReminderCtl.dismissCheckin(key); } catch { /* */ } },
+      onCheckinResolveHelp: (taskId, key) => resolveSlaHelpViaRenderer(taskId, key),
     });
     slaReminderCtl = createSlaReminderController({
       surface: slaSurface, store: slaReminderStore, now: () => Date.now(),
@@ -714,6 +789,23 @@ app.whenReady().then(() => {
         } catch { /* histórico local nunca derruba o ack */ }
       },
       onLog: (t, d) => { try { diag(t, d as any); } catch { /* */ } },
+      // F3.5.4Q — check-in de tarefa parada (aditivo; prioridade abaixo do SLA; transação própria; sino/telemetria sanitizada).
+      persistIdleResponse: (req) => persistIdleResponseViaRenderer(req),
+      idleEnabled: () => taskIdleDetectionEnabled,
+      idleStore: taskIdleStore || undefined,
+      onIdleResponded: (info) => {
+        try {
+          const rt = String(info.responseType || "");
+          if (rt === "working") taskIdleTele.working++; else if (rt === "blocked") taskIdleTele.blocked++; else if (rt === "help_requested") taskIdleTele.help++; else if (rt === "return_to_todo") taskIdleTele.returned++;
+          taskIdleTele.lastAt = Date.now(); taskIdleTele.lastType = rt;
+          mainWin?.webContents.send("notif-history", {
+            eventType: "task_idle_response", severity: "info", taskId: info.taskId, dedupKey: "task_idle_ack:" + info.idleCheckKey,
+            title: "Resposta de check-in registrada", body: taskIdleSinoText(info),
+            context: "", createdAt: Date.now(), source: "task-idle", providerCalled: false,
+            action: { type: "detail", deep: info.taskId ? "detail/" + info.taskId : "" },
+          });
+        } catch { /* sino local nunca derruba o commit */ }
+      },
     });
     diag("sla.reminder.init", { warnBytes: (slaReminderSounds.warning || "").length, critBytes: (slaReminderSounds.critical || "").length });
   } catch (e) { diag("sla.reminder.init.error", { err: String(((e as any) && (e as any).message) || e) }); }
@@ -840,6 +932,8 @@ app.whenReady().then(() => {
       groupingOpens: groupTele.opens, groupingLastOpenAt: groupTele.lastOpenAt,
       // F3.5.4P — decisão do responsável (telemetria SANITIZADA: sem conteúdo/uid/reasonText)
       slaDecisionActionsEnabled, slaDecisionCommitted: slaDecisionTele.committed, slaDecisionLastType: slaDecisionTele.lastType, slaDecisionLastAt: slaDecisionTele.lastAt,
+      // F3.5.4Q — check-in de tarefa parada (telemetria SANITIZADA: contadores/flag/últimoTipo; sem conteúdo/uid/reasonText)
+      taskIdleDetectionEnabled, taskIdleShown: taskIdleTele.shown, taskIdleWorking: taskIdleTele.working, taskIdleBlocked: taskIdleTele.blocked, taskIdleHelp: taskIdleTele.help, taskIdleReturned: taskIdleTele.returned, taskIdleLastType: taskIdleTele.lastType, taskIdleLastAt: taskIdleTele.lastAt,
     };
   });
   // F3.5.4N — REDE: o renderer reporta navigator.onLine + eventos online/offline (sinal REAL do SO). O
@@ -875,6 +969,9 @@ app.whenReady().then(() => {
   // alertas de prazo. OFF ⇒ só OK (1.0.205), preserva tudo, NÃO apaga decisões já gravadas, NÃO altera backend.
   ipcMain.handle("sla-decision-get", () => ({ enabled: slaDecisionActionsEnabled }));
   ipcMain.handle("sla-decision-set", (_e, v: boolean) => { slaDecisionActionsEnabled = !!v; saveSlaDecisionFlag(slaDecisionActionsEnabled); diag("sla.decision.flag", { enabled: slaDecisionActionsEnabled }); return { enabled: slaDecisionActionsEnabled }; });
+  // F3.5.4Q — flag da DETECÇÃO DE TAREFA PARADA (Configurações → Notificações). OFF ⇒ nenhum novo check-in.
+  ipcMain.handle("task-idle-get", () => ({ enabled: taskIdleDetectionEnabled }));
+  ipcMain.handle("task-idle-set", (_e, v: boolean) => { taskIdleDetectionEnabled = !!v; saveTaskIdleFlag(taskIdleDetectionEnabled); diag("task.idle.flag", { enabled: taskIdleDetectionEnabled }); return { enabled: taskIdleDetectionEnabled }; });
   // F3.5.3 — leitura de texto da área de transferência p/ o pipeline explícito de COLAGEM do
   // formulário (Legenda/Tema/Observações). SOMENTE texto simples; nunca HTML executável.
   ipcMain.handle("clipboard-read-text", () => { try { return String(clipboard.readText() || ""); } catch { return ""; } });
@@ -990,6 +1087,7 @@ app.whenReady().then(() => {
       // dentro de startUserListeners.
       try { if (slaReminderCtl) slaReminderCtl.reconcile("login"); } catch { /* */ }
       try { if (slaReminderCtl) void slaReminderCtl.syncPendingDecisions("login"); } catch { /* */ } // F3.5.4P — sincroniza fila offline do usuário logado
+      try { if (slaReminderCtl) void slaReminderCtl.syncPendingIdleResponses("login"); } catch { /* */ } // F3.5.4Q — sincroniza fila offline de check-in
       // UPDATER:BEGIN (F3.4.1A — política de verificação item 2: após restauração da sessão)
       if (updater) updater.checkAuto("session-restore");
       // UPDATER:END

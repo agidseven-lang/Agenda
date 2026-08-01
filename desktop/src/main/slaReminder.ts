@@ -86,13 +86,86 @@ export type DecisionPublicResult =
   { status: "committed" | "already_decided" | "task_completed" | "task_deleted" | "queued" | "error" | "ignored";
     decisionType?: DecisionType; deep?: string; error?: string };
 
+/**
+ * F3.5.4Q — CHECK-IN DE TAREFA PARADA (view AZUL, não acusatória) — cidadão de PRIORIDADE MAIS BAIXA
+ * da MESMA janela central (garante "nunca duas janelas centrais"). O SLA (amarelo/vermelho) SEMPRE
+ * preempta: ao chegar um SLA com o check-in ativo, o rascunho é preservado, o check-in é suspenso
+ * (recolocado na fila) e o SLA é exibido; ao esvaziar o SLA, o check-in é restaurado se o ciclo
+ * continuar válido. A persistência é uma TRANSAÇÃO própria (persistIdleResponse) — NUNCA mistura com
+ * a decisão de SLA (sla_decision permanece intacta).
+ */
+export type CheckinResponseType = "working" | "blocked" | "help_requested" | "return_to_todo";
+export type CheckinState = "prompt" | "already_answered" | "activity_changed" | "task_completed" | "task_deleted" | "queued" | "error";
+
+export type CheckinView = {
+  kind: "checkin";
+  key: string;                 // idleCheckKey (também é a dedupKey)
+  taskId: string;
+  recipientUid: string;
+  actorName: string;
+  actorAvatar: string;
+  taskTitle: string;
+  clientName: string;
+  etapa: string;               // "Em andamento"
+  sinceText: string;           // "há 2 horas"
+  inactivityMinutes: number;
+  deep: string;
+  soundDataUri: string;
+  statusVersion: string;
+  activityBoundaryVersion: number;
+  thresholdVersion: string;
+  draft?: any;                 // rascunho preservado (suspend/restore): {responseType,reasonCode,reasonText,helpText,helpRecipientId,...}
+  state?: CheckinState;        // estado exibido (default 'prompt')
+  queueLen?: number;           // sempre 0 no check-in (não expõe contador de SLA)
+};
+
+/** View central (SLA amarelo/vermelho OU check-in azul). */
+export type CentralView = ReminderView | CheckinView;
+
+export type CheckinDecisionInput = {
+  key: string;                 // idleCheckKey ATIVO
+  responseType: CheckinResponseType;
+  reasonCode?: string;         // blocked
+  reasonText?: string;         // blocked 'outro'
+  helpText?: string;           // help
+  helpRecipientId?: string;    // help — destinatário resolvido/escolhido no renderer (C5)
+  helpRecipientName?: string;
+  confirmReturn?: boolean;     // return_to_todo — confirmação explícita do usuário
+};
+
+export type IdlePersistStatus =
+  "committed" | "already_answered" | "activity_changed" | "task_completed" | "task_deleted" | "not_authorized" | "offline" | "error";
+export type IdlePersistResult = { status: IdlePersistStatus; error?: string; deep?: string };
+
+export type IdlePersistRequest = {
+  idleCheckKey: string;
+  taskId: string;
+  recipientUid: string;
+  responseType: CheckinResponseType;
+  activityBoundaryVersion: number;   // lastMeaningfulActivityAt (a transação revalida)
+  statusVersion: string;
+  thresholdVersion: string;
+  reasonCode?: string;
+  reasonText?: string;
+  helpText?: string;
+  helpRecipientId?: string;
+  helpRecipientName?: string;
+  actorId: string;
+  actorName: string;
+  taskTitle: string;
+};
+
+export type CheckinPublicResult =
+  { status: "committed" | "already_answered" | "activity_changed" | "task_completed" | "task_deleted" | "queued" | "error" | "ignored";
+    responseType?: CheckinResponseType; deep?: string; error?: string };
+
 /** Superfície injetável (produção = Electron; teste = fake que registra chamadas). */
 export type ReminderSurface = {
-  show: (view: ReminderView) => void;          // cria/exibe a janela central com este view
+  show: (view: CentralView) => void;          // cria/exibe a janela central com este view (SLA ou check-in)
   promote: (view: ReminderView) => void;       // atualiza a MESMA janela (amarelo→vermelho) + som vermelho
   close: () => void;                           // destrói a janela (após ack)
   isOpen: () => boolean;
-  native: (view: ReminderView) => boolean;     // fallback nativo persistente (lock / overlay bloqueado)
+  native: (view: CentralView) => boolean;     // fallback nativo persistente (lock / overlay bloqueado)
   onNoRender?: (key: string, cb: () => void) => void; // prova de render; se não renderizar, cb (fallback)
 };
 
@@ -125,6 +198,18 @@ export type SlaReminderControllerOpts = {
   persistDecision?: (req: DecisionPersistRequest) => Promise<DecisionPersistResult>; // TRANSAÇÃO real (renderer); teste injeta simulador OCC
   onDecided?: (info: { decisionType: DecisionType; key: string; level: ReminderLevel; actorName: string; taskTitle: string; taskId: string; etaMinutes?: number; reasonCode?: string; recipientName?: string }) => void; // sino/observabilidade pós-commit
   decisionsEnabled?: () => boolean; // feature flag slaDecisionActionsEnabled (default ON); OFF ⇒ controlador ignora decisões (só OK)
+  // F3.5.4Q — CHECK-IN DE TAREFA PARADA (aditivo; prioridade abaixo do SLA)
+  persistIdleResponse?: (req: IdlePersistRequest) => Promise<IdlePersistResult>; // TRANSAÇÃO real (renderer); teste injeta simulador OCC
+  onIdleResponded?: (info: { responseType: CheckinResponseType; idleCheckKey: string; actorName: string; taskTitle: string; taskId: string; reasonCode?: string; recipientName?: string }) => void; // sino/observabilidade pós-commit
+  idleEnabled?: () => boolean;      // feature flag taskIdleDetectionEnabled (default ON); OFF ⇒ ignora check-in
+  idleStore?: {
+    getResponse: (idleCheckKey: string) => any;
+    isResponseSettled: (idleCheckKey: string) => boolean;
+    markResponsePending: (rec: any) => void;
+    markResponseSynced: (idleCheckKey: string, meta?: any) => void;
+    markResponseSuperseded: (idleCheckKey: string) => void;
+    listResponsesPendingSync: () => any[];
+  };
 };
 
 const LEVEL_RANK: Record<ReminderLevel, number> = { critical: 0, warning: 1 };
@@ -156,6 +241,14 @@ export function createSlaReminderController(opts: SlaReminderControllerOpts) {
   const inFlight = new Set<string>();         // idempotência: decisionKeys em processamento (bloqueia duplo-clique/reentrância)
   const persistDecision = opts.persistDecision || (async () => ({ status: "offline" as DecisionPersistStatus }));
   const decisionsEnabled = opts.decisionsEnabled || (() => true);
+  // F3.5.4Q — CHECK-IN DE TAREFA PARADA (estado ISOLADO; prioridade ABAIXO de qualquer SLA)
+  type CheckinItem = { key: string; view: CheckinView; taskId: string; recipientUid: string; enqueuedAt: number };
+  const checkinQueue: CheckinItem[] = [];
+  let activeCheckin: CheckinItem | null = null;
+  const checkinInFlight = new Set<string>();
+  const persistIdleResponse = opts.persistIdleResponse || (async () => ({ status: "offline" as IdlePersistStatus }));
+  const idleEnabled = opts.idleEnabled || (() => true);
+  const idleStore = opts.idleStore || null;
 
   function baseOf(p: any): string { return String((p && p.taskId) || "") + ":" + String((p && p.targetUserId) || (p && p.recipientUid) || ""); }
   function recipientOf(p: any): string { return String((p && p.targetUserId) || (p && p.recipientUid) || ""); }
@@ -208,7 +301,8 @@ export function createSlaReminderController(opts: SlaReminderControllerOpts) {
   function showNext(): void {
     if (stopped || active) return;
     const idx = pickNextIndex();
-    if (idx < 0) { if (surface.isOpen()) { try { surface.close(); } catch { /* */ } } return; }
+    // F3.5.4Q — nenhum SLA pendente ⇒ tenta o check-in (prioridade mais baixa) ou fecha a janela.
+    if (idx < 0) { showNextCheckin(); return; }
     const it = queue.splice(idx, 1)[0];
     // valida antes de exibir (tarefa concluída/removida/destinatário inválido ⇒ pula, sem emitir)
     if (!taskValid(String(it.view.deep.replace(/^detail\//, "") || it.key), recipientOf({ dedupKey: it.key, targetUserId: it.base.split(":")[1] }))) {
@@ -234,12 +328,66 @@ export function createSlaReminderController(opts: SlaReminderControllerOpts) {
     }
   }
 
+  // ═══════════════ F3.5.4Q — CHECK-IN DE TAREFA PARADA (helpers internos) ═══════════════
+  function checkinPendingCount(): number { return (activeCheckin ? 1 : 0) + checkinQueue.length; }
+
+  function buildCheckinView(p: any): CheckinView {
+    return {
+      kind: "checkin",
+      key: String((p && (p.idleCheckKey || p.dedupKey || p.key)) || ""),
+      taskId: String((p && p.taskId) || ""),
+      recipientUid: String((p && p.recipientUid) || ""),
+      actorName: String((p && (p.responsibleName || p.actorName)) || ""),
+      actorAvatar: String((p && (p.responsibleAvatar || p.actorAvatar)) || ""),
+      taskTitle: String((p && p.taskTitle) || "Tarefa"),
+      clientName: String((p && p.clientName) || ""),
+      etapa: String((p && p.etapa) || "Em andamento"),
+      sinceText: String((p && p.sinceText) || ""),
+      inactivityMinutes: Number((p && p.inactivityMinutes)) || 0,
+      deep: String((p && p.action && p.action.deep) || (p && p.taskId ? "detail/" + p.taskId : "")),
+      soundDataUri: String((p && p.soundDataUri) || ""),   // som NEUTRO/discreto (opcional; default vazio)
+      statusVersion: String((p && p.statusVersion) || ""),
+      activityBoundaryVersion: Number((p && p.activityBoundaryVersion)) || 0,
+      thresholdVersion: String((p && p.thresholdVersion) || ""),
+      state: "prompt",
+      queueLen: 0,
+    };
+  }
+
+  /** Suspende (preservando rascunho) o check-in ativo quando um SLA precisa da janela central. */
+  function suspendActiveCheckinForSla(): void {
+    if (!activeCheckin) return;
+    checkinQueue.unshift(activeCheckin);   // volta à FRENTE da fila; rascunho preservado em .view.draft
+    log("task.idle.check_suspended_for_sla", { key: mask(activeCheckin.key) });
+    activeCheckin = null;
+    // NÃO fecha a janela: o showNext do SLA fará surface.show(sla), substituindo o conteúdo.
+  }
+
+  /** Mostra o próximo check-in (só quando NÃO há SLA ativo/na fila) ou fecha a janela. */
+  function showNextCheckin(): void {
+    if (stopped) return;
+    if (active || queue.length) return;         // SLA tem PRIORIDADE absoluta sobre o check-in
+    if (activeCheckin) return;
+    // descarta itens já respondidos (qualquer estado) — o ciclo não deve reaparecer
+    while (checkinQueue.length && idleStore && idleStore.getResponse(checkinQueue[0].key)) checkinQueue.shift();
+    if (!checkinQueue.length) { if (surface.isOpen()) { try { surface.close(); } catch { /* */ } } return; }
+    const it = checkinQueue.shift()!;
+    if (!taskValid(it.taskId, it.recipientUid)) { log("task.idle.cancelled_gone", { key: mask(it.key) }); return showNextCheckin(); }
+    activeCheckin = it;
+    if (isLocked()) { try { const ok = surface.native(it.view); log("task.idle.locked", { key: mask(it.key), nativeOk: ok }); } catch (e) { log("task.idle.native.failed", { key: mask(it.key), err: errMsg(e) }); } return; }
+    try { surface.show(it.view); } catch (e) { log("task.idle.show.failed", { key: mask(it.key), err: errMsg(e) }); }
+    log("task.idle.check_shown", { key: mask(it.key), taskId: it.taskId });
+    if (surface.onNoRender) { surface.onNoRender(it.key, () => { try { surface.native(it!.view); } catch { /* */ } }); }
+  }
+
   return {
     /** Entrada do HUB: recebe um payload de SLA amarelo/vermelho já classificado. */
     enqueue(p: any): { ok: boolean; channel: string } {
       if (stopped) return { ok: false, channel: "none" };
       const level = classifyReminderLevel(p);
       if (!level) return { ok: false, channel: "not-sla" };
+      // F3.5.4Q — PRIORIDADE: um SLA chegando SUSPENDE (preservando rascunho) um check-in ativo.
+      suspendActiveCheckinForSla();
       const key = String((p && p.dedupKey) || "");
       if (!key) return { ok: false, channel: "none" };
       if (store.isAcked(key)) { log("sla.reminder.dedup.skipped", { key: mask(key), reason: "acked" }); return { ok: true, channel: "sla-acked" }; }
@@ -460,10 +608,15 @@ export function createSlaReminderController(opts: SlaReminderControllerOpts) {
     onLockChange(locked: boolean): void {
       if (locked) {
         if (active) { try { const ok = surface.native(active.view); log("sla.reminder.locked", { key: mask(active.key), nativeOk: ok, switched: true }); } catch (e) { log("sla.reminder.native.failed", { err: errMsg(e) }); } try { surface.close(); } catch { /* */ } }
+        else if (activeCheckin) { // F3.5.4Q — check-in ativo (sem SLA): nativa + recoloca na fila p/ reexibir no unlock
+          try { const ok = surface.native(activeCheckin.view); log("task.idle.locked", { key: mask(activeCheckin.key), nativeOk: ok, switched: true }); } catch (e) { log("task.idle.native.failed", { err: errMsg(e) }); }
+          checkinQueue.unshift(activeCheckin); activeCheckin = null; try { surface.close(); } catch { /* */ }
+        }
       } else {
         // unlock: se havia ativo (mostrado em nativa), reabre central; e reconcilia pendentes
         if (active && !surface.isOpen()) { try { surface.show(active.view); log("sla.reminder.unlock.reshown", { key: mask(active.key), single: true }); } catch { /* */ } }
         this.reconcile("unlock");
+        if (!active && !queue.length && !activeCheckin) showNextCheckin();   // F3.5.4Q — restaura o check-in suspenso
       }
     },
 
@@ -478,11 +631,121 @@ export function createSlaReminderController(opts: SlaReminderControllerOpts) {
         log("sla.reminder.cancelled.completed", { key: mask(active.key), active: true });
       } else { refreshCounter(); }
     },
+    // ═══════════════ F3.5.4Q — CHECK-IN DE TAREFA PARADA: API pública ═══════════════
+    /** Produtor idle: há amarelo/vermelho ativo ou na fila? (o produtor não emite check-in enquanto sim) */
+    hasPendingSla(): boolean { return !!active || queue.length > 0; },
+
+    /** Enfileira uma pergunta de check-in (prioridade ABAIXO do SLA; persistente sem duplicar). */
+    enqueueCheckin(p: any): { ok: boolean; channel: string } {
+      if (stopped) return { ok: false, channel: "none" };
+      if (!idleEnabled()) return { ok: false, channel: "idle-off" };
+      const key = String((p && (p.idleCheckKey || p.dedupKey || p.key)) || "");
+      if (!key) return { ok: false, channel: "none" };
+      if (idleStore && idleStore.getResponse(key)) return { ok: true, channel: "idle-answered" };   // já respondido ⇒ não reabrir
+      if ((activeCheckin && activeCheckin.key === key) || checkinQueue.some((q) => q.key === key)) return { ok: true, channel: "idle-dup" };
+      const view = buildCheckinView(p);
+      checkinQueue.push({ key, view, taskId: view.taskId, recipientUid: view.recipientUid, enqueuedAt: now() });
+      log("task.idle.check_queued", { key: mask(key), pending: checkinPendingCount() });
+      if (!active && !queue.length && !activeCheckin) showNextCheckin();   // só quando a janela central está livre de SLA
+      return { ok: true, channel: "idle-central" };
+    },
+
+    /** Rascunho do check-in (preserva o preenchido p/ suspend/restore). */
+    onCheckinDraft(key: string, draft: any): void {
+      const k = String(key || "");
+      if (activeCheckin && activeCheckin.key === k) { activeCheckin.view = Object.assign({}, activeCheckin.view, { draft }); return; }
+      for (const it of checkinQueue) if (it.key === k) { it.view = Object.assign({}, it.view, { draft }); return; }
+    },
+
+    /** DECISÃO do check-in — TRANSAÇÃO real; 1ª vence; 2ª already_answered; nova atividade activity_changed. */
+    async onCheckinDecide(input: CheckinDecisionInput): Promise<CheckinPublicResult> {
+      if (stopped) return { status: "ignored" };
+      if (!idleEnabled()) { log("task.idle.disabled.ignored", {}); return { status: "ignored" }; }
+      const k = String((input && input.key) || "");
+      if (!k || !activeCheckin || activeCheckin.key !== k) { log("task.idle.stale.ignored", { key: mask(k) }); return { status: "ignored" }; }
+      const cur = activeCheckin;
+      const responseType = String((input && input.responseType) || "") as CheckinResponseType;
+      if (responseType === "return_to_todo" && !input.confirmReturn) return { status: "ignored" };   // exige confirmação explícita
+      const idleCheckKey = cur.key;
+      if (checkinInFlight.has(idleCheckKey)) { log("task.idle.inflight.ignored", { key: mask(idleCheckKey) }); return { status: "ignored" }; }
+      checkinInFlight.add(idleCheckKey);
+      try {
+        if (idleStore && idleStore.isResponseSettled(idleCheckKey)) { log("task.idle.already.local", { key: mask(idleCheckKey) }); return { status: "already_answered" }; }
+        const req: IdlePersistRequest = {
+          idleCheckKey, taskId: cur.taskId, recipientUid: cur.recipientUid, responseType,
+          activityBoundaryVersion: cur.view.activityBoundaryVersion, statusVersion: cur.view.statusVersion, thresholdVersion: cur.view.thresholdVersion,
+          reasonCode: input.reasonCode, reasonText: input.reasonText, helpText: input.helpText,
+          helpRecipientId: input.helpRecipientId, helpRecipientName: input.helpRecipientName,
+          actorId: getUid() || cur.recipientUid, actorName: cur.view.actorName, taskTitle: cur.view.taskTitle,
+        };
+        try {
+          if (idleStore) idleStore.markResponsePending({ idleCheckKey, state: "pending_sync", responseType, recipientUid: cur.recipientUid, taskId: cur.taskId, activityBoundaryVersion: cur.view.activityBoundaryVersion, payload: req, createdAt: now(), updatedAt: now() });
+        } catch (e) { log("task.idle.persist.local.failed", { key: mask(idleCheckKey), err: errMsg(e) }); return { status: "error", error: "persist-local" }; }
+        log("task.idle.persist_started", { key: mask(idleCheckKey), responseType });
+
+        let res: IdlePersistResult;
+        try { res = await persistIdleResponse(req); }
+        catch (e) { log("task.idle.tx.threw", { key: mask(idleCheckKey), err: errMsg(e) }); res = { status: "offline" }; }
+
+        const closeIfActive = () => { if (activeCheckin === cur) { activeCheckin = null; try { surface.close(); } catch { /* */ } showNext(); } };
+        switch (res.status) {
+          case "committed": {
+            if (idleStore) idleStore.markResponseSynced(idleCheckKey, { syncedAt: now() });
+            log("task.idle.persist_success", { key: mask(idleCheckKey), responseType });
+            try { if (opts.onIdleResponded) opts.onIdleResponded({ responseType, idleCheckKey, actorName: cur.view.actorName, taskTitle: cur.view.taskTitle, taskId: cur.taskId, reasonCode: input.reasonCode, recipientName: input.helpRecipientName }); } catch { /* sino nunca derruba o commit */ }
+            closeIfActive();
+            return { status: "committed", responseType, deep: cur.view.deep };
+          }
+          case "already_answered": { if (idleStore) idleStore.markResponseSuperseded(idleCheckKey); log("task.idle.already_answered", { key: mask(idleCheckKey) }); return { status: "already_answered" }; }
+          case "activity_changed": { if (idleStore) idleStore.markResponseSuperseded(idleCheckKey); log("task.idle.activity_changed", { key: mask(idleCheckKey) }); return { status: "activity_changed" }; }
+          case "task_completed": { if (idleStore) idleStore.markResponseSuperseded(idleCheckKey); log("task.idle.cancelled_completed", { key: mask(idleCheckKey) }); return { status: "task_completed" }; }
+          case "task_deleted": { if (idleStore) idleStore.markResponseSuperseded(idleCheckKey); log("task.idle.cancelled_deleted", { key: mask(idleCheckKey) }); return { status: "task_deleted" }; }
+          case "not_authorized": { if (idleStore) idleStore.markResponseSuperseded(idleCheckKey); log("task.idle.not.authorized", { key: mask(idleCheckKey) }); return { status: "error", error: "not_authorized" }; }
+          case "offline":
+          default: { log("task.idle.offline_queued", { key: mask(idleCheckKey), responseType }); return { status: "queued" }; }   // fica pending_sync; sincroniza depois
+        }
+      } finally { checkinInFlight.delete(idleCheckKey); }
+    },
+
+    /** Fecha o check-in ativo após uma mensagem (already_answered / activity_changed / task_completed / task_deleted / queued). */
+    dismissCheckin(key: string): void {
+      const kk = String(key || "");
+      if (activeCheckin && activeCheckin.key === kk) { activeCheckin = null; try { surface.close(); } catch { /* */ } log("task.idle.dismissed", { key: mask(kk) }); showNext(); }
+      else { for (let i = checkinQueue.length - 1; i >= 0; i--) if (checkinQueue[i].key === kk) checkinQueue.splice(i, 1); }
+    },
+
+    /** Reconexão/resume/boot: re-dirige a MESMA transação p/ respostas idle pendentes de sync (sem duplicar). */
+    async syncPendingIdleResponses(reason?: string): Promise<void> {
+      if (stopped || !idleStore) return;
+      const pend = idleStore.listResponsesPendingSync() || [];
+      if (!pend.length) return;
+      const uid = getUid();
+      log("task.idle.sync.start", { reason: reason || "reconnect", count: pend.length });
+      for (const rec of pend) {
+        if (!rec || !rec.payload) continue;
+        if (uid && String(rec.recipientUid || "") !== uid) continue;
+        if (checkinInFlight.has(rec.idleCheckKey)) continue;
+        checkinInFlight.add(rec.idleCheckKey);
+        try {
+          let res: IdlePersistResult;
+          try { res = await persistIdleResponse(rec.payload); } catch { res = { status: "offline" }; }
+          if (res.status === "committed") {
+            idleStore.markResponseSynced(rec.idleCheckKey, { syncedAt: now(), viaSync: true });
+            log("task.idle.offline_synced", { key: mask(rec.idleCheckKey) });
+            try { if (opts.onIdleResponded) opts.onIdleResponded({ responseType: rec.responseType as CheckinResponseType, idleCheckKey: rec.idleCheckKey, actorName: String((rec.payload && rec.payload.actorName) || ""), taskTitle: String((rec.payload && rec.payload.taskTitle) || ""), taskId: rec.taskId, reasonCode: rec.payload && rec.payload.reasonCode, recipientName: rec.payload && rec.payload.helpRecipientName }); } catch { /* */ }
+          } else if (res.status === "already_answered" || res.status === "activity_changed" || res.status === "task_completed" || res.status === "task_deleted" || res.status === "not_authorized") {
+            idleStore.markResponseSuperseded(rec.idleCheckKey);
+            log("task.idle.superseded", { key: mask(rec.idleCheckKey), reason: res.status });
+          } else { log("task.idle.sync.stillPending", { key: mask(rec.idleCheckKey) }); }
+        } finally { checkinInFlight.delete(rec.idleCheckKey); }
+      }
+    },
+
     status() { return { open: surface.isOpen(), activeKey: active ? mask(active.key) : "", queueLen: pendingCount() }; },
     _debug() { return { active, queue: queue.slice() }; },
     /** Logout / troca de usuário: fecha a janela e limpa a memória (store PRESERVADO; o próximo login reexibe os pendentes do novo uid). */
-    clearActive() { try { surface.close(); } catch { /* */ } active = null; queue.length = 0; completedTasks.clear(); },
-    stop() { stopped = true; try { surface.close(); } catch { /* */ } queue.length = 0; active = null; },
+    clearActive() { try { surface.close(); } catch { /* */ } active = null; queue.length = 0; completedTasks.clear(); activeCheckin = null; checkinQueue.length = 0; },
+    stop() { stopped = true; try { surface.close(); } catch { /* */ } queue.length = 0; active = null; checkinQueue.length = 0; activeCheckin = null; },
   };
 }
 
