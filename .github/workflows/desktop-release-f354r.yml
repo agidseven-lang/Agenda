@@ -1,0 +1,272 @@
+# =====================================================================
+# F3.5.4R — Publicacao da Desktop 1.0.208 no CANAL DO ATUALIZADOR INTERNO (Latest)
+# ---------------------------------------------------------------------
+# Publica a 1.0.208 (F3.5.4R: ASSISTENTE INTELIGENTE DE PRIORIDADES / painel "Minhas Prioridades"):
+#   - camada DERIVADA e SOMENTE LEITURA que organiza, em tempo real, as tarefas que precisam da atencao
+#     de cada usuario primeiro. Consultivo/explicativo/deterministico — NAO altera tarefas nem notificacoes.
+#   - motor PURO priorityEngine.js sobre FATOS calculados pelos helpers CONGELADOS existentes (SLA, prazo,
+#     fase, papel); NAO duplica logica de SLA. Hierarquia N1 (vermelho real direcionado / prazo oficial
+#     vencido e pendente), N2 (amarelo real / termina hoje / alteracao pendente / acao-aprovacao direcionada),
+#     N3 (em andamento / A Fazer / futura / sem prazo) + 7 desempates deterministicos. Ocorrencias
+#     (ajuda/bloqueio) NUNCA elevam sozinhas — so enriquecem quando outro fato atual comprovado ja colocou a
+#     tarefa no topo; texto honesto "Pedido de ajuda registrado" / "Bloqueio reportado". Abre a tarefa pelo
+#     deep-link existente (openDetails). Flag LOCAL priorityAssistantEnabled (default ON) + preferencias
+#     visuais locais. Reutiliza o onSnapshot(tasks) existente. SEM previsao/IA/score/ranking de pessoas.
+# TODA a logica da 1.0.207 preservada (gates no build): deteccao de tarefa parada / check-in (F3.5.4Q),
+# decisao de SLA (F3.5.4P), lembrete central (F3.5.4L/M), agrupamento das comuns (F3.5.4O), notificacoes
+# individuais, tempos T-30/T-10, destinatarios, Card Premium/Cronograma/Monitor SLA/sino, autocorrecao/
+# inicializacao (F3.5.4N), updater e Android: INTOCADOS (renderer-only; todo o main/*.ts byte-identico).
+# USA EXCLUSIVAMENTE os BYTES do run de build F3.5.4R 30714544298 (gated, verde nos 2 jobs; --publish
+# never): NAO RECOMPILA — baixa os 2 artifacts e publica os MESMOS bytes. TUDO PINADO: run id, digests
+# dos artifacts, 5 hashes SHA-256, tag v1.0.208 no head EXATO da branch. 6 assets: EXE, MSI, latest.yml,
+# blockmap, SHA256SUMS, VERSAO-DESKTOP.txt.
+# ESCRITAS (tag + release + Latest) SO via token temporario do GitHub App "Agenda ID Seven Release Bot"
+# (expira sozinho); GITHUB_TOKEN permanece somente leitura; sem RELEASE_PAT.
+# Roda NA PROPRIA branch de teste (main INTOCAVEL): dispara no push DESTE arquivo + workflow_dispatch.
+# v1.0.207 (rollback), v1.0.206, v1.0.205 e v1.0.204 permanecem PRESERVADAS (releases/tags intocadas).
+# A publicacao NAO significa aprovacao fisica — o teste fisico do owner vem depois, pelo atualizador.
+# =====================================================================
+name: "F3.5.4R Desktop Release — 1.0.208 no canal do updater (assistente de prioridades; sem build novo)"
+"on":
+  push:
+    branches:
+      - "desktop/f354r-priority-assistant-1.0.208"
+    paths:
+      - ".github/workflows/desktop-release-f354r.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: agidseven-lang/Agenda
+      # ── PINAGEM COMPLETA (F3.5.4R; run de build 30714544298 verde nos 2 jobs) ──
+      RUN_ID: "30714544298"
+      STABLE_SHA: "db8cdca1d92cd42f3ec98aced39e6a418c4d478e"
+      TEST_BRANCH: "desktop/f354r-priority-assistant-1.0.208"
+      BASE_207_SHA: "17c8ef507206cc92dab5b1fcc1da9d9df7194ed0"
+      TAG: "v1.0.208"
+      TITLE: "Agenda ID Seven Desktop 1.0.208 — Assistente Inteligente de Prioridades"
+      ART_INST: "agenda-id-seven-desktop-1.0.208-installer"
+      ART_INST_DIGEST: "sha256:1c68307c136e6ea66d327e196431bc4f8ee227b8aa23bc4aa612bffda7c65827"
+      ART_META: "agenda-id-seven-desktop-1.0.208-updatemeta"
+      ART_META_DIGEST: "sha256:61f74ad2c600f525711996788ed897ccb018f93adcbd22094ef4ce763394ff87"
+      EXE_NAME: "Agenda-ID-Seven-Desktop-1.0.208-x64.exe"
+      MSI_NAME: "Agenda-ID-Seven-Desktop-1.0.208-x64.msi"
+      BM_NAME: "Agenda-ID-Seven-Desktop-1.0.208-x64.exe.blockmap"
+      LY_NAME: "latest.yml"
+      EXP_EXE: "d89345461d50f9cd17e26d16850f39d022372af979ef2f608fec2cbb1d83b4cc"
+      EXP_MSI: "340624b1c7dba65ea57824f8d25535a58331dbd0c8dde51bf3f465d282fb5bd9"
+      EXP_LY: "56e1c24143191698b6c0a5c022ddb9c35c490e73da5d28da7d2c30942de3bb6b"
+      EXP_BM: "64a846aeb2210ef0932bdc30022a1073e59feb9fc64f17d3610bf7ab7d99cd34"
+      EXP_SBOM: "b2c21217bb1c927a524fb98b1c6e88f852bbffb87a4dc6005cc7d49dab57226b"
+      PROD_PREV_TAG: "v1.0.207"
+      PROD_ROLLBACK_TAG: "v1.0.206"
+      PROD_HIST_TAG: "v1.0.205"
+      PROD_HIST2_TAG: "v1.0.204"
+    steps:
+      - name: "Gate 0 — contexto: branch de teste correta (publicacao autorizada F3.5.4R)"
+        run: |
+          set -euo pipefail
+          [ "${{ github.ref_name }}" = "$TEST_BRANCH" ] || { echo "::error::ref '${{ github.ref_name }}' != $TEST_BRANCH — nada publicado"; exit 1; }
+          echo "OK: rodando na branch de teste autorizada"
+
+      - name: "Gate 0a — token temporario do Release Bot (GitHub App; expira sozinho)"
+        id: release_bot
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: Agenda
+          permission-contents: write
+          permission-workflows: write
+
+      - name: "Gate 0b — token do Release Bot ATIVO + escopo SO Agenda"
+        env:
+          BOT_TOKEN: ${{ steps.release_bot.outputs.token }}
+        run: |
+          set -euo pipefail
+          [ -n "$BOT_TOKEN" ] || { echo "::error::token do Release Bot vazio — NADA publicado."; exit 1; }
+          FN="$(GH_TOKEN="$BOT_TOKEN" gh api "repos/$REPO" --jq '.full_name' 2>/dev/null || true)"
+          [ "$FN" = "$REPO" ] || { echo "::error::Release Bot sem acesso a $REPO."; exit 1; }
+          J="$(GH_TOKEN="$BOT_TOKEN" gh api /installation/repositories)"
+          N="$(echo "$J" | jq -r '.total_count')"; R="$(echo "$J" | jq -r '.repositories[0].full_name')"
+          { [ "$N" = "1" ] && [ "$R" = "$REPO" ]; } || { echo "::error::escopo do Release Bot != {1 repo, $REPO} ($N,$R)."; exit 1; }
+          echo "OK: Release Bot ativo, escopo restrito a $REPO"
+
+      - name: "Gate 1 — run de build F3.5.4R completed/success e head EXATO"
+        run: |
+          set -euo pipefail
+          J="$(gh api "repos/$REPO/actions/runs/$RUN_ID")"
+          ST="$(echo "$J" | jq -r '.status + "|" + .conclusion')"
+          HS="$(echo "$J" | jq -r '.head_sha')"
+          BR="$(echo "$J" | jq -r '.head_branch')"
+          echo "run $RUN_ID: $ST head=$HS branch=$BR"
+          [ "$ST" = "completed|success" ] || { echo "::error::run de build invalido"; exit 1; }
+          [ "$HS" = "$STABLE_SHA" ] || { echo "::error::head do run != STABLE_SHA"; exit 1; }
+          [ "$BR" = "$TEST_BRANCH" ] || { echo "::error::branch do run != branch de teste"; exit 1; }
+
+      - name: "Gate 2 — STABLE_SHA na linhagem do tip; commits alem dele SO o workflow de release"
+        run: |
+          set -euo pipefail
+          H="$(gh api "repos/$REPO/git/ref/heads/$TEST_BRANCH" --jq '.object.sha')"
+          CMP="$(gh api "repos/$REPO/compare/$STABLE_SHA...$H" --jq '.status')"
+          echo "compare $STABLE_SHA...$H: $CMP"
+          { [ "$CMP" = "identical" ] || [ "$CMP" = "ahead" ]; } || { echo "::error::STABLE_SHA fora da linhagem do tip ($CMP)"; exit 1; }
+          gh api "repos/$REPO/compare/$STABLE_SHA...$H" --jq '.files[].filename' | tee /tmp/extra.txt || true
+          if grep -vE '^\.github/workflows/desktop-release-f354r\.yml$' /tmp/extra.txt | grep -q .; then
+            echo "::error::commits pos-candidato tocam arquivos alem do workflow de release"; exit 1; fi
+          CMP2="$(gh api "repos/$REPO/compare/$BASE_207_SHA...$STABLE_SHA" --jq '.status')"
+          { [ "$CMP2" = "ahead" ] || [ "$CMP2" = "identical" ]; } || { echo "::error::STABLE_SHA nao descende da 1.0.207 ($CMP2)"; exit 1; }
+          echo "OK: STABLE_SHA ancestral do tip; extras = so o workflow de release; base 1.0.207 na linhagem"
+
+      - name: "Gate 3 — release v1.0.208 NAO existe; tag so pode preexistir apontando p/ STABLE_SHA"
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then echo "::error::release $TAG ja existe"; exit 1; fi
+          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            TS="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+            [ "$TS" = "$STABLE_SHA" ] || { echo "::error::tag $TAG aponta para outro sha ($TS)"; exit 1; }
+          fi
+          echo "OK: release/tag livres (ou tag ja em STABLE_SHA)"
+
+      - name: "Gate 4 — artifacts: ids+digests conferem (mesmos bytes do run verde)"
+        run: |
+          set -euo pipefail
+          json="$(gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts" --paginate)"
+          chk() { local d; d="$(echo "$json" | jq -r --arg n "$1" '.artifacts[]|select(.name==$n)|.digest')"; echo "$1: $d"; [ "$d" = "$2" ] || { echo "::error::digest $1 divergente"; exit 1; }; }
+          chk "$ART_INST" "$ART_INST_DIGEST"
+          chk "$ART_META" "$ART_META_DIGEST"
+
+      - name: "Baixar artifacts (installer + updatemeta) — SEM recompilar"
+        run: |
+          set -euo pipefail
+          gh run download "$RUN_ID" -R "$REPO" -n "$ART_INST" -D pacote
+          gh run download "$RUN_ID" -R "$REPO" -n "$ART_META" -D pacote
+          for f in "$EXE_NAME" "$MSI_NAME" "$LY_NAME" "$BM_NAME" SHA256SUMS SBOM-cyclonedx.json VERSAO-DESKTOP.txt; do
+            test -f "pacote/$f" || { echo "::error::arquivo ausente: $f"; exit 1; }
+          done
+          if [ -f pacote/canary.yml ]; then echo "::error::canary.yml presente — canal ambiguo"; exit 1; fi
+
+      - name: "Gate 5 — hashes SHA-256 + latest.yml (versao/EXE/sha512) + VERSAO-DESKTOP"
+        run: |
+          set -euo pipefail
+          declare -A EXP=( ["$EXE_NAME"]="$EXP_EXE" ["$MSI_NAME"]="$EXP_MSI" ["$LY_NAME"]="$EXP_LY" ["$BM_NAME"]="$EXP_BM" ["SBOM-cyclonedx.json"]="$EXP_SBOM" )
+          for f in "${!EXP[@]}"; do
+            H="$(sha256sum "pacote/$f" | awk '{print $1}')"; echo "$f=$H"
+            [ "$H" = "${EXP[$f]}" ] || { echo "::error::hash $f divergente"; exit 1; }
+          done
+          ( cd pacote && sha256sum -c SHA256SUMS ) || { echo "::error::SHA256SUMS nao confere"; exit 1; }
+          grep -q "version: 1.0.208" "pacote/$LY_NAME" || { echo "::error::latest.yml version != 1.0.208"; exit 1; }
+          grep -qE "^path: $EXE_NAME" "pacote/$LY_NAME" || { echo "::error::latest.yml path != EXE"; exit 1; }
+          META_SHA512=$(grep -E '^sha512:' "pacote/$LY_NAME" | head -1 | sed -E 's/^sha512:[[:space:]]*//' | tr -d '\r')
+          CALC_SHA512=$(openssl dgst -sha512 -binary "pacote/$EXE_NAME" | openssl base64 -A)
+          [ "$META_SHA512" = "$CALC_SHA512" ] || { echo "::error::sha512 do latest.yml != EXE (updater rejeitaria)"; exit 1; }
+          grep -q "versionName : 1.0.208" pacote/VERSAO-DESKTOP.txt || { echo "::error::VERSAO-DESKTOP sem 1.0.208"; exit 1; }
+          grep -q "1.0.208-priority-assistant" pacote/VERSAO-DESKTOP.txt || { echo "::error::rotulo da candidata ausente"; exit 1; }
+          echo "OK: 5 hashes + SHA256SUMS + latest.yml (1.0.208/EXE/sha512==EXE) + VERSAO-DESKTOP"
+
+      - name: "Release notes"
+        run: |
+          cat > notas.md <<'NOTAS'
+          Agenda ID Seven Desktop 1.0.208 — Assistente Inteligente de Prioridades
+
+          Atualizacao disponibilizada pelo ATUALIZADOR INTERNO do app (Configuracoes ->
+          Atualizacoes -> Verificar atualizacoes -> Baixar -> Instalar e reiniciar).
+          NENHUM download manual e necessario.
+
+          O QUE MUDA vs 1.0.207 (F3.5.4R — painel "Minhas Prioridades")
+          - Uma aba nova, "Minhas Prioridades", organiza automaticamente e em TEMPO REAL as tarefas que
+            precisam da sua atencao primeiro. E um painel CONSULTIVO e EXPLICATIVO: apenas LE, classifica,
+            explica e abre a tarefa. NAO altera nada.
+          - Responde, com base em fatos reais: o que fazer primeiro, o que esta urgente, o que vence hoje,
+            quem pediu ajuda, o que esta em andamento e o que ainda esta em "A Fazer".
+          - Ordem oficial (deterministica): 1) CRITICO — alerta VERMELHO real direcionado a voce OU prazo
+            oficial vencido e ainda pendente; 2) ATENCAO — alerta AMARELO real, ou termina HOJE, ou tem
+            alteracao pendente, ou depende de uma acao/aprovacao sua; 3) NORMAL — em andamento, A Fazer,
+            prazo futuro ou sem prazo. Empates resolvidos por regras fixas (prazo mais proximo, alerta mais
+            grave, ja em andamento, etc.).
+          - Cada prioridade vem EXPLICADA com dados reais ("Prazo termina hoje 14:30", "Alerta vermelho
+            ativo", "Cliente solicitou alteracao", "Aguardando sua acao") — nunca um rotulo solto.
+          - "Pedido de ajuda" e "Bloqueio" aparecem em "Acoes e ocorrencias recentes" com texto honesto
+            ("Pedido de ajuda registrado" / "Bloqueio reportado") e NAO sobem a tarefa para critico sozinhos:
+            so pesam quando ha outro fato atual comprovado (alerta vermelho/amarelo real ou prazo). "Dispensar
+            deste painel" e apenas uma preferencia visual sua — nao mexe na tarefa, no historico nem em
+            notificacoes.
+          - Atualiza sozinho junto com o app (mesma fonte de dados em tempo real). Pode ser ligado/desligado
+            em Configuracoes -> Produtividade (ligado por padrao); e uma preferencia local do aparelho.
+          - NAO cria/duplica/altera notificacoes, NAO toca som, NAO move/conclui/reatribui tarefas, NAO altera
+            prazos/responsaveis/historico, NAO mexe no Monitor de SLA nem no sino. SEM previsao de atraso, SEM
+            IA, SEM pontuacao de produtividade, SEM ranking de pessoas.
+
+          PRESERVACAO (provado por gates no build)
+          - Deteccao de tarefa parada / check-in de atividade (1.0.207), decisao do responsavel no alerta de
+            SLA (1.0.206), lembrete central (1.0.202/1.0.203), agrupamento das notificacoes comuns (1.0.205),
+            notificacoes individuais, tempos de SLA (T-30/T-10), destinatarios, Card Premium, Cronograma,
+            Roteiro, Monitor SLA, sino, inicializacao com o Windows e autocorrecao do canal (1.0.204),
+            atualizador, login/logout e Android: INTOCADOS (mudanca 100% no renderer; todo o processo
+            principal byte-identico a 1.0.207).
+          - Rollback: 1.0.207, 1.0.206, 1.0.205 e 1.0.204 PRESERVADAS (releases e tags intactas).
+
+          IMPORTANTE: esta versao ainda DEPENDE DE VALIDACAO FISICA do owner (abrir "Minhas Prioridades",
+          conferir a ordem N1/N2/N3 e as explicacoes com dados reais, conferir que ajuda/bloqueio nao sobem
+          sozinhos para critico, que abrir a tarefa nao grava nada, que desligar a flag oculta o painel sem
+          efeito colateral, e que nenhuma notificacao/alerta/prazo/tarefa e alterado pelo painel). A
+          publicacao apenas disponibiliza a atualizacao pelo mecanismo oficial.
+
+          Procedencia: run de build F3.5.4R 30714544298 (success; --publish never; gates de verificacao +
+          Windows verdes, incluindo os 25 gates F3.5.4R no app.asar, com prova de motor PURO, painel SOMENTE
+          LEITURA e sintaxe do renderer) @ commit db8cdca1d92cd42f3ec98aced39e6a418c4d478e (branch
+          desktop/f354r-priority-assistant-1.0.208 = tag v1.0.207 + commits da fase). Mesmos bytes; sem
+          recompilar. Confira SHA-256 em SHA256SUMS.
+          NOTAS
+
+      - name: "Criar tag v1.0.208 pinada em STABLE_SHA — ESCRITA via Release Bot"
+        env:
+          GH_TOKEN: ${{ steps.release_bot.outputs.token }}
+        run: |
+          set -euo pipefail
+          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            TS="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+            [ "$TS" = "$STABLE_SHA" ] || { echo "::error::tag $TAG aponta para outro sha ($TS)"; exit 1; }
+          else
+            gh api -X POST "repos/$REPO/git/refs" -f ref="refs/tags/$TAG" -f sha="$STABLE_SHA" >/dev/null
+            echo "tag $TAG criada em $STABLE_SHA"
+          fi
+
+      - name: "Publicar release no canal do updater (latest=true, prerelease=false) — 6 assets — via Release Bot"
+        env:
+          GH_TOKEN: ${{ steps.release_bot.outputs.token }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" -R "$REPO" \
+            --target "$STABLE_SHA" --latest=true \
+            --title "$TITLE" --notes-file notas.md \
+            "pacote/$EXE_NAME" "pacote/$MSI_NAME" "pacote/$LY_NAME" "pacote/$BM_NAME" "pacote/SHA256SUMS" "pacote/VERSAO-DESKTOP.txt"
+          echo "publicado: $TAG (canal do electron-updater: release Latest com latest.yml)"
+
+      - name: "Pos-verificacao (Latest=1.0.208; 1.0.207 rollback + 1.0.206/1.0.205/1.0.204 preservadas)"
+        run: |
+          set -euo pipefail
+          FLAGS="$(gh release view "$TAG" -R "$REPO" --json isPrerelease,isDraft --jq '(.isPrerelease|tostring)+"|"+(.isDraft|tostring)')"
+          [ "$FLAGS" = "false|false" ] || { echo "::error::flags incorretas: $FLAGS"; exit 1; }
+          N="$(gh release view "$TAG" -R "$REPO" --json assets --jq '.assets|length')"
+          [ "$N" = "6" ] || { echo "::error::esperado 6 assets, encontrados $N"; exit 1; }
+          for a in "$EXE_NAME" "$MSI_NAME" "$LY_NAME" "$BM_NAME" SHA256SUMS VERSAO-DESKTOP.txt; do
+            gh release view "$TAG" -R "$REPO" --json assets --jq '.assets[].name' | grep -qx "$a" || { echo "::error::asset $a ausente"; exit 1; }
+          done
+          if gh release view "$TAG" -R "$REPO" --json assets --jq '.assets[].name' | grep -qx "app-update.yml"; then echo "::error::app-update.yml nao pode ser asset"; exit 1; fi
+          TAGSHA="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+          [ "$TAGSHA" = "$STABLE_SHA" ] || { echo "::error::tag != STABLE_SHA"; exit 1; }
+          LATEST_TAG="$(gh api "repos/$REPO/releases/latest" --jq '.tag_name')"
+          [ "$LATEST_TAG" = "$TAG" ] || { echo "::error::Latest do repo != $TAG (got $LATEST_TAG)"; exit 1; }
+          for t in "$PROD_PREV_TAG" "$PROD_ROLLBACK_TAG" "$PROD_HIST_TAG" "$PROD_HIST2_TAG"; do
+            gh release view "$t" -R "$REPO" --json tagName --jq '.tagName' | grep -qx "$t" || { echo "::error::$t (preservacao/rollback) sumiu"; exit 1; }
+          done
+          echo "===== GO: 1.0.208 no canal do updater (Latest); 1.0.207/1.0.206/1.0.205/1.0.204 preservadas ====="
