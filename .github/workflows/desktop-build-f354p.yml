@@ -1,0 +1,404 @@
+# =====================================================================
+# [push/manual] F3.5.4P — Desktop Build (candidata 1.0.206 — ALERTAS DE SLA COM DECISÃO DO RESPONSÁVEL)
+# ---------------------------------------------------------------------
+# Base 1.0.205 OFICIAL (@31881d3, tag v1.0.205, testada fisicamente). Delta F3.5.4P (produção, 100% real):
+#   - O lembrete central de SLA (amarelo/vermelho) deixa de ter só "OK": o RESPONSÁVEL informa o que fará —
+#     INICIAR AGORA / ESTOU FINALIZANDO / ESTOU BLOQUEADO / PRECISO DE AJUDA / APENAS RECONHECER.
+#   - Persistência OFICIAL por TRANSAÇÃO Firestore em tasks/{id}.history[] (relê+valida+append único):
+#     a 1ª transação confirmada vence; a 2ª recebe already_decided; idempotência por decisionKey. SEM
+#     backend novo (reusa history[] + notifierA). Fila offline durável sincroniza com a MESMA transação.
+#   - Flag slaDecisionActionsEnabled (default ON; OFF ⇒ só OK, 1.0.205). Notificação individual de
+#     ajuda/bloqueio (notifierA, recipient-targeted); grouping denylist reforçada; observabilidade sanitizada.
+# Arquivos autorizados: main.ts (wiring/relay/flag/sync), slaReminder.ts (onDecide/dismiss/sync),
+#   slaReminderStore.ts (decisão durável), slaReminderWindow.ts (IPC decide/dismiss/help + setFocusable),
+#   slareminder-preload.ts + preload.ts (pontes), slareminder.html (área de decisão), index.html (transação
+#   + resolução + toggle), notifEvents.js (derivação help/blocked), notificationGrouping.ts (denylist),
+#   package(-lock).json, testes (f354p novo; f354l/f354i → DIFF CONTROLADO do notifEvents). TODO O RESTO
+#   byte-idêntico à 1.0.205 (slaScheduler/slaRules/cardsRules/notifier/notifierA/firebase/watchdog/startup/
+#   bgNotify/bgnotify.html; T-30/T-10; destinatários; Card Premium/Cronograma/Monitor SLA/sino; Android/
+#   backend/Worker/Rules). Roda no PRÓPRIO ref: `--publish never`, NADA publicado (artifacts privados).
+# =====================================================================
+name: "[push/manual] F3.5.4P Desktop Build (candidata 1.0.206 — decisão do responsável no alerta de SLA)"
+"on":
+  push:
+    branches:
+      - "desktop/f354p-sla-decision-actions-1.0.206"
+    paths-ignore:
+      - ".github/workflows/desktop-release-f354p.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  BASE_204_SHA: "151cf6545d15fcfd8c4ed56b017fcc925957bbfd" # Desktop 1.0.204 OFICIAL (referência histórica)
+  BASE_205_SHA: "31881d3978ed998638f8cd0a7ed347d7cb89e939" # Desktop 1.0.205 OFICIAL (tag v1.0.205; BASE do delta F3.5.4P)
+  TEST_BRANCH: "desktop/f354p-sla-decision-actions-1.0.206"
+  APP_DIR: "desktop"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout (SHA do push; history completo p/ baselines)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Gate REF + ANCESTRIA — branch correta e descendente da 1.0.205 pinada
+        run: |
+          set -e
+          [ "${{ github.ref_name }}" = "$TEST_BRANCH" ] || { echo "::error:: ref != $TEST_BRANCH"; exit 1; }
+          git merge-base --is-ancestor "$BASE_205_SHA" HEAD || { echo "::error:: HEAD nao descende da base 1.0.205 ($BASE_205_SHA)"; exit 1; }
+          echo "ref=$TEST_BRANCH head=$(git rev-parse HEAD) base=$BASE_205_SHA OK"
+
+      - name: Derivar versao — exige 1.0.206 exato, sem sufixo
+        run: |
+          set -e
+          APP_VERSION=$(node -p "require('./desktop/package.json').version")
+          [ "$APP_VERSION" = "1.0.206" ] || { echo "::error:: versao != 1.0.206 ($APP_VERSION)"; exit 1; }
+          LOCKV=$(node -p "require('./desktop/package-lock.json').version")
+          [ "$LOCKV" = "1.0.206" ] || { echo "::error:: package-lock version != 1.0.206 ($LOCKV)"; exit 1; }
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: npm ci
+        working-directory: desktop
+        run: npm ci --no-audit --no-fund
+
+      - name: TypeScript build (main + preload + renderer + modulos .js)
+        working-directory: desktop
+        run: npm run build
+
+      - name: Lint (tsc --noEmit)
+        working-directory: desktop
+        run: npx tsc --noEmit -p tsconfig.json
+
+      - name: Gate F3.5.4P DECISÃO — controlador + transação real (OCC) + concorrência + falha + offline + wiring (>=66)
+        working-directory: desktop
+        run: |
+          set -e
+          node scripts/f354p-sla-decision-actions.test.mjs || { echo "::error:: f354p-sla-decision-actions vermelho"; exit 1; }
+
+      - name: Gate REGRESSAO — HUB/entrega/SLA/Categoria A/reminder/agrupamento/clock/updater/watchdog/startup (delta ZERO vs 1.0.205)
+        working-directory: desktop
+        run: |
+          set -e
+          for t in \
+            f354o-common-notification-grouping \
+            f354n-watchdog \
+            f354n-startup \
+            f354k-notification-all-window-states \
+            f354l-sla-central-persistent-reminders \
+            f354h-red-notification-boundary \
+            f354i-cronograma-save-send-client \
+            f354-notifications-reliability \
+            f354f-task-edit-update-notification \
+            f354f-sla-designer-live-timer \
+            f353-durable-notifications \
+            f353a-actor-photo \
+            f343-delivery-channel \
+            f343-operational-block \
+            f343-main-scheduler \
+            f343-sla-golden-master \
+            f343-preservation \
+            f347-immediate-visual-delivery \
+            f347-independent-behavior \
+            f352-cards-notify \
+            f352-cards-channel-substitution \
+            f3377a-r4b-http-date-clock \
+            f33A-notif-central \
+            f33F-bg-notify \
+            f341a-updater-state-machine; do
+            node "scripts/$t.test.mjs" || { echo "::error:: regressao vermelha em $t"; exit 1; }
+          done
+          echo "REGRESSAO OK (delta zero vs 1.0.205)."
+
+      - name: Gate CONGELADOS — comportamento byte-idêntico à 1.0.205 (tudo exceto o delta F3.5.4P)
+        run: |
+          set -e
+          # DELTA AUTORIZADO F3.5.4P (fora deste gate): main.ts, slaReminder.ts, slaReminderStore.ts,
+          # slaReminderWindow.ts, slareminder-preload.ts, slareminder.html, preload.ts, index.html,
+          # notifEvents.js (DIFF CONTROLADO), notificationGrouping.ts (denylist). O AGRUPAMENTO F3.5.4O
+          # (bgNotify.ts/bgnotify.html/bgnotify-preload.ts) agora e BASELINE 1.0.205 => CONGELADO.
+          FROZEN="desktop/src/main/slaScheduler.ts desktop/src/main/slaRules.js desktop/src/main/cardsRules.js desktop/src/main/notifier.ts desktop/src/main/notifierA.ts desktop/src/main/notifStore.ts desktop/src/main/slaSeenUser.ts desktop/src/main/toastAck.ts desktop/src/main/reminder.ts desktop/src/main/tray.ts desktop/src/main/autostart.ts desktop/src/main/updaterService.ts desktop/src/main/clockSync.ts desktop/src/main/actorProfile.js desktop/src/main/auth.ts desktop/src/main/auth-core.ts desktop/src/main/prewarm.ts desktop/src/main/diag.ts desktop/src/main/firebase.ts desktop/src/main/listenerWatchdog.ts desktop/src/main/startupPrefs.ts desktop/src/main/bgNotify.ts desktop/src/preload/bgnotify-preload.ts desktop/src/renderer/bgnotify.html desktop/src/renderer/sounds/sla-warning.wav desktop/src/renderer/sounds/sla-critical.wav desktop/electron-builder.yml desktop/scripts/copy-renderer.js desktop/tsconfig.json"
+          for f in $FROZEN; do
+            if ! git -C "$GITHUB_WORKSPACE" diff --quiet "$BASE_205_SHA" HEAD -- "$f"; then
+              echo "::error:: arquivo CONGELADO alterado vs 1.0.205: $f"; git -C "$GITHUB_WORKSPACE" diff --stat "$BASE_205_SHA" HEAD -- "$f"; exit 1; fi
+          done
+          echo "CONGELADOS byte-identicos a 1.0.205 OK."
+
+      - name: Gate DIFF CONTROLADO — o delta F3.5.4P é ADITIVO (decisão presente + contrato 1.0.205 preservado)
+        working-directory: desktop
+        run: |
+          set -e
+          # main.ts — relay de TRANSAÇÃO + flag + sync; contrato 1.0.205 (agrupamento/entrega/SLA reminder) preservado
+          M=src/main/main.ts
+          grep -q 'persistSlaDecisionViaRenderer' "$M" && grep -q 'resolveSlaHelpViaRenderer' "$M" || { echo "::error:: main.ts sem relay de transação/ajuda"; exit 1; }
+          grep -q '"sla-decision-get"' "$M" && grep -q '"sla-decision-set"' "$M" || { echo "::error:: main.ts sem IPC da flag de decisão"; exit 1; }
+          grep -q 'persistDecision:' "$M" && grep -q 'onDecided:' "$M" && grep -q 'decisionsEnabled:' "$M" && grep -q 'onDecide:' "$M" || { echo "::error:: main.ts sem wiring da decisão no controlador/superfície"; exit 1; }
+          grep -q 'syncPendingDecisions' "$M" || { echo "::error:: main.ts sem sincronização da fila offline"; exit 1; }
+          grep -q 'notificationGrouping.route(p)' "$M" && grep -q '"grouping-get"' "$M" || { echo "::error:: main.ts: agrupamento F3.5.4O removido"; exit 1; }
+          grep -q 'function deliverNotification' "$M" && grep -q '_notifSeen.has(key)' "$M" && grep -q 'classifyReminderLevel(p)' "$M" || { echo "::error:: main.ts: contrato entrega/dedup/SLA removido"; exit 1; }
+          # slaReminder.ts — onDecide/dismiss/sync ADITIVOS; enqueue/ack/promoção 1.0.205 preservados
+          SR=src/main/slaReminder.ts
+          grep -q 'async onDecide(' "$SR" && grep -q 'syncPendingDecisions' "$SR" && grep -q 'dismiss(' "$SR" && grep -q 'buildDecisionKey' "$SR" || { echo "::error:: slaReminder.ts sem máquina de decisão"; exit 1; }
+          grep -q 'enqueue(p: any)' "$SR" && grep -q 'ack(key: string' "$SR" && grep -q 'surface.promote' "$SR" || { echo "::error:: slaReminder.ts: contrato do lembrete removido"; exit 1; }
+          # slaReminderStore.ts — decisão durável ADITIVA; recibo/pendentes 1.0.205 preservados
+          ST=src/main/slaReminderStore.ts
+          grep -q 'markDecisionPending' "$ST" && grep -q 'markDecisionSynced' "$ST" && grep -q 'markDecisionSuperseded' "$ST" && grep -q 'isDecisionSettled' "$ST" && grep -q 'listDecisionsPendingSync' "$ST" || { echo "::error:: slaReminderStore.ts sem decisão durável"; exit 1; }
+          grep -q 'markAck' "$ST" && grep -q 'markPending' "$ST" && grep -q 'listPending' "$ST" || { echo "::error:: slaReminderStore.ts: recibo/pendentes removidos"; exit 1; }
+          # slaReminderWindow.ts — IPC decide/dismiss/help + setFocusable ADITIVOS; ok/card 1.0.205 preservados
+          SW=src/main/slaReminderWindow.ts
+          grep -q 'slareminder-decide' "$SW" && grep -q 'slareminder-dismiss' "$SW" && grep -q 'slareminder-resolve-help' "$SW" && grep -q 'setFocusable' "$SW" || { echo "::error:: slaReminderWindow.ts sem IPC da decisão"; exit 1; }
+          grep -q 'slareminder-ok' "$SW" && grep -q 'slareminder-card' "$SW" && grep -q 'showInactive' "$SW" || { echo "::error:: slaReminderWindow.ts: contrato da janela removido"; exit 1; }
+          # slareminder.html — 5 decisões + api.decide/onResult ADITIVOS; OK/render 1.0.205 preservados
+          SH=src/renderer/slareminder.html
+          grep -q 'Iniciar agora' "$SH" && grep -q 'Estou finalizando' "$SH" && grep -q 'Estou bloqueado' "$SH" && grep -q 'Preciso de ajuda' "$SH" && grep -q 'Apenas reconhecer' "$SH" || { echo "::error:: slareminder.html sem as 5 decisões"; exit 1; }
+          grep -q 'api.decide' "$SH" && grep -q 'onResult' "$SH" && grep -q 'aguardando sincronização' "$SH" || { echo "::error:: slareminder.html sem fluxo de decisão/estados"; exit 1; }
+          grep -q 'api.ok' "$SH" && grep -q 'api.rendered' "$SH" && grep -q 'onCard' "$SH" || { echo "::error:: slareminder.html: OK/render 1.0.205 removidos"; exit 1; }
+          # preloads — pontes novas ADITIVAS; pontes 1.0.205 (agrupamento) preservadas
+          SP=src/preload/slareminder-preload.ts
+          grep -q 'decide:' "$SP" && grep -q 'onResult:' "$SP" && grep -q 'dismiss:' "$SP" && grep -q 'resolveHelp:' "$SP" && grep -q 'onHelpCandidates:' "$SP" || { echo "::error:: slareminder-preload sem pontes da decisão"; exit 1; }
+          grep -q 'ok:' "$SP" && grep -q 'onCard:' "$SP" && grep -q 'rendered:' "$SP" || { echo "::error:: slareminder-preload: pontes 1.0.205 removidas"; exit 1; }
+          P=src/preload/preload.ts
+          grep -q 'slaDecisionGet:' "$P" && grep -q 'slaDecisionSet:' "$P" || { echo "::error:: preload.ts sem pontes da flag de decisão"; exit 1; }
+          grep -q 'groupingGet:' "$P" && grep -q 'onNotifToast:' "$P" || { echo "::error:: preload.ts: pontes 1.0.205 (agrupamento/toast) removidas"; exit 1; }
+          # index.html — TRANSAÇÃO real + resolução + toggle ADITIVOS; agrupamento/toast/Cronograma 1.0.205 preservados
+          I=src/renderer/index.html
+          grep -q 'window.__slaPersistDecision' "$I" && grep -q 'runTransaction' "$I" && grep -q 'window.__slaResolveHelp' "$I" && grep -q 'data-cfgsladecision' "$I" && grep -q 'blockedRecipientIds' "$I" || { echo "::error:: index.html sem transação/resolução/toggle da decisão"; exit 1; }
+          grep -q 'notifGroupUpdate' "$I" && grep -q 'data-cfggrouping' "$I" && grep -q 'notifShowToast' "$I" && grep -q 'cronSanitizeDeep' "$I" || { echo "::error:: index.html: agrupamento/toast/Cronograma 1.0.205 removidos"; exit 1; }
+          # PROIBIÇÃO EXPLÍCITA: a persistência da decisão NÃO pode ser arrayUnion SEM transação (a transação envolve o arrayUnion).
+          node -e 'const fs=require("fs");const s=fs.readFileSync("src/renderer/index.html","utf8");const m=s.match(/window\.__slaPersistDecision = async function[\s\S]*?\n\};/);if(!m){console.error("::error:: __slaPersistDecision nao localizada");process.exit(1);}const fn=m[0];if(!/runTransaction/.test(fn)){console.error("::error:: __slaPersistDecision sem runTransaction (proibido arrayUnion sem transacao)");process.exit(1);}if(!/arrayUnion/.test(fn)){console.error("::error:: __slaPersistDecision sem arrayUnion dentro da transacao");process.exit(1);}if(fn.indexOf("runTransaction")>fn.indexOf("arrayUnion")){console.error("::error:: arrayUnion fora/antes da transacao");process.exit(1);}if(!/already_decided/.test(fn)){console.error("::error:: __slaPersistDecision sem already_decided (idempotencia da 2a transacao)");process.exit(1);}'
+          # notifEvents.js — derivação help/blocked ADITIVA; Categoria A/destinatários preservados (ZERO remoção vs 1.0.205)
+          NE=src/main/notifEvents.js
+          grep -q 'help_requested' "$NE" && grep -qF "=== 'blocked'" "$NE" && grep -q 'reasonLabelNE' "$NE" || { echo "::error:: notifEvents.js sem derivação help/blocked"; exit 1; }
+          grep -qF "recipientMode: 'all_active_users'" "$NE" && grep -qF "recipientMode: 'assigned_designer'" "$NE" || { echo "::error:: notifEvents.js: Categoria A/destinatários alterados"; exit 1; }
+          node -e 'const {execSync}=require("child_process");const d=execSync("git -C \"'"$GITHUB_WORKSPACE"'\" diff '"$BASE_205_SHA"' HEAD -- desktop/src/main/notifEvents.js",{encoding:"utf8"});const add=new Set(d.split("\n").filter(l=>l.startsWith("+")&&!l.startsWith("+++")).map(l=>l.slice(1).trim()));const netRem=d.split("\n").filter(l=>l.startsWith("-")&&!l.startsWith("---")).map(l=>l.slice(1).trim()).filter(l=>l&&!add.has(l));if(netRem.length){console.error("::error:: notifEvents.js removeu logica congelada (nao-aditivo):",netRem.slice(0,5).join(" | "));process.exit(1);}'
+          # notificationGrouping.ts — denylist reforçada ADITIVA; controlador 1.0.205 preservado
+          NG=src/main/notificationGrouping.ts
+          grep -q 'help_requested' "$NG" && grep -q 'blocked' "$NG" || { echo "::error:: notificationGrouping.ts denylist nao reforçada"; exit 1; }
+          grep -q 'createNotificationGrouping' "$NG" && grep -q 'GROUPABLE_EVENT_TYPES' "$NG" || { echo "::error:: notificationGrouping.ts: controlador 1.0.205 alterado"; exit 1; }
+          echo "DIFF CONTROLADO F3.5.4P OK (aditivo; transação real; contrato 1.0.205 preservado)."
+
+      - name: Gate ISOLAMENTO — diff vs 1.0.205 SÓ nos arquivos autorizados F3.5.4P
+        run: |
+          set -e
+          git -C "$GITHUB_WORKSPACE" diff --name-only "$BASE_205_SHA" HEAD | tee /tmp/f354p-diff.txt
+          if grep -vE '^(desktop/src/main/main\.ts$|desktop/src/main/slaReminder\.ts$|desktop/src/main/slaReminderStore\.ts$|desktop/src/main/slaReminderWindow\.ts$|desktop/src/main/notifEvents\.js$|desktop/src/main/notificationGrouping\.ts$|desktop/src/preload/preload\.ts$|desktop/src/preload/slareminder-preload\.ts$|desktop/src/renderer/index\.html$|desktop/src/renderer/slareminder\.html$|desktop/scripts/f354p-sla-decision-actions\.test\.mjs$|desktop/scripts/f354l-sla-central-persistent-reminders\.test\.mjs$|desktop/scripts/f354i-cronograma-save-send-client\.test\.mjs$|desktop/package\.json$|desktop/package-lock\.json$|docs/f354p-qa/|\.github/workflows/desktop-build-f354p\.yml$|\.github/workflows/desktop-release-f354p\.yml$)' /tmp/f354p-diff.txt | grep -q .; then
+            echo "::error:: diff vs 1.0.205 toca arquivo NAO autorizado"; grep -vE '^(desktop/src/main/main\.ts$|desktop/src/main/slaReminder\.ts$|desktop/src/main/slaReminderStore\.ts$|desktop/src/main/slaReminderWindow\.ts$|desktop/src/main/notifEvents\.js$|desktop/src/main/notificationGrouping\.ts$|desktop/src/preload/preload\.ts$|desktop/src/preload/slareminder-preload\.ts$|desktop/src/renderer/index\.html$|desktop/src/renderer/slareminder\.html$|desktop/scripts/f354p-sla-decision-actions\.test\.mjs$|desktop/scripts/f354l-sla-central-persistent-reminders\.test\.mjs$|desktop/scripts/f354i-cronograma-save-send-client\.test\.mjs$|desktop/package\.json$|desktop/package-lock\.json$|docs/f354p-qa/|\.github/workflows/desktop-build-f354p\.yml$|\.github/workflows/desktop-release-f354p\.yml$)' /tmp/f354p-diff.txt || true; exit 1; fi
+          echo "ISOLAMENTO OK — diff confinado aos arquivos autorizados F3.5.4P."
+
+      - name: Gate ANDROID/BACKEND intactos — diff nao toca android/ nem functions/ nem worker/ nem Rules
+        run: |
+          set -e
+          BAD=$(git -C "$GITHUB_WORKSPACE" diff --name-only "$BASE_205_SHA" HEAD | grep -cE '^(android/|android-native/|functions/|worker/|worker-deploy/|presence-service/|firestore\.rules|cloudflare-worker\.js)' || true)
+          [ "$BAD" = "0" ] || { echo "::error:: diff toca backend/android ($BAD)"; git -C "$GITHUB_WORKSPACE" diff --name-only "$BASE_205_SHA" HEAD | grep -E '^(android/|android-native/|functions/|worker/|worker-deploy/|presence-service/|firestore\.rules|cloudflare-worker\.js)' || true; exit 1; }
+          echo "ANDROID/BACKEND intactos OK."
+
+  build:
+    needs: verify
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      APP_DIR: desktop
+    steps:
+      - name: Forcar LF no checkout
+        run: git config --global core.autocrlf false
+
+      - name: Checkout (mesmo SHA do run)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Gate REF + ANCESTRIA (windows)
+        run: |
+          set -e
+          [ "${{ github.ref_name }}" = "$TEST_BRANCH" ] || { echo "::error:: ref != $TEST_BRANCH"; exit 1; }
+          git merge-base --is-ancestor "$BASE_205_SHA" HEAD || { echo "::error:: HEAD nao descende da 1.0.205"; exit 1; }
+
+      - name: Gate LINE ENDINGS LF (fontes do delta)
+        run: |
+          set -e
+          for f in desktop/src/main/main.ts desktop/src/main/slaReminder.ts desktop/src/main/slaReminderStore.ts desktop/src/main/slaReminderWindow.ts desktop/src/main/notifEvents.js desktop/src/main/notificationGrouping.ts desktop/src/preload/preload.ts desktop/src/preload/slareminder-preload.ts desktop/src/renderer/index.html desktop/src/renderer/slareminder.html; do
+            if grep -lU $'\r' "$f" >/dev/null 2>&1; then echo "::error:: CRLF em $f"; exit 1; fi
+          done
+          echo "LF OK."
+
+      - name: Derivar versao — exige 1.0.206 exato
+        run: |
+          APP_VERSION=$(node -p "require('./desktop/package.json').version")
+          [ "$APP_VERSION" = "1.0.206" ] || { echo "::error:: versao != 1.0.206 ($APP_VERSION)"; exit 1; }
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: npm ci
+        working-directory: desktop
+        run: npm ci --no-audit --no-fund
+
+      - name: TypeScript build
+        working-directory: desktop
+        run: npm run build
+
+      - name: electron-builder (NSIS + MSI; --publish never)
+        working-directory: desktop
+        run: npx electron-builder --win nsis msi --publish never
+
+      - name: Gate tray icon empacotado
+        working-directory: desktop
+        run: |
+          set -e
+          test -f dist-installer/win-unpacked/resources/icon.png || { echo "::error:: tray icon.png ausente em resources"; exit 1; }
+          echo "resources/icon.png OK"
+
+      - name: Gate prova-de-versao (asar == 1.0.206) + renderer EMPACOTADO == fonte (EOL-normalizado)
+        working-directory: desktop
+        run: |
+          set -e
+          ASAR="dist-installer/win-unpacked/resources/app.asar"; test -f "$ASAR" || { echo "::error:: app.asar ausente"; exit 1; }
+          EXDIR="$RUNNER_TEMP/asarx"; rm -rf "$EXDIR"; mkdir -p "$EXDIR"; npx --yes @electron/asar extract "$ASAR" "$EXDIR"
+          PKGV=$(P="$EXDIR/package.json" node -e 'console.log(JSON.parse(require("fs").readFileSync(process.env.P,"utf8")).version||"")')
+          [ "$PKGV" = "1.0.206" ] || { echo "::error:: package.json EMPACOTADO version=$PKGV != 1.0.206"; exit 1; }
+          cmp_norm() { EX="$1" SRC="$2" node -e 'const fs=require("fs");const n=s=>String(s).replace(/\r\n/g,"\n");if(n(fs.readFileSync(process.env.EX,"utf8"))!==n(fs.readFileSync(process.env.SRC,"utf8"))){console.error(process.env.SRC+" EMPACOTADO != fonte");process.exit(1);}'; }
+          cmp_norm "$EXDIR/src/renderer/index.html" "src/renderer/index.html"
+          cmp_norm "$EXDIR/src/renderer/bgnotify.html" "src/renderer/bgnotify.html"
+          cmp_norm "$EXDIR/src/renderer/slareminder.html" "src/renderer/slareminder.html"
+          echo "GATE prova-de-versao 1.0.206 + renderer==fonte OK."
+
+      - name: Gate F3.5.4P EMPACOTADO — decisão presente (transação real); comportamento 1.0.205 preservado (23 gates)
+        working-directory: desktop
+        run: |
+          set -e
+          EXDIR="$RUNNER_TEMP/asarx"; DM="$EXDIR/dist/main"; DP="$EXDIR/dist/preload"; RR="$EXDIR/src/renderer"
+          MJS="$DM/main.js"
+          cmp_norm() { EX="$1" SRC="$2" node -e 'const fs=require("fs");const n=s=>String(s).replace(/\r\n/g,"\n");if(n(fs.readFileSync(process.env.EX,"utf8"))!==n(fs.readFileSync(process.env.SRC,"utf8"))){console.error(process.env.SRC+" EMPACOTADO != fonte");process.exit(1);}'; }
+          # ===== DECISÃO DO RESPONSÁVEL (F3.5.4P) =====
+          # 1 — controlador de decisão empacotado (onDecide + decisionKey + sync + dismiss)
+          grep -q 'onDecide' "$DM/slaReminder.js" && grep -q 'sla_decision:' "$DM/slaReminder.js" && grep -q 'syncPendingDecisions' "$DM/slaReminder.js" && grep -q 'dismiss' "$DM/slaReminder.js" || { echo "::error:: slaReminder.js sem máquina de decisão"; exit 1; }
+          # 2 — store de decisão durável empacotado
+          grep -q 'markDecisionPending' "$DM/slaReminderStore.js" && grep -q 'listDecisionsPendingSync' "$DM/slaReminderStore.js" && grep -q 'isDecisionSettled' "$DM/slaReminderStore.js" || { echo "::error:: slaReminderStore.js sem decisão durável"; exit 1; }
+          # 3 — janela empacotada com IPC decide/dismiss/help + setFocusable
+          grep -q 'slareminder-decide' "$DM/slaReminderWindow.js" && grep -q 'slareminder-resolve-help' "$DM/slaReminderWindow.js" && grep -q 'setFocusable' "$DM/slaReminderWindow.js" || { echo "::error:: slaReminderWindow.js sem IPC da decisão"; exit 1; }
+          # 4 — slareminder.html empacotado: 5 decisões + api.decide + estados
+          grep -q 'Iniciar agora' "$RR/slareminder.html" && grep -q 'Estou bloqueado' "$RR/slareminder.html" && grep -q 'Preciso de ajuda' "$RR/slareminder.html" && grep -q 'api.decide' "$RR/slareminder.html" && grep -q 'aguardando sincronização' "$RR/slareminder.html" || { echo "::error:: slareminder.html empacotado sem área de decisão"; exit 1; }
+          # 5 — main empacotado: relay de transação + IPC da flag + sync + wiring da decisão
+          grep -q 'persistSlaDecisionViaRenderer' "$MJS" && grep -q 'resolveSlaHelpViaRenderer' "$MJS" || { echo "::error:: main.js sem relay de transação/ajuda"; exit 1; }
+          grep -q 'sla-decision-get' "$MJS" && grep -q 'sla-decision-set' "$MJS" && grep -q 'syncPendingDecisions' "$MJS" || { echo "::error:: main.js sem IPC da flag/sync"; exit 1; }
+          grep -q 'slaDecisionActionsEnabled' "$MJS" || { echo "::error:: main.js sem flag de decisão"; exit 1; }
+          # 6 — index.html empacotado: TRANSAÇÃO real (runTransaction) + resolução + toggle
+          grep -q 'window.__slaPersistDecision' "$RR/index.html" && grep -q 'runTransaction' "$RR/index.html" && grep -q 'window.__slaResolveHelp' "$RR/index.html" && grep -q 'data-cfgsladecision' "$RR/index.html" || { echo "::error:: index.html empacotado sem transação/resolução/toggle"; exit 1; }
+          # 7 — CRUX: a persistência é TRANSAÇÃO (arrayUnion DENTRO de runTransaction), NUNCA arrayUnion isolado
+          node -e 'const fs=require("fs");const s=fs.readFileSync(process.env.RR+"/index.html","utf8").replace(/\r\n/g,"\n");const m=s.match(/window\.__slaPersistDecision = async function[\s\S]*?\n\};/);if(!m||!/runTransaction/.test(m[0])||!/arrayUnion/.test(m[0])||m[0].indexOf("runTransaction")>m[0].indexOf("arrayUnion")||!/already_decided/.test(m[0])){console.error("::error:: transacao real ausente/invertida no asar (proibido arrayUnion sem transacao)");process.exit(1);}' RR="$RR"
+          # 8 — notifEvents empacotado: derivação help/blocked + Categoria A/destinatários preservados (== fonte)
+          cmp_norm "$DM/notifEvents.js" "src/main/notifEvents.js"
+          grep -q 'help_requested' "$DM/notifEvents.js" && grep -qF "=== 'blocked'" "$DM/notifEvents.js" || { echo "::error:: notifEvents.js empacotado sem help/blocked"; exit 1; }
+          grep -qF "recipientMode: 'all_active_users'" "$DM/notifEvents.js" && grep -qF "recipientMode: 'assigned_designer'" "$DM/notifEvents.js" || { echo "::error:: Categoria A/destinatários alterados"; exit 1; }
+          # 9 — notificationGrouping empacotado: denylist reforçada (help/blocked passthrough)
+          grep -q 'help_requested' "$DM/notificationGrouping.js" && grep -q 'isDenylisted' "$DM/notificationGrouping.js" || { echo "::error:: notificationGrouping.js denylist nao reforçada"; exit 1; }
+          # 10 — preload empacotado: pontes de decisão + pontes 1.0.205 (agrupamento)
+          grep -q 'slaDecisionGet' "$DP/preload.js" && grep -q 'slaDecisionSet' "$DP/preload.js" && grep -q 'groupingGet' "$DP/preload.js" || { echo "::error:: preload.js sem pontes de decisão/agrupamento"; exit 1; }
+          grep -q 'decide' "$DP/slareminder-preload.js" && grep -q 'onResult' "$DP/slareminder-preload.js" && grep -q 'resolveHelp' "$DP/slareminder-preload.js" || { echo "::error:: slareminder-preload.js sem pontes da decisão"; exit 1; }
+          # ===== COMPORTAMENTO 1.0.205 PRESERVADO =====
+          # 11 — lembrete central (F3.5.4L/M) intacto (controlador + janela + som local)
+          grep -q 'createSlaReminderController' "$DM/slaReminder.js" && grep -q 'classifyReminderLevel' "$DM/slaReminder.js" || { echo "::error:: lembrete central ausente"; exit 1; }
+          grep -q 'showInactive' "$DM/slaReminderWindow.js" && grep -q 'slareminder.html' "$DM/slaReminderWindow.js" && grep -q 'slareminder-ok' "$DM/slaReminderWindow.js" || { echo "::error:: janela central / OK ausente"; exit 1; }
+          test -f "$RR/sounds/sla-warning.wav" && head -c 4 "$RR/sounds/sla-warning.wav" | grep -q 'RIFF' || { echo "::error:: som local do lembrete ausente/invalido"; exit 1; }
+          # 12 — AGRUPAMENTO das comuns (F3.5.4O) intacto e empacotado
+          grep -q 'createNotificationGrouping' "$DM/notificationGrouping.js" && grep -q 'common_group:' "$DM/notificationGrouping.js" || { echo "::error:: agrupamento F3.5.4O ausente"; exit 1; }
+          grep -q 'notificationGrouping' "$MJS" && grep -q 'notif-group-update' "$MJS" && grep -q 'notificationCommonGroupingEnabled' "$MJS" || { echo "::error:: main nao liga o agrupamento 1.0.205"; exit 1; }
+          # 13 — HUB de entrega comum (toast/nativa/bg-window/lock) + sino/dedup individual intactos
+          grep -q 'function deliverNotification' "$MJS" && grep -q 'notif-toast' "$MJS" && grep -q 'showBgNotify' "$MJS" && grep -q 'notif-history' "$MJS" && grep -q '_notifSeen' "$MJS" || { echo "::error:: HUB/sino/dedup removido"; exit 1; }
+          # 14 — TEMPOS CONGELADOS: cardsRules T-30/T-10 + slaRules == fonte
+          cmp_norm "$DM/cardsRules.js" "src/main/cardsRules.js"
+          cmp_norm "$DM/slaRules.js" "src/main/slaRules.js"
+          grep -qF 'var CARDS_WARN_MS = 30 * 60000' "$DM/cardsRules.js" || { echo "::error:: T-30 alterada"; exit 1; }
+          grep -qF 'var CARDS_RED_MS  = 10 * 60000' "$DM/cardsRules.js" || { echo "::error:: T-10 alterada"; exit 1; }
+          # 15 — scheduler + Categoria A duravel + notifier empacotados (produtor SLA congelado)
+          grep -q 'startSlaScheduler' "$DM/slaScheduler.js" && grep -q 'startNotifierA' "$DM/notifierA.js" && grep -q 'event_new' "$DM/notifier.js" || { echo "::error:: produtores SLA/notif nao empacotados"; exit 1; }
+          # 16 — AUTOCORREÇÃO/INICIALIZAÇÃO (F3.5.4N) congeladas e empacotadas
+          grep -q 'setListenHealthObserver' "$DM/firebase.js" && grep -q 'createListenerWatchdog' "$DM/listenerWatchdog.js" && grep -q 'createStartupPrefs' "$DM/startupPrefs.js" || { echo "::error:: autocorreção/inicialização ausentes"; exit 1; }
+          # 17 — COMUNS no renderer: toast + Monitor SLA + sino + Cronograma preservados
+          grep -q 'notifToastOnce' "$RR/index.html" && grep -q 'f354gMonAlerts' "$RR/index.html" && grep -q 'function slaibToggle(' "$RR/index.html" && grep -q 'function cronSanitizeDeep(' "$RR/index.html" || { echo "::error:: comuns/Monitor/sino/Cronograma ausentes"; exit 1; }
+          # 18 — premium (bgnotify) empacotada + SEM som
+          grep -q 'renderGroupUpdate' "$RR/bgnotify.html" && grep -q 'function render(p)' "$RR/bgnotify.html" || { echo "::error:: premium bgnotify ausente"; exit 1; }
+          if grep -qE '<audio|\.play\(\)' "$RR/bgnotify.html"; then echo "::error:: premium ganhou som (nao pode)"; exit 1; fi
+          # 19 — tray + updater channel latest preservados
+          grep -q 'ensureTray' "$MJS" || { echo "::error:: ensureTray ausente"; exit 1; }
+          grep -qE 'channel[[:space:]]*=[[:space:]]*"latest"' "$DM/updaterService.js" || { echo "::error:: updater channel != latest"; exit 1; }
+          # 20 — Card Premium/Cronograma no index (buildClientMessage) preservado
+          grep -q 'function buildClientMessage(' "$RR/index.html" || { echo "::error:: Card Premium/mensagem ausente"; exit 1; }
+          # 21 — flag de decisão default ON no empacotado (loadSlaDecisionFlag + f354p-notify.json)
+          grep -q 'f354p-notify.json' "$MJS" || { echo "::error:: persistência da flag de decisão ausente"; exit 1; }
+          # 22 — observabilidade sanitizada empacotada (eventos sla.decision.*)
+          grep -q 'sla.decision.' "$DM/slaReminder.js" || { echo "::error:: observabilidade sla.decision.* ausente"; exit 1; }
+          # 23 — Android NAO tocado
+          A2=$(git -C "$GITHUB_WORKSPACE" diff --name-only "$BASE_205_SHA" HEAD | grep -c '^android' || true); [ "$A2" = "0" ] || { echo "::error:: diff toca android ($A2)"; exit 1; }
+          echo "GATE F3.5.4P EMPACOTADO: VERIFIED (23 gates; transação real; 1.0.205 preservado)"
+
+      - name: Empacotar bundle (EXE/MSI/latest.yml/blockmap/SBOM/SHA256SUMS/VERSAO-DESKTOP) + SHA256SUMS
+        working-directory: ${{ env.APP_DIR }}
+        env:
+          APP_VERSION: "1.0.206"
+        run: |
+          set -e
+          npx --yes @cyclonedx/cyclonedx-npm --omit dev --output-format JSON --output-file "$RUNNER_TEMP/sbom-cyclonedx.json" || echo '{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}' > "$RUNNER_TEMP/sbom-cyclonedx.json"
+          OUT="$GITHUB_WORKSPACE/dist-pkg"; mkdir -p "$OUT"
+          EXE=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe | head -1)
+          MSI=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.msi 2>/dev/null | head -1)
+          BM=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap | head -1)
+          cp "$EXE" "$OUT/"; [ -n "$MSI" ] && cp "$MSI" "$OUT/"; cp dist-installer/latest.yml "$OUT/"; cp "$BM" "$OUT/"
+          cp "$RUNNER_TEMP/sbom-cyclonedx.json" "$OUT/SBOM-cyclonedx.json"
+          EXE_NAME=$(basename "$EXE"); MSI_NAME=$([ -n "$MSI" ] && basename "$MSI" || echo ""); BM_NAME=$(basename "$BM")
+          ( cd "$OUT" && sha256sum "$EXE_NAME" ${MSI_NAME:+$MSI_NAME} latest.yml "$BM_NAME" SBOM-cyclonedx.json > SHA256SUMS )
+          {
+            echo "productName : Agenda ID Seven Desktop"
+            echo "versionName : $APP_VERSION"
+            echo "rotulo      : 1.0.206-sla-decision-actions (CANDIDATA — alertas de SLA com decisao do responsavel)"
+            echo "channel     : latest (estrutura do updater; NADA publicado neste build)"
+            echo "appId       : br.com.idseven.agenda.desktop"
+            echo "instalador  : $EXE_NAME"
+            echo "SHA-256 exe : $(sha256sum "$OUT/$EXE_NAME" | awk '{print $1}')"
+            [ -n "$MSI_NAME" ] && echo "instalador2 : $MSI_NAME" && echo "SHA-256 msi : $(sha256sum "$OUT/$MSI_NAME" | awk '{print $1}')"
+            echo "commit      : $GITHUB_SHA (branch $GITHUB_REF_NAME)"
+            echo "baseline    : Desktop 1.0.205 OFICIAL (commit 31881d3; tag v1.0.205 preservada; testada fisicamente)"
+            echo "origem      : F3.5.4P — ALERTAS DE SLA COM DECISAO DO RESPONSAVEL (5 decisoes: iniciar agora/finalizando/bloqueado/ajuda/reconhecer; persistencia OFICIAL por TRANSACAO Firestore em tasks/{id}.history[], 1a transacao vence e 2a recebe already_decided; SEM backend novo; fila offline duravel; notificacao individual de ajuda/bloqueio via notifierA; flag default ON). Tempos T-30/T-10, destinatarios, agrupamento das comuns (1.0.205), lembrete central, Card Premium/Cronograma/Monitor SLA/sino, updater e Android: INTOCADOS"
+            echo "assinatura  : mesmo processo da 1.0.205 (sem code-signing -> NotSigned)"
+            echo "distribuicao: CANDIDATA — build gated; publicacao no Latest ocorre no workflow desktop-release-f354p.yml (mesmos bytes deste run)"
+          } > "$OUT/VERSAO-DESKTOP.txt"
+          echo "== SHA256SUMS =="; cat "$OUT/SHA256SUMS"
+
+      - name: Upload artifact — installer (EXE + MSI) PRIVADO
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-1.0.206-installer
+          path: |
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.msi
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload artifact — updatemeta (latest.yml + blockmap + SHA256SUMS + SBOM + VERSAO) PRIVADO
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-1.0.206-updatemeta
+          path: |
+            dist-pkg/latest.yml
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap
+            dist-pkg/SHA256SUMS
+            dist-pkg/SBOM-cyclonedx.json
+            dist-pkg/VERSAO-DESKTOP.txt
+          if-no-files-found: error
+          retention-days: 30
