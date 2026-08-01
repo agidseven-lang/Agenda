@@ -186,14 +186,18 @@ jobs:
           test -f "$PE" || { echo "::error:: priorityEngine.js ausente"; exit 1; }
           grep -q 'buildUserPriorityList' "$PE" && grep -q 'resolvePriorityLevel' "$PE" && grep -q 'resolvePriorityReasons' "$PE" && grep -q 'comparePriorities' "$PE" && grep -q 'buildOccurrences' "$PE" || { echo "::error:: priorityEngine.js sem API do motor"; exit 1; }
           grep -qE 'module\.exports|PriorityEngine' "$PE" || { echo "::error:: priorityEngine.js nao e UMD (node+renderer)"; exit 1; }
-          if grep -iE "require\('electron'\)|firebase|firestore|ipcRenderer|new Notification|\.play\(|Date\.now\(|Math\.random\(" "$PE"; then echo "::error:: priorityEngine.js NAO e puro (electron/firestore/ipc/notify/som/Date.now/Math.random)"; exit 1; fi
-          # PROIBIÇÃO: nada de previsão/IA/ML/score/ranking de pessoas
-          if grep -iE 'delayPredict|riskScore|productivity|machineLearning|\bML\b|tensorflow|gamif|ranking' "$PE"; then echo "::error:: priorityEngine.js contem previsao/IA/score/ranking (proibido)"; exit 1; fi
-          # hierarquia N1/N2/N3 + ocorrências NUNCA elevam sozinhas + texto honesto
+          # PUREZA + PROIBIÇÕES + TEXTO PROIBIDO — sobre o CÓDIGO (comentários removidos p/ nao falsar na prosa honesta "NAO acessa Firestore"/"nao e ranking")
+          PE="$PE" node -e '
+            const fs=require("fs"); let s=fs.readFileSync(process.env.PE,"utf8");
+            s=s.replace(/\/\*[\s\S]*?\*\//g," ").replace(/(^|[^:])\/\/.*$/gm,"$1");
+            const bad=[[/\brequire\s*\(\s*[\x27"]electron[\x27"]/,"electron"],[/firebase\.|firestore/,"firestore"],[/runTransaction|arrayUnion|\.collection\(|\.doc\(/,"firestore-op"],[/ipcRenderer|ipcMain/,"ipc"],[/new Notification|showBgNotify/,"notification"],[/\.play\(|new Audio/,"som"],[/Date\.now|Math\.random/,"clock/random"],[/delayPredict|riskScore|productivity|machineLearning|tensorflow|gamif|\branking\b/i,"previsao/IA/score/ranking"],[/n[aã]o resolvido|bloqueada agora|bloqueando outra|impedindo outra/i,"texto-proibido"]];
+            for(const [re,l] of bad){ if(re.test(s)){ console.error("::error:: priorityEngine.js viola pureza/proibicao ("+l+")"); process.exit(1);} }
+            console.log("priorityEngine.js: pureza + proibicoes + texto honesto OK (codigo sem comentarios).");
+          '
+          # hierarquia N1/N2/N3 + texto honesto de ocorrência (presentes no CÓDIGO)
           grep -qF "x.alert === 'red' || x.deadlineKind === 'overdue'" "$PE" || { echo "::error:: N1 (vermelho/vencido) ausente"; exit 1; }
           grep -qF "x.alert === 'amber' || x.deadlineKind === 'today'" "$PE" || { echo "::error:: N2 (amarelo/hoje) ausente"; exit 1; }
           grep -qF 'Pedido de ajuda registrado' "$PE" && grep -qF 'Bloqueio reportado' "$PE" || { echo "::error:: texto honesto de ocorrência ausente"; exit 1; }
-          if grep -qiE 'não resolvido|nao resolvido|bloqueada agora|bloqueando outra|impedindo outra' "$PE"; then echo "::error:: priorityEngine.js contem texto proibido de ocorrência/dependência"; exit 1; fi
           # index.html — painel read-only ADITIVO (bloco F3.5.4R + motor + aba + deep-link + flag + toggle); contrato 1.0.207 preservado
           I=src/renderer/index.html
           grep -q 'F3.5.4R:START' "$I" && grep -q 'F3.5.4R:END' "$I" || { echo "::error:: index.html sem bloco F3.5.4R delimitado"; exit 1; }
@@ -315,14 +319,17 @@ jobs:
           # ===== ASSISTENTE DE PRIORIDADES (F3.5.4R) — camada derivada, read-only, motor puro =====
           # 1 — motor puro empacotado (API completa + UMD)
           grep -q 'buildUserPriorityList' "$RR/priorityEngine.js" && grep -q 'resolvePriorityLevel' "$RR/priorityEngine.js" && grep -q 'comparePriorities' "$RR/priorityEngine.js" && grep -q 'buildOccurrences' "$RR/priorityEngine.js" || { echo "::error:: priorityEngine.js empacotado sem API do motor"; exit 1; }
-          # 2 — motor puro empacotado (sem electron/firestore/ipc/notify/som/Date.now/Math.random)
-          if grep -iE "require\('electron'\)|firebase|firestore|ipcRenderer|new Notification|\.play\(|Date\.now\(|Math\.random\(" "$RR/priorityEngine.js"; then echo "::error:: priorityEngine.js empacotado NAO e puro"; exit 1; fi
-          # 3 — motor sem previsão/IA/score/ranking
-          if grep -iE 'delayPredict|riskScore|productivity|tensorflow|gamif|ranking' "$RR/priorityEngine.js"; then echo "::error:: priorityEngine.js empacotado contem previsao/IA/score/ranking (proibido)"; exit 1; fi
-          # 4 — hierarquia N1/N2/N3 + ocorrências NUNCA elevam sozinhas (texto honesto)
+          # 2+3 — motor puro EMPACOTADO (sem electron/firestore/ipc/notify/som/clock/random) + sem previsão/IA/score/ranking + sem texto proibido
+          #        checa o CÓDIGO (comentários removidos p/ nao falsar na prosa honesta "NAO acessa Firestore"/"nao e ranking")
+          PE="$RR/priorityEngine.js" node -e '
+            const fs=require("fs"); let s=fs.readFileSync(process.env.PE,"utf8");
+            s=s.replace(/\/\*[\s\S]*?\*\//g," ").replace(/(^|[^:])\/\/.*$/gm,"$1");
+            const bad=[[/\brequire\s*\(\s*[\x27"]electron[\x27"]/,"electron"],[/firebase\.|firestore/,"firestore"],[/runTransaction|arrayUnion|\.collection\(|\.doc\(/,"firestore-op"],[/ipcRenderer|ipcMain/,"ipc"],[/new Notification|showBgNotify/,"notification"],[/\.play\(|new Audio/,"som"],[/Date\.now|Math\.random/,"clock/random"],[/delayPredict|riskScore|productivity|machineLearning|tensorflow|gamif|\branking\b/i,"previsao/IA/score/ranking"],[/n[aã]o resolvido|bloqueada agora|bloqueando outra|impedindo outra/i,"texto-proibido"]];
+            for(const [re,l] of bad){ if(re.test(s)){ console.error("::error:: priorityEngine.js EMPACOTADO viola pureza/proibicao ("+l+")"); process.exit(1);} }
+          '
+          # 4 — hierarquia N1/N2/N3 + ocorrências NUNCA elevam sozinhas (texto honesto) — presentes no CÓDIGO empacotado
           grep -qF "x.alert === 'red' || x.deadlineKind === 'overdue'" "$RR/priorityEngine.js" || { echo "::error:: N1 ausente no asar"; exit 1; }
           grep -qF 'Pedido de ajuda registrado' "$RR/priorityEngine.js" && grep -qF 'Bloqueio reportado' "$RR/priorityEngine.js" || { echo "::error:: texto honesto de ocorrência ausente no asar"; exit 1; }
-          if grep -qiE 'não resolvido|nao resolvido|bloqueada agora|bloqueando outra|impedindo outra' "$RR/priorityEngine.js"; then echo "::error:: texto proibido no motor empacotado"; exit 1; fi
           # 5 — index.html empacotado: bloco F3.5.4R + motor + aba + painel + deep-link + flag/toggle
           grep -q 'F3.5.4R:START' "$RR/index.html" && grep -q '<script src="priorityEngine.js">' "$RR/index.html" && grep -q 'window.PriorityEngine' "$RR/index.html" || { echo "::error:: index.html empacotado sem bloco/motor F3.5.4R"; exit 1; }
           grep -qF "k:'prioridades'" "$RR/index.html" && grep -q 'function renderPrioridades(' "$RR/index.html" && grep -q 'function priBuildItems(' "$RR/index.html" && grep -q 'priorityAssistantEnabled' "$RR/index.html" && grep -q 'data-cfgpriorityassistant' "$RR/index.html" || { echo "::error:: painel/aba/flag ausentes no asar"; exit 1; }
