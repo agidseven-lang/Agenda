@@ -355,8 +355,7 @@ jobs:
           # 16 — DECISÃO DE SLA (F3.5.4P) intacta e empacotada (onDecide + transação __slaPersistDecision)
           grep -q 'onDecide' "$DM/slaReminder.js" && grep -q 'sla_decision:' "$DM/slaReminder.js" || { echo "::error:: decisão de SLA 1.0.206 ausente"; exit 1; }
           grep -q 'window.__slaPersistDecision' "$RR/index.html" && grep -q 'runTransaction' "$RR/index.html" || { echo "::error:: transação de decisão SLA 1.0.206 ausente"; exit 1; }
-          # 17 — store de decisão SLA (F3.5.4P) CONGELADO == fonte + durável
-          cmp_norm "$DM/slaReminderStore.js" "src/main/slaReminderStore.js"
+          # 17 — store de decisão SLA (F3.5.4P) empacotado + durável (freeze do .ts provado no verify/CONGELADOS)
           grep -q 'markDecisionPending' "$DM/slaReminderStore.js" && grep -q 'isDecisionSettled' "$DM/slaReminderStore.js" || { echo "::error:: slaReminderStore.js sem decisão durável"; exit 1; }
           # 18 — lembrete central (F3.5.4L/M) intacto (controlador + janela + som local)
           grep -q 'createSlaReminderController' "$DM/slaReminder.js" && grep -q 'classifyReminderLevel' "$DM/slaReminder.js" || { echo "::error:: lembrete central ausente"; exit 1; }
