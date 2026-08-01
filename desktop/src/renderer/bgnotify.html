@@ -37,6 +37,41 @@
   .ntf-gi{color:#9fb0c8;font-size:12px;line-height:1.35;overflow-wrap:anywhere;word-break:break-word}
   .ntf-gi b{color:#eef2f8;font-weight:700}
   .ntf-more{color:#7f8aa0;font-size:11px;margin-top:3px;font-weight:600}
+  /* F3.5.4U — LAYOUT PREMIUM das notificações COMUNS (atrás da flag premiumCommonNotificationsEnabled).
+     Hierarquia: TIPO(eyebrow) → ATOR → TÍTULO dominante → MOVIMENTO(chips) → COMPLEMENTARES. Informações
+     maiores; título da tarefa é o elemento mais importante. IDÊNTICO ao index.html (teste de paridade). */
+  .ntf-card.ntfp{gap:14px;padding:14px 40px 15px 17px}
+  .ntfp-av{flex:0 0 auto;width:54px;height:54px;border-radius:50%;background-size:cover;background-position:center;box-shadow:0 0 0 2px rgba(109,91,255,.5),0 6px 16px -6px rgba(0,0,0,.7)}
+  .ntfp-av.gen{display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#6D5BFF,#22D3EE);color:#fff;font-weight:800;font-size:20px;letter-spacing:.5px}
+  .ntfp-bd{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}
+  .ntfp-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .ntfp-eyebrow{display:inline-flex;align-items:center;gap:6px;min-width:0;color:#a9b4ff;font-size:11.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ntfp-eyebrow .dot{flex:0 0 auto;width:7px;height:7px;border-radius:50%;background:var(--nac,#5B6CFF)}
+  .ntfp-tm{flex:0 0 auto;color:#8b97a8;font-size:11px}
+  .ntfp-actor{color:#e7ecf6;font-size:15px;font-weight:700;line-height:1.25;margin-top:2px;white-space:normal;overflow-wrap:anywhere;word-break:break-word;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .ntfp-task{color:#ffffff;font-size:18px;font-weight:800;line-height:1.25;margin-top:2px;white-space:normal;overflow-wrap:anywhere;word-break:break-word;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .ntfp-chips{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin-top:8px}
+  .ntfp-chip{display:inline-flex;align-items:center;gap:6px;padding:3px 11px;border-radius:999px;font-size:12.5px;font-weight:700;line-height:1.25;border:1px solid var(--cbd,rgba(255,255,255,.16));background:var(--cbg,rgba(255,255,255,.06));color:var(--cfg,#cdd6e6);white-space:nowrap}
+  .ntfp-chip .cdot{flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:var(--cfg,#cdd6e6)}
+  .ntfp-arrow{flex:0 0 auto;color:#8b97a8;font-size:14px;font-weight:800}
+  .ntfp-action{color:#c3ccdb;font-size:12.5px;font-weight:600;margin-top:8px;line-height:1.35;white-space:normal;overflow-wrap:anywhere;word-break:break-word}
+  .ntfp-meta{color:#8792a6;font-size:11.5px;margin-top:8px;line-height:1.3;white-space:normal;overflow-wrap:anywhere;word-break:break-word}
+  .ntfp-cta{margin-top:10px;display:inline-flex;align-items:center;gap:5px;align-self:flex-start;padding:5px 12px;border-radius:9px;border:1px solid rgba(109,91,255,.5);background:rgba(109,91,255,.16);color:#cdd6ff;font-size:12px;font-weight:700;cursor:pointer}
+  .ntfp-cta:hover{background:rgba(109,91,255,.28)}
+  .ntfp-sev{position:absolute;right:36px;top:14px;width:22px;height:22px;border-radius:7px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--nac) 22%,transparent);color:var(--nac);font-size:12px;font-weight:900}
+  .ntfp-glist{margin-top:8px;display:flex;flex-direction:column;gap:4px}
+  .ntfp-gi{color:#aeb8ca;font-size:12.5px;line-height:1.4;white-space:normal;overflow-wrap:anywhere;word-break:break-word}
+  .ntfp-gi b{color:#e7ecf6;font-weight:700}
+  .ntfp-more{color:#8792a6;font-size:11.5px;margin-top:3px;font-weight:600}
+  /* chips por ESTADO real (cor associada ao estado; NUNCA só cor — sempre com rótulo textual legível). */
+  .cs-afazer{--cfg:#c3ccdb;--cbg:rgba(148,163,184,.14);--cbd:rgba(148,163,184,.34)}
+  .cs-andamento{--cfg:#8FA2FF;--cbg:rgba(91,108,255,.16);--cbd:rgba(91,108,255,.44)}
+  .cs-revisao{--cfg:#F2C46B;--cbg:rgba(242,169,59,.15);--cbd:rgba(242,169,59,.44)}
+  .cs-concluido{--cfg:#4FD9A0;--cbg:rgba(47,207,143,.15);--cbd:rgba(47,207,143,.44)}
+  /* F3.5.4U — card premium ocupa a largura RESPONSIVA da janela (dimensionada em bgNotify.ts); o card
+     antigo (fallback) permanece 404px, ancorado no mesmo canto inferior direito (janela transparente). */
+  .ntf.ntfp-w{width:100%;max-width:100%}
+  @media (prefers-reduced-motion: reduce){ .ntf{transition:none} }
 </style>
 </head>
 <body>
@@ -52,6 +87,40 @@
   function sevClass(s){return s==='critical'?'ntf-critical':(s==='warning'?'ntf-warning':(s==='success'?'ntf-success':'ntf-info'));}
   function sevIcon(s){return s==='critical'?'!':(s==='warning'?'⏱':(s==='success'?'✓':'i'));}
   function report(){ try{ var h=stack.scrollHeight; if(!stack.children.length){ if(window.bgAPI)bgAPI.empty(); } else if(window.bgAPI){ bgAPI.resize(h); } }catch(_){ } }
+
+  /* F3.5.4U — LAYOUT PREMIUM das notificações COMUNS. Construtores INLINE e IDÊNTICOS ao index.html
+     (janela premium × toast in-app) — o teste de paridade obriga o MESMO DOM. CSP intacta (sem script
+     externo). Presentation-only: monta a partir dos campos ESTRUTURADOS (eventType/actorName/taskTitle/
+     fromStatus/toStatus/setor/cliente/hora); NÃO usa o body genérico (evita repetir ator/tarefa). */
+  var PREMIUM_TYPES={task_moved:1,task_assigned:1,task_reassigned:1,task_updated:1,task_completed:1,task_reopened:1,designer_assigned:1};
+  function premiumUse(p){ return !!(p&&p._premiumCommon===true&&PREMIUM_TYPES[String(p.eventType||'')]); }
+  function premiumSevIcon(s){ return s==='critical'?'!':(s==='warning'?'⏱':(s==='success'?'✓':'i')); }
+  function premiumHM(){ try{ var d=new Date(); var z=function(n){return(n<10?'0':'')+n;}; return z(d.getHours())+':'+z(d.getMinutes()); }catch(_){ return ''; } }
+  function premiumChip(k){ var s=String(k||''); var m={afazer:['A Fazer','cs-afazer'],andamento:['Em andamento','cs-andamento'],revisao:['Revisão','cs-revisao'],concluido:['Concluído','cs-concluido'],entregue:['Concluído','cs-concluido']}; var e=m[s]; return e?{label:e[0],cls:e[1]}:{label:s,cls:'cs-afazer'}; }
+  function premiumAvatar(name,photo,sev){ var ini=''; try{ ini=(initials(name)||'').toUpperCase(); }catch(_){} return photo?('<div class="ntfp-av" style="background-image:url(\''+esc(photo)+'\')" aria-hidden="true"></div>'):(name?('<div class="ntfp-av gen" aria-hidden="true">'+esc(ini||'?')+'</div>'):('<div class="ntfp-av gen" aria-hidden="true">'+esc(premiumSevIcon(sev))+'</div>')); }
+  function premiumCommonInner(p){
+    p=p||{}; var sev=p.severity||'info'; var sic=premiumSevIcon(sev);
+    var type=String(p.title||'Atualização'); var actor=String(p.actorName||p.responsibleName||''); var task=String(p.taskTitle||'');
+    var av=premiumAvatar(actor,String(p.actorAvatar||''),sev);
+    var from=String(p.fromStatus||''), to=String(p.toStatus||''), et=String(p.eventType||''); var mid='';
+    if(from&&to){ var cf=premiumChip(from), ct=premiumChip(to);
+      mid='<div class="ntfp-chips" role="group" aria-label="Movimento de '+esc(cf.label)+' para '+esc(ct.label)+'"><span class="ntfp-chip '+cf.cls+'"><span class="cdot"></span>'+esc(cf.label)+'</span><span class="ntfp-arrow" aria-hidden="true">→</span><span class="ntfp-chip '+ct.cls+'"><span class="cdot"></span>'+esc(ct.label)+'</span></div>';
+    } else if(et==='task_assigned'||et==='task_reassigned'||et==='designer_assigned'){ var resp=String(p.responsibleName||''); mid='<div class="ntfp-action">'+(resp?('Atribuída a '+esc(resp)):'Nova atribuição')+'</div>';
+    } else { var ctx=String(p.context||''); if(ctx&&ctx!=='Tarefas') mid='<div class="ntfp-action">'+esc(ctx)+'</div>'; }
+    var comp=[]; if(p.sector) comp.push(esc(String(p.sector))); if(p.clientName) comp.push(esc(String(p.clientName)));
+    var meta=comp.length?('<div class="ntfp-meta">'+comp.join(' · ')+'</div>'):'';
+    return av+'<div class="ntfp-bd"><div class="ntfp-top"><span class="ntfp-eyebrow"><span class="dot" aria-hidden="true"></span>'+esc(type)+'</span><span class="ntfp-tm">'+esc(premiumHM())+'</span></div>'+(actor?('<div class="ntfp-actor">'+esc(actor)+'</div>'):'')+(task?('<div class="ntfp-task">'+esc(task)+'</div>'):'')+mid+meta+'<div class="ntfp-cta" data-cta="1">Abrir tarefa</div></div><span class="ntfp-sev" title="'+esc(sev)+'" aria-hidden="true">'+esc(sic)+'</span><button class="ntf-x" title="Fechar" aria-label="Fechar">×</button>';
+  }
+  function premiumGroupAction(t){ var s=String(t||''); var m={'Tarefa movimentada':'movimentou a tarefa','Tarefa concluída':'concluiu a tarefa','Tarefa reaberta':'reabriu a tarefa','Tarefa atribuída':'atribuiu a tarefa','Tarefa atualizada':'atualizou a tarefa'}; return m[s]||s; }
+  function premiumGroupInner(view){
+    view=view||{}; var sev=view.severity||'info'; var sic=premiumSevIcon(sev);
+    var count=String(view.count||0); var task=String(view.taskTitle||'Tarefa');
+    var av=premiumAvatar(String(view.primaryName||''),String(view.primaryAvatar||''),sev);
+    var items=view.items||[], lines='';
+    for(var i=0;i<items.length;i++){ var it=items[i]||{}; var who=esc(String(it.actorName||'')); lines+='<div class="ntfp-gi">'+(who?('<b>'+who+'</b> '):'')+esc(premiumGroupAction(it.title))+'</div>'; }
+    if((view.extraCount||0)>0) lines+='<div class="ntfp-more">+'+esc(String(view.extraCount))+' outras atualizações</div>';
+    return av+'<div class="ntfp-bd"><div class="ntfp-top"><span class="ntfp-eyebrow"><span class="dot" aria-hidden="true"></span>'+esc(count)+' atualizações</span><span class="ntfp-tm">'+esc(premiumHM())+'</span></div><div class="ntfp-task">'+esc(task)+'</div><div class="ntfp-glist">'+lines+'</div><div class="ntfp-cta" data-cta="1">Abrir tarefa</div></div><span class="ntfp-sev" title="'+esc(sev)+'" aria-hidden="true">'+esc(sic)+'</span><button class="ntf-x" title="Fechar" aria-label="Fechar">×</button>';
+  }
 
   function render(p){
     p=p||{};
@@ -91,9 +160,10 @@
         +(p.context?'<div class="ntf-ctx">'+esc(p.context)+'</div>':'')
         +'<div class="ntf-cta" data-cta="1">Abrir tarefa</div></div>';
     }
-    var el=document.createElement('div'); el.className='ntf '+sevClass(sev);
+    var el=document.createElement('div'); el.className='ntf '+sevClass(sev)+(premiumUse(p)?' ntfp-w':''); // F3.5.4U — largura responsiva só no premium
     if(p.groupKey) el.setAttribute('data-group',String(p.groupKey)); // F3.5.4O — endereço p/ atualização de grupo (comum)
-    el.innerHTML='<div class="ntf-card">'+av+inner
+    if(premiumUse(p)){ el.innerHTML='<div class="ntf-card ntfp">'+premiumCommonInner(p)+'</div>'; } // F3.5.4U — layout premium (flag ON + tipo comum)
+    else el.innerHTML='<div class="ntf-card">'+av+inner  // F3.5.4U — fallback: markup equivalente à 1.0.208 (flag OFF / tipo fora do escopo)
       +'<span class="ntf-sev">'+esc(sevIcon(sev))+'</span>'
       +'<button class="ntf-x" title="Fechar" aria-label="Fechar">×</button></div>';
     stack.appendChild(el);
@@ -138,9 +208,10 @@
       var ini=initials(primName);
       var av=primPhoto?('<div class="ntf-av" style="background-image:url(\''+esc(primPhoto)+'\')"></div>')
             :(primName?('<div class="ntf-av gen">'+esc(ini||'?')+'</div>'):('<div class="ntf-av gen">'+esc(sevIcon(sev))+'</div>'));
-      el.className='ntf '+sevClass(sev)+' in'; // mantém visível (sem re-animar entrada), só atualiza a cor
+      el.className='ntf '+sevClass(sev)+((view._premiumCommon===true)?' ntfp-w':'')+' in'; // F3.5.4U — largura responsiva no grupo premium; mantém visível (sem re-animar entrada), só atualiza a cor
       var deep=String(view.deep||'');
-      el.innerHTML='<div class="ntf-card">'+av+groupInner(view)
+      if(view._premiumCommon===true){ el.innerHTML='<div class="ntf-card ntfp">'+premiumGroupInner(view)+'</div>'; } // F3.5.4U — grupo premium
+      else el.innerHTML='<div class="ntf-card">'+av+groupInner(view)  // F3.5.4U — fallback: grupo equivalente à 1.0.208
         +'<span class="ntf-sev">'+esc(sevIcon(sev))+'</span>'
         +'<button class="ntf-x" title="Fechar" aria-label="Fechar">×</button></div>';
       var dismiss=el.__ntfDismiss||function(){ try{ el.classList.remove('in'); setTimeout(function(){ if(el.parentNode){el.parentNode.removeChild(el);} report(); },200); }catch(_){ } };

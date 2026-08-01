@@ -323,6 +323,13 @@ function buildCategoryAPayload(ev, uid, resolveProfile) {
     targetUserId: uid, createdAt: ev.at,
     title: evTitle(ev.type), body: evBody(ev, ator, designer),
     context: ctx,
+    // F3.5.4U — campos ESTRUTURADOS OPCIONAIS (ADITIVOS) p/ o layout premium das notificações comuns.
+    // Dado já existente no evento derivado (deriveTaskEvents) — NENHUM cálculo/rede/destinatário novo. A
+    // superfície premium monta o card a partir destes campos (chips de movimento + setor) SEM depender do
+    // body genérico (evita repetir ator/tarefa). O `body` e o `context` acima permanecem intactos p/ o
+    // sino/histórico e p/ o fallback retrocompatível (flag OFF / payloads antigos). Chaves cruas de status
+    // (afazer/andamento/revisao/concluido/entregue) — a superfície traduz via columnLabel e escolhe a cor.
+    fromStatus: ev.fromStatus || '', toStatus: ev.toStatus || '', sector: ev.sector || '',
     severity: evSeverity(ev.type), sound: true,
     action: { type: 'detail', deep: 'detail/' + ev.taskId },
     source: 'notifierA', providerCalled: false

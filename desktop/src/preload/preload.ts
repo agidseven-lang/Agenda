@@ -65,6 +65,10 @@ contextBridge.exposeInMainWorld("desktopAPI", {
   // SOMENTE o agrupamento (OFF ⇒ 1.0.204; a entrega individual continua idêntica).
   groupingGet: (): Promise<any> => ipcRenderer.invoke("grouping-get"),
   groupingSet: (v: boolean): Promise<any> => ipcRenderer.invoke("grouping-set", v),
+  // F3.5.4U — LAYOUT PREMIUM das notificações comuns (Configurações → Notificações): ligar/desligar
+  // SOMENTE a APRESENTAÇÃO (OFF ⇒ layout equivalente à 1.0.208; entrega/dedup/recibos/agrupamento iguais).
+  premiumGet: (): Promise<any> => ipcRenderer.invoke("premium-get"),
+  premiumSet: (v: boolean): Promise<any> => ipcRenderer.invoke("premium-set", v),
   // F3.5.4P — AÇÕES DE DECISÃO nos alertas de prazo (Configurações → Notificações): ligar/desligar
   // SOMENTE as opções de ação (OFF ⇒ só OK, 1.0.205; não apaga decisões; não altera backend).
   slaDecisionGet: (): Promise<any> => ipcRenderer.invoke("sla-decision-get"),

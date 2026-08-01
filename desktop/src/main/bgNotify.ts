@@ -18,7 +18,22 @@ import { diag } from "./diag";
 let bgWin: BrowserWindow | null = null;
 let onOpen: ((deep: string) => void) | null = null;
 let wired = false;
-const WIDTH = 430;
+// F3.5.4U — largura RESPONSIVA do card premium (antes fixa 430). Preferencial ~500px; faixa segura
+// 440–560; NUNCA maior que a workArea do monitor ativo (com margem lateral). Em telas estreitas encolhe
+// abaixo de 440 até um piso (respeitando as margens) — evita corte de conteúdo em 1366×768 / escala
+// 125–150% / dois monitores / barra de tarefas lateral. A ALTURA segue adaptável ao conteúdo (resize).
+const WIDTH_PREF = 500;
+const WIDTH_MAX = 560;
+const WIDTH_MIN = 440;
+const WIDTH_FLOOR = 360;   // piso absoluto p/ telas muito estreitas (margens preservadas)
+const EDGE_MARGIN = 14;    // margem até a borda direita/inferior do workArea (idêntico ao 1.0.208)
+function computeWidth(wa: Electron.Rectangle | null | undefined): number {
+  const avail = Math.max(1, (wa ? wa.width : 1200) - EDGE_MARGIN * 2);
+  let w = Math.min(WIDTH_PREF, WIDTH_MAX, avail);           // preferencial, com teto e nunca fora da tela
+  if (w < WIDTH_MIN) w = Math.min(Math.max(w, WIDTH_FLOOR), avail); // faixa segura, cedendo em telas estreitas
+  return Math.round(Math.max(WIDTH_FLOOR, Math.min(w, avail)));
+}
+function bgVersion(): string { try { return app.getVersion(); } catch { return "dev"; } }
 // F3.4.7 — PROVA DE RENDER: o "bgnotify-rendered" (que antes era só log) vira ACK de entrega.
 // Cada card enviado arma um prazo; se o ACK do dedupKey não chegar (janela não carregou, renderer
 // morto, GPU/transparência falhou, load falhou), o main dispara o fallback (Notification nativa)
@@ -50,9 +65,10 @@ function position(h: number): void {
     try { wa = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea; }
     catch { wa = screen.getPrimaryDisplay().workArea; }
     if (!wa) wa = screen.getPrimaryDisplay().workArea;
+    const WIDTH = computeWidth(wa); // F3.5.4U — largura RESPONSIVA ao monitor ativo (nunca fora da tela; contrato canto-inferior-direito/workArea preservado)
     const height = Math.max(1, Math.min(Math.round(h) || 160, wa.height - 24));
-    const x = wa.x + wa.width - WIDTH - 14;
-    const y = wa.y + wa.height - height - 14;
+    const x = wa.x + wa.width - WIDTH - EDGE_MARGIN;
+    const y = wa.y + wa.height - height - EDGE_MARGIN;
     bgWin.setBounds({ x, y, width: WIDTH, height });
   } catch { /* nunca quebrar por causa de posicionamento */ }
 }
@@ -62,7 +78,7 @@ function wireIpc(): void {
   // bg renderer -> main: ajustar altura ao conteúdo (mantém ancorado no canto inferior direito)
   ipcMain.on("bgnotify-resize", (_e, h: number) => position(Number(h) || 160));
   // bg renderer -> main: fila vazia -> esconder a janela (não fica um retângulo invisível na tela)
-  ipcMain.on("bgnotify-empty", () => { try { if (bgWin && !bgWin.isDestroyed()) bgWin.hide(); } catch { /* */ } });
+  ipcMain.on("bgnotify-empty", () => { try { diag("notification.premium.closed", { eventType: "", deliverySurface: "premium_window", appVersion: bgVersion(), timestamp: Date.now() }); } catch { /* F3.5.4U — observabilidade sanitizada */ } try { if (bgWin && !bgWin.isDestroyed()) bgWin.hide(); } catch { /* */ } });
   // bg renderer -> main: clique em "Abrir tarefa" -> reabrir mainWindow + navegar (deep link)
   ipcMain.on("bgnotify-open", (_e, deep: string) => { diag("bg.open", { deep }); try { onOpen && onOpen(String(deep || "")); } catch { /* */ } });
   // bg renderer -> main: prova de render — confirma que o card premium foi montado.
@@ -75,8 +91,9 @@ function wireIpc(): void {
 
 function ensureWin(): BrowserWindow {
   if (bgWin && !bgWin.isDestroyed()) return bgWin;
+  let initW = WIDTH_PREF; try { initW = computeWidth(screen.getPrimaryDisplay().workArea); } catch { initW = WIDTH_PREF; } // F3.5.4U
   bgWin = new BrowserWindow({
-    width: WIDTH, height: 160, show: false, frame: false, transparent: true,
+    width: initW, height: 160, show: false, frame: false, transparent: true,
     resizable: false, movable: false, minimizable: false, maximizable: false,
     fullscreenable: false, skipTaskbar: true, focusable: false, hasShadow: false,
     alwaysOnTop: true, acceptFirstMouse: true, title: "Agenda ID Seven — Notificacao",

@@ -5,7 +5,7 @@
  * - Autostart Windows opcional (sobe oculto na tray no login)
  * - Notifier + Reminder rodam aqui (sobrevivem a janela escondida)
  */
-import { app, BrowserWindow, ipcMain, Notification, shell, clipboard, nativeImage, dialog, powerMonitor } from "electron";
+import { app, BrowserWindow, ipcMain, Notification, shell, clipboard, nativeImage, dialog, powerMonitor, screen } from "electron";
 import path from "path";
 import fs from "fs";
 import os from "os";
@@ -77,6 +77,10 @@ const selfHealTele = { lastAlertAt: 0, lastReasonCode: "", alerts: 0, lastRestar
 let notificationGrouping: ReturnType<typeof createNotificationGrouping> | null = null;
 let groupingEnabled = true;
 const groupTele = { updates: 0, lastUpdateAt: 0, lastOpenAt: 0, opens: 0 };
+// F3.5.4U — LAYOUT PREMIUM das notificações COMUNS (default ON). Presentation-only: a flag só liga/desliga
+// a APRESENTAÇÃO nas superfícies (toast/janela premium). Roteamento/entrega/dedup/recibos/agrupamento/
+// destinatários permanecem IDÊNTICOS à 1.0.208. Propagada às superfícies pelo carimbo _premiumCommon.
+let premiumCommonEnabled = true;
 // F3.5.4P — AÇÕES DE DECISÃO no alerta de SLA. Flag default ON; OFF ⇒ só OK (1.0.205). Telemetria SANITIZADA.
 let slaDecisionActionsEnabled = true;
 const slaDecisionTele = { committed: 0, alreadyDecided: 0, queued: 0, failed: 0, lastAt: 0, lastType: "" };
@@ -231,6 +235,12 @@ function deliverNotification(p: NotifPayload): { ok: boolean; channel: string } 
     try { if (typeof notificationGrouping !== "undefined" && notificationGrouping && !sessionLocked) __group = notificationGrouping.route(p); } catch { __group = { action: "passthrough", groupKey: "", view: null as any }; }
     if (__group.action === "first" || __group.action === "update") { (p as any).groupKey = __group.groupKey; }
     if (__group.action === "update") { (p as any)._groupUpdate = true; }
+    // F3.5.4U — carimba o estado do LAYOUT PREMIUM no payload p/ AMBAS as superfícies (toast in-app e
+    // janela premium — esta não tem localStorage) escolherem a apresentação SEM novo canal/IPC. É metadado
+    // de APRESENTAÇÃO: NÃO altera roteamento/dedup/recibos/destinatário/severidade/som/deep-link. typeof-guard
+    // (padrão notificationGrouping/toastAck): fixtures f343/f354k extraem SÓ o corpo do deliverNotification e
+    // rodam sem o escopo de módulo — o guard evita ReferenceError e mantém a semântica 1.0.208 (default premium).
+    (p as any)._premiumCommon = (typeof premiumCommonEnabled !== "undefined") ? premiumCommonEnabled : true;
     // F3.3.10 — CAPTURA p/ a Central (histórico local no renderer). CAPTURE-ONLY: encaminha o MESMO
     // payload já deduplicado, sem alterar roteamento/toast/nativa/dedup/som/severidade/destino. Nunca
     // pode impedir a entrega — por isso vem em try/catch isolado e ANTES da decisão toast×nativa.
@@ -253,11 +263,15 @@ function deliverNotification(p: NotifPayload): { ok: boolean; channel: string } 
     // aqui como update). O sino já registrou ESTE evento individualmente (captura acima). markSeen grava
     // o dedup ⇒ o notifierA recebe ok:true, adiciona recibo e avança o cursor (sem reentrega/duplicação).
     if (__group.action === "update") {
+      // F3.5.4U — carimba o estado do layout premium no VIEW do grupo p/ o renderer (toast e janela premium)
+      // escolher a apresentação agrupada premium × antiga. Presentation-only; não altera contador/itens/deep.
+      try { if (__group.view) (__group.view as any)._premiumCommon = premiumCommonEnabled; } catch { /* */ }
       try { mainWin?.webContents.send("notif-group-update", __group.view); } catch { /* atualização do toast é best-effort */ }
       try { if (typeof updateBgGroup === "function") updateBgGroup(__group.view); } catch { /* atualização da premium é best-effort */ }
       markSeen();
       notifTele.lastAt = Date.now(); notifTele.lastChannel = "grouped"; notifTele.lastEventType = String(p.eventType || "");
       try { if (typeof groupTele !== "undefined") { groupTele.updates++; groupTele.lastUpdateAt = Date.now(); } } catch { /* */ }
+      try { premiumObserveGroup(p, (__group.view && __group.view.count) || 0); } catch { /* */ }
       nlog("notify.group.updated", { dedupKey: key, taskId: nmask(p.taskId), recipientUid: nmask(p.targetUserId), count: (__group.view && __group.view.count) || 0 });
       return { ok: true, channel: "grouped" };
     }
@@ -309,6 +323,7 @@ function deliverNotification(p: NotifPayload): { ok: boolean; channel: string } 
           diag("deliver.toast.noAck.fallback", { dedupKey: key, channel: bgOk2 ? "bg-window" : (nOk2 ? "native" : "none") });
         });
       }
+      try { premiumObserve(p, "toast"); } catch { /* observabilidade nunca derruba a entrega */ }
       markSeen();
       notifTele.lastAt = Date.now(); notifTele.lastChannel = "toast"; notifTele.lastEventType = String(p.eventType || "");
       return { ok: true, channel: "toast" };
@@ -330,6 +345,7 @@ function deliverNotification(p: NotifPayload): { ok: boolean; channel: string } 
     diag("deliver.bg", { dedupKey: key, deep, taskId: p.taskId, title: String(p.title || ""), channel, fallbackNative: !bgOk });
     if (bgOk || nativeOk) { markSeen(); notifTele.lastAt = Date.now(); notifTele.lastChannel = channel; notifTele.lastEventType = String(p.eventType || ""); }
     else { notifTele.lastFailAt = Date.now(); notifTele.lastFailReason = "premium-and-native-failed"; }
+    try { premiumObserve(p, bgOk ? "premium_window" : (nativeOk ? "native" : "none")); } catch { /* observabilidade nunca derruba a entrega */ }
     return { ok: bgOk || nativeOk, channel };
   } catch (e) { diag("deliver.error", { err: String(((e as any) && (e as any).message) || e) }); return { ok: false, channel: "error" }; }
 }
@@ -515,6 +531,54 @@ function saveSelfHealingFlag(v: boolean): void { try { const s = jsonStore("f354
 // passthrough sempre (comportamento 1.0.204 byte-a-byte). Constante local; NÃO é remota/configurável.
 function loadGroupingFlag(): boolean { try { return (jsonStore("f354o-notify.json").read() || {}).notificationCommonGroupingEnabled !== false; } catch { return true; } }
 function saveGroupingFlag(v: boolean): void { try { const s = jsonStore("f354o-notify.json"); const raw = s.read() || {}; raw.notificationCommonGroupingEnabled = !!v; s.write(raw); } catch { /* */ } }
+// F3.5.4U — flag do LAYOUT PREMIUM das notificações COMUNS. Default ON (undefined ⇒ true). OFF ⇒
+// apresentação equivalente à 1.0.208 (entrega/dedup/recibos/agrupamento inalterados). Arquivo próprio,
+// isolado do agrupamento (f354o). Constante local; NÃO é remota/configurável.
+function loadPremiumFlag(): boolean { try { return (jsonStore("f354u-notify.json").read() || {}).premiumCommonNotificationsEnabled !== false; } catch { return true; } }
+function savePremiumFlag(v: boolean): void { try { const s = jsonStore("f354u-notify.json"); const raw = s.read() || {}; raw.premiumCommonNotificationsEnabled = !!v; s.write(raw); } catch { /* */ } }
+// F3.5.4U — universo do layout premium (allowlist EXCLUSIVA, idêntica à do agrupamento). Fora daqui ⇒
+// apresentação antiga (layout_fallback). designer_assigned/task_assigned entram (antes eram só isAttr).
+const PREMIUM_COMMON_TYPES: Record<string, true> = {
+  task_moved: true, task_assigned: true, task_reassigned: true,
+  task_updated: true, task_completed: true, task_reopened: true, designer_assigned: true,
+};
+// F3.5.4U — comuns Categoria A que NÃO recebem o layout premium (renderizam o layout antigo de propósito):
+// pedido de ajuda / bloqueio (fora do escopo desta fase). Só para observabilidade de layout_fallback.
+const PREMIUM_FALLBACK_TYPES: Record<string, true> = { help_requested: true, blocked: true };
+function premiumAppVersion(): string { try { return app.getVersion(); } catch { return "dev"; } }
+function premiumScaleFactor(): number { try { return screen.getPrimaryDisplay().scaleFactor || 1; } catch { return 1; } }
+// F3.5.4U — observabilidade SANITIZADA das notificações comuns premium. NOMES EXATOS do escopo. Campos
+// permitidos APENAS: eventType, deliverySurface, hasAvatar, actorNameLength, taskTitleLength, groupedCount,
+// scaleFactor, appVersion, timestamp. NUNCA nome/título/cliente/setor/UID/e-mail/token/URL de foto/conteúdo.
+const PREMIUM_NAME_TRUNC = 28;   // limiar (aprox.) de possível truncamento do NOME (2 linhas ~500px)
+const PREMIUM_TITLE_TRUNC = 48;  // limiar (aprox.) de possível truncamento do TÍTULO (2 linhas ~500px)
+function premiumObserve(p: NotifPayload, surface: string): void {
+  try {
+    const et = String((p && (p as any).eventType) || "");
+    if (PREMIUM_COMMON_TYPES[et]) {
+      if (!premiumCommonEnabled) {
+        diag("notification.premium.feature_disabled", { eventType: et, deliverySurface: surface, appVersion: premiumAppVersion(), timestamp: Date.now() });
+        return;
+      }
+      const hasAvatar = !!(p && (p as any).actorAvatar);
+      const actorNameLength = String((p && (p as any).actorName) || "").length;
+      const taskTitleLength = String((p && (p as any).taskTitle) || "").length;
+      diag("notification.premium.rendered", { eventType: et, deliverySurface: surface, hasAvatar, actorNameLength, taskTitleLength, scaleFactor: premiumScaleFactor(), appVersion: premiumAppVersion(), timestamp: Date.now() });
+      if (!hasAvatar) diag("notification.premium.avatar_fallback", { eventType: et, deliverySurface: surface, appVersion: premiumAppVersion(), timestamp: Date.now() });
+      if (actorNameLength > PREMIUM_NAME_TRUNC || taskTitleLength > PREMIUM_TITLE_TRUNC) diag("notification.premium.text_truncated", { eventType: et, deliverySurface: surface, actorNameLength, taskTitleLength, appVersion: premiumAppVersion(), timestamp: Date.now() });
+    } else if (PREMIUM_FALLBACK_TYPES[et] && premiumCommonEnabled) {
+      diag("notification.premium.layout_fallback", { eventType: et, deliverySurface: surface, appVersion: premiumAppVersion(), timestamp: Date.now() });
+    }
+  } catch { /* observabilidade nunca derruba a entrega */ }
+}
+function premiumObserveGroup(p: NotifPayload, count: number): void {
+  try {
+    if (!premiumCommonEnabled) return;
+    const et = String((p && (p as any).eventType) || "");
+    if (!PREMIUM_COMMON_TYPES[et]) return;
+    diag("notification.premium.group_updated", { eventType: et, deliverySurface: "grouped", groupedCount: Number(count) || 0, scaleFactor: premiumScaleFactor(), appVersion: premiumAppVersion(), timestamp: Date.now() });
+  } catch { /* */ }
+}
 // F3.5.4P — flag das AÇÕES DE DECISÃO nos alertas de prazo. Default ON (undefined ⇒ true). OFF ⇒ só OK
 // (1.0.205), preserva tudo, NÃO apaga decisões, NÃO altera backend. Constante local; NÃO remota.
 function loadSlaDecisionFlag(): boolean { try { return (jsonStore("f354p-notify.json").read() || {}).slaDecisionActionsEnabled !== false; } catch { return true; } }
@@ -867,10 +931,16 @@ app.whenReady().then(() => {
     diag("notification.grouping.ready", { enabled: groupingEnabled, windowMs: 5000, maxItems: 5 });
   } catch (e) { diag("notification.grouping.init.error", { err: String(((e as any) && (e as any).message) || e) }); }
 
+  // F3.5.4U — LAYOUT PREMIUM das notificações comuns: carrega a flag persistente (default ON). Só
+  // presentation-only; entrega/dedup/recibos/agrupamento inalterados. Diagnóstico SANITIZADO no painel.
+  premiumCommonEnabled = loadPremiumFlag();
+  diag("notify.premiumcommon.ready", { enabled: premiumCommonEnabled });
+
   // F3.3.10-BG — registra a janela premium de background + callback de "Abrir tarefa"
   // (reabre a mainWindow minimizada/oculta e navega via deep link). NÃO rouba foco do SO.
   initBgNotify((deep: string) => {
     nlog("notify.click.received", { via: "premium", deep }); // F3.5.4K — clique na janela premium
+    try { diag("notification.premium.opened", { eventType: "", deliverySurface: "premium_window", appVersion: premiumAppVersion(), timestamp: Date.now() }); } catch { /* F3.5.4U — observabilidade sanitizada */ }
     bringToFrontAndOpen(deep); // traz o Agenda à frente + abre a tarefa (deep-link enfileirável)
   });
 
@@ -883,7 +953,19 @@ app.whenReady().then(() => {
     return true;
   });
   // F3.3.10-DIAG — renderer envia eventos p/ o MESMO arquivo de log local (scan/Central/visibility).
-  ipcMain.on("diag-log", (_e, tag: string, data?: unknown) => { try { diag("renderer." + String(tag), data); } catch { /* */ } });
+  ipcMain.on("diag-log", (_e, tag: string, data?: unknown) => {
+    try {
+      const t = String(tag || "");
+      // F3.5.4U — o toast in-app emite observabilidade premium de INTERAÇÃO (opened/closed) com NOME EXATO
+      // do escopo. Reescreve SANITIZADO (allowlist de nomes + campos permitidos), sem o prefixo "renderer.".
+      if (t === "notification.premium.opened" || t === "notification.premium.closed") {
+        const d: any = (data && typeof data === "object") ? data : {};
+        diag(t, { eventType: String(d.eventType || ""), deliverySurface: String(d.deliverySurface || "toast"), appVersion: premiumAppVersion(), timestamp: Date.now() });
+        return;
+      }
+      diag("renderer." + t, data);
+    } catch { /* */ }
+  });
   ipcMain.handle("diag-path", () => diagPath());
   // F3.3.70D3R10I — fonte unica da versao p/ o renderer (Config mostra a versao real do build)
   ipcMain.on("app-version", (e) => { try { e.returnValue = app.getVersion(); } catch { e.returnValue = "dev"; } });
@@ -926,6 +1008,8 @@ app.whenReady().then(() => {
       wasOpenedAtLogin,
       // F3.5.4O — agrupamento das notificações comuns (SANITIZADO; sem conteúdo/uid|taskId integral)
       groupingEnabled,
+      // F3.5.4U — layout premium das notificações comuns (SANITIZADO; só boolean)
+      premiumCommonEnabled,
       groupingWindowMs: (() => { try { return notificationGrouping ? notificationGrouping.windowMs : 5000; } catch { return 5000; } })(),
       groupingActive: (() => { try { return notificationGrouping ? notificationGrouping.activeCount() : 0; } catch { return 0; } })(),
       groupingUpdates: groupTele.updates, groupingLastUpdateAt: groupTele.lastUpdateAt,
@@ -965,6 +1049,11 @@ app.whenReady().then(() => {
   // notificações comuns (OFF ⇒ 1.0.204; a entrega individual continua idêntica). Persistente e local.
   ipcMain.handle("grouping-get", () => ({ enabled: groupingEnabled }));
   ipcMain.handle("grouping-set", (_e, v: boolean) => { groupingEnabled = !!v; saveGroupingFlag(groupingEnabled); try { if (notificationGrouping && !groupingEnabled) notificationGrouping.reset(); } catch { /* */ } diag("notification.group.flag", { enabled: groupingEnabled }); return { enabled: groupingEnabled }; });
+  // F3.5.4U — LAYOUT PREMIUM (Configurações → Notificações): liga/desliga SOMENTE a APRESENTAÇÃO das
+  // notificações comuns (OFF ⇒ layout equivalente à 1.0.208; entrega/dedup/recibos/agrupamento/destinatários
+  // idênticos). Persistente e local. Propagado às superfícies pelo carimbo _premiumCommon no payload.
+  ipcMain.handle("premium-get", () => ({ enabled: premiumCommonEnabled }));
+  ipcMain.handle("premium-set", (_e, v: boolean) => { premiumCommonEnabled = !!v; savePremiumFlag(premiumCommonEnabled); diag("notify.premiumcommon.flag", { enabled: premiumCommonEnabled }); return { enabled: premiumCommonEnabled }; });
   // F3.5.4P — AÇÕES DE DECISÃO (Configurações → Notificações): liga/desliga SOMENTE as opções de ação nos
   // alertas de prazo. OFF ⇒ só OK (1.0.205), preserva tudo, NÃO apaga decisões já gravadas, NÃO altera backend.
   ipcMain.handle("sla-decision-get", () => ({ enabled: slaDecisionActionsEnabled }));

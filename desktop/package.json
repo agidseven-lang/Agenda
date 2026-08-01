@@ -1,7 +1,7 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.208",
-  "description": "Agenda ID Seven Desktop 1.0.208-priority-assistant — Assistente Inteligente de Prioridades (painel Minhas Prioridades: camada derivada, somente leitura, determinística; não altera tarefas nem notificações)",
+  "version": "1.0.209",
+  "description": "Agenda ID Seven Desktop 1.0.209-premium-common-notifications — Notificações Comuns Premium (reformulação visual: tipo como eyebrow, ator, título dominante, chips de movimento, complementares no rodapé; feature flag premiumCommonNotificationsEnabled default ON; apresentação-only, sem alterar entrega/dedup/recibos/agrupamento/destinatários)",
   "main": "dist/main/main.js",
   "private": true,
   "scripts": {

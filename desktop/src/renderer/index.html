@@ -4062,7 +4062,37 @@ function notifEnsureStack(){
      +'.ntf-resp-av.gen{display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#5B6CFF,#22D3EE);color:#fff;font-weight:800;font-size:9px}'
      +'.ntf-sev{flex:0 0 auto;width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--nac) 20%,transparent);color:var(--nac)}.ntf-sev svg{width:14px;height:14px}'
      +'.ntf-x{position:absolute;top:8px;right:9px;width:20px;height:20px;border:0;border-radius:6px;background:transparent;color:#7f8aa0;font-size:15px;line-height:1;cursor:pointer}.ntf-x:hover{background:rgba(255,255,255,.08);color:#cdd6e6}'
-     +'.ntf-glist{margin-top:7px;display:flex;flex-direction:column;gap:3px}.ntf-gi{color:#9fb0c8;font-size:12px;line-height:1.35;white-space:normal;overflow-wrap:anywhere;word-break:break-word}.ntf-gi b{color:#eef2f8;font-weight:700}.ntf-more{color:#7f8aa0;font-size:11px;margin-top:3px;font-weight:600}';
+     +'.ntf-glist{margin-top:7px;display:flex;flex-direction:column;gap:3px}.ntf-gi{color:#9fb0c8;font-size:12px;line-height:1.35;white-space:normal;overflow-wrap:anywhere;word-break:break-word}.ntf-gi b{color:#eef2f8;font-weight:700}.ntf-more{color:#7f8aa0;font-size:11px;margin-top:3px;font-weight:600}'
+     /* F3.5.4U — LAYOUT PREMIUM das notificações COMUNS (paridade visual/estrutural com a janela premium de fundo). */
+     +'.ntf-card.ntfp{gap:14px;padding:14px 40px 15px 17px}'
+     +'.ntfp-av{flex:0 0 auto;width:54px;height:54px;border-radius:50%;background-size:cover;background-position:center;box-shadow:0 0 0 2px rgba(109,91,255,.5),0 6px 16px -6px rgba(0,0,0,.7)}'
+     +'.ntfp-av.gen{display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#6D5BFF,#22D3EE);color:#fff;font-weight:800;font-size:20px;letter-spacing:.5px}'
+     +'.ntfp-bd{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}'
+     +'.ntfp-top{display:flex;align-items:center;justify-content:space-between;gap:8px}'
+     +'.ntfp-eyebrow{display:inline-flex;align-items:center;gap:6px;min-width:0;color:#a9b4ff;font-size:11.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+     +'.ntfp-eyebrow .dot{flex:0 0 auto;width:7px;height:7px;border-radius:50%;background:var(--nac,#5B6CFF)}'
+     +'.ntfp-tm{flex:0 0 auto;color:#8b97a8;font-size:11px}'
+     +'.ntfp-actor{color:#e7ecf6;font-size:15px;font-weight:700;line-height:1.25;margin-top:2px;white-space:normal;overflow-wrap:anywhere;word-break:break-word;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}'
+     +'.ntfp-task{color:#ffffff;font-size:18px;font-weight:800;line-height:1.25;margin-top:2px;white-space:normal;overflow-wrap:anywhere;word-break:break-word;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}'
+     +'.ntfp-chips{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin-top:8px}'
+     +'.ntfp-chip{display:inline-flex;align-items:center;gap:6px;padding:3px 11px;border-radius:999px;font-size:12.5px;font-weight:700;line-height:1.25;border:1px solid var(--cbd,rgba(255,255,255,.16));background:var(--cbg,rgba(255,255,255,.06));color:var(--cfg,#cdd6e6);white-space:nowrap}'
+     +'.ntfp-chip .cdot{flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:var(--cfg,#cdd6e6)}'
+     +'.ntfp-arrow{flex:0 0 auto;color:#8b97a8;font-size:14px;font-weight:800}'
+     +'.ntfp-action{color:#c3ccdb;font-size:12.5px;font-weight:600;margin-top:8px;line-height:1.35;white-space:normal;overflow-wrap:anywhere;word-break:break-word}'
+     +'.ntfp-meta{color:#8792a6;font-size:11.5px;margin-top:8px;line-height:1.3;white-space:normal;overflow-wrap:anywhere;word-break:break-word}'
+     +'.ntfp-cta{margin-top:10px;display:inline-flex;align-items:center;gap:5px;align-self:flex-start;padding:5px 12px;border-radius:9px;border:1px solid rgba(109,91,255,.5);background:rgba(109,91,255,.16);color:#cdd6ff;font-size:12px;font-weight:700;cursor:pointer}'
+     +'.ntfp-cta:hover{background:rgba(109,91,255,.28)}'
+     +'.ntfp-sev{position:absolute;right:36px;top:14px;width:22px;height:22px;border-radius:7px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--nac) 22%,transparent);color:var(--nac);font-size:12px;font-weight:900}'
+     +'.ntfp-glist{margin-top:8px;display:flex;flex-direction:column;gap:4px}'
+     +'.ntfp-gi{color:#aeb8ca;font-size:12.5px;line-height:1.4;white-space:normal;overflow-wrap:anywhere;word-break:break-word}'
+     +'.ntfp-gi b{color:#e7ecf6;font-weight:700}'
+     +'.ntfp-more{color:#8792a6;font-size:11.5px;margin-top:3px;font-weight:600}'
+     +'.cs-afazer{--cfg:#c3ccdb;--cbg:rgba(148,163,184,.14);--cbd:rgba(148,163,184,.34)}'
+     +'.cs-andamento{--cfg:#8FA2FF;--cbg:rgba(91,108,255,.16);--cbd:rgba(91,108,255,.44)}'
+     +'.cs-revisao{--cfg:#F2C46B;--cbg:rgba(242,169,59,.15);--cbd:rgba(242,169,59,.44)}'
+     +'.cs-concluido{--cfg:#4FD9A0;--cbg:rgba(47,207,143,.15);--cbd:rgba(47,207,143,.44)}'
+     +'.ntf.ntfp-w{width:500px;max-width:calc(100vw - 36px)}'
+     +'@media (prefers-reduced-motion: reduce){.ntf{transition:none}}';
     document.head.appendChild(st);
   }
   return s;
@@ -4103,6 +4133,39 @@ function notifNormalize(p){
   }catch(_){}
   return p;
 }
+/* F3.5.4U — LAYOUT PREMIUM das notificações COMUNS. Construtores INLINE e IDÊNTICOS aos da janela premium
+   de fundo (toast in-app × janela premium) — o teste de paridade obriga o MESMO DOM. Presentation-only: monta a
+   partir dos campos ESTRUTURADOS (eventType/actorName/taskTitle/fromStatus/toStatus/setor/cliente/hora);
+   NÃO usa o body genérico (evita repetir ator/tarefa). Reusa esc()/initials() globais deste renderer. */
+  var PREMIUM_TYPES={task_moved:1,task_assigned:1,task_reassigned:1,task_updated:1,task_completed:1,task_reopened:1,designer_assigned:1};
+  function premiumUse(p){ return !!(p&&p._premiumCommon===true&&PREMIUM_TYPES[String(p.eventType||'')]); }
+  function premiumSevIcon(s){ return s==='critical'?'!':(s==='warning'?'⏱':(s==='success'?'✓':'i')); }
+  function premiumHM(){ try{ var d=new Date(); var z=function(n){return(n<10?'0':'')+n;}; return z(d.getHours())+':'+z(d.getMinutes()); }catch(_){ return ''; } }
+  function premiumChip(k){ var s=String(k||''); var m={afazer:['A Fazer','cs-afazer'],andamento:['Em andamento','cs-andamento'],revisao:['Revisão','cs-revisao'],concluido:['Concluído','cs-concluido'],entregue:['Concluído','cs-concluido']}; var e=m[s]; return e?{label:e[0],cls:e[1]}:{label:s,cls:'cs-afazer'}; }
+  function premiumAvatar(name,photo,sev){ var ini=''; try{ ini=(initials(name)||'').toUpperCase(); }catch(_){} return photo?('<div class="ntfp-av" style="background-image:url(\''+esc(photo)+'\')" aria-hidden="true"></div>'):(name?('<div class="ntfp-av gen" aria-hidden="true">'+esc(ini||'?')+'</div>'):('<div class="ntfp-av gen" aria-hidden="true">'+esc(premiumSevIcon(sev))+'</div>')); }
+  function premiumCommonInner(p){
+    p=p||{}; var sev=p.severity||'info'; var sic=premiumSevIcon(sev);
+    var type=String(p.title||'Atualização'); var actor=String(p.actorName||p.responsibleName||''); var task=String(p.taskTitle||'');
+    var av=premiumAvatar(actor,String(p.actorAvatar||''),sev);
+    var from=String(p.fromStatus||''), to=String(p.toStatus||''), et=String(p.eventType||''); var mid='';
+    if(from&&to){ var cf=premiumChip(from), ct=premiumChip(to);
+      mid='<div class="ntfp-chips" role="group" aria-label="Movimento de '+esc(cf.label)+' para '+esc(ct.label)+'"><span class="ntfp-chip '+cf.cls+'"><span class="cdot"></span>'+esc(cf.label)+'</span><span class="ntfp-arrow" aria-hidden="true">→</span><span class="ntfp-chip '+ct.cls+'"><span class="cdot"></span>'+esc(ct.label)+'</span></div>';
+    } else if(et==='task_assigned'||et==='task_reassigned'||et==='designer_assigned'){ var resp=String(p.responsibleName||''); mid='<div class="ntfp-action">'+(resp?('Atribuída a '+esc(resp)):'Nova atribuição')+'</div>';
+    } else { var ctx=String(p.context||''); if(ctx&&ctx!=='Tarefas') mid='<div class="ntfp-action">'+esc(ctx)+'</div>'; }
+    var comp=[]; if(p.sector) comp.push(esc(String(p.sector))); if(p.clientName) comp.push(esc(String(p.clientName)));
+    var meta=comp.length?('<div class="ntfp-meta">'+comp.join(' · ')+'</div>'):'';
+    return av+'<div class="ntfp-bd"><div class="ntfp-top"><span class="ntfp-eyebrow"><span class="dot" aria-hidden="true"></span>'+esc(type)+'</span><span class="ntfp-tm">'+esc(premiumHM())+'</span></div>'+(actor?('<div class="ntfp-actor">'+esc(actor)+'</div>'):'')+(task?('<div class="ntfp-task">'+esc(task)+'</div>'):'')+mid+meta+'<div class="ntfp-cta" data-cta="1">Abrir tarefa</div></div><span class="ntfp-sev" title="'+esc(sev)+'" aria-hidden="true">'+esc(sic)+'</span><button class="ntf-x" title="Fechar" aria-label="Fechar">×</button>';
+  }
+  function premiumGroupAction(t){ var s=String(t||''); var m={'Tarefa movimentada':'movimentou a tarefa','Tarefa concluída':'concluiu a tarefa','Tarefa reaberta':'reabriu a tarefa','Tarefa atribuída':'atribuiu a tarefa','Tarefa atualizada':'atualizou a tarefa'}; return m[s]||s; }
+  function premiumGroupInner(view){
+    view=view||{}; var sev=view.severity||'info'; var sic=premiumSevIcon(sev);
+    var count=String(view.count||0); var task=String(view.taskTitle||'Tarefa');
+    var av=premiumAvatar(String(view.primaryName||''),String(view.primaryAvatar||''),sev);
+    var items=view.items||[], lines='';
+    for(var i=0;i<items.length;i++){ var it=items[i]||{}; var who=esc(String(it.actorName||'')); lines+='<div class="ntfp-gi">'+(who?('<b>'+who+'</b> '):'')+esc(premiumGroupAction(it.title))+'</div>'; }
+    if((view.extraCount||0)>0) lines+='<div class="ntfp-more">+'+esc(String(view.extraCount))+' outras atualizações</div>';
+    return av+'<div class="ntfp-bd"><div class="ntfp-top"><span class="ntfp-eyebrow"><span class="dot" aria-hidden="true"></span>'+esc(count)+' atualizações</span><span class="ntfp-tm">'+esc(premiumHM())+'</span></div><div class="ntfp-task">'+esc(task)+'</div><div class="ntfp-glist">'+lines+'</div><div class="ntfp-cta" data-cta="1">Abrir tarefa</div></div><span class="ntfp-sev" title="'+esc(sev)+'" aria-hidden="true">'+esc(sic)+'</span><button class="ntf-x" title="Fechar" aria-label="Fechar">×</button>';
+  }
 function notifShowToast(p){
   try{
     p=notifNormalize(p||{}); var stack=notifEnsureStack(); var sev=p.severity||'info';
@@ -4116,7 +4179,7 @@ function notifShowToast(p){
     if(!primIni&&primName){ try{ primIni=(initials(primName)||'').toUpperCase(); }catch(_){} }
     if(!primIni&&primName) primIni=String(primName).trim().charAt(0).toUpperCase();
     var icon=sev==='critical'?'bell':(sev==='warning'?'clock':(sev==='success'?'check':'info'));
-    var el=document.createElement('div'); el.className='ntf ntf-'+sev; if(p.action&&p.action.deep) el.setAttribute('data-deep',p.action.deep);
+    var el=document.createElement('div'); el.className='ntf ntf-'+sev+(premiumUse(p)?' ntfp-w':''); if(p.action&&p.action.deep) el.setAttribute('data-deep',p.action.deep); // F3.5.4U — largura responsiva só no premium
     if(p.groupKey) el.setAttribute('data-group',String(p.groupKey)); // F3.5.4O — endereço p/ atualização de grupo comum
     // AVATAR: foto REAL → iniciais do NOME → genérico (só sem usuário). NUNCA a inicial do título.
     var av = primPhoto ? ('<div class="ntf-av" style="background-image:url(\''+esc(primPhoto)+'\')"></div>')
@@ -4133,7 +4196,10 @@ function notifShowToast(p){
                                  :('<span class="ntf-resp-av gen">'+esc(p._respIni||String(p.responsibleName).trim().charAt(0).toUpperCase()||'?')+'</span>');
       respRow='<div class="ntf-resp">'+rav+'<span>Responsável: '+esc(p.responsibleName)+'</span></div>';
     }
-    if(isAttr){
+    if(premiumUse(p)){
+      // F3.5.4U — LAYOUT PREMIUM (flag ON + tipo comum): tipo(eyebrow)→ator→título dominante→chips→complementares.
+      el.innerHTML='<div class="ntf-card ntfp">'+premiumCommonInner(p)+'</div>';
+    } else if(isAttr){
       // F3.3.10-FIX — toast de ATRIBUIÇÃO em linhas organizadas (premium), sem cortar nada:
       // [Nome de quem atribuiu] · "atribuiu uma tarefa" · [Tarefa] · [Cliente] · Responsável · Etapa.
       var who=primName||'';
@@ -4158,9 +4224,9 @@ function notifShowToast(p){
     }
     stack.appendChild(el);
     try{ requestAnimationFrame(function(){ el.classList.add('in'); }); }catch(_){ el.classList.add('in'); }
-    var dismiss=function(){ try{ el.classList.remove('in'); setTimeout(function(){ if(el&&el.parentNode) el.parentNode.removeChild(el); },200); }catch(_){} };
+    var dismiss=function(){ try{ if(premiumUse(p)&&typeof ncDiag==='function') ncDiag('notification.premium.closed',{eventType:p.eventType,deliverySurface:'toast'}); }catch(_){} try{ el.classList.remove('in'); setTimeout(function(){ if(el&&el.parentNode) el.parentNode.removeChild(el); },200); }catch(_){} }; // F3.5.4U — observabilidade sanitizada (só premium)
     var xb=el.querySelector('.ntf-x'); if(xb) xb.addEventListener('click',function(ev){ ev.stopPropagation(); dismiss(); });
-    var cd=el.querySelector('.ntf-card'); if(cd) cd.addEventListener('click',function(){ notifRoute(p.action&&p.action.deep); dismiss(); });
+    var cd=el.querySelector('.ntf-card'); if(cd) cd.addEventListener('click',function(){ try{ if(premiumUse(p)&&typeof ncDiag==='function') ncDiag('notification.premium.opened',{eventType:p.eventType,deliverySurface:'toast'}); }catch(_){} notifRoute(p.action&&p.action.deep); dismiss(); }); // F3.5.4U — clique abre a tarefa (deep-link atual); não movimenta/conclui a tarefa
     if(p.sound!==false) notifSound(sev);
     var ttl=sev==='critical'?11000:(sev==='warning'?8000:6000);
     // F3.5.4O — guarda dismiss/timer/1º instante no elemento p/ a atualização de grupo religar handlers
@@ -4191,9 +4257,10 @@ function notifGroupUpdate(view){
     var lines=''; var items=view.items||[];
     for(var j=0;j<items.length;j++){ var it=items[j]||{}; var who=it.actorName?('<b>'+esc(it.actorName)+'</b> '):''; lines+='<div class="ntf-gi">'+who+esc(String(it.body||it.title||''))+'</div>'; }
     if((view.extraCount||0)>0) lines+='<div class="ntf-more">+'+esc(String(view.extraCount))+' outras atualizações</div>';
-    el.className='ntf ntf-'+sev+' in';
+    el.className='ntf ntf-'+sev+((view._premiumCommon===true)?' ntfp-w':'')+' in'; // F3.5.4U — largura responsiva no grupo premium
     var deep=String(view.deep||''); if(deep) el.setAttribute('data-deep',deep);
-    el.innerHTML='<div class="ntf-card">'+av
+    if(view._premiumCommon===true){ el.innerHTML='<div class="ntf-card ntfp">'+premiumGroupInner(view)+'</div>'; } // F3.5.4U — grupo premium
+    else el.innerHTML='<div class="ntf-card">'+av  // F3.5.4U — fallback: grupo equivalente à 1.0.208
       +'<div class="ntf-bd"><div class="ntf-hd"><b>'+esc(String(view.count||0))+' atualizações em ‘'+esc(view.taskTitle||'Tarefa')+'’</b><span class="ntf-tm">'+esc(notifNowHM())+'</span></div>'
       +'<div class="ntf-glist">'+lines+'</div></div>'
       +'<span class="ntf-sev" title="'+esc(sev)+'">'+(typeof svg==='function'?svg(icon):'')+'</span>'
@@ -8845,6 +8912,9 @@ function notifDiagCardHtml(d){
     /* F3.5.4O — agrupamento das notificações comuns (mesma tarefa + mesmo destinatário) */
     notifDiagRow('Agrupar atualizações comuns', d.groupingEnabled===false?'Desligado':('Ligado'+(d.groupingActive?(' · '+d.groupingActive+' ativo(s)'):'')), d.groupingEnabled===false?'':'ok')+'<div class="divline"></div>'+
     '<button class="settrow" data-cfggrouping="'+(d.groupingEnabled===false?'on':'off')+'"><div class="icb">'+svg('gear')+'</div><div class="sm"><div class="sl">Agrupar atualizações comuns da mesma tarefa</div><div class="ss">'+(d.groupingEnabled===false?'Desligado — cada atualização vem separada. Tocar para ligar':'Ligado — atualizações comuns da mesma tarefa aparecem juntas (a 1ª em tempo real). Tocar para desligar')+'</div></div><div class="arr">'+svg('arr')+'</div></button><div class="divline"></div>'+
+    /* F3.5.4U — layout premium das notificações comuns (apresentação; não altera entrega/agrupamento) */
+    notifDiagRow('Estilo das notificações comuns', d.premiumCommonEnabled===false?'Clássico':'Premium', d.premiumCommonEnabled===false?'':'ok')+'<div class="divline"></div>'+
+    '<button class="settrow" data-cfgpremium="'+(d.premiumCommonEnabled===false?'on':'off')+'"><div class="icb">'+svg('gear')+'</div><div class="sm"><div class="sl">Estilo premium das notificações comuns</div><div class="ss">'+(d.premiumCommonEnabled===false?'Clássico — layout da versão anterior. Tocar para ativar o premium':'Premium — tipo, ator, título em destaque e movimento em etiquetas. Tocar para voltar ao clássico')+'</div></div><div class="arr">'+svg('arr')+'</div></button><div class="divline"></div>'+
     /* F3.5.4P — opções de ação (decisão do responsável) nos alertas de prazo */
     '<button class="settrow" data-cfgsladecision="'+(d.slaDecisionActionsEnabled===false?'on':'off')+'"><div class="icb">'+svg('gear')+'</div><div class="sm"><div class="sl">Mostrar opções de ação nos alertas de prazo</div><div class="ss">'+(d.slaDecisionActionsEnabled===false?'Desligado — o alerta mostra apenas OK. Tocar para ligar':'Ligado — o responsável informa o que fará (Iniciar, Finalizando, Bloqueado, Ajuda). Tocar para desligar')+'</div></div><div class="arr">'+svg('arr')+'</div></button><div class="divline"></div>'+
     /* F3.5.4Q — verificar tarefas paradas em "Em andamento" (check-in de atividade) */
@@ -9742,6 +9812,16 @@ document.addEventListener('click',async e=>{
       try{ if(window.desktopAPI&&window.desktopAPI.groupingSet){ await window.desktopAPI.groupingSet(_cfgGroupingOn); } }catch(_){}
       try{ notifDiagFill(); }catch(_){}
       flashToast(_cfgGroupingOn?'Agrupar atualizações comuns: ligado.':'Agrupar atualizações comuns: desligado.');
+    })();
+    return;
+  }
+  /* F3.5.4U — ESTILO PREMIUM das notificações comuns: liga/desliga SOMENTE a apresentação (OFF ⇒ layout clássico 1.0.208). */
+  if(el=g('[data-cfgpremium]')){
+    var _cfgPremiumOn=el.getAttribute('data-cfgpremium')==='on';
+    (async function(){
+      try{ if(window.desktopAPI&&window.desktopAPI.premiumSet){ await window.desktopAPI.premiumSet(_cfgPremiumOn); } }catch(_){}
+      try{ notifDiagFill(); }catch(_){}
+      flashToast(_cfgPremiumOn?'Estilo das notificações comuns: Premium.':'Estilo das notificações comuns: Clássico.');
     })();
     return;
   }
