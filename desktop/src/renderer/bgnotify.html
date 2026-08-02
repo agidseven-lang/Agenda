@@ -40,11 +40,17 @@
   /* F3.5.4U — LAYOUT PREMIUM das notificações COMUNS (atrás da flag premiumCommonNotificationsEnabled).
      Hierarquia: TIPO(eyebrow) → ATOR → TÍTULO dominante → MOVIMENTO(chips) → COMPLEMENTARES. Informações
      maiores; título da tarefa é o elemento mais importante. IDÊNTICO ao index.html (teste de paridade). */
-  .ntf-card.ntfp{gap:14px;padding:14px 40px 15px 17px}
+  .ntf-card.ntfp{gap:14px;padding:14px 16px 15px 17px}
   .ntfp-av{flex:0 0 auto;width:54px;height:54px;border-radius:50%;background-size:cover;background-position:center;box-shadow:0 0 0 2px rgba(109,91,255,.5),0 6px 16px -6px rgba(0,0,0,.7)}
   .ntfp-av.gen{display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#6D5BFF,#22D3EE);color:#fff;font-weight:800;font-size:20px;letter-spacing:.5px}
   .ntfp-bd{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}
   .ntfp-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  /* F3.5.4U-H1 (Defeito 1) — CABEÇALHO em GRID com COLUNAS RESERVADAS: [eyebrow 1fr] [horário auto] [fechar auto].
+     Elimina 3 elementos disputando a mesma posição absoluta (horário × ícone verde × X). O ícone de nível vira
+     um glifo PEQUENO integrado ao eyebrow (esev); horário e X nunca se sobrepõem, em qualquer escala/resolução. */
+  .ntfp-hd{display:grid;grid-template-columns:1fr auto auto;align-items:center;column-gap:9px;min-width:0}
+  .ntfp-eyebrow .esev{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:5px;background:color-mix(in srgb,var(--nac) 22%,transparent);color:var(--nac);font-size:10.5px;font-weight:900;line-height:1}
+  .ntf-card.ntfp .ntfp-hd .ntf-x{position:static;top:auto;right:auto;flex:0 0 auto;width:22px;height:22px;font-size:16px}
   .ntfp-eyebrow{display:inline-flex;align-items:center;gap:6px;min-width:0;color:#a9b4ff;font-size:11.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .ntfp-eyebrow .dot{flex:0 0 auto;width:7px;height:7px;border-radius:50%;background:var(--nac,#5B6CFF)}
   .ntfp-tm{flex:0 0 auto;color:#8b97a8;font-size:11px}
@@ -109,7 +115,7 @@
     } else { var ctx=String(p.context||''); if(ctx&&ctx!=='Tarefas') mid='<div class="ntfp-action">'+esc(ctx)+'</div>'; }
     var comp=[]; if(p.sector) comp.push(esc(String(p.sector))); if(p.clientName) comp.push(esc(String(p.clientName)));
     var meta=comp.length?('<div class="ntfp-meta">'+comp.join(' · ')+'</div>'):'';
-    return av+'<div class="ntfp-bd"><div class="ntfp-top"><span class="ntfp-eyebrow"><span class="dot" aria-hidden="true"></span>'+esc(type)+'</span><span class="ntfp-tm">'+esc(premiumHM())+'</span></div>'+(actor?('<div class="ntfp-actor">'+esc(actor)+'</div>'):'')+(task?('<div class="ntfp-task">'+esc(task)+'</div>'):'')+mid+meta+'<div class="ntfp-cta" data-cta="1">Abrir tarefa</div></div><span class="ntfp-sev" title="'+esc(sev)+'" aria-hidden="true">'+esc(sic)+'</span><button class="ntf-x" title="Fechar" aria-label="Fechar">×</button>';
+    return av+'<div class="ntfp-bd"><div class="ntfp-hd"><span class="ntfp-eyebrow"><span class="esev" aria-hidden="true">'+esc(sic)+'</span>'+esc(type)+'</span><span class="ntfp-tm">'+esc(premiumHM())+'</span><button class="ntf-x" title="Fechar" aria-label="Fechar">×</button></div>'+(actor?('<div class="ntfp-actor">'+esc(actor)+'</div>'):'')+(task?('<div class="ntfp-task">'+esc(task)+'</div>'):'')+mid+meta+'<div class="ntfp-cta" data-cta="1">Abrir tarefa</div></div>';
   }
   function premiumGroupAction(t){ var s=String(t||''); var m={'Tarefa movimentada':'movimentou a tarefa','Tarefa concluída':'concluiu a tarefa','Tarefa reaberta':'reabriu a tarefa','Tarefa atribuída':'atribuiu a tarefa','Tarefa atualizada':'atualizou a tarefa'}; return m[s]||s; }
   function premiumGroupInner(view){
@@ -119,7 +125,7 @@
     var items=view.items||[], lines='';
     for(var i=0;i<items.length;i++){ var it=items[i]||{}; var who=esc(String(it.actorName||'')); lines+='<div class="ntfp-gi">'+(who?('<b>'+who+'</b> '):'')+esc(premiumGroupAction(it.title))+'</div>'; }
     if((view.extraCount||0)>0) lines+='<div class="ntfp-more">+'+esc(String(view.extraCount))+' outras atualizações</div>';
-    return av+'<div class="ntfp-bd"><div class="ntfp-top"><span class="ntfp-eyebrow"><span class="dot" aria-hidden="true"></span>'+esc(count)+' atualizações</span><span class="ntfp-tm">'+esc(premiumHM())+'</span></div><div class="ntfp-task">'+esc(task)+'</div><div class="ntfp-glist">'+lines+'</div><div class="ntfp-cta" data-cta="1">Abrir tarefa</div></div><span class="ntfp-sev" title="'+esc(sev)+'" aria-hidden="true">'+esc(sic)+'</span><button class="ntf-x" title="Fechar" aria-label="Fechar">×</button>';
+    return av+'<div class="ntfp-bd"><div class="ntfp-hd"><span class="ntfp-eyebrow"><span class="esev" aria-hidden="true">'+esc(sic)+'</span>'+esc(count)+' atualizações</span><span class="ntfp-tm">'+esc(premiumHM())+'</span><button class="ntf-x" title="Fechar" aria-label="Fechar">×</button></div><div class="ntfp-task">'+esc(task)+'</div><div class="ntfp-glist">'+lines+'</div><div class="ntfp-cta" data-cta="1">Abrir tarefa</div></div>';
   }
 
   function render(p){

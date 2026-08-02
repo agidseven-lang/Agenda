@@ -57,12 +57,20 @@ export function createSlaReminderSurface(deps: SlaReminderSurfaceDeps): Reminder
   let renderTimer: any = null;
   let onNoRenderCb: (() => void) | null = null;
   let lastFocusedBefore: BrowserWindow | null = null;
+  let winId = 0;                    // F3.5.4U-H1 — id da janela ÚNICA (observabilidade central_alert.*)
 
   function winState(): string { return "reminder"; }
+  function appVer(): string { try { return app.getVersion(); } catch { return "dev"; } }
+  // F3.5.4U-H1 (Defeito 2) — observabilidade SANITIZADA do ciclo de vida da janela central (sem título/nome/etc.).
+  function cobs(event: string, extra?: Record<string, unknown>): void {
+    try { log(event, Object.assign({ windowCount: (win && !win.isDestroyed()) ? 1 : 0, windowId: winId, appVersion: appVer(), timestamp: Date.now() }, extra || {})); } catch { /* */ }
+  }
 
   function ensure(): BrowserWindow {
-    if (win && !win.isDestroyed()) return win;
+    // F3.5.4U-H1 (Defeito 2) — GARANTIA de UMA ÚNICA janela central: reutiliza a existente (nunca cria a 2ª).
+    if (win && !win.isDestroyed()) { acknowledged = false; cobs("central_alert.window_reused"); return win; }
     acknowledged = false;
+    winId++;
     win = new BrowserWindow({
       width: WIDTH, height: 260, show: false, frame: false, transparent: true,
       resizable: false, movable: false, minimizable: false, maximizable: false, closable: true,
@@ -80,6 +88,7 @@ export function createSlaReminderSurface(deps: SlaReminderSurfaceDeps): Reminder
     // Alt+F4 / qualquer close antes do OK ⇒ bloqueado
     win.on("close", (e) => { if (!acknowledged) { try { e.preventDefault(); } catch { /* */ } log("sla.reminder.close.blocked", { key: mask(curKey) }); } });
     win.loadFile(path.join(app.getAppPath(), "src", "renderer", "slareminder.html"));
+    cobs("central_alert.window_created");
     return win;
   }
 
@@ -128,10 +137,14 @@ export function createSlaReminderSurface(deps: SlaReminderSurfaceDeps): Reminder
     },
     promote(view: ReminderView): void { push(view); armRenderProof(view.key); },
     close(): void {
+      // F3.5.4U-H1 (Defeito 2): REUTILIZAR a janela — HIDE, não destruir. Destruir+recriar entre itens da fila
+      // recriava a BrowserWindow e a mostrava (showInactive) ANTES do card pintar → janela transparente vazia
+      // (retângulo/"2ª notificação" preta atrás). Com hide, a janela ÚNICA persiste (renderer vivo) e o próximo
+      // item apenas MORFA o conteúdo. Teardown real (logout/quit) segue em destroy().
       clearRenderProof();
       acknowledged = true; onNoRenderCb = null; curKey = "";
-      if (win && !win.isDestroyed()) { try { win.destroy(); } catch { /* */ } }
-      win = null;
+      try { if (win && !win.isDestroyed() && win.isVisible()) win.hide(); } catch { /* */ }
+      cobs("central_alert.closed");
     },
     isOpen(): boolean { return !!(win && !win.isDestroyed() && win.isVisible()); },
     native(view: CentralView): boolean {
@@ -152,12 +165,12 @@ export function createSlaReminderSurface(deps: SlaReminderSurfaceDeps): Reminder
       } catch { return false; }
     },
     onNoRender(key: string, cb: () => void): void { onNoRenderCb = cb; if (curKey === key && !renderTimer) armRenderProof(key); },
-    destroy(): void { clearRenderProof(); acknowledged = true; if (win && !win.isDestroyed()) { try { win.destroy(); } catch { /* */ } } win = null; },
+    destroy(): void { clearRenderProof(); acknowledged = true; cobs("central_alert.destroyed"); if (win && !win.isDestroyed()) { try { win.destroy(); } catch { /* */ } } win = null; },
     ackState(): string { return winState(); },
   };
 
   // IPC do card (registrado uma vez)
-  ipcMain.on("slareminder-rendered", (_e, key) => { if (String(key || "") === curKey) { clearRenderProof(); log("sla.reminder.rendered", { key: mask(curKey) }); } });
+  ipcMain.on("slareminder-rendered", (_e, key) => { if (String(key || "") === curKey) { clearRenderProof(); log("sla.reminder.rendered", { key: mask(curKey) }); cobs("central_alert.render_ack"); } });
   ipcMain.on("slareminder-resize", (_e, h) => { center(Number(h) || 260); });
   ipcMain.on("slareminder-ok", (_e, key) => { const k = String(key || ""); log("sla.reminder.ok.click", { key: mask(k) }); try { deps.onAck(k, winState()); } catch (e) { log("sla.reminder.ok.error", { err: String((e as any) && (e as any).message || e) }); } });
   ipcMain.on("slareminder-open", (_e, deep) => { try { deps.onOpenTask(String(deep || "")); } catch { /* */ } });

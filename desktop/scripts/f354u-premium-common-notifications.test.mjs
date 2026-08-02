@@ -85,7 +85,8 @@ ok((hMove.match(/Ferreira/g) || []).length === 1, "B09 ATOR não repetido (nome 
 ok(/ntfp-meta">Vídeo/.test(hMove), "B10 COMPLEMENTARES: setor no rodapé");
 ok(/ntfp-cta[^>]*>Abrir tarefa/.test(hMove), "B11 CTA discreta 'Abrir tarefa'");
 ok(/class="ntf-x"/.test(hMove), "B12 botão fechar (X)");
-ok(/ntfp-sev/.test(hMove), "B13 indicador de severidade discreto");
+ok(/ntfp-eyebrow"><span class="esev"/.test(hMove), "B13 indicador de severidade discreto INTEGRADO ao eyebrow (H1 Defeito 1)");
+ok(/ntfp-hd/.test(hMove) && !/ntfp-sev/.test(hMove), "B13b cabeçalho em GRID reservado (ntfp-hd) SEM ntfp-sev grande sobreposto (H1 Defeito 1)");
 ok(/role="group" aria-label="Movimento de/.test(hMove), "B14 acessibilidade: aria-label nos chips");
 ok(/ntfp-av" style="background-image:url\('https/.test(hMove), "B15 avatar por foto real quando há URL");
 ok(/ntfp-av gen[^>]*>AS?</.test(hAssign) || /ntfp-av gen/.test(hAssign), "B16 avatar iniciais quando SEM foto (assign)");

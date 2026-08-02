@@ -10,11 +10,17 @@
   html,body{ background:transparent; overflow:hidden; -webkit-user-select:none; user-select:none; font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif; }
   /* #wrap reserva 46px no topo p/ o avatar transbordar SEM ser cortado pela borda da janela.
      position:relative => o avatar (irmão do card) posiciona-se relativo ao #wrap, não ao card. */
-  #wrap{ position:relative; padding:46px 18px 20px; display:flex; justify-content:center; }
+  /* F3.5.4U-H1 (Defeito 2 — área preta): padding lateral/inferior AMPLIADO p/ CONTER integralmente a sombra
+     do card DENTRO da janela transparente. Assim a borda retangular da BrowserWindow cai numa região 100%
+     transparente (sem sombra escura vazando p/ a borda) — elimina o "retângulo/halo preto" no Windows. */
+  #wrap{ position:relative; padding:46px 30px 40px; display:flex; justify-content:center; }
   /* overflow:hidden encaixa a faixa superior perfeitamente nos cantos arredondados do card;
      o avatar é IRMÃO (fora do card), então não é afetado por este clip. */
+  /* F3.5.4U-H1 (Defeito 2 — área preta): sombra ENXUTA e clara (alcance ~36px, contido no padding do #wrap),
+     em vez da sombra escura de 80px que vazava até a borda da janela transparente e virava um retângulo preto
+     no Windows. Elegante, uniforme, apenas ao redor do card. */
   .card{ position:relative; z-index:1; width:100%; max-width:420px; background:#FFFFFF; border-radius:20px;
-    overflow:hidden; box-shadow:0 30px 80px -18px rgba(2,6,23,.62), 0 6px 18px rgba(2,6,23,.18);
+    overflow:hidden; box-shadow:0 10px 26px -10px rgba(2,6,23,.30), 0 2px 8px rgba(2,6,23,.10);
     padding:52px 22px 20px; text-align:center; border:1px solid rgba(15,23,42,.06); }
   .card::before{ content:""; position:absolute; left:0; right:0; top:0; height:6px; background:var(--amber); }
   .card.red::before{ background:var(--red); }

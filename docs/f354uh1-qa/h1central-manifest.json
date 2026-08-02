@@ -1,0 +1,33 @@
+{
+  "version": "1.0.210",
+  "appPath": "/tmp/claude-0/-home-user-Agenda/8377c5c8-12ce-54f5-829a-8004bc1dfd9b/scratchpad/wt-f354u/.f354uh1-central/app.asar",
+  "electron": "31.3.1",
+  "steps": [
+    {
+      "label": "single_shown",
+      "centralWindowCount": 1,
+      "webContentsId": 1,
+      "visible": true
+    },
+    {
+      "label": "second_enqueued_first_still_shown",
+      "centralWindowCount": 1,
+      "webContentsId": 1,
+      "visible": true
+    },
+    {
+      "label": "after_ack_second_shown",
+      "centralWindowCount": 1,
+      "webContentsId": 1,
+      "visible": true
+    },
+    {
+      "label": "queue_empty_hidden",
+      "centralWindowCount": 1,
+      "webContentsId": 1,
+      "visible": false
+    }
+  ],
+  "singleWindowInvariant": true,
+  "reusedOnAck": true
+}

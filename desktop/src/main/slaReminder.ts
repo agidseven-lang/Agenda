@@ -255,6 +255,17 @@ export function createSlaReminderController(opts: SlaReminderControllerOpts) {
   // F3.5.4P — boundaryVersion = finishMs (marco do prazo) extraído da dedupKey (epoch-ms de 12+ dígitos),
   // independente do produtor (SLA idx2 / cards|dedupByDesigner idx3) — SEM tocar os produtores congelados.
   function boundaryOf(dedupKey: string): string { const m = String(dedupKey || "").match(/(\d{12,})/); return m ? m[1] : ""; }
+  // F3.5.4U-H1 (Defeito 2) — CHAVE LÓGICA do alerta (taskId+destinatário+nível+marco-do-prazo). Independe da
+  // dedupKey crua do produtor: dois PRODUTORES/SOURCES que emitem o MESMO alerta lógico (dedupKeys diferentes)
+  // colapsam numa única ocorrência. Prazo NOVO (outro marco) ⇒ chave diferente ⇒ novo alerta permitido.
+  function logicalOf(p: any, level: ReminderLevel): string { return baseOf(p) + ":" + level + ":" + boundaryOf(String((p && p.dedupKey) || "")); }
+  function logicalOfItem(it: QueueItem): string { return it.base + ":" + it.level + ":" + boundaryOf(it.key); }
+  // hash NÃO reversível p/ observabilidade (nunca logar taskId/dedupKey crus).
+  function hashId(s: string): string { let h = 5381; const v = String(s || ""); for (let i = 0; i < v.length; i++) h = ((h << 5) + h + v.charCodeAt(i)) >>> 0; return h.toString(36); }
+  // F3.5.4U-H1 — observabilidade SANITIZADA do ciclo de vida (só nível/threshold/source/contagens/hashes).
+  function centralObs(event: string, p: any, level: ReminderLevel | "", extra?: Record<string, unknown>): void {
+    try { log(event, Object.assign({ alertType: level || "", threshold: String((p && (p.threshold || p.slaThreshold)) || ""), source: String((p && p.source) || "notifierA"), queueDepth: queue.length, activeExists: !!active, appVersion, timestamp: now(), taskIdHash: hashId(String((p && p.taskId) || "")), dedupKeyHash: hashId(String((p && p.dedupKey) || (p && p.key) || "")) }, extra || {})); } catch { /* */ }
+  }
   function buildDecisionKey(taskId: string, level: ReminderLevel, boundary: string, uid: string): string {
     return "sla_decision:" + String(taskId || "") + ":" + String(level || "") + ":" + String(boundary || "") + ":" + String(uid || "");
   }
@@ -318,6 +329,7 @@ export function createSlaReminderController(opts: SlaReminderControllerOpts) {
       return; // permanece "active" até ack/unlock; não abre BrowserWindow sobre o lock
     }
     surface.show(it.view);
+    centralObs("central_alert.activated", { taskId: it.taskId, dedupKey: it.key }, it.level, { queueDepth: queue.length });
     log("sla.reminder.shown", { key: mask(it.key), level: it.level, queueLen: it.view.queueLen });
     log("sla.reminder.sound.played", { key: mask(it.key), level: it.level });
     if (surface.onNoRender) {
@@ -370,7 +382,7 @@ export function createSlaReminderController(opts: SlaReminderControllerOpts) {
     if (activeCheckin) return;
     // descarta itens já respondidos (qualquer estado) — o ciclo não deve reaparecer
     while (checkinQueue.length && idleStore && idleStore.getResponse(checkinQueue[0].key)) checkinQueue.shift();
-    if (!checkinQueue.length) { if (surface.isOpen()) { try { surface.close(); } catch { /* */ } } return; }
+    if (!checkinQueue.length) { centralObs("central_alert.queue_empty", {}, "", { queueDepth: 0 }); if (surface.isOpen()) { try { surface.close(); } catch { /* */ } } return; }
     const it = checkinQueue.shift()!;
     if (!taskValid(it.taskId, it.recipientUid)) { log("task.idle.cancelled_gone", { key: mask(it.key) }); return showNextCheckin(); }
     activeCheckin = it;
@@ -394,7 +406,17 @@ export function createSlaReminderController(opts: SlaReminderControllerOpts) {
       const base = baseOf(p);
       // já na fila ou ativo com a MESMA chave ⇒ duplicata (unlock/resume/reconexão/replay)
       if ((active && active.key === key) || queue.some((q) => q.key === key)) {
+        centralObs("central_alert.duplicate_dropped", p, level, { reason: "inflight" });
         log("sla.reminder.dedup.skipped", { key: mask(key), reason: "inflight" }); return { ok: true, channel: "sla-dup" };
+      }
+      // F3.5.4U-H1 (Defeito 2) — DEDUP LÓGICO: mesmo alerta lógico (task+destinatário+nível+marco) vindo de OUTRA
+      // source/dedupKey ⇒ UMA ocorrência (não mostra duas vezes). Não afeta promoção (nível difere) nem prazo novo
+      // (marco difere) nem tarefas diferentes (base difere).
+      const lk = logicalOf(p, level);
+      if ((active && active.key !== key && active.level === level && logicalOfItem(active) === lk) || queue.some((q) => q.level === level && logicalOfItem(q) === lk)) {
+        centralObs("central_alert.duplicate_dropped", p, level, { reason: "logical" });
+        store.removePending(key);
+        log("sla.reminder.dedup.skipped", { key: mask(key), reason: "logical" }); return { ok: true, channel: "sla-logical-dup" };
       }
       const taskId = String((p && p.taskId) || "");
       // tarefa concluída com modal aberto ⇒ não gerar o alerta vermelho futuro (mandato)
@@ -432,6 +454,7 @@ export function createSlaReminderController(opts: SlaReminderControllerOpts) {
 
       queue.push(item);
       log("sla.reminder.queued", { key: mask(key), level, pending: pendingCount() });
+      centralObs("central_alert.enqueued", p, level, { queueDepth: queue.length });
       if (!active) showNext(); else refreshCounter();
       return { ok: true, channel: "sla-central" };
     },
@@ -450,10 +473,12 @@ export function createSlaReminderController(opts: SlaReminderControllerOpts) {
       } catch (e) { log("sla.reminder.ack.failed", { key: mask(k), err: errMsg(e) }); return false; }
       store.removePending(k);
       log("sla.reminder.ack.success", { key: mask(k), level: active.level });
+      centralObs("central_alert.recognized", { taskId: active.taskId, dedupKey: k }, active.level, {});
       try { if (opts.onAcked) opts.onAcked({ key: k, level: active.level, actorName: active.view.actorName, taskTitle: active.view.taskTitle, taskId: active.taskId }); } catch { /* histórico nunca derruba o ack */ }
       active = null;
       try { surface.close(); } catch { /* */ }
       log("sla.reminder.closed", { key: mask(k) });
+      if (queue.length) centralObs("central_alert.next_promoted", {}, "", { queueDepth: queue.length });
       showNext();
       return true;
     },
@@ -470,6 +495,7 @@ export function createSlaReminderController(opts: SlaReminderControllerOpts) {
       const k = String((input && input.key) || "");
       if (!k || !active || active.key !== k) { log("sla.decision.stale.ignored", { key: mask(k) }); return { status: "ignored" }; }
       const cur = active;   // item ATIVO no momento da decisão (estável ao longo do await; active pode mudar)
+      centralObs("central_alert.action_received", { taskId: cur.taskId, dedupKey: cur.key }, cur.level, { decisionType: String((input && (input as any).decisionType) || "") });
       const decisionType = String((input && input.decisionType) || "") as DecisionType;
       const recipientUid = cur.base.split(":")[1] || "";
       const boundary = boundaryOf(cur.key);

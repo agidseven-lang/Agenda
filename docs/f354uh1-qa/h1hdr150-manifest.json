@@ -1,0 +1,63 @@
+{
+  "tag": "h1hdr150",
+  "ident": {
+    "executable": "/home/user/Agenda/desktop/node_modules/electron/dist/electron",
+    "appPath": "/tmp/claude-0/-home-user-Agenda/8377c5c8-12ce-54f5-829a-8004bc1dfd9b/scratchpad/wt-f354u/.f354u-electron-proof/proof-app.asar",
+    "isAsar": true,
+    "version": "1.0.210",
+    "electron": "31.3.1",
+    "chrome": "126.0.6478.185",
+    "node": "20.15.1",
+    "processType": "browser",
+    "pid": 13688,
+    "platform": "linux",
+    "arch": "x64",
+    "scaleHint": ""
+  },
+  "generatedScenes": [
+    {
+      "scene": "02-completed-premium",
+      "file": "h1hdr150-02-completed-premium.png",
+      "kind": "single",
+      "surface": "premium_window",
+      "appVersion": "1.0.210",
+      "appPath": "/tmp/claude-0/-home-user-Agenda/8377c5c8-12ce-54f5-829a-8004bc1dfd9b/scratchpad/wt-f354u/.f354u-electron-proof/proof-app.asar",
+      "executable": "/home/user/Agenda/desktop/node_modules/electron/dist/electron",
+      "electron": "31.3.1",
+      "scale": "",
+      "pngBytes": 56570,
+      "imgSize": {
+        "width": 750,
+        "height": 324
+      },
+      "window": {
+        "width": 500,
+        "height": 216,
+        "x": 552,
+        "y": 436,
+        "focusable": false,
+        "visible": true,
+        "alwaysOnTop": true
+      },
+      "renderAck": true,
+      "resizeReported": 215,
+      "payloadSanitized": {
+        "eventType": "task_completed",
+        "_premiumCommon": true,
+        "hasAvatar": false,
+        "actorNameLength": 10,
+        "taskTitleLength": 28,
+        "fromStatus": "andamento",
+        "toStatus": "concluido",
+        "hasSector": true,
+        "hasClient": false,
+        "hasBody": true,
+        "hasContext": true,
+        "severity": "success",
+        "deep": "detail/t_cp"
+      },
+      "click": null
+    }
+  ],
+  "scale": ""
+}
