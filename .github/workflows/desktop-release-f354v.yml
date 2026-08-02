@@ -1,0 +1,263 @@
+# =====================================================================
+# F3.5.4V — Publicacao da Desktop 1.0.212 no CANAL DO ATUALIZADOR INTERNO (Latest)
+# ---------------------------------------------------------------------
+# Publica a 1.0.212 (F3.5.4V — QUANTIDADE PERSONALIZADA de videos/roteiros: no setor Edicao de videos,
+# os 3 pacotes fixos 4/6/12 viram um seletor numerico [−][N][+], inteiro >=1, sem teto de negocio; teto
+# tecnico 500 com mensagem clara). Abordagem de subtipo SINTETICO: curSub() deriva items/videoTema da
+# quantidade; o contrato de saida data.videos=[{id,n,tema}] permanece byte-identico a 1.0.211 — exibicao,
+# Worker, Functions e Android seguem count-agnosticos. Delta vs 1.0.211: SO desktop/src/renderer/index.html.
+# USA EXCLUSIVAMENTE os BYTES do run de build F3.5.4V 30756982562 (gated, verde nos 2 jobs; --publish never):
+# NAO RECOMPILA — baixa os 2 artifacts e publica os MESMOS bytes. TUDO PINADO: run id, digests dos artifacts,
+# 5 hashes SHA-256, tag v1.0.212 no head EXATO da branch. 6 assets: EXE, MSI, latest.yml, blockmap,
+# SHA256SUMS, VERSAO-DESKTOP.txt.
+# ESCRITAS (tag + release + Latest) SO via token temporario do GitHub App "Agenda ID Seven Release Bot"
+# (expira sozinho); GITHUB_TOKEN permanece somente leitura; sem RELEASE_PAT.
+# Roda NA PROPRIA branch de teste (main INTOCAVEL): dispara no push DESTE arquivo + workflow_dispatch.
+# Rollback imediato: v1.0.211 (baseline fisicamente aprovada). Rollback adicional: v1.0.208. v1.0.210 e
+# v1.0.209 permanecem PRESERVADAS no historico (reprovadas fisicamente). A publicacao NAO significa aprovacao
+# fisica — o teste fisico do owner vem depois, pelo atualizador.
+# =====================================================================
+name: "F3.5.4V Desktop Release — 1.0.212 no canal do updater (quantidade personalizada de videos; sem build novo)"
+"on":
+  push:
+    branches:
+      - "desktop/f354v-custom-video-quantity-1.0.212"
+    paths:
+      - ".github/workflows/desktop-release-f354v.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: agidseven-lang/Agenda
+      # ── PINAGEM COMPLETA (F3.5.4V; run de build 30756982562 verde nos 2 jobs) ──
+      RUN_ID: "30756982562"
+      STABLE_SHA: "ee0eb543d07d5fbec67f39077a693a2f410f9784"
+      TEST_BRANCH: "desktop/f354v-custom-video-quantity-1.0.212"
+      BASE_211_SHA: "fe303b8ab9546ff00d0459b98e0e9eaab20dd8e2"
+      BASE_208_SHA: "db8cdca1d92cd42f3ec98aced39e6a418c4d478e"
+      TAG: "v1.0.212"
+      TITLE: "Agenda ID Seven Desktop 1.0.212 — Quantidade Personalizada de Vídeos"
+      ART_INST: "agenda-id-seven-desktop-1.0.212-installer"
+      ART_INST_DIGEST: "sha256:d371365ed34225639e32c0f5c545f9b8a0d866ece040a748d2b2be18f80c18ab"
+      ART_META: "agenda-id-seven-desktop-1.0.212-updatemeta"
+      ART_META_DIGEST: "sha256:66383dc0e18d1974c35eb1a9add3af14b46335c957676d03cc765b4aa68847b2"
+      EXE_NAME: "Agenda-ID-Seven-Desktop-1.0.212-x64.exe"
+      MSI_NAME: "Agenda-ID-Seven-Desktop-1.0.212-x64.msi"
+      BM_NAME: "Agenda-ID-Seven-Desktop-1.0.212-x64.exe.blockmap"
+      LY_NAME: "latest.yml"
+      EXP_EXE: "1b0534ad8c6a9353e8b295a062a80aa8e23e7c012906931ea714e7cfb637e9c0"
+      EXP_MSI: "d47b5d7f0727f7e485eac77de0841c41333d920cd745e770b6fe01c361f18cb5"
+      EXP_LY: "98a7cef783d2d9819f9795bea7592ed34ec1af6bcdf5e2a908e27c24ffd3092a"
+      EXP_BM: "38778f0c926f4d7ee47b62fe6423b86e3b7a9817e442c04375a1dd57af8a209c"
+      EXP_SBOM: "0eae7a08268c5bf7e050d82ce29d87667a9c1c42ef9a0311573df23fa0bacecf"
+      PROD_PREV_TAG: "v1.0.211"
+      PROD_ROLLBACK_TAG: "v1.0.208"
+      PROD_HIST_TAG: "v1.0.210"
+      PROD_HIST2_TAG: "v1.0.209"
+    steps:
+      - name: "Gate 0 — contexto: branch de teste correta (publicacao autorizada F3.5.4V)"
+        run: |
+          set -euo pipefail
+          [ "${{ github.ref_name }}" = "$TEST_BRANCH" ] || { echo "::error::ref '${{ github.ref_name }}' != $TEST_BRANCH — nada publicado"; exit 1; }
+          echo "OK: rodando na branch de teste autorizada"
+
+      - name: "Gate 0a — token temporario do Release Bot (GitHub App; expira sozinho)"
+        id: release_bot
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: Agenda
+          permission-contents: write
+          permission-workflows: write
+
+      - name: "Gate 0b — token do Release Bot ATIVO + escopo SO Agenda"
+        env:
+          BOT_TOKEN: ${{ steps.release_bot.outputs.token }}
+        run: |
+          set -euo pipefail
+          [ -n "$BOT_TOKEN" ] || { echo "::error::token do Release Bot vazio — NADA publicado."; exit 1; }
+          FN="$(GH_TOKEN="$BOT_TOKEN" gh api "repos/$REPO" --jq '.full_name' 2>/dev/null || true)"
+          [ "$FN" = "$REPO" ] || { echo "::error::Release Bot sem acesso a $REPO."; exit 1; }
+          J="$(GH_TOKEN="$BOT_TOKEN" gh api /installation/repositories)"
+          N="$(echo "$J" | jq -r '.total_count')"; R="$(echo "$J" | jq -r '.repositories[0].full_name')"
+          { [ "$N" = "1" ] && [ "$R" = "$REPO" ]; } || { echo "::error::escopo do Release Bot != {1 repo, $REPO} ($N,$R)."; exit 1; }
+          echo "OK: Release Bot ativo, escopo restrito a $REPO"
+
+      - name: "Gate 1 — run de build F3.5.4V completed/success e head EXATO"
+        run: |
+          set -euo pipefail
+          J="$(gh api "repos/$REPO/actions/runs/$RUN_ID")"
+          ST="$(echo "$J" | jq -r '.status + "|" + .conclusion')"
+          HS="$(echo "$J" | jq -r '.head_sha')"
+          BR="$(echo "$J" | jq -r '.head_branch')"
+          echo "run $RUN_ID: $ST head=$HS branch=$BR"
+          [ "$ST" = "completed|success" ] || { echo "::error::run de build invalido"; exit 1; }
+          [ "$HS" = "$STABLE_SHA" ] || { echo "::error::head do run != STABLE_SHA"; exit 1; }
+          [ "$BR" = "$TEST_BRANCH" ] || { echo "::error::branch do run != branch de teste"; exit 1; }
+
+      - name: "Gate 2 — STABLE_SHA na linhagem do tip; commits alem dele SO o workflow de release"
+        run: |
+          set -euo pipefail
+          H="$(gh api "repos/$REPO/git/ref/heads/$TEST_BRANCH" --jq '.object.sha')"
+          CMP="$(gh api "repos/$REPO/compare/$STABLE_SHA...$H" --jq '.status')"
+          echo "compare $STABLE_SHA...$H: $CMP"
+          { [ "$CMP" = "identical" ] || [ "$CMP" = "ahead" ]; } || { echo "::error::STABLE_SHA fora da linhagem do tip ($CMP)"; exit 1; }
+          gh api "repos/$REPO/compare/$STABLE_SHA...$H" --jq '.files[].filename' | tee /tmp/extra.txt || true
+          if grep -vE '^\.github/workflows/desktop-release-f354v\.yml$' /tmp/extra.txt | grep -q .; then
+            echo "::error::commits pos-candidato tocam arquivos alem do workflow de release"; exit 1; fi
+          if grep -qE '^(desktop/src/|desktop/scripts/copy-renderer\.js|desktop/package\.json|desktop/package-lock\.json|desktop/tsconfig\.json|desktop/electron-builder)' /tmp/extra.txt; then
+            echo "::error::insumo de build alterado apos STABLE_SHA — bytes publicados nao corresponderiam ao build"; exit 1; fi
+          CMP2="$(gh api "repos/$REPO/compare/$BASE_211_SHA...$STABLE_SHA" --jq '.status')"
+          { [ "$CMP2" = "ahead" ] || [ "$CMP2" = "identical" ]; } || { echo "::error::STABLE_SHA nao descende da 1.0.211 ($CMP2)"; exit 1; }
+          CMP3="$(gh api "repos/$REPO/compare/$BASE_208_SHA...$STABLE_SHA" --jq '.status')"
+          { [ "$CMP3" = "ahead" ] || [ "$CMP3" = "identical" ]; } || { echo "::error::STABLE_SHA nao descende da 1.0.208 ($CMP3)"; exit 1; }
+          echo "OK: STABLE_SHA ancestral do tip; extras = so o workflow de release; bases 1.0.211 e 1.0.208 na linhagem"
+
+      - name: "Gate 3 — release v1.0.212 NAO existe; tag so pode preexistir apontando p/ STABLE_SHA"
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then echo "::error::release $TAG ja existe"; exit 1; fi
+          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            TS="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+            [ "$TS" = "$STABLE_SHA" ] || { echo "::error::tag $TAG aponta para outro sha ($TS)"; exit 1; }
+          fi
+          echo "OK: release/tag livres (ou tag ja em STABLE_SHA)"
+
+      - name: "Gate 4 — artifacts: ids+digests conferem (mesmos bytes do run verde)"
+        run: |
+          set -euo pipefail
+          json="$(gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts" --paginate)"
+          chk() { local d; d="$(echo "$json" | jq -r --arg n "$1" '.artifacts[]|select(.name==$n)|.digest')"; echo "$1: $d"; [ "$d" = "$2" ] || { echo "::error::digest $1 divergente"; exit 1; }; }
+          chk "$ART_INST" "$ART_INST_DIGEST"
+          chk "$ART_META" "$ART_META_DIGEST"
+
+      - name: "Baixar artifacts (installer + updatemeta) — SEM recompilar"
+        run: |
+          set -euo pipefail
+          gh run download "$RUN_ID" -R "$REPO" -n "$ART_INST" -D pacote
+          gh run download "$RUN_ID" -R "$REPO" -n "$ART_META" -D pacote
+          for f in "$EXE_NAME" "$MSI_NAME" "$LY_NAME" "$BM_NAME" SHA256SUMS SBOM-cyclonedx.json VERSAO-DESKTOP.txt; do
+            test -f "pacote/$f" || { echo "::error::arquivo ausente: $f"; exit 1; }
+          done
+          if [ -f pacote/canary.yml ]; then echo "::error::canary.yml presente — canal ambiguo"; exit 1; fi
+
+      - name: "Gate 5 — hashes SHA-256 + latest.yml (versao/EXE/sha512) + VERSAO-DESKTOP"
+        run: |
+          set -euo pipefail
+          declare -A EXP=( ["$EXE_NAME"]="$EXP_EXE" ["$MSI_NAME"]="$EXP_MSI" ["$LY_NAME"]="$EXP_LY" ["$BM_NAME"]="$EXP_BM" ["SBOM-cyclonedx.json"]="$EXP_SBOM" )
+          for f in "${!EXP[@]}"; do
+            H="$(sha256sum "pacote/$f" | awk '{print $1}')"; echo "$f=$H"
+            [ "$H" = "${EXP[$f]}" ] || { echo "::error::hash $f divergente"; exit 1; }
+          done
+          ( cd pacote && sha256sum -c SHA256SUMS ) || { echo "::error::SHA256SUMS nao confere"; exit 1; }
+          grep -q "version: 1.0.212" "pacote/$LY_NAME" || { echo "::error::latest.yml version != 1.0.212"; exit 1; }
+          grep -qE "^path: $EXE_NAME" "pacote/$LY_NAME" || { echo "::error::latest.yml path != EXE"; exit 1; }
+          META_SHA512=$(grep -E '^sha512:' "pacote/$LY_NAME" | head -1 | sed -E 's/^sha512:[[:space:]]*//' | tr -d '\r')
+          CALC_SHA512=$(openssl dgst -sha512 -binary "pacote/$EXE_NAME" | openssl base64 -A)
+          [ "$META_SHA512" = "$CALC_SHA512" ] || { echo "::error::sha512 do latest.yml != EXE (updater rejeitaria)"; exit 1; }
+          grep -q "versionName : 1.0.212" pacote/VERSAO-DESKTOP.txt || { echo "::error::VERSAO-DESKTOP sem 1.0.212"; exit 1; }
+          grep -q "1.0.212-custom-video-quantity" pacote/VERSAO-DESKTOP.txt || { echo "::error::rotulo da candidata ausente"; exit 1; }
+          echo "OK: 5 hashes + SHA256SUMS + latest.yml (1.0.212/EXE/sha512==EXE) + VERSAO-DESKTOP"
+
+      - name: "Release notes"
+        run: |
+          cat > notas.md <<'NOTAS'
+          Agenda ID Seven Desktop 1.0.212 — Quantidade Personalizada de Vídeos
+
+          Atualização disponibilizada pelo ATUALIZADOR INTERNO do app (Configurações ->
+          Atualizações -> Verificar atualizações -> Baixar -> Instalar e reiniciar).
+          NENHUM download manual é necessário.
+
+          O QUE MUDA vs 1.0.211 (F3.5.4V — quantidade personalizada de vídeos/roteiros)
+          No fluxo "Nova tarefa -> Edição de vídeos -> Briefing", a seção que antes oferecia apenas três
+          pacotes fixos (4, 6 ou 12 vídeos/roteiros) passa a ser um SELETOR DE QUANTIDADE personalizada:
+
+              Quantidade de vídeos/roteiros
+              [ − ]   [ 8 ]   [ + ]
+
+          - Aceita qualquer quantidade inteira válida (1, 2, 3, 5, 7, 8, 10, 15, 20 … ou qualquer outra),
+            não apenas 4/6/12. Mínimo 1; sem teto de negócio (há apenas um teto técnico de 500 por tarefa,
+            com aviso claro, para proteger o desempenho e o limite do documento).
+          - Pode diminuir/aumentar pelos botões, digitar direto, colar um número e usar as setas do teclado.
+            O valor não se perde ao rolar, avançar/voltar entre as etapas nem ao re-renderizar o formulário.
+          - A revisão mostra a quantidade escolhida. Ao salvar, a quantidade é persistida como número inteiro.
+          - Tarefas antigas (pacotes 4/6/12) continuam abrindo e exibindo normalmente; ao editar, o campo já
+            vem preenchido com a quantidade correspondente. Nada é migrado nem reescrito.
+
+          PRESERVAÇÃO (provado pelos gates do app.asar no build)
+          - O contrato de dados de vídeos (data.videos = [{id, n, tema}]) é byte-idêntico à 1.0.211, então
+            Card Premium, Cronograma, detalhes, portal, Worker, Functions e Android continuam exibindo a
+            contagem exata, sem qualquer dependência de 4/6/12.
+          - Demais setores (Cronograma, Roteiro, Copywriting) mantêm seus seletores atuais, intactos.
+          - Notificações comuns premium e horário, alertas amarelo/vermelho, estado "Registrando…", fila
+            central, check-in, decisões, T-30/T-10, prazos, deduplicação, destinatários, recibos, sino,
+            Minhas Prioridades, Monitor de SLA, watchdog, tray, atualizador, backend, Firebase
+            Rules/Functions/Worker e Android: INTOCADOS (byte-idênticos à 1.0.211; delta só no renderer
+            index.html do formulário).
+          - Rollback imediato: 1.0.211 (baseline fisicamente aprovada). Rollback adicional: 1.0.208. As
+            versões 1.0.210 e 1.0.209 permanecem preservadas no histórico (reprovadas fisicamente).
+
+          IMPORTANTE: esta versão ainda DEPENDE DE VALIDAÇÃO FÍSICA do owner no Windows (criar uma tarefa de
+          Edição de vídeos escolhendo quantidades diversas — inclusive fora de 4/6/12 —, revisar, salvar e
+          reabrir; conferir a responsividade em 100%/125%/150%). A publicação apenas disponibiliza a
+          atualização pelo mecanismo oficial; não constitui aprovação física.
+
+          Procedência: run de build F3.5.4V 30756982562 (success; --publish never; jobs de verificação +
+          Windows verdes, incluindo o Gate F3.5.4V EMPACOTADO no app.asar — seletor de quantidade no
+          index.html, contrato data.videos preservado, e stack de notificação/SLA congelada byte vs 1.0.211)
+          @ commit ee0eb543d07d5fbec67f39077a693a2f410f9784 (branch desktop/f354v-custom-video-quantity-1.0.212).
+          Mesmos bytes; sem recompilar. Confira SHA-256 em SHA256SUMS.
+          NOTAS
+
+      - name: "Criar tag v1.0.212 pinada em STABLE_SHA — ESCRITA via Release Bot"
+        env:
+          GH_TOKEN: ${{ steps.release_bot.outputs.token }}
+        run: |
+          set -euo pipefail
+          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            TS="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+            [ "$TS" = "$STABLE_SHA" ] || { echo "::error::tag $TAG aponta para outro sha ($TS)"; exit 1; }
+          else
+            gh api -X POST "repos/$REPO/git/refs" -f ref="refs/tags/$TAG" -f sha="$STABLE_SHA" >/dev/null
+            echo "tag $TAG criada em $STABLE_SHA"
+          fi
+
+      - name: "Publicar release no canal do updater (latest=true, prerelease=false) — 6 assets — via Release Bot"
+        env:
+          GH_TOKEN: ${{ steps.release_bot.outputs.token }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" -R "$REPO" \
+            --target "$STABLE_SHA" --latest=true \
+            --title "$TITLE" --notes-file notas.md \
+            "pacote/$EXE_NAME" "pacote/$MSI_NAME" "pacote/$LY_NAME" "pacote/$BM_NAME" "pacote/SHA256SUMS" "pacote/VERSAO-DESKTOP.txt"
+          echo "publicado: $TAG (canal do electron-updater: release Latest com latest.yml)"
+
+      - name: "Pos-verificacao (Latest=1.0.212; 1.0.211 rollback + 1.0.210/1.0.209 preservadas + 1.0.208 rollback adicional)"
+        run: |
+          set -euo pipefail
+          FLAGS="$(gh release view "$TAG" -R "$REPO" --json isPrerelease,isDraft --jq '(.isPrerelease|tostring)+"|"+(.isDraft|tostring)')"
+          [ "$FLAGS" = "false|false" ] || { echo "::error::flags incorretas: $FLAGS"; exit 1; }
+          N="$(gh release view "$TAG" -R "$REPO" --json assets --jq '.assets|length')"
+          [ "$N" = "6" ] || { echo "::error::esperado 6 assets, encontrados $N"; exit 1; }
+          for a in "$EXE_NAME" "$MSI_NAME" "$LY_NAME" "$BM_NAME" SHA256SUMS VERSAO-DESKTOP.txt; do
+            gh release view "$TAG" -R "$REPO" --json assets --jq '.assets[].name' | grep -qx "$a" || { echo "::error::asset $a ausente"; exit 1; }
+          done
+          if gh release view "$TAG" -R "$REPO" --json assets --jq '.assets[].name' | grep -qx "app-update.yml"; then echo "::error::app-update.yml nao pode ser asset"; exit 1; fi
+          TAGSHA="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+          [ "$TAGSHA" = "$STABLE_SHA" ] || { echo "::error::tag != STABLE_SHA"; exit 1; }
+          LATEST_TAG="$(gh api "repos/$REPO/releases/latest" --jq '.tag_name')"
+          [ "$LATEST_TAG" = "$TAG" ] || { echo "::error::Latest do repo != $TAG (got $LATEST_TAG)"; exit 1; }
+          for t in "$PROD_PREV_TAG" "$PROD_ROLLBACK_TAG" "$PROD_HIST_TAG" "$PROD_HIST2_TAG"; do
+            gh release view "$t" -R "$REPO" --json tagName --jq '.tagName' | grep -qx "$t" || { echo "::error::$t (preservacao/rollback) sumiu"; exit 1; }
+          done
+          echo "===== GO: 1.0.212 no canal do updater (Latest); 1.0.211 rollback imediato; 1.0.210/1.0.209 preservadas; 1.0.208 rollback adicional ====="
