@@ -140,7 +140,8 @@ jobs:
           set -e
           git -C "$GITHUB_WORKSPACE" diff --name-only "$BASE_210_SHA" HEAD > /tmp/diff.txt
           echo "== arquivos alterados vs 1.0.210 =="; cat /tmp/diff.txt
-          ALLOW='^(desktop/src/main/slaReminderWindow\.ts|desktop/src/preload/slareminder-preload\.ts|desktop/src/renderer/slareminder\.html|desktop/package\.json|desktop/package-lock\.json|desktop/scripts/f354uh2-atomic-central-alert-processing\.test\.mjs|desktop/scripts/f354uh2-central-proof-main\.js|docs/f354uh2-qa/.*|\.github/workflows/desktop-build-f354uh2\.yml|\.github/workflows/desktop-release-f354uh2\.yml)$'
+          # desktop-release-f354uh1.yml é HERDADO do tip da 1.0.210 (b4d7c4e = a3655cd + release da 1.0.210); não é insumo de build nem alteração do H2.
+          ALLOW='^(desktop/src/main/slaReminderWindow\.ts|desktop/src/preload/slareminder-preload\.ts|desktop/src/renderer/slareminder\.html|desktop/package\.json|desktop/package-lock\.json|desktop/scripts/f354uh2-atomic-central-alert-processing\.test\.mjs|desktop/scripts/f354uh2-central-proof-main\.js|docs/f354uh2-qa/.*|\.github/workflows/desktop-release-f354uh1\.yml|\.github/workflows/desktop-build-f354uh2\.yml|\.github/workflows/desktop-release-f354uh2\.yml)$'
           if grep -vE "$ALLOW" /tmp/diff.txt | grep -q .; then echo "::error:: arquivo fora da allowlist do hotfix H2:"; grep -vE "$ALLOW" /tmp/diff.txt; exit 1; fi
           # CONGELADOS vs 1.0.210: produtores/entrega/controller/renderers comuns NÃO podem mudar
           if grep -qE '^desktop/src/main/(main\.ts|notifEvents\.js|notifierA\.js|notifier\.js|slaScheduler\.js|notificationGrouping\.ts|cardsRules\.js|slaRules\.js|slaReminderStore\.ts|slaReminder\.ts|taskIdle\.js|updaterService\.ts)$' /tmp/diff.txt; then echo "::error:: produtor/entrega/controller congelado alterado vs 1.0.210"; exit 1; fi
