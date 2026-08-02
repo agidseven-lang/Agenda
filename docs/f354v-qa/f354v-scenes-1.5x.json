@@ -1,0 +1,23 @@
+{
+  "feature": "F3.5.4V",
+  "scale": "1.5x",
+  "scenes": 1,
+  "failures": 0,
+  "fatal": null,
+  "results": [
+    {
+      "name": "qty8",
+      "fVideoQtyCount": 1,
+      "vqtyRowCount": 1,
+      "inputValue": "8",
+      "vtemaCount": 8,
+      "chipCount": 0,
+      "labelPresent": true,
+      "minusDisabled": false,
+      "videoQtyState": 8,
+      "png": "f354v-qty8-1.5x.png",
+      "ok": true,
+      "expected": 8
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.211",
-  "description": "Agenda ID Seven Desktop 1.0.211-atomic-central-alert-processing",
+  "version": "1.0.212",
+  "description": "Agenda ID Seven Desktop 1.0.212-custom-video-quantity",
   "main": "dist/main/main.js",
   "private": true,
   "scripts": {

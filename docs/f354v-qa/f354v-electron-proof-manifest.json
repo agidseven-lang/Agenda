@@ -1,0 +1,38 @@
+{
+  "feature": "F3.5.4V",
+  "version": "1.0.212",
+  "electron": "31.3.1(real)",
+  "asar": {
+    "bytes": 1229916,
+    "sha256": "a2a88eea6e9e5ff76afeb5c1a539461928393939e47015a5c3d690368db52451"
+  },
+  "rendererSha256": "f5a0a384ee9a34e7bd276b0b240dfa54b30ebd43ba9b5b3c3f33fe855db16ba8",
+  "configs": [
+    {
+      "scale": "1x",
+      "screen": "1366x768x24",
+      "dsf": "1",
+      "scenes": 10,
+      "failures": 0,
+      "ok": true
+    },
+    {
+      "scale": "1.25x",
+      "screen": "1600x1000x24",
+      "dsf": "1.25",
+      "scenes": 1,
+      "failures": 0,
+      "ok": true
+    },
+    {
+      "scale": "1.5x",
+      "screen": "1600x1000x24",
+      "dsf": "1.5",
+      "scenes": 1,
+      "failures": 0,
+      "ok": true
+    }
+  ],
+  "totalScenes": 12,
+  "totalFailures": 0
+}

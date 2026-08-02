@@ -205,6 +205,16 @@
   .chips{display:flex;gap:8px;overflow-x:auto;padding:2px 0;scrollbar-width:none}
   .chips::-webkit-scrollbar{display:none}
   .chip{flex:none;border:1px solid var(--line);background:var(--surface);color:var(--soft);border-radius:999px;padding:7px 14px;font-size:12.5px;font-weight:700;white-space:nowrap}
+  /* F3.5.4V — Edição de vídeos: seletor de QUANTIDADE personalizada [−][N][+]. Responsivo (não corta
+     nem estoura em 1366×768→ultrawide, escalas Windows 100/125/150) — flex + wrap do sufixo. As setas
+     do TECLADO (↑/↓) seguem funcionando no input type=number mesmo com o spinner nativo oculto. */
+  .vqty-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+  .vqty-btn{flex:none;width:40px;height:40px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:20px;font-weight:800;line-height:1;display:flex;align-items:center;justify-content:center;user-select:none;transition:background .12s,border-color .12s}
+  .vqty-btn:hover:not(:disabled){border-color:var(--accent)}
+  .vqty-btn:disabled{opacity:.4;cursor:default}
+  .vqty-input{width:96px;flex:none;text-align:center;font-weight:800;font-size:16px;-moz-appearance:textfield}
+  .vqty-input::-webkit-outer-spin-button,.vqty-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  .vqty-suffix{color:var(--soft);font-size:13px;font-weight:700}
   /* F3.4.6 — GRADE DIÁRIA da Agenda/Mês: restaura as MOLDURAS individuais de cada dia (visual
      aprovado da linhagem PWA .cell): cada data na sua própria célula com superfície+borda (linhas
      e colunas delimitadas), fora-do-mês discreto porém VISÍVEL, hoje contornado, seleção em accent.
@@ -8979,13 +8989,19 @@ function openSheet(which){
 }
 
 /* ---- TASK FORM (wizard) ---- */
-function newForm(sector){return {id:null,step:0,sector:sector||null,title:'',client:'',assigneeId:null,assignee:'',status:'afazer',startDate:'',startTime:'',endDate:'',endTime:'',dueDate:'',dueTime:'',priority:false,subtype:null,fields:{},contents:[],items:[],videos:[],checklist:[],link:'',obs:'',_openContent:null,_sendAfterSave:false,_sending:false,_draftId:null,/* F3.5.4I — estado de envio + id idempotente do draft *//* F3.5.2 — Edição de Cards (aditivo): N cards avulsos + quantidade. F3.5.2A: cada card com INTERVALO
+function newForm(sector){return {id:null,step:0,sector:sector||null,title:'',client:'',assigneeId:null,assignee:'',status:'afazer',startDate:'',startTime:'',endDate:'',endTime:'',dueDate:'',dueTime:'',priority:false,subtype:null,videoQty:null,fields:{},contents:[],items:[],videos:[],checklist:[],link:'',obs:'',_openContent:null,_sendAfterSave:false,_sending:false,_draftId:null,/* F3.5.4I — estado de envio + id idempotente do draft *//* F3.5.2 — Edição de Cards (aditivo): N cards avulsos + quantidade. F3.5.2A: cada card com INTERVALO
    completo {tema,legenda,obs,startDate,startTime,endDate,endTime} (início + término; término=prazo) */cards:[],cardsQty:1};}
 /* F3.5.2 — quem pode CRIAR tarefas de Edição de Cards: Social Media / Administrador (contrato atual
    de supervisão). Designer recebe/movimenta, mas não cria em nome da Social. Gate SÓ do novo setor. */
 function canCreateCards(){try{return (typeof canSeeAll==='function')&&state&&state.user&&canSeeAll(state.user);}catch(_){return false;}}
 /* F3.5.2 — limite técnico seguro de criação em lote (bem abaixo do teto de 500 do batch do Firestore). */
 var CARDS_MAX_BATCH=50;
+/* F3.5.4V — Edição de vídeos: teto TÉCNICO (não de negócio) para a quantidade personalizada de
+   vídeos/roteiros. Origem: (a) render de N campos de tema no DOM e (b) o documento único da tarefa
+   guarda videos[]={id,n,tema} e precisa caber no limite de 1 MiB do Firestore. Muito acima da
+   operação real (exemplos do owner vão a ~20). NÃO é aplicado em silêncio: ao exceder, mostra
+   mensagem clara e mantém o teto. Sem teto MÍNIMO arbitrário além do inteiro ≥1 exigido. */
+var VIDEO_QTY_MAX=500;
 function cardsQtyOf(f){var n=Math.floor(Number(f&&f.cardsQty)||0);return (n>=1&&n<=CARDS_MAX_BATCH)?n:(n<1?1:CARDS_MAX_BATCH);}
 function openTaskForm(sector){closeModal();if(sector&&secOf(sector).descontinuado)sector=null;state.form=newForm(sector);if(sector)state.form.step=1;render();}
 // F3.3.75A — função CANÔNICA de "Nova tarefa": TODO entry point de CRIAÇÃO recomeça na ETAPA 1
@@ -9001,7 +9017,51 @@ function openNewTaskWizard(){
   render();
 }
 function tpl(){return state.form.sector?TEMPLATES[secOf(state.form.sector).key]:null;}
-function curSub(){const t=tpl();return (t&&t.subtypes&&state.form.subtype)?t.subtypes[state.form.subtype]:null;}
+/* F3.5.4V — Edição de vídeos: normaliza a quantidade personalizada para inteiro ≥1 (ou '' vazio).
+   Zero/negativo → 1 (mínimo); decimal → piso; letras/lixo → '' (vazio, campo é OPCIONAL como o pacote
+   de antes). Excedendo o teto TÉCNICO → mantém no teto com mensagem clara (nunca em silêncio). */
+function normVideoQty(raw){
+  var s=String(raw==null?'':raw).trim();
+  if(s==='')return '';
+  var n=Math.floor(Number(s));
+  if(!isFinite(n))return '';
+  if(n<1)return 1;
+  if(n>VIDEO_QTY_MAX){ try{ if(typeof flashToast==='function')flashToast('Quantidade máxima por tarefa: '+VIDEO_QTY_MAX+' vídeos/roteiros (limite técnico). Para mais, divida em tarefas.'); }catch(_){ } return VIDEO_QTY_MAX; }
+  return n;
+}
+/* Quantidade CANÔNICA de vídeos de um form de Edição de mídia: usa videoQty (fonte da verdade na
+   criação/edição). Fallback defensivo APENAS em modo edição (f.id): pacote antigo p4/p6/p12 → 4/6/12,
+   ou videos.length — nunca interfere na criação ativa (onde videoQty manda). null = vazio (opcional). */
+function videoQtyOf(f){
+  if(!f)return null;
+  var raw=f.videoQty;
+  if(raw!==null&&raw!==undefined&&String(raw).trim()!==''){
+    var n=Math.floor(Number(raw));
+    return (isFinite(n)&&n>=1)?Math.min(n,VIDEO_QTY_MAX):null;
+  }
+  if(f.id){
+    var m={p4:4,p6:6,p12:12}; if(f.subtype&&m[f.subtype])return m[f.subtype];
+    if(Array.isArray(f.videos)&&f.videos.length)return Math.min(f.videos.length,VIDEO_QTY_MAX);
+  }
+  return null;
+}
+/* Subtipo SINTÉTICO da Edição de mídia dirigido por N (quantidade personalizada). Mantém o MESMO
+   contrato de subtipo (items/videoTema/itemLabel/fields/checklist) que o mapa p4/p6/p12 usava, de
+   modo que TODO o pipeline a jusante (blocos de tema, revisão, texto, data.videos) permanece idêntico
+   — só a ORIGEM da contagem muda (número livre em vez de 4/6/12). null quando N vazio/inválido. */
+function synthVideoSub(n){
+  if(!(isFinite(n)&&n>=1))return null;
+  return {label:n+' vídeos/roteiros',formTitle:'Edição — '+n+' vídeos/roteiros',items:n,itemLabel:'Vídeo',videoTema:true,
+    fields:[{k:'orientacoes',l:'Orientações',kind:'text',ph:'Cortes, ritmo, trilha, identidade…'}],
+    checklist:['Receber materiais','Editar '+n+' vídeos','Revisar','Aprovar','Entregar']};
+}
+function curSub(){
+  const t=tpl(); if(!t)return null;
+  /* F3.5.4V — Edição de vídeos usa QUANTIDADE personalizada (subtipo sintético), não mais os chips
+     fixos p4/p6/p12. Demais setores (Cronograma/Copywriting/Roteiro) mantêm t.subtypes intactos. */
+  if(secOf(state.form.sector).key==='edicao_midia')return synthVideoSub(videoQtyOf(state.form));
+  return (t.subtypes&&state.form.subtype)?t.subtypes[state.form.subtype]:null;
+}
 function renderForm(){
   const f=state.form;const s=f.sector?secOf(f.sector):null;const STEPS=['Setor','Dados','Briefing','Revisão'];
   let h='<div class="scr-head"><div class="row"><div style="flex:1"><div style="font-size:20px;font-weight:800">'+(f.id?'Editar tarefa':'Nova tarefa')+'</div>'+
@@ -9102,7 +9162,24 @@ function stepBriefing(){const f=state.form;const t=tpl();const s=secOf(f.sector)
     return h;
   }
   if(t&&t.subtypes){
-    h+='<div class="lbl">'+esc(t.subLabel||'Tipo')+'</div><div class="chips" style="margin-bottom:14px">'+Object.keys(t.subtypes).map(k=>'<button class="chip" data-fsub="'+k+'" style="'+(f.subtype===k?'background:var(--accent);border-color:transparent;color:#fff':'')+'">'+esc(t.subtypes[k].label)+'</button>').join('')+'</div>';
+    if(secOf(f.sector).key==='edicao_midia'){
+      /* F3.5.4V — Edição de vídeos: QUANTIDADE personalizada [−][N][+] no lugar dos chips fixos
+         p4/p6/p12. Inteiro ≥1, sem teto de negócio, digitação/colagem/setas/teclado. O valor
+         (videoQty) é a fonte da contagem; curSub() gera o subtipo sintético → blocos de tema. */
+      var _vqn=videoQtyOf(f);
+      /* mostra o valor digitado; na edição de tarefa antiga (f.id) reflete a quantidade DERIVADA
+         (pacote p4/p6/p12 → 4/6/12, ou videos.length). Na criação vazia → placeholder. */
+      var _vq=(f.videoQty===0||f.videoQty)?f.videoQty:(_vqn||'');
+      h+='<div class="lbl">Quantidade de vídeos/roteiros</div>'
+        +'<div class="vqty-row">'
+          +'<button type="button" class="vqty-btn" data-vqminus="1" aria-label="Diminuir quantidade"'+((!(_vqn>1))?' disabled':'')+'>−</button>'
+          +'<input class="inp vqty-input" id="fVideoQty" type="number" min="1" step="1" inputmode="numeric" placeholder="Ex.: 8" aria-label="Quantidade de vídeos/roteiros" value="'+esc(_vq)+'">'
+          +'<button type="button" class="vqty-btn" data-vqplus="1" aria-label="Aumentar quantidade">+</button>'
+          +'<span class="vqty-suffix">vídeos/roteiros</span>'
+        +'</div>';
+    }else{
+      h+='<div class="lbl">'+esc(t.subLabel||'Tipo')+'</div><div class="chips" style="margin-bottom:14px">'+Object.keys(t.subtypes).map(k=>'<button class="chip" data-fsub="'+k+'" style="'+(f.subtype===k?'background:var(--accent);border-color:transparent;color:#fff':'')+'">'+esc(t.subtypes[k].label)+'</button>').join('')+'</div>';
+    }
     const sub=curSub();
     if(sub){
       h+='<div style="background:'+withAlpha('#5B6CFF',.12)+';color:var(--accent);font-size:13px;font-weight:700;padding:8px 12px;border-radius:10px;margin-bottom:12px">'+esc(sub.formTitle)+'</div>'+fieldsHtml(sub.fields);
@@ -9188,7 +9265,7 @@ function stepReview(){const f=state.form;const s=secOf(f.sector);const sub=curSu
       revItem('today','Término',f.endDate?fmtDateBR(f.endDate)+(f.endTime?' '+f.endTime:''):'—')+
       revItem('calendar','Prazo final',prazo+(f.dueTime?' às '+f.dueTime:''))+
       revItem('grid','Setor',s.label)+
-      (sub?revItem('description','Subtipo',sub.label||sub.formTitle):'')+
+      (sub?revItem('description',secOf(f.sector).key==='edicao_midia'?'Quantidade de vídeos/roteiros':'Subtipo',sub.label||sub.formTitle):'')+
     '</div>'+
     '<div class="rev-divider"></div>'+
     '<div class="rev-resp">'+
@@ -9249,6 +9326,11 @@ function afterForm(){
   // F3.5.2 — Edição de Cards: quantidade + campos por-card (tema/legenda/obs) → state.form.cards[i]
   // F3.5.2A — intervalo por-card: início (startDate/startTime) + término (endDate/endTime) → state.form.cards[i]
   bind('#fCardsQty',e=>{state.form.cardsQty=e.value;});
+  /* F3.5.4V — Edição de vídeos: quantidade personalizada. oninput só atualiza o estado (SEM re-render:
+     não perde foco nem valor ao digitar; oninput é idempotente ⇒ zero listeners duplicados). O commit
+     (change/blur/Enter/setas nativas) normaliza (inteiro ≥1, teto técnico) e re-renderiza os N blocos. */
+  bind('#fVideoQty',e=>{state.form.videoQty=e.value;});
+  {var _vqEl=c.querySelector('#fVideoQty'); if(_vqEl){_vqEl.onchange=function(ev){var _prev=state.form.videoQty;state.form.videoQty=normVideoQty(ev&&ev.target?ev.target.value:_vqEl.value);if(String(_prev)!==String(state.form.videoQty))state.form.checklist=[];/* re-semeia "Editar N vídeos"; PRESERVA videos/link/obs */render();};}}
   bind('[data-cardtema]',e=>{const i=+e.dataset.cardtema;state.form.cards[i]=state.form.cards[i]||{};state.form.cards[i].tema=e.value;});
   bind('[data-cardleg]',e=>{const i=+e.dataset.cardleg;state.form.cards[i]=state.form.cards[i]||{};state.form.cards[i].legenda=e.value;});
   bind('[data-cardobs]',e=>{const i=+e.dataset.cardobs;state.form.cards[i]=state.form.cards[i]||{};state.form.cards[i].obs=e.value;});
@@ -9884,6 +9966,10 @@ document.addEventListener('click',async e=>{
   if(el=g('[data-fstatus]')){state.form.status=el.dataset.fstatus;render();return;}
   if(el=g('[data-ftoggle]')){state.form[el.dataset.ftoggle]=!state.form[el.dataset.ftoggle];render();return;}
   if(el=g('[data-fsub]')){state.form.subtype=el.dataset.fsub;state.form.checklist=[];state.form.contents=[];state.form._openContent=0;render();return;}
+  /* F3.5.4V — Edição de vídeos: botões da quantidade personalizada. '+' incrementa (vazio→1, aplica
+     teto técnico via normVideoQty); '−' decrementa sem descer abaixo de 1 (vazio/1 = sem efeito). */
+  if(el=g('[data-vqplus]')){var _vqp=Math.floor(Number(state.form.videoQty));state.form.videoQty=normVideoQty((isFinite(_vqp)&&_vqp>=1?_vqp:0)+1);state.form.checklist=[];render();return;}
+  if(el=g('[data-vqminus]')){var _vqm=Math.floor(Number(state.form.videoQty));if(isFinite(_vqm)&&_vqm>1){state.form.videoQty=_vqm-1;state.form.checklist=[];}render();return;}
   if(el=g('[data-fchoice]')){const p=el.dataset.fchoice.split('|');state.form.fields[p[0]]=p[1];render();return;}
   if(el=g('[data-fbool]')){const k=el.dataset.fbool;state.form.fields[k]=!state.form.fields[k];render();return;}
   if(el=g('[data-content]')){state.form._openContent=(state.form._openContent===+el.dataset.content)?null:+el.dataset.content;render();return;}
