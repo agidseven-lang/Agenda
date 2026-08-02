@@ -1,7 +1,7 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.210",
-  "description": "Agenda ID Seven Desktop 1.0.210-notification-physical-hotfix",
+  "version": "1.0.211",
+  "description": "Agenda ID Seven Desktop 1.0.211-atomic-central-alert-processing",
   "main": "dist/main/main.js",
   "private": true,
   "scripts": {

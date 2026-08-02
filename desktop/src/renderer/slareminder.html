@@ -150,6 +150,21 @@
   function resizeSelf(){ try{ var h = document.getElementById("wrap").getBoundingClientRect().height; api.resize && api.resize(Math.ceil(h)); }catch(_e){} }
   function taskIdOf(v){ return String((v&&v.taskId) || ((v&&v.deep)||"").replace(/^detail\//,"") || ""); }
 
+  // ── F3.5.4U-H2 — PROCESSAMENTO ATÔMICO (correção da sobreposição do "Registrando…") ──
+  // Ao clicar numa ação, CONGELAMOS a altura do #foot (medida ANTES de trocar os botões pelo spinner) e NÃO
+  // pedimos resize ao main. Assim o card NÃO encolhe e a janela NÃO redimensiona/move → some o artefato de
+  // sobreposição (backing-store do card antigo aparecendo atrás do "Registrando…"). Só o #foot MORFA, no mesmo
+  // ciclo, para o spinner; cabeçalho/tarefa/prazo permanecem. UM único card, sempre.
+  function freezeFoot(){ try{ var f=document.getElementById("foot"); if(f){ f.style.minHeight=Math.ceil(f.getBoundingClientRect().height)+"px"; f.style.display="flex"; f.style.flexDirection="column"; f.style.justifyContent="center"; } }catch(_e){} }
+  function unfreezeFoot(){ try{ var f=document.getElementById("foot"); if(f){ f.style.minHeight=""; f.style.display=""; f.style.flexDirection=""; f.style.justifyContent=""; } }catch(_e){} }
+  // Prova SANITIZADA no clique: contagens de DOM (nunca nome/título/cliente/UID/conteúdo).
+  function centralCounts(){
+    var cards=document.querySelectorAll(".card"); var vis=0;
+    for(var i=0;i<cards.length;i++){ try{ if(cards[i].getClientRects().length>0) vis++; }catch(_e){} }
+    return { cardElementCount:cards.length, visibleCardCount:vis, processingLayerCount:document.querySelectorAll(".busy").length };
+  }
+  function sendObs(actionType){ try{ var cc=centralCounts(); api.obs && api.obs({ actionType:String(actionType||""), cardElementCount:cc.cardElementCount, visibleCardCount:cc.visibleCardCount, processingLayerCount:cc.processingLayerCount, rendererState:"processing" }); }catch(_e){} }
+
   function playSound(v){
     if(v.soundDataUri && v.key && v.key !== lastSoundKey){
       lastSoundKey = v.key;
@@ -181,6 +196,7 @@
   // ── footer por estado ──
   function renderFoot(v){
     var foot = document.getElementById("foot");
+    if(!busy){ unfreezeFoot(); }   // F3.5.4U-H2: fora do processamento, sem trava de altura (restore/promoção/novo)
     var html = "";
     if(mode === "msg"){ html = footMsg(); }
     else if(busy){ html = '<div class="busy"><span class="spin"></span><span>Registrando…</span></div>'; }
@@ -262,8 +278,8 @@
   }
 
   var msgState = null;
-  function showMsg(text, action){ mode="msg"; busy=false; lastError=""; msgState={ text:text, action:action }; if(cur) renderFoot(cur); resizeSelf(); }
-  function showError(text){ lastError=text; busy=false; if(cur) renderFoot(cur); resizeSelf(); }
+  function showMsg(text, action){ mode="msg"; busy=false; lastError=""; try{ api.setProcessing && api.setProcessing(false); }catch(_e){} msgState={ text:text, action:action }; if(cur) renderFoot(cur); resizeSelf(); }
+  function showError(text){ lastError=text; busy=false; try{ api.setProcessing && api.setProcessing(false); }catch(_e){} if(cur) renderFoot(cur); resizeSelf(); }
 
   // ── wiring por estado (após innerHTML) ──
   function wire(v){
@@ -320,15 +336,18 @@
   }
 
   function sendDecision(extra){
-    if(busy) return;             // idempotência de UI: bloqueia duplo-clique
+    if(busy) return;             // idempotência de UI: bloqueia duplo-clique (1º passo da ordem obrigatória)
+    freezeFoot();                // F3.5.4U-H2: congela a altura do #foot ANTES de trocar botões→spinner (sem encolher/mover)
     busy = true; lastError=""; mode = (mode==="idle"?mode:mode);
+    try{ api.setProcessing && api.setProcessing(true); }catch(_e){}   // main CONGELA os bounds (nenhum setBounds visível)
     var payload = { key: (cur&&cur.key)||"", decisionType: extra.decisionType };
     if(extra.etaMinutes) payload.etaMinutes = extra.etaMinutes;
     if(extra.reasonCode) payload.reasonCode = extra.reasonCode;
     if(extra.reasonText) payload.reasonText = extra.reasonText;
     if(extra.helpText) payload.helpText = extra.helpText;
     if(extra.helpRecipientId){ payload.helpRecipientId = extra.helpRecipientId; payload.helpRecipientName = extra.helpRecipientName||""; }
-    renderFoot(cur); resizeSelf();
+    renderFoot(cur);             // troca ATÔMICA só do #foot → "Registrando…" (mesmo card, mesma altura). SEM resizeSelf.
+    sendObs(extra.decisionType); // prova sanitizada no clique: 1 card / 1 camada / 1 janela
     try{ api.decide && api.decide(payload); }catch(_e){ busy=false; showError("Não foi possível registrar a resposta. Tente novamente."); }
   }
 
@@ -348,6 +367,7 @@
       var cprev=ccur;
       if(!cprev || cprev.key!==v.key){   // ciclo novo ⇒ reset total
         cmode="idle"; cbusy=false; cerr=""; cmsgState=null;
+        try{ api.setProcessing && api.setProcessing(false); }catch(_e){}   // F3.5.4U-H2: novo check-in ⇒ sem trava de processamento
         cdraft={ reasonCode:"", reasonText:"", helpText:"", helpRecipientId:"", helpRecipientName:"" };
         chelp={ loading:false, reason:"", preselect:null, eligible:[] };
       }
@@ -367,9 +387,11 @@
     if(promoted){
       // Promoção amarelo→vermelho: PRESERVA rascunho/painel aberto; exige decisão do vermelho (cancela busy).
       busy=false; if(mode==="msg") mode="idle"; lastError="";
+      try{ api.setProcessing && api.setProcessing(false); }catch(_e){}   // F3.5.4U-H2: libera bounds p/ o card vermelho renderizar/recentralizar
     } else if(!sameKey){
       // Novo alerta (não é promoção nem re-render do mesmo): reset total.
       mode="idle"; busy=false; lastError=""; msgState=null;
+      try{ api.setProcessing && api.setProcessing(false); }catch(_e){}   // F3.5.4U-H2: novo card ⇒ sem trava de processamento
       draft={ decisionType:"", etaMinutes:0, reasonCode:"", reasonText:"", helpText:"", helpRecipientId:"", helpRecipientName:"" };
       help={ loading:false, reason:"", preselect:null, eligible:[] };
     }
@@ -423,6 +445,7 @@
   function cFootMsg(){ var s=cmsgState||{}; var a=""; if(s.action==="dismiss"){ a='<button class="ok" id="cm_dismiss" type="button">Fechar</button>'; } else if(s.action==="back"){ a='<button class="ok" id="cm_back" type="button">Voltar</button>'; } return '<div class="statebox"><div class="txt">'+esc(s.text||"")+'</div>'+a+'</div>'; }
   function renderCheckinFoot(v){
     var foot=document.getElementById("foot"); var html="";
+    if(!cbusy){ unfreezeFoot(); }   // F3.5.4U-H2: fora do processamento, sem trava de altura
     if(cmode==="msg"){ html=cFootMsg(); }
     else if(cbusy){ html='<div class="busy"><span class="spin"></span><span>Registrando…</span></div>'; }
     else if(cmode==="idle"){
@@ -456,8 +479,8 @@
     if(cerr && cmode!=="msg" && !cbusy){ html+='<div class="errbanner">'+esc(cerr)+'</div>'; }
     foot.innerHTML=html; cwire(v);
   }
-  function cShowMsg(text, action){ cmode="msg"; cbusy=false; cerr=""; cmsgState={text:text,action:action}; if(ccur) renderCheckinFoot(ccur); resizeSelf(); }
-  function cShowError(text){ cerr=text; cbusy=false; if(ccur) renderCheckinFoot(ccur); resizeSelf(); }
+  function cShowMsg(text, action){ cmode="msg"; cbusy=false; cerr=""; try{ api.setProcessing && api.setProcessing(false); }catch(_e){} cmsgState={text:text,action:action}; if(ccur) renderCheckinFoot(ccur); resizeSelf(); }
+  function cShowError(text){ cerr=text; cbusy=false; try{ api.setProcessing && api.setProcessing(false); }catch(_e){} if(ccur) renderCheckinFoot(ccur); resizeSelf(); }
   function cwire(v){
     if(cmode==="msg"){ bind("cm_dismiss","click",function(){ try{ api.checkinDismiss && api.checkinDismiss(ccur.key); }catch(_e){} }); bind("cm_back","click",function(){ cmode="idle"; cerr=""; cPushDraft(); renderCheckinFoot(ccur); resizeSelf(); }); return; }
     if(cbusy) return;
@@ -488,14 +511,17 @@
   }
   function cStartHelp(){ cmode="help"; cerr=""; chelp={ loading:true, reason:"", preselect:null, eligible:[] }; cdraft.helpRecipientId=""; cdraft.helpRecipientName=""; cPushDraft(); renderCheckinFoot(ccur); resizeSelf(); try{ api.checkinResolveHelp && api.checkinResolveHelp({ key:ccur.key, taskId:taskIdOf(ccur) }); }catch(_e){} }
   function cSend(extra){
-    if(cbusy) return; cbusy=true; cerr="";
+    if(cbusy) return; freezeFoot();   // F3.5.4U-H2: congela a altura ANTES de trocar botões→spinner (sem encolher/mover)
+    cbusy=true; cerr="";
+    try{ api.setProcessing && api.setProcessing(true); }catch(_e){}   // main CONGELA os bounds
     var payload={ key:(ccur&&ccur.key)||"", responseType:extra.responseType };
     if(extra.reasonCode) payload.reasonCode=extra.reasonCode;
     if(extra.reasonText) payload.reasonText=extra.reasonText;
     if(extra.helpText) payload.helpText=extra.helpText;
     if(extra.helpRecipientId){ payload.helpRecipientId=extra.helpRecipientId; payload.helpRecipientName=extra.helpRecipientName||""; }
     if(extra.confirmReturn) payload.confirmReturn=true;
-    renderCheckinFoot(ccur); resizeSelf();
+    renderCheckinFoot(ccur);          // troca ATÔMICA só do #foot → "Registrando…" (mesmo card, mesma altura). SEM resizeSelf.
+    sendObs(extra.responseType);      // prova sanitizada no clique
     try{ api.checkinDecide && api.checkinDecide(payload); }catch(_e){ cbusy=false; cShowError("Não foi possível registrar a resposta. Tente novamente."); }
   }
   function renderCheckin(v){ ccur=v; renderCheckinHeader(v); renderCheckinFoot(v); resizeSelf(); try{ api.rendered && api.rendered(v.key); }catch(_e){} playSound(v); }

@@ -1,0 +1,141 @@
+{
+  "version": "1.0.211",
+  "appPath": "/tmp/tmp.VdhH6LxpoY.app.asar",
+  "electron": "31.3.1",
+  "actions": [
+    {
+      "action": "acknowledge_only",
+      "before": {
+        "dbtn": 5,
+        "cards": 1,
+        "windows": 1
+      },
+      "during": {
+        "setBoundsDuringProcessing": 0,
+        "cardElementCount": 1,
+        "visibleCardCount": 1,
+        "processingLayerCount": 1,
+        "dbtnBehind": 0,
+        "registrandoText": "Registrando…",
+        "windows": 1
+      },
+      "after": {
+        "windowsVisible": 0
+      },
+      "ok": true
+    },
+    {
+      "action": "start_now",
+      "before": {
+        "dbtn": 5,
+        "cards": 1,
+        "windows": 1
+      },
+      "during": {
+        "setBoundsDuringProcessing": 0,
+        "cardElementCount": 1,
+        "visibleCardCount": 1,
+        "processingLayerCount": 1,
+        "dbtnBehind": 0,
+        "registrandoText": "Registrando…",
+        "windows": 1
+      },
+      "after": {
+        "windowsVisible": 0
+      },
+      "ok": true
+    },
+    {
+      "action": "finishing",
+      "before": {
+        "dbtn": 5,
+        "cards": 1,
+        "windows": 1
+      },
+      "during": {
+        "setBoundsDuringProcessing": 0,
+        "cardElementCount": 1,
+        "visibleCardCount": 1,
+        "processingLayerCount": 1,
+        "dbtnBehind": 0,
+        "registrandoText": "Registrando…",
+        "windows": 1
+      },
+      "after": {
+        "windowsVisible": 0
+      },
+      "ok": true
+    },
+    {
+      "action": "blocked",
+      "before": {
+        "dbtn": 5,
+        "cards": 1,
+        "windows": 1
+      },
+      "during": {
+        "setBoundsDuringProcessing": 0,
+        "cardElementCount": 1,
+        "visibleCardCount": 1,
+        "processingLayerCount": 1,
+        "dbtnBehind": 0,
+        "registrandoText": "Registrando…",
+        "windows": 1
+      },
+      "after": {
+        "windowsVisible": 0
+      },
+      "ok": true
+    },
+    {
+      "action": "help_requested",
+      "before": {
+        "dbtn": 5,
+        "cards": 1,
+        "windows": 1
+      },
+      "during": {
+        "setBoundsDuringProcessing": 0,
+        "cardElementCount": 1,
+        "visibleCardCount": 1,
+        "processingLayerCount": 1,
+        "dbtnBehind": 0,
+        "registrandoText": "Registrando…",
+        "windows": 1
+      },
+      "after": {
+        "windowsVisible": 0
+      },
+      "ok": true
+    }
+  ],
+  "scenarios": [
+    {
+      "scenario": "queue-advance",
+      "q1": {
+        "windows": 1,
+        "visible": 1
+      },
+      "q2": {
+        "windows": 1,
+        "visibleAfter": 1,
+        "dbtnNow": 5,
+        "cards": 1
+      },
+      "ok": true
+    },
+    {
+      "scenario": "scale-150",
+      "s150": {
+        "setBoundsDuringProcessing": 0,
+        "cards": 1,
+        "dbtnBehind": 0,
+        "busy": 1
+      },
+      "ok": true
+    }
+  ],
+  "allActionsOk": true,
+  "allScenariosOk": true,
+  "PASS": true
+}

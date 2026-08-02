@@ -1,0 +1,293 @@
+# =====================================================================
+# [push/manual] F3.5.4U-H2 — Desktop Build (hotfix 1.0.211 — PROCESSAMENTO ATÔMICO do alerta central)
+# ---------------------------------------------------------------------
+# Base de código: Desktop 1.0.210 (@a3655cd = tag v1.0.210). Baseline aprovada/rollback: 1.0.208 (@db8cdca).
+# Corrige o defeito reprovado na validação física da 1.0.210: SOBREPOSIÇÃO no processamento do alerta central
+# (ao clicar numa ação, o card antigo com os botões — ex.: "Estou bloqueado" — ficava visível ATRÁS do
+# "Registrando…"). Causa PROVADA (painel adversarial + Electron real): UMA janela / UM #card / UM documento —
+# NÃO era 2 janelas nem 2 DOM. Era artefato de backing-store do Windows/DWM disparado por win.setBounds
+# (redimensionar+recentralizar) na janela TRANSPARENTE VISÍVEL durante o clique (renderer resizeSelf → center).
+# Correção ATÔMICA: no processamento o renderer CONGELA a altura do #foot e NÃO pede resize; o main CONGELA os
+# bounds (center() early-return se processing); a fila MORFA em vez de hide→show (hide coalescido). Só o #foot
+# troca para "Registrando…" (mesmo card). Observabilidade central_alert.action_received SANITIZADA
+# (cardElementCount/visibleCardCount/processingLayerCount/browserWindowCount/actionType/rendererState).
+# Arquivos autorizados (delta vs 1.0.210): src/main/slaReminderWindow.ts, src/preload/slareminder-preload.ts,
+#   src/renderer/slareminder.html, package(-lock).json, scripts f354uh2, docs/f354uh2-qa/, workflows f354u-h2.
+# TODO O RESTO byte-idêntico à 1.0.210 (controller slaReminder.ts, main.ts, notifEvents.js, bgnotify/index.html,
+# demais preloads). `--publish never`.
+# =====================================================================
+name: "[push/manual] F3.5.4U-H2 Desktop Build (hotfix 1.0.211 — processamento atômico do alerta central)"
+"on":
+  push:
+    branches:
+      - "desktop/f354u-h2-atomic-central-alert-processing-1.0.211"
+    paths-ignore:
+      - ".github/workflows/desktop-release-f354uh2.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  BASE_208_SHA: "db8cdca1d92cd42f3ec98aced39e6a418c4d478e" # 1.0.208 OFICIAL (baseline aprovada/rollback)
+  BASE_210_SHA: "a3655cdbb2e974978b9a5e182e62a291a8ed5211" # 1.0.210 (base de código do hotfix = tag v1.0.210)
+  TEST_BRANCH: "desktop/f354u-h2-atomic-central-alert-processing-1.0.211"
+  APP_DIR: "desktop"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults: { run: { shell: bash } }
+    steps:
+      - name: Checkout (SHA do push; history completo)
+        uses: actions/checkout@v4
+        with: { ref: "${{ github.sha }}", fetch-depth: 0 }
+
+      - name: Gate REF + ANCESTRIA — branch correta e descendente da 1.0.210 e da 1.0.208
+        working-directory: desktop
+        run: |
+          set -e
+          [ "$GITHUB_REF_NAME" = "$TEST_BRANCH" ] || { echo "::error:: ref $GITHUB_REF_NAME != $TEST_BRANCH"; exit 1; }
+          git merge-base --is-ancestor "$BASE_210_SHA" HEAD || { echo "::error:: HEAD nao descende de 1.0.210"; exit 1; }
+          git merge-base --is-ancestor "$BASE_208_SHA" HEAD || { echo "::error:: HEAD nao descende de 1.0.208"; exit 1; }
+          echo "REF/ANCESTRIA OK"
+
+      - name: Derivar versao — exige 1.0.211 exato (package + lock x2)
+        working-directory: desktop
+        run: |
+          set -e
+          node -e 'const fs=require("fs");const p=JSON.parse(fs.readFileSync("package.json","utf8"));const l=JSON.parse(fs.readFileSync("package-lock.json","utf8"));if(p.version!=="1.0.211"){console.error("package.json version "+p.version+" != 1.0.211");process.exit(1);}if(l.version!=="1.0.211"||(l.packages&&l.packages[""]&&l.packages[""].version!=="1.0.211")){console.error("package-lock version != 1.0.211");process.exit(1);}console.log("versao 1.0.211 OK (3 campos)");'
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with: { node-version: "20" }
+
+      - name: npm ci
+        working-directory: desktop
+        run: npm ci
+
+      - name: TypeScript build (main + preload + renderer + modulos .js)
+        working-directory: desktop
+        run: npm run build
+
+      - name: Lint (tsc --noEmit)
+        working-directory: desktop
+        run: npx tsc --noEmit -p tsconfig.json
+
+      - name: Gate SINTAXE DOS RENDERERS — <script> inline de index/bgnotify/slareminder DEVEM parsear
+        working-directory: desktop
+        run: |
+          set -e
+          node -e '
+            const fs=require("fs");
+            function chk(file){ const s=fs.readFileSync(file,"utf8").replace(/\r\n/g,"\n");
+              const re=/<script(\b[^>]*)>([\s\S]*?)<\/script>/gi; let m,n=0;
+              while((m=re.exec(s))){ if(/\bsrc\s*=/.test(m[1]||"")) continue; n++;
+                try{ new Function(m[2]); }catch(e){ console.error("::error:: SyntaxError "+file+" #"+n+": "+(e&&e.message||e)); process.exit(1);} }
+              if(!n){ console.error("::error:: sem <script> inline "+file); process.exit(1);} }
+            chk("src/renderer/index.html"); chk("src/renderer/bgnotify.html"); chk("src/renderer/slareminder.html");
+            console.log("SINTAXE dos <script> inline OK.");'
+
+      - name: Gate F3.5.4U-H2 — processamento atômico (freeze + center congelado + hide coalescido + obs) 62 asserts
+        working-directory: desktop
+        run: |
+          set -e
+          node scripts/f354uh2-atomic-central-alert-processing.test.mjs || { echo "::error:: f354u-h2 vermelho"; exit 1; }
+
+      - name: Gate F3.5.4U-H1 — cabeçalho + janela única/dedup/observabilidade PRESERVADOS (47 asserts)
+        working-directory: desktop
+        run: |
+          set -e
+          node scripts/f354u-h1-notification-hotfix.test.mjs || { echo "::error:: f354u-h1 (H1) regrediu"; exit 1; }
+
+      - name: Gate F3.5.4U — premium/flag/chips/paridade + cabeçalho (108 asserts)
+        working-directory: desktop
+        run: |
+          set -e
+          node scripts/f354u-premium-common-notifications.test.mjs || { echo "::error:: f354u vermelho"; exit 1; }
+
+      - name: Gate REGRESSAO — entrega/SLA/decisão/idle/Categoria A/lembrete/agrupamento/updater/renderer (delta ZERO vs 1.0.208)
+        working-directory: desktop
+        run: |
+          set -e
+          for t in \
+            f354u-h1-notification-hotfix f354r-priority-assistant f354q-task-idle-detection f354o-common-notification-grouping \
+            f354n-watchdog f354n-startup f354k-notification-all-window-states f354l-sla-central-persistent-reminders \
+            f354h-red-notification-boundary f354i-cronograma-save-send-client f354-notifications-reliability \
+            f354f-task-edit-update-notification f354f-sla-designer-live-timer f353-durable-notifications f353a-actor-photo \
+            f343-delivery-channel f343-operational-block f343-main-scheduler f343-sla-golden-master f344-flow-golden-master \
+            f345-sla-timestamp-golden-master f343-preservation f347-immediate-visual-delivery f347-independent-behavior \
+            f352-cards-notify f352-cards-channel-substitution f3377a-r4b-http-date-clock f33A-notif-central f33F-bg-notify \
+            f33B-form-typing f33C-assignment-toast f33L-account-anchor ; do
+            node "scripts/$t.test.mjs" || { echo "::error:: regressao vermelha: $t"; exit 1; }
+          done
+          echo "REGRESSAO (32 suites) verde."
+
+      - name: Gate DECISÃO-SLA preservada — f354p verde EXCETO o auto-ID de versão (X18 1.0.206→1.0.211)
+        working-directory: desktop
+        run: |
+          set -e
+          OUT="$(node scripts/f354p-sla-decision-actions.test.mjs 2>&1 || true)"
+          echo "$OUT" | tail -3
+          FAILN="$(echo "$OUT" | grep -oE '[0-9]+ falharam' | grep -oE '^[0-9]+' || echo 99)"
+          [ "$FAILN" = "1" ] || { echo "::error:: f354p deveria ter só 1 obsoleto (X18 versão); tem $FAILN"; exit 1; }
+          echo "$OUT" | grep -q "X18" || { echo "::error:: a única falha do f354p NÃO é o X18 de versão"; exit 1; }
+          echo "f354p: só o X18 (auto-ID de versão) obsoleto, esperado."
+
+      - name: Gate ISOLAMENTO — diff vs 1.0.210 SÓ nos arquivos autorizados do hotfix H2
+        working-directory: desktop
+        run: |
+          set -e
+          git -C "$GITHUB_WORKSPACE" diff --name-only "$BASE_210_SHA" HEAD > /tmp/diff.txt
+          echo "== arquivos alterados vs 1.0.210 =="; cat /tmp/diff.txt
+          ALLOW='^(desktop/src/main/slaReminderWindow\.ts|desktop/src/preload/slareminder-preload\.ts|desktop/src/renderer/slareminder\.html|desktop/package\.json|desktop/package-lock\.json|desktop/scripts/f354uh2-atomic-central-alert-processing\.test\.mjs|desktop/scripts/f354uh2-central-proof-main\.js|docs/f354uh2-qa/.*|\.github/workflows/desktop-build-f354uh2\.yml|\.github/workflows/desktop-release-f354uh2\.yml)$'
+          if grep -vE "$ALLOW" /tmp/diff.txt | grep -q .; then echo "::error:: arquivo fora da allowlist do hotfix H2:"; grep -vE "$ALLOW" /tmp/diff.txt; exit 1; fi
+          # CONGELADOS vs 1.0.210: produtores/entrega/controller/renderers comuns NÃO podem mudar
+          if grep -qE '^desktop/src/main/(main\.ts|notifEvents\.js|notifierA\.js|notifier\.js|slaScheduler\.js|notificationGrouping\.ts|cardsRules\.js|slaRules\.js|slaReminderStore\.ts|slaReminder\.ts|taskIdle\.js|updaterService\.ts)$' /tmp/diff.txt; then echo "::error:: produtor/entrega/controller congelado alterado vs 1.0.210"; exit 1; fi
+          if grep -qE '^desktop/src/renderer/(index|bgnotify)\.html$' /tmp/diff.txt; then echo "::error:: renderer comum (index/bgnotify) alterado vs 1.0.210"; exit 1; fi
+          # o ÚNICO preload que pode mudar é slareminder-preload.ts
+          if grep -E '^desktop/src/preload/' /tmp/diff.txt | grep -vqE '^desktop/src/preload/slareminder-preload\.ts$'; then echo "::error:: preload alem do slareminder-preload alterado vs 1.0.210"; exit 1; fi
+          echo "ISOLAMENTO OK."
+
+      - name: Gate ANDROID/BACKEND intactos — diff nao toca android/functions/worker/Rules
+        working-directory: desktop
+        run: |
+          set -e
+          A=$(git -C "$GITHUB_WORKSPACE" diff --name-only "$BASE_208_SHA" HEAD | grep -cE '^(android/|functions/|worker/|.*\.rules$|firestore\.rules)' || true)
+          [ "$A" = "0" ] || { echo "::error:: diff toca android/backend ($A)"; exit 1; }
+          echo "ANDROID/BACKEND intactos."
+
+  build:
+    needs: verify
+    runs-on: windows-latest
+    defaults: { run: { shell: bash } }
+    steps:
+      - name: Forcar LF no checkout
+        run: git config --global core.autocrlf false
+      - name: Checkout (mesmo SHA do run)
+        uses: actions/checkout@v4
+        with: { ref: "${{ github.sha }}", fetch-depth: 0 }
+
+      - name: Gate REF + ANCESTRIA (windows)
+        working-directory: desktop
+        run: |
+          set -e
+          [ "$GITHUB_REF_NAME" = "$TEST_BRANCH" ] || { echo "::error:: ref != branch"; exit 1; }
+          git merge-base --is-ancestor "$BASE_210_SHA" HEAD || { echo "::error:: nao descende de 1.0.210"; exit 1; }
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - name: npm ci
+        working-directory: desktop
+        run: npm ci
+      - name: TypeScript build
+        working-directory: desktop
+        run: npm run build
+      - name: electron-builder (NSIS + MSI; --publish never)
+        working-directory: desktop
+        run: npx electron-builder --win nsis msi --publish never
+
+      - name: Gate prova-de-versao (asar == 1.0.211) + renderers EMPACOTADOS == fonte (EOL-normalizado)
+        working-directory: desktop
+        run: |
+          set -e
+          ASAR="dist-installer/win-unpacked/resources/app.asar"; test -f "$ASAR" || { echo "::error:: app.asar ausente"; exit 1; }
+          EXDIR="$RUNNER_TEMP/asarx"; rm -rf "$EXDIR"; mkdir -p "$EXDIR"; npx --yes @electron/asar extract "$ASAR" "$EXDIR"
+          PKGV=$(P="$EXDIR/package.json" node -e 'console.log(JSON.parse(require("fs").readFileSync(process.env.P,"utf8")).version||"")')
+          [ "$PKGV" = "1.0.211" ] || { echo "::error:: asar version=$PKGV != 1.0.211"; exit 1; }
+          cmp_norm() { EX="$1" SRC="$2" node -e 'const fs=require("fs");const n=s=>String(s).replace(/\r\n/g,"\n");if(n(fs.readFileSync(process.env.EX,"utf8"))!==n(fs.readFileSync(process.env.SRC,"utf8"))){console.error(process.env.SRC+" EMPACOTADO != fonte");process.exit(1);}'; }
+          cmp_norm "$EXDIR/src/renderer/index.html" "src/renderer/index.html"
+          cmp_norm "$EXDIR/src/renderer/bgnotify.html" "src/renderer/bgnotify.html"
+          cmp_norm "$EXDIR/src/renderer/slareminder.html" "src/renderer/slareminder.html"
+          echo "GATE prova-de-versao 1.0.211 + renderers==fonte OK."
+
+      - name: Gate F3.5.4U-H2 EMPACOTADO — processamento atômico (freeze + center congelado + hide coalescido + obs) + congelados
+        working-directory: desktop
+        run: |
+          set -e
+          EXDIR="$RUNNER_TEMP/asarx"; DM="$EXDIR/dist/main"; DP="$EXDIR/dist/preload"; RR="$EXDIR/src/renderer"; MJS="$DM/main.js"; SW="$DM/slaReminderWindow.js"
+          # ── correção H2 no main empacotado (slaReminderWindow.js) — regex tolerante ao reformat do tsc ──
+          SWF="$SW" node -e 'const s=require("fs").readFileSync(process.env.SWF,"utf8");const need={"center() congela bounds em processing":/if \(processing\)\s*\n?\s*return;/,"push evita resize em morph visivel":/if \(!wasVisible\)\s*\n?\s*center\(260\)/};for(const[k,re]of Object.entries(need)){if(!re.test(s)){console.error("::error:: "+k+" ausente (asar)");process.exit(1);}}console.log("center gate + morph-skip OK (asar)");'
+          grep -q 'slareminder-set-processing' "$SW" || { echo "::error:: IPC set-processing ausente (asar)"; exit 1; }
+          grep -q 'slareminder-obs' "$SW" || { echo "::error:: IPC obs ausente (asar)"; exit 1; }
+          grep -q "browserWindowCount" "$SW" || { echo "::error:: browserWindowCount ausente na obs (asar)"; exit 1; }
+          grep -q "setImmediate" "$SW" && grep -q "pendingHide" "$SW" || { echo "::error:: hide coalescido (setImmediate/pendingHide) ausente (asar)"; exit 1; }
+          # ── correção H2 no renderer empacotado (slareminder.html) ──
+          grep -q "function freezeFoot()" "$RR/slareminder.html" || { echo "::error:: freezeFoot ausente no asar"; exit 1; }
+          grep -q "api.setProcessing && api.setProcessing(true)" "$RR/slareminder.html" || { echo "::error:: setProcessing(true) no clique ausente no asar"; exit 1; }
+          grep -q "function sendObs(" "$RR/slareminder.html" || { echo "::error:: sendObs (prova sanitizada) ausente no asar"; exit 1; }
+          # sendDecision NÃO chama resizeSelf (processamento congelado): o bloco entre 'function sendDecision' e o próximo 'function ' não pode conter resizeSelf
+          RRH="$RR/slareminder.html" node -e 'const fs=require("fs");const s=fs.readFileSync(process.env.RRH,"utf8");function block(name){const a=s.indexOf("function "+name+"(");if(a<0)throw new Error("no "+name);const b=s.indexOf("\n  function ",a+1);return s.slice(a,b<0?a+1200:b);}for(const fn of ["sendDecision","cSend"]){const blk=block(fn);if(/resizeSelf\(\)/.test(blk)){console.error("::error:: "+fn+" ainda chama resizeSelf (asar)");process.exit(1);}if(!/setProcessing && api\.setProcessing\(true\)/.test(blk)){console.error("::error:: "+fn+" sem setProcessing(true) (asar)");process.exit(1);}if(!/freezeFoot\(\)/.test(blk)){console.error("::error:: "+fn+" sem freezeFoot (asar)");process.exit(1);}}console.log("sendDecision/cSend: freeze + setProcessing + SEM resizeSelf (asar) OK");'
+          # ── preload empacotado: setProcessing + obs expostos ──
+          grep -q 'slareminder-set-processing' "$DP/slareminder-preload.js" || { echo "::error:: preload sem setProcessing (asar)"; exit 1; }
+          grep -q 'slareminder-obs' "$DP/slareminder-preload.js" || { echo "::error:: preload sem obs (asar)"; exit 1; }
+          # ── observabilidade central_alert.* SANITIZADA (compilado) ──
+          A="$DM/slaReminder.js" B="$SW" node -e 'const fs=require("fs");const src=fs.readFileSync(process.env.A,"utf8")+"\n"+fs.readFileSync(process.env.B,"utf8");const calls=src.match(/"central_alert\.[a-z_]+",\s*[^;]*?\)/g)||[];const bad=/\b(actorName|taskTitle|clientName|body|context|title|deep|photo|avatar|email|token)\b/;if(calls.length<6){console.error("::error:: poucas chamadas central_alert.* no asar");process.exit(1);}for(const c of calls){if(bad.test(c)){console.error("::error:: campo proibido em central_alert.* no asar: "+c.slice(0,120));process.exit(1);}}'
+          # ── H1 PRESERVADO (defeito 1 cabeçalho + defeito 2 janela única/sombra/dedup) ──
+          grep -q "ntfp-hd{display:grid;grid-template-columns:1fr auto auto" "$RR/bgnotify.html" || { echo "::error:: cabeçalho H1 (grid) regrediu no asar"; exit 1; }
+          grep -q "box-shadow:0 10px 26px -10px rgba(2,6,23,.30)" "$RR/slareminder.html" || { echo "::error:: sombra enxuta H1 regrediu no asar"; exit 1; }
+          grep -q "REUTILIZAR a janela" "$SW" && grep -q "win.hide()" "$SW" || { echo "::error:: reutilização de janela H1 regrediu no asar"; exit 1; }
+          grep -q "function logicalOf" "$DM/slaReminder.js" || { echo "::error:: dedup lógico H1 regrediu no asar"; exit 1; }
+          # ── 1.0.210 PRESERVADO: produtores/entrega/decisão/idle/agrupamento intactos ──
+          grep -q "function deliverNotification" "$MJS" && grep -q "showBgNotify" "$MJS" && grep -q "updateBgGroup" "$MJS" || { echo "::error:: HUB de entrega alterado"; exit 1; }
+          grep -q "createSlaReminderController" "$DM/slaReminder.js" && grep -q "onDecide" "$DM/slaReminder.js" && grep -q "classifyReminderLevel" "$DM/slaReminder.js" || { echo "::error:: decisão SLA (1.0.206) ausente"; exit 1; }
+          grep -q "createNotificationGrouping" "$DM/notificationGrouping.js" || { echo "::error:: agrupamento (1.0.205) ausente"; exit 1; }
+          grep -qF "premiumCommonNotificationsEnabled" "$MJS" || { echo "::error:: flag premium (1.0.209) ausente"; exit 1; }
+          grep -qF 'var CARDS_WARN_MS = 30 * 60000' "$DM/cardsRules.js" && grep -qF 'var CARDS_RED_MS  = 10 * 60000' "$DM/cardsRules.js" || { echo "::error:: tempos T-30/T-10 alterados"; exit 1; }
+          # ── CONGELADOS vs 1.0.210 (byte-idênticos): controller, main.ts, notifEvents, renderers comuns, demais preloads ──
+          git -C "$GITHUB_WORKSPACE" diff --quiet "$BASE_210_SHA" HEAD -- desktop/src/main/slaReminder.ts desktop/src/main/main.ts desktop/src/main/notifEvents.js desktop/src/renderer/index.html desktop/src/renderer/bgnotify.html || { echo "::error:: controller/main.ts/notifEvents/renderers comuns alterados vs 1.0.210"; exit 1; }
+          if git -C "$GITHUB_WORKSPACE" diff --name-only "$BASE_210_SHA" HEAD -- desktop/src/preload/ | grep -vqE '^desktop/src/preload/slareminder-preload\.ts$'; then echo "::error:: preload alem do slareminder-preload alterado vs 1.0.210"; exit 1; fi
+          echo "GATE F3.5.4U-H2 EMPACOTADO: VERIFIED."
+
+      - name: Empacotar bundle (EXE/MSI/latest.yml/blockmap/SBOM/SHA256SUMS/VERSAO-DESKTOP)
+        working-directory: ${{ env.APP_DIR }}
+        env: { APP_VERSION: "1.0.211" }
+        run: |
+          set -e
+          npx --yes @cyclonedx/cyclonedx-npm --omit dev --output-format JSON --output-file "$RUNNER_TEMP/sbom.json" || echo '{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}' > "$RUNNER_TEMP/sbom.json"
+          OUT="$GITHUB_WORKSPACE/dist-pkg"; mkdir -p "$OUT"
+          EXE=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe | head -1)
+          MSI=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.msi 2>/dev/null | head -1)
+          BM=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap | head -1)
+          cp "$EXE" "$OUT/"; [ -n "$MSI" ] && cp "$MSI" "$OUT/"; cp dist-installer/latest.yml "$OUT/"; cp "$BM" "$OUT/"; cp "$RUNNER_TEMP/sbom.json" "$OUT/SBOM-cyclonedx.json"
+          EXE_NAME=$(basename "$EXE"); MSI_NAME=$([ -n "$MSI" ] && basename "$MSI" || echo ""); BM_NAME=$(basename "$BM")
+          ( cd "$OUT" && sha256sum "$EXE_NAME" ${MSI_NAME:+$MSI_NAME} latest.yml "$BM_NAME" SBOM-cyclonedx.json > SHA256SUMS )
+          {
+            echo "productName : Agenda ID Seven Desktop"
+            echo "versionName : $APP_VERSION"
+            echo "rotulo      : 1.0.211-atomic-central-alert-processing (CANDIDATA — hotfix do processamento dos alertas)"
+            echo "channel     : latest (estrutura do updater; NADA publicado neste build)"
+            echo "appId       : br.com.idseven.agenda.desktop"
+            echo "instalador  : $EXE_NAME"
+            echo "SHA-256 exe : $(sha256sum "$OUT/$EXE_NAME" | awk '{print $1}')"
+            [ -n "$MSI_NAME" ] && echo "instalador2 : $MSI_NAME" && echo "SHA-256 msi : $(sha256sum "$OUT/$MSI_NAME" | awk '{print $1}')"
+            echo "commit      : $GITHUB_SHA (branch $GITHUB_REF_NAME)"
+            echo "baseline    : Desktop 1.0.208 OFICIAL (commit db8cdca; aprovada fisicamente; rollback)"
+            echo "base-codigo : Desktop 1.0.210 (commit a3655cd = tag v1.0.210)"
+            echo "origem      : F3.5.4U-H2 — processamento ATÔMICO do alerta central: no clique de uma ação, o card NÃO redimensiona/move (freeze do #foot no renderer + center() congelado no main) e a fila MORFA (hide coalescido) — some a sobreposição do card antigo atrás do 'Registrando…'. Um único card/janela; observabilidade central_alert.action_received sanitizada. Controller/entrega/decisão/idle/agrupamento/T-30/T-10/Card Premium/updater/Android: INTOCADOS (byte vs 1.0.210)."
+            echo "distribuicao: CANDIDATA — build gated; publicacao no Latest ocorre no workflow desktop-release-f354uh2.yml (mesmos bytes deste run)"
+          } > "$OUT/VERSAO-DESKTOP.txt"
+          echo "== SHA256SUMS =="; cat "$OUT/SHA256SUMS"
+
+      - name: Upload artifact — installer (EXE + MSI) PRIVADO
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-1.0.211-installer
+          path: |
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.msi
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload artifact — updatemeta PRIVADO
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-1.0.211-updatemeta
+          path: |
+            dist-pkg/latest.yml
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap
+            dist-pkg/SHA256SUMS
+            dist-pkg/SBOM-cyclonedx.json
+            dist-pkg/VERSAO-DESKTOP.txt
+          if-no-files-found: error
+          retention-days: 30

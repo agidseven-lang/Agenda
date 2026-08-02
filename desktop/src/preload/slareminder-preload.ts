@@ -8,6 +8,12 @@ contextBridge.exposeInMainWorld("slaAPI", {
   onCard: (cb: (view: unknown) => void) => ipcRenderer.on("slareminder-card", (_e, v) => cb(v)),
   rendered: (key: string) => ipcRenderer.send("slareminder-rendered", key),
   resize: (h: number) => ipcRenderer.send("slareminder-resize", h),
+  // F3.5.4U-H2 (processamento atômico): informa o main que uma ação está em PROCESSAMENTO ⇒ o main
+  // CONGELA os bounds da janela (não faz setBounds/move enquanto processando), eliminando o artefato
+  // de sobreposição (backing-store antigo) do redimensionamento da janela transparente durante o clique.
+  setProcessing: (on: boolean) => ipcRenderer.send("slareminder-set-processing", !!on),
+  // F3.5.4U-H2 (prova sanitizada no clique): contagens de DOM/janela — SEM nome/título/cliente/UID/conteúdo.
+  obs: (payload: unknown) => ipcRenderer.send("slareminder-obs", payload),
   ok: (key: string) => ipcRenderer.send("slareminder-ok", key),
   open: (deep: string) => ipcRenderer.send("slareminder-open", deep),
   // F3.5.4P — decisão do responsável (transação), dismiss e resolução de destinatário da ajuda

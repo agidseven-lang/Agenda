@@ -58,6 +58,14 @@ export function createSlaReminderSurface(deps: SlaReminderSurfaceDeps): Reminder
   let onNoRenderCb: (() => void) | null = null;
   let lastFocusedBefore: BrowserWindow | null = null;
   let winId = 0;                    // F3.5.4U-H1 — id da janela ÚNICA (observabilidade central_alert.*)
+  // F3.5.4U-H2 (processamento atômico): enquanto o renderer processa uma ação (spinner "Registrando…"),
+  // o main CONGELA os bounds — NENHUM setBounds/move na janela transparente visível → elimina o artefato
+  // de sobreposição (backing-store antigo do Windows/DWM aparecendo atrás do card durante o redimensionamento).
+  let processing = false;
+  // F3.5.4U-H2 (fila): hide COALESCIDO. close() agenda o hide p/ o próximo tick; se um show() (avanço da fila /
+  // promoção) ocorrer antes, o hide é CANCELADO e a MESMA janela MORFA o conteúdo — sem hide→show (sem flash do
+  // card anterior no backing-store). Fila vazia (nenhum show em seguida) ⇒ o hide agendado realmente esconde.
+  let pendingHide = false;
 
   function winState(): string { return "reminder"; }
   function appVer(): string { try { return app.getVersion(); } catch { return "dev"; } }
@@ -94,6 +102,10 @@ export function createSlaReminderSurface(deps: SlaReminderSurfaceDeps): Reminder
 
   function center(h: number): void {
     if (!win || win.isDestroyed()) return;
+    // F3.5.4U-H2: NÃO redimensionar/mover a janela transparente enquanto uma ação está em PROCESSAMENTO.
+    // Este early-return cobre TODAS as origens de setBounds (IPC slareminder-resize E o center() direto do
+    // push()/show/promote/refreshCounter/task_completed/noteCompleted), não só o handler do IPC.
+    if (processing) return;
     let disp;
     try { disp = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()); } catch { /* */ }
     try { if (!disp) disp = screen.getPrimaryDisplay(); } catch { /* */ }
@@ -116,6 +128,10 @@ export function createSlaReminderSurface(deps: SlaReminderSurfaceDeps): Reminder
   function clearRenderProof(): void { if (renderTimer) { try { clearTimeout(renderTimer); } catch { /* */ } renderTimer = null; } }
 
   function push(view: CentralView): void {
+    // F3.5.4U-H2: um show/promoção CANCELA um hide agendado ⇒ a MESMA janela MORFA o conteúdo (sem hide→show,
+    // sem flash do card anterior). wasVisible é medido ANTES de ensure() (ensure pode criar a janela oculta).
+    pendingHide = false;
+    const wasVisible = !!(win && !win.isDestroyed() && win.isVisible());
     const w = ensure();
     curKey = view.key;
     // F3.5.4P: com decisões ON a janela precisa ser focável (inputs de texto de bloqueio/ajuda). showInactive
@@ -125,7 +141,10 @@ export function createSlaReminderSurface(deps: SlaReminderSurfaceDeps): Reminder
     const send = () => { try { w.webContents.send("slareminder-card", view); } catch { /* */ } };
     if (w.webContents.isLoading()) { w.webContents.once("did-finish-load", send); } else { send(); }
     try { w.showInactive(); } catch { /* */ }
-    center(260);
+    // F3.5.4U-H2: só centraliza no PRIMEIRO show (oculta→visível). Num morfar de janela já visível (avanço da
+    // fila/promoção) NÃO força center(260); o renderer ajusta a altura via resizeSelf (e center() é congelado
+    // enquanto processing). Evita o setBounds "260→altura real" que redimensiona a janela visível a cada show.
+    if (!wasVisible) center(260);
   }
 
   const surface: ReminderSurface & { destroy: () => void; ackState: () => string } = {
@@ -141,9 +160,14 @@ export function createSlaReminderSurface(deps: SlaReminderSurfaceDeps): Reminder
       // recriava a BrowserWindow e a mostrava (showInactive) ANTES do card pintar → janela transparente vazia
       // (retângulo/"2ª notificação" preta atrás). Com hide, a janela ÚNICA persiste (renderer vivo) e o próximo
       // item apenas MORFA o conteúdo. Teardown real (logout/quit) segue em destroy().
+      // F3.5.4U-H2 (fila): hide COALESCIDO. Agenda o hide p/ o próximo tick; se um show()/promote ocorrer antes
+      // (avanço da fila), push() zera pendingHide e o hide é CANCELADO — a MESMA janela MORFA o conteúdo (sem
+      // hide→show, sem flash do backing-store do card anterior). Fila vazia ⇒ o hide agendado esconde de fato.
       clearRenderProof();
-      acknowledged = true; onNoRenderCb = null; curKey = "";
-      try { if (win && !win.isDestroyed() && win.isVisible()) win.hide(); } catch { /* */ }
+      acknowledged = true; onNoRenderCb = null; curKey = ""; processing = false;
+      pendingHide = true;
+      const doHide = () => { pendingHide = false; try { if (win && !win.isDestroyed() && win.isVisible()) win.hide(); } catch { /* */ } };
+      try { setImmediate(() => { if (pendingHide) doHide(); }); } catch { doHide(); }
       cobs("central_alert.closed");
     },
     isOpen(): boolean { return !!(win && !win.isDestroyed() && win.isVisible()); },
@@ -172,6 +196,27 @@ export function createSlaReminderSurface(deps: SlaReminderSurfaceDeps): Reminder
   // IPC do card (registrado uma vez)
   ipcMain.on("slareminder-rendered", (_e, key) => { if (String(key || "") === curKey) { clearRenderProof(); log("sla.reminder.rendered", { key: mask(curKey) }); cobs("central_alert.render_ack"); } });
   ipcMain.on("slareminder-resize", (_e, h) => { center(Number(h) || 260); });
+  // F3.5.4U-H2 — o renderer sinaliza início/fim do PROCESSAMENTO (spinner "Registrando…"). Enquanto true,
+  // center() congela os bounds (nenhum setBounds/move na janela transparente visível) — mata o artefato de
+  // sobreposição do redimensionamento durante o clique. Sempre liberado no restore/commit (renderer) e no close().
+  ipcMain.on("slareminder-set-processing", (_e, on) => { processing = !!on; });
+  // F3.5.4U-H2 — PROVA SANITIZADA no clique: contagens de DOM (renderer) + contagem de janelas centrais (main).
+  // NUNCA nome/título/cliente/UID/e-mail/conteúdo — apenas números e enums (actionType/rendererState).
+  ipcMain.on("slareminder-obs", (_e, p) => {
+    try {
+      const o = (p || {}) as Record<string, unknown>;
+      let bwc = 0;
+      try { bwc = BrowserWindow.getAllWindows().filter((w) => { try { return /Lembrete de SLA/.test(w.getTitle()); } catch { return false; } }).length; } catch { /* */ }
+      cobs("central_alert.action_received", {
+        actionType: String((o.actionType as string) || ""),
+        cardElementCount: Number(o.cardElementCount) || 0,
+        visibleCardCount: Number(o.visibleCardCount) || 0,
+        processingLayerCount: Number(o.processingLayerCount) || 0,
+        browserWindowCount: bwc,
+        rendererState: String((o.rendererState as string) || ""),
+      });
+    } catch { /* */ }
+  });
   ipcMain.on("slareminder-ok", (_e, key) => { const k = String(key || ""); log("sla.reminder.ok.click", { key: mask(k) }); try { deps.onAck(k, winState()); } catch (e) { log("sla.reminder.ok.error", { err: String((e as any) && (e as any).message || e) }); } });
   ipcMain.on("slareminder-open", (_e, deep) => { try { deps.onOpenTask(String(deep || "")); } catch { /* */ } });
 
