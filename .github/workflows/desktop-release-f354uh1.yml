@@ -1,0 +1,281 @@
+# =====================================================================
+# F3.5.4U-H1 — Publicacao da Desktop 1.0.210 no CANAL DO ATUALIZADOR INTERNO (Latest)
+# ---------------------------------------------------------------------
+# Publica a 1.0.210 (F3.5.4U-H1: HOTFIX FISICO das NOTIFICACOES — corrige os DOIS defeitos reprovados na
+# validacao fisica da 1.0.209, APRESENTACAO-only + CICLO DE VIDA da janela central; ZERO mudanca em
+# entrega/dedup/recibos/destinatarios/SLA/decisao/idle/agrupamento/produtores/Card Premium/Cronograma/
+# updater/backend/Android):
+#   Defeito 1 — notificacao COMUM PREMIUM: cabecalho em GRID de COLUNAS RESERVADAS (eyebrow 1fr | horario |
+#     fechar). O icone de nivel virou glifo PEQUENO dentro do eyebrow (esev). Acaba a sobreposicao
+#     horario x icone verde x X. Aplicado as 2 superficies (janela premium bgnotify.html + toast index.html)
+#     e a TODOS os eventTypes (inclui "TAREFA CONCLUIDA"); construtores premium byte-identicos (paridade).
+#   Defeito 2 — LEMBRETE CENTRAL de SLA: UMA unica janela REUTILIZADA (close()=hide; nunca destroi+recria →
+#     fim da "2a janela/card atras"); sombra ENXUTA contida no #wrap (fim do retangulo/area preta no Windows);
+#     dedup LOGICO por chave (tarefa+destinatario+nivel+marco); observabilidade central_alert.* SANITIZADA
+#     (12 nomes; so alertType/threshold/source/queueDepth/activeExists/windowCount/windowId/appVersion/
+#     timestamp/taskIdHash/dedupKeyHash — NUNCA titulo/nome/cliente/UID/e-mail/descricao/token/conteudo).
+# PRESERVACAO (provado pelos gates do app.asar no build): roteamento/entrega, dedup, recibos, destinatarios,
+# T-30/T-10/vencimento, decisao de SLA, movimentacao, pedido de ajuda, check-in, alertas vermelhos,
+# notificacoes comuns, agrupamento comum, som unico, deep-link, sino, historico, Minhas Prioridades,
+# Monitor SLA, formularios, Cronograma, Roteiro, Card Premium, updater, backend, Firebase Rules, Functions,
+# Worker, schema e Android: INTOCADOS. main.ts / notifEvents.js / preload CONGELADOS (byte-identicos a 1.0.209).
+# USA EXCLUSIVAMENTE os BYTES do run de build F3.5.4U-H1 30727059489 (gated, verde nos 2 jobs; --publish
+# never): NAO RECOMPILA — baixa os 2 artifacts e publica os MESMOS bytes. TUDO PINADO: run id, digests dos
+# artifacts, 5 hashes SHA-256, tag v1.0.210 no head EXATO da branch. 6 assets: EXE, MSI, latest.yml,
+# blockmap, SHA256SUMS, VERSAO-DESKTOP.txt.
+# ESCRITAS (tag + release + Latest) SO via token temporario do GitHub App "Agenda ID Seven Release Bot"
+# (expira sozinho); GITHUB_TOKEN permanece somente leitura; sem RELEASE_PAT.
+# Roda NA PROPRIA branch de teste (main INTOCAVEL): dispara no push DESTE arquivo + workflow_dispatch.
+# Baseline aprovada/rollback imediato: v1.0.208. v1.0.209 permanece PRESERVADA no historico (releases/tags
+# intocadas), mas NAO classificada como baseline fisicamente aprovada. v1.0.207/v1.0.206 tambem preservadas.
+# A publicacao NAO significa aprovacao fisica — o teste fisico do owner vem depois, pelo atualizador.
+# =====================================================================
+name: "F3.5.4U-H1 Desktop Release — 1.0.210 no canal do updater (hotfix das notificacoes; sem build novo)"
+"on":
+  push:
+    branches:
+      - "desktop/f354u-h1-notification-physical-hotfix-1.0.210"
+    paths:
+      - ".github/workflows/desktop-release-f354uh1.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: agidseven-lang/Agenda
+      # ── PINAGEM COMPLETA (F3.5.4U-H1; run de build 30727059489 verde nos 2 jobs) ──
+      RUN_ID: "30727059489"
+      STABLE_SHA: "a3655cdbb2e974978b9a5e182e62a291a8ed5211"
+      TEST_BRANCH: "desktop/f354u-h1-notification-physical-hotfix-1.0.210"
+      BASE_209_SHA: "2ba47f2031718947816baa7ba77e1e1ac3b63ec5"
+      BASE_208_SHA: "db8cdca1d92cd42f3ec98aced39e6a418c4d478e"
+      TAG: "v1.0.210"
+      TITLE: "Agenda ID Seven Desktop 1.0.210 — Hotfix das Notificações"
+      ART_INST: "agenda-id-seven-desktop-1.0.210-installer"
+      ART_INST_DIGEST: "sha256:c66bbe5b124481901fbf1a26d3d0daf577c6d04dd23b259251f0fe90c346258a"
+      ART_META: "agenda-id-seven-desktop-1.0.210-updatemeta"
+      ART_META_DIGEST: "sha256:b51e253cfac05461ca285faaee6998e19202de0aa2802774fc5e2aade053db01"
+      EXE_NAME: "Agenda-ID-Seven-Desktop-1.0.210-x64.exe"
+      MSI_NAME: "Agenda-ID-Seven-Desktop-1.0.210-x64.msi"
+      BM_NAME: "Agenda-ID-Seven-Desktop-1.0.210-x64.exe.blockmap"
+      LY_NAME: "latest.yml"
+      EXP_EXE: "df91d550e87cc3b598e20041e057c505b48754aba6eea96d089efe7d11246bf2"
+      EXP_MSI: "8556f425250c89c35353a98cc02206b5a2d3985c16c31a1182017c85021c04f5"
+      EXP_LY: "6f0b0ae4df9943fa7b03af03d63ededbda0bb370971bd27f2d5e9721b16af18b"
+      EXP_BM: "80989e936253a2a8ae790d2b9a4f9bff4ae02c194a6a9e8e79e4c1f82f9834e0"
+      EXP_SBOM: "bf2160d5baab84e593d31e23051153992c42e20c3435b0b4ac9f7183c8522be4"
+      PROD_PREV_TAG: "v1.0.209"
+      PROD_ROLLBACK_TAG: "v1.0.208"
+      PROD_HIST_TAG: "v1.0.207"
+      PROD_HIST2_TAG: "v1.0.206"
+    steps:
+      - name: "Gate 0 — contexto: branch de teste correta (publicacao autorizada F3.5.4U-H1)"
+        run: |
+          set -euo pipefail
+          [ "${{ github.ref_name }}" = "$TEST_BRANCH" ] || { echo "::error::ref '${{ github.ref_name }}' != $TEST_BRANCH — nada publicado"; exit 1; }
+          echo "OK: rodando na branch de teste autorizada"
+
+      - name: "Gate 0a — token temporario do Release Bot (GitHub App; expira sozinho)"
+        id: release_bot
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: Agenda
+          permission-contents: write
+          permission-workflows: write
+
+      - name: "Gate 0b — token do Release Bot ATIVO + escopo SO Agenda"
+        env:
+          BOT_TOKEN: ${{ steps.release_bot.outputs.token }}
+        run: |
+          set -euo pipefail
+          [ -n "$BOT_TOKEN" ] || { echo "::error::token do Release Bot vazio — NADA publicado."; exit 1; }
+          FN="$(GH_TOKEN="$BOT_TOKEN" gh api "repos/$REPO" --jq '.full_name' 2>/dev/null || true)"
+          [ "$FN" = "$REPO" ] || { echo "::error::Release Bot sem acesso a $REPO."; exit 1; }
+          J="$(GH_TOKEN="$BOT_TOKEN" gh api /installation/repositories)"
+          N="$(echo "$J" | jq -r '.total_count')"; R="$(echo "$J" | jq -r '.repositories[0].full_name')"
+          { [ "$N" = "1" ] && [ "$R" = "$REPO" ]; } || { echo "::error::escopo do Release Bot != {1 repo, $REPO} ($N,$R)."; exit 1; }
+          echo "OK: Release Bot ativo, escopo restrito a $REPO"
+
+      - name: "Gate 1 — run de build F3.5.4U-H1 completed/success e head EXATO"
+        run: |
+          set -euo pipefail
+          J="$(gh api "repos/$REPO/actions/runs/$RUN_ID")"
+          ST="$(echo "$J" | jq -r '.status + "|" + .conclusion')"
+          HS="$(echo "$J" | jq -r '.head_sha')"
+          BR="$(echo "$J" | jq -r '.head_branch')"
+          echo "run $RUN_ID: $ST head=$HS branch=$BR"
+          [ "$ST" = "completed|success" ] || { echo "::error::run de build invalido"; exit 1; }
+          [ "$HS" = "$STABLE_SHA" ] || { echo "::error::head do run != STABLE_SHA"; exit 1; }
+          [ "$BR" = "$TEST_BRANCH" ] || { echo "::error::branch do run != branch de teste"; exit 1; }
+
+      - name: "Gate 2 — STABLE_SHA na linhagem do tip; commits alem dele SO o workflow de release"
+        run: |
+          set -euo pipefail
+          H="$(gh api "repos/$REPO/git/ref/heads/$TEST_BRANCH" --jq '.object.sha')"
+          CMP="$(gh api "repos/$REPO/compare/$STABLE_SHA...$H" --jq '.status')"
+          echo "compare $STABLE_SHA...$H: $CMP"
+          { [ "$CMP" = "identical" ] || [ "$CMP" = "ahead" ]; } || { echo "::error::STABLE_SHA fora da linhagem do tip ($CMP)"; exit 1; }
+          gh api "repos/$REPO/compare/$STABLE_SHA...$H" --jq '.files[].filename' | tee /tmp/extra.txt || true
+          # commits pos-candidato so podem tocar o PROPRIO workflow de release (nao-insumo de build).
+          if grep -vE '^\.github/workflows/desktop-release-f354uh1\.yml$' /tmp/extra.txt | grep -q .; then
+            echo "::error::commits pos-candidato tocam arquivos alem do workflow de release"; exit 1; fi
+          # PROTECAO REFORCADA: garante que NENHUM insumo de build mudou apos STABLE_SHA (bytes publicados == build).
+          if grep -qE '^(desktop/src/|desktop/scripts/copy-renderer\.js|desktop/package\.json|desktop/package-lock\.json|desktop/tsconfig\.json|desktop/electron-builder)' /tmp/extra.txt; then
+            echo "::error::insumo de build alterado apos STABLE_SHA — bytes publicados nao corresponderiam ao build"; exit 1; fi
+          CMP2="$(gh api "repos/$REPO/compare/$BASE_209_SHA...$STABLE_SHA" --jq '.status')"
+          { [ "$CMP2" = "ahead" ] || [ "$CMP2" = "identical" ]; } || { echo "::error::STABLE_SHA nao descende da 1.0.209 ($CMP2)"; exit 1; }
+          CMP3="$(gh api "repos/$REPO/compare/$BASE_208_SHA...$STABLE_SHA" --jq '.status')"
+          { [ "$CMP3" = "ahead" ] || [ "$CMP3" = "identical" ]; } || { echo "::error::STABLE_SHA nao descende da 1.0.208 ($CMP3)"; exit 1; }
+          echo "OK: STABLE_SHA ancestral do tip; extras = so o workflow de release; bases 1.0.209 e 1.0.208 na linhagem"
+
+      - name: "Gate 3 — release v1.0.210 NAO existe; tag so pode preexistir apontando p/ STABLE_SHA"
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then echo "::error::release $TAG ja existe"; exit 1; fi
+          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            TS="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+            [ "$TS" = "$STABLE_SHA" ] || { echo "::error::tag $TAG aponta para outro sha ($TS)"; exit 1; }
+          fi
+          echo "OK: release/tag livres (ou tag ja em STABLE_SHA)"
+
+      - name: "Gate 4 — artifacts: ids+digests conferem (mesmos bytes do run verde)"
+        run: |
+          set -euo pipefail
+          json="$(gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts" --paginate)"
+          chk() { local d; d="$(echo "$json" | jq -r --arg n "$1" '.artifacts[]|select(.name==$n)|.digest')"; echo "$1: $d"; [ "$d" = "$2" ] || { echo "::error::digest $1 divergente"; exit 1; }; }
+          chk "$ART_INST" "$ART_INST_DIGEST"
+          chk "$ART_META" "$ART_META_DIGEST"
+
+      - name: "Baixar artifacts (installer + updatemeta) — SEM recompilar"
+        run: |
+          set -euo pipefail
+          gh run download "$RUN_ID" -R "$REPO" -n "$ART_INST" -D pacote
+          gh run download "$RUN_ID" -R "$REPO" -n "$ART_META" -D pacote
+          for f in "$EXE_NAME" "$MSI_NAME" "$LY_NAME" "$BM_NAME" SHA256SUMS SBOM-cyclonedx.json VERSAO-DESKTOP.txt; do
+            test -f "pacote/$f" || { echo "::error::arquivo ausente: $f"; exit 1; }
+          done
+          if [ -f pacote/canary.yml ]; then echo "::error::canary.yml presente — canal ambiguo"; exit 1; fi
+
+      - name: "Gate 5 — hashes SHA-256 + latest.yml (versao/EXE/sha512) + VERSAO-DESKTOP"
+        run: |
+          set -euo pipefail
+          declare -A EXP=( ["$EXE_NAME"]="$EXP_EXE" ["$MSI_NAME"]="$EXP_MSI" ["$LY_NAME"]="$EXP_LY" ["$BM_NAME"]="$EXP_BM" ["SBOM-cyclonedx.json"]="$EXP_SBOM" )
+          for f in "${!EXP[@]}"; do
+            H="$(sha256sum "pacote/$f" | awk '{print $1}')"; echo "$f=$H"
+            [ "$H" = "${EXP[$f]}" ] || { echo "::error::hash $f divergente"; exit 1; }
+          done
+          ( cd pacote && sha256sum -c SHA256SUMS ) || { echo "::error::SHA256SUMS nao confere"; exit 1; }
+          grep -q "version: 1.0.210" "pacote/$LY_NAME" || { echo "::error::latest.yml version != 1.0.210"; exit 1; }
+          grep -qE "^path: $EXE_NAME" "pacote/$LY_NAME" || { echo "::error::latest.yml path != EXE"; exit 1; }
+          META_SHA512=$(grep -E '^sha512:' "pacote/$LY_NAME" | head -1 | sed -E 's/^sha512:[[:space:]]*//' | tr -d '\r')
+          CALC_SHA512=$(openssl dgst -sha512 -binary "pacote/$EXE_NAME" | openssl base64 -A)
+          [ "$META_SHA512" = "$CALC_SHA512" ] || { echo "::error::sha512 do latest.yml != EXE (updater rejeitaria)"; exit 1; }
+          grep -q "versionName : 1.0.210" pacote/VERSAO-DESKTOP.txt || { echo "::error::VERSAO-DESKTOP sem 1.0.210"; exit 1; }
+          grep -q "1.0.210-notification-physical-hotfix" pacote/VERSAO-DESKTOP.txt || { echo "::error::rotulo da candidata ausente"; exit 1; }
+          echo "OK: 5 hashes + SHA256SUMS + latest.yml (1.0.210/EXE/sha512==EXE) + VERSAO-DESKTOP"
+
+      - name: "Release notes"
+        run: |
+          cat > notas.md <<'NOTAS'
+          Agenda ID Seven Desktop 1.0.210 — Hotfix das Notificações
+
+          Atualização disponibilizada pelo ATUALIZADOR INTERNO do app (Configurações ->
+          Atualizações -> Verificar atualizações -> Baixar -> Instalar e reiniciar).
+          NENHUM download manual é necessário.
+
+          O QUE MUDA vs 1.0.209 (F3.5.4U-H1 — hotfix físico; APRESENTAÇÃO + ciclo de vida da janela central)
+          Esta versão corrige os DOIS defeitos observados na validação física da 1.0.209, sem alterar nenhuma
+          regra de negócio, entrega ou notificação:
+
+          1) Notificação comum premium — cabeçalho reorganizado
+             - O cabeçalho passou a usar COLUNAS RESERVADAS (tipo | horário | fechar). O horário deixa de ficar
+               sobre o ícone verde de conclusão e sobre o "×". Não há mais três elementos disputando o mesmo
+               canto. O ícone de nível virou um pequeno glifo integrado ao rótulo do tipo. Aplica-se às duas
+               superfícies (janela premium e aviso dentro do app) e a todos os tipos, inclusive
+               "TAREFA CONCLUÍDA".
+
+          2) Lembrete central de SLA — uma única janela, sem área preta
+             - Agora existe SEMPRE UMA ÚNICA janela central visível de cada vez. Ao reconhecer um alerta, a
+               MESMA janela é REUTILIZADA para o próximo da fila (nunca surge uma "segunda janela/cartão atrás").
+             - A sombra do cartão foi contida na própria janela — acaba a "área/retângulo preto" ao redor do
+               cartão no Windows.
+             - Alertas equivalentes (mesma tarefa + destinatário + nível + marco) passam a ser deduplicados por
+               chave lógica, evitando duplicidade. O contador do alerta só começa quando a janela está de fato
+               visível e o conteúdo foi renderizado.
+
+          PRESERVAÇÃO (provado pelos gates do app.asar no build)
+          - Roteamento/entrega, dedup, recibos, destinatários, prazos e cálculo T-30/T-10/vencimento, decisão
+            de SLA, movimentação da tarefa, pedido de ajuda, check-in de tarefa parada, alertas vermelhos,
+            notificações comuns e seu agrupamento, som único, deep-link, sino, histórico, "Minhas Prioridades",
+            Monitor de SLA, formulários, Cronograma, Roteiro, Card Premium, atualizador, backend, Firebase
+            Rules/Functions/Worker e Android: INTOCADOS. Os módulos de entrega (main/notifEvents/preload)
+            permanecem byte-idênticos à 1.0.209.
+          - Rollback/baseline aprovada: 1.0.208. A 1.0.209 permanece PRESERVADA no histórico (release e tag
+            intactas), mas NÃO é classificada como baseline fisicamente aprovada. 1.0.207 e 1.0.206 também
+            preservadas.
+
+          IMPORTANTE: esta versão ainda DEPENDE DE VALIDAÇÃO FÍSICA do owner no Windows (conferir, na
+          "TAREFA CONCLUÍDA", o horário fora do ícone/×; e, no alerta amarelo T-30, UMA única janela central
+          reutilizada, sem segunda janela/cartão atrás e sem área preta ao redor). A publicação apenas
+          disponibiliza a atualização pelo mecanismo oficial; não constitui aprovação física.
+
+          Procedência: run de build F3.5.4U-H1 30727059489 (success; --publish never; jobs de verificação +
+          Windows verdes, incluindo o Gate F3.5.4U-H1 EMPACOTADO no app.asar — cabeçalho em colunas reservadas
+          nas 2 superfícies + paridade + sombra contida + janela reutilizada + dedup lógico + observabilidade
+          central_alert.* sanitizada + main/notifEvents/preload congelados vs 1.0.209) @ commit
+          a3655cdbb2e974978b9a5e182e62a291a8ed5211 (branch desktop/f354u-h1-notification-physical-hotfix-1.0.210).
+          Mesmos bytes; sem recompilar. Confira SHA-256 em SHA256SUMS.
+          NOTAS
+
+      - name: "Criar tag v1.0.210 pinada em STABLE_SHA — ESCRITA via Release Bot"
+        env:
+          GH_TOKEN: ${{ steps.release_bot.outputs.token }}
+        run: |
+          set -euo pipefail
+          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            TS="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+            [ "$TS" = "$STABLE_SHA" ] || { echo "::error::tag $TAG aponta para outro sha ($TS)"; exit 1; }
+          else
+            gh api -X POST "repos/$REPO/git/refs" -f ref="refs/tags/$TAG" -f sha="$STABLE_SHA" >/dev/null
+            echo "tag $TAG criada em $STABLE_SHA"
+          fi
+
+      - name: "Publicar release no canal do updater (latest=true, prerelease=false) — 6 assets — via Release Bot"
+        env:
+          GH_TOKEN: ${{ steps.release_bot.outputs.token }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" -R "$REPO" \
+            --target "$STABLE_SHA" --latest=true \
+            --title "$TITLE" --notes-file notas.md \
+            "pacote/$EXE_NAME" "pacote/$MSI_NAME" "pacote/$LY_NAME" "pacote/$BM_NAME" "pacote/SHA256SUMS" "pacote/VERSAO-DESKTOP.txt"
+          echo "publicado: $TAG (canal do electron-updater: release Latest com latest.yml)"
+
+      - name: "Pos-verificacao (Latest=1.0.210; 1.0.209 preservada no historico + 1.0.208 rollback + 1.0.207/1.0.206 preservadas)"
+        run: |
+          set -euo pipefail
+          FLAGS="$(gh release view "$TAG" -R "$REPO" --json isPrerelease,isDraft --jq '(.isPrerelease|tostring)+"|"+(.isDraft|tostring)')"
+          [ "$FLAGS" = "false|false" ] || { echo "::error::flags incorretas: $FLAGS"; exit 1; }
+          N="$(gh release view "$TAG" -R "$REPO" --json assets --jq '.assets|length')"
+          [ "$N" = "6" ] || { echo "::error::esperado 6 assets, encontrados $N"; exit 1; }
+          for a in "$EXE_NAME" "$MSI_NAME" "$LY_NAME" "$BM_NAME" SHA256SUMS VERSAO-DESKTOP.txt; do
+            gh release view "$TAG" -R "$REPO" --json assets --jq '.assets[].name' | grep -qx "$a" || { echo "::error::asset $a ausente"; exit 1; }
+          done
+          if gh release view "$TAG" -R "$REPO" --json assets --jq '.assets[].name' | grep -qx "app-update.yml"; then echo "::error::app-update.yml nao pode ser asset"; exit 1; fi
+          TAGSHA="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+          [ "$TAGSHA" = "$STABLE_SHA" ] || { echo "::error::tag != STABLE_SHA"; exit 1; }
+          LATEST_TAG="$(gh api "repos/$REPO/releases/latest" --jq '.tag_name')"
+          [ "$LATEST_TAG" = "$TAG" ] || { echo "::error::Latest do repo != $TAG (got $LATEST_TAG)"; exit 1; }
+          for t in "$PROD_PREV_TAG" "$PROD_ROLLBACK_TAG" "$PROD_HIST_TAG" "$PROD_HIST2_TAG"; do
+            gh release view "$t" -R "$REPO" --json tagName --jq '.tagName' | grep -qx "$t" || { echo "::error::$t (preservacao/rollback) sumiu"; exit 1; }
+          done
+          echo "===== GO: 1.0.210 no canal do updater (Latest); 1.0.209 preservada no historico; 1.0.208 rollback; 1.0.207/1.0.206 preservadas ====="
