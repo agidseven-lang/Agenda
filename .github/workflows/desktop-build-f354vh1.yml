@@ -198,14 +198,14 @@ jobs:
           grep -qF 'id="authSplashMsg">Restaurando sessão…' "$IDX" || { echo "::error:: mensagem de restauração ausente no asar"; exit 1; }
           grep -qF '<section id="login" class="hidden">' "$IDX" || { echo "::error:: #login não nasce oculto no asar"; exit 1; }
           # ── boot NÃO abre com renderLogin() incondicional (a causa do bug) ──
-          node -e 'const s=require("fs").readFileSync(process.env.I,"utf8");if(/async function boot\(\)\{\s*renderLogin\(\)/.test(s)){console.error("::error:: boot ainda abre com renderLogin() incondicional no asar");process.exit(1)}' I="$IDX"
+          node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");if(/async function boot\(\)\{\s*renderLogin\(\)/.test(s)){console.error("::error:: boot ainda abre com renderLogin() incondicional no asar");process.exit(1)}' "$IDX"
           # ── máquina de estados AUTH_* + escape/observabilidade presentes no asar ──
           for m in AUTH_INITIALIZING AUTH_RESTORING AUTHENTICATED AUTH_OFFLINE_CACHED AUTH_UNAUTHENTICATED_CONFIRMED AUTH_REVOKED _revealLogin authManualLogin 'auth.startup.'; do
             grep -qF "$m" "$IDX" || { echo "::error:: marcador '$m' ausente no asar"; exit 1; }
           done
           grep -qF 'authState:authPhase,networkAvailable:on,manualOrAutostart:mode' "$IDX" || { echo "::error:: observabilidade sanitizada ausente no asar"; exit 1; }
           # ── segurança: sem senha/token em localStorage ──
-          node -e 'const s=require("fs").readFileSync(process.env.I,"utf8");if(/localStorage\.setItem\((["\x27])[^"\x27]*(pass|senha|token)/i.test(s)){console.error("::error:: localStorage grava senha/token no asar");process.exit(1)}' I="$IDX"
+          node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");if(/localStorage\.setItem\((["\x27])[^"\x27]*(pass|senha|token)/i.test(s)){console.error("::error:: localStorage grava senha/token no asar");process.exit(1)}' "$IDX"
           # ── 1.0.212 (quantidade personalizada de vídeos) PRESERVADA no asar ──
           grep -q 'data-vqminus' "$IDX" && grep -q 'data-vqplus' "$IDX" || { echo "::error:: seletor de quantidade [−]/[+] ausente no asar"; exit 1; }
           grep -q 'var VIDEO_QTY_MAX=500;' "$IDX" || { echo "::error:: teto técnico VIDEO_QTY_MAX ausente no asar"; exit 1; }
