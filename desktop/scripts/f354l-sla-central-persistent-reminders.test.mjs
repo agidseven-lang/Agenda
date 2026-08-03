@@ -297,8 +297,12 @@ function f354oIndexControlledDiff() {
   const rm = d.split("\n").filter((l) => l.startsWith("-") && !l.startsWith("---"));
   const hasF354n = /startupCardHtml/.test(d) && /data-cfgstartup/.test(d) && /data-cfgselfheal/.test(d) && /desktopAPI\.netStatus/.test(d);
   const hasF354o = /function notifGroupUpdate\(/.test(d) && /data-cfggrouping/.test(d) && /data-group/.test(d) && /onNotifGroupUpdate/.test(d);
-  // FUNÇÕES/telas congeladas que F3.5.4O NÃO toca — nenhuma remoção pode retirá-las:
-  const rmTouchesFrozen = rm.some((l) => /f354gMonAlerts|slaibToggle|cronSanitizeDeep|buildShareClientUrl|kbv2/.test(l));
+  // FUNÇÕES/telas congeladas que NÃO podem ser removidas: Monitor SLA (f354gMonAlerts/slaibToggle),
+  // sanitizador do Cronograma (cronSanitizeDeep) e link do cliente (buildShareClientUrl).
+  // [ATUALIZADA F3.5.4W] 'kbv2' REMOVIDO desta guarda: o card (kbv2*) é INTENCIONALMENTE evoluído em
+  // F3.5.4W (cards compactos — remove a renderização da lista de temas). O invariante real (SLA/sino/
+  // Cronograma/link intactos) segue protegido pelos demais tokens e por anchorsPresent.
+  const rmTouchesFrozen = rm.some((l) => /f354gMonAlerts|slaibToggle|cronSanitizeDeep|buildShareClientUrl/.test(l));
   const cur = fs.readFileSync(path.join(DESK, "src/renderer/index.html"), "utf8");
   const anchorsPresent = /f354gMonAlerts/.test(cur) && /function slaibToggle\(/.test(cur) && /function cronSanitizeDeep\(/.test(cur) && /notifToastOnce/.test(cur) && /function notifShowToast\(/.test(cur) && /function notifSound\(/.test(cur);
   return hasF354n && hasF354o && !rmTouchesFrozen && anchorsPresent;

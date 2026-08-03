@@ -1414,8 +1414,9 @@
   body.desktop .tc-act:active{transform:translateY(1px)}
   body.desktop .tc-detail:active{filter:brightness(.97)}
 
-  /* DETALHES (modal) — largo o suficiente p/ nomes longos, scroll vertical */
-  body.desktop .det-sheet{max-width:720px;width:100%;text-align:left;max-height:88vh;display:flex;flex-direction:column;padding:0;overflow:hidden}
+  /* DETALHES (modal) — F3.5.4W: Central de Detalhes GRANDE (≈92% largura / 88-90% altura),
+     largura limitada p/ leitura confortável em telas ultrawide; header/rodapé fixos, corpo rola. */
+  body.desktop .det-sheet{width:min(1240px,92vw);max-width:92vw;text-align:left;height:88vh;max-height:90vh;display:flex;flex-direction:column;padding:0;overflow:hidden}
   .det-sheet .det-head{display:flex;align-items:center;justify-content:space-between;padding:22px 26px 0;gap:14px}
   .det-badge{display:inline-flex;align-items:center;gap:7px;padding:6px 13px;border-radius:999px;font-size:12.5px;font-weight:800}
   .det-badge svg{width:15px;height:15px;flex:none}
@@ -1449,6 +1450,30 @@
   .det-content-m{min-width:0;flex:1}
   .det-content-t{font-size:15px;font-weight:800;line-height:1.3;word-break:break-word}
   .det-content-l{font-size:13px;color:var(--soft);margin-top:5px;line-height:1.55;white-space:pre-wrap;word-break:break-word}
+  /* F3.5.4W — Central de Detalhes: acordeões nativos <details> por bloco numerado.
+     Cabeçalho (summary) sempre visível; corpo preserva parágrafos/quebras (pre-wrap).
+     Chevron = ícone "arr" girado 90° quando aberto. Barra Expandir/Recolher todos. */
+  .det-acc{background:var(--surface2);border:1px solid var(--line-soft);border-radius:14px;overflow:hidden}
+  .det-acc+.det-acc{margin-top:11px}
+  .det-acc>summary{display:flex;align-items:center;gap:13px;padding:15px;cursor:pointer;list-style:none;-webkit-user-select:none;user-select:none}
+  .det-acc>summary::-webkit-details-marker{display:none}
+  .det-acc>summary:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;border-radius:14px}
+  .det-acc>summary:hover{background:rgba(255,255,255,.03)}
+  .det-acc>summary>.det-content-n{flex:none}
+  .det-acc-h{min-width:0;flex:1;display:flex;flex-direction:column;gap:3px}
+  .det-acc-k{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
+  .det-acc-t{font-size:15px;font-weight:800;line-height:1.3;word-break:break-word}
+  .det-acc-chev{flex:none;color:var(--faint);display:flex;transition:transform .18s ease}
+  .det-acc-chev svg{width:20px;height:20px}
+  .det-acc[open]>summary .det-acc-chev{transform:rotate(90deg)}
+  .det-acc-body{padding:0 15px 15px 56px}
+  .det-acc-l{font-size:13.5px;color:var(--soft);line-height:1.6;white-space:pre-wrap;word-break:break-word}
+  .det-acc-empty{font-size:13px;color:var(--faint);font-style:italic}
+  .det-acc-tools{display:inline-flex;gap:7px;margin-left:auto;text-transform:none}
+  .det-acc-btn{font-size:11px;font-weight:700;color:var(--soft);background:var(--surface2);border:1px solid var(--line);border-radius:999px;padding:5px 12px;cursor:pointer;transition:border-color .12s,color .12s}
+  .det-acc-btn:hover{border-color:var(--accent);color:var(--ink)}
+  .det-acc-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  @media(max-width:560px){.det-acc-body{padding-left:15px}}
   .det-desc{font-size:13.5px;color:var(--soft);line-height:1.6;white-space:pre-wrap;word-break:break-word;background:var(--surface2);border:1px solid var(--line-soft);border-radius:14px;padding:15px}
   .det-check{display:flex;flex-direction:column;gap:2px}
   .det-check-i{display:flex;align-items:center;gap:11px;font-size:13.5px;padding:9px 0;border-bottom:1px solid var(--line-soft)}
@@ -2196,7 +2221,12 @@ body.desktop .kbv2-menu-it:hover{ background:rgba(255,255,255,.06); }
 body.desktop .kbv2-menu-del{ color:#ff6b61; } body.desktop .kbv2-menu-del svg{ color:#ff6b61; }
 /* F3.5.4-B — faixa de seleção de Designers (autoload): os cartões de seleção continuam VISÍVEIS
    acima do quadro; chip ativo destacado; contagem por designer; rolagem horizontal discreta. */
-body.desktop .f354-dstrip{ display:flex; gap:8px; overflow-x:auto; padding:10px 2px 2px; scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.18) transparent; }
+/* F3.5.4W — FIX do corte vertical do strip de seleção (Designers + Social): dá altura real à
+   faixa e impede o recorte do anel/círculo do avatar. Causa: overflow-x:auto forçava
+   overflow-y:auto (recorte) numa faixa sem min-height e com só 2px embaixo, invadida pela barra
+   horizontal. Correção estrutural: align-items:center + min-height suficiente (avatar+anel+barra)
+   + padding simétrico + reserva de barra. NÃO encolhe o avatar, NÃO usa margem negativa. */
+body.desktop .f354-dstrip{ display:flex; align-items:center; gap:8px; overflow-x:auto; overflow-y:hidden; min-height:58px; padding:11px 4px 13px; scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.18) transparent; scrollbar-gutter:stable; }
 body.desktop .f354-dchip{ display:inline-flex; align-items:center; gap:7px; padding:5px 11px 5px 6px; border-radius:999px; border:1px solid rgba(255,255,255,.10); background:rgba(255,255,255,.04); color:#c6cdda; font-size:12px; font-weight:700; cursor:pointer; flex:0 0 auto; }
 body.desktop .f354-dchip .av{ border-radius:50%; }
 body.desktop .f354-dchip i{ font-style:normal; font-size:10.5px; font-weight:800; padding:1px 7px; border-radius:999px; background:rgba(124,108,255,.16); color:#bcaeff; }
@@ -2320,6 +2350,17 @@ body.desktop .kbv2-card-themes>.kbv2-themes-list{ overflow-y:visible; min-height
 body.desktop .kbv2-card>.kbv2-card-notes{ overflow-y:visible; min-height:auto; }
 body.desktop .kbv2-card-themes{ overflow:visible; }
 body.desktop .kbv2-card>.kbv2-card-themes{ flex:0 0 auto; }
+
+/* ── F3.5.4W — RESUMO COMPACTO DE CONTEÚDO: bloco de contagem (nunca a lista/texto). Altura fixa,
+   sem crescer com temas/legendas; o conteúdo integral vai para a Central de Detalhes. ── */
+body.desktop .kbv2-card-summary{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex:0 0 auto; margin-top:12px; padding:10px 12px; border-radius:12px; background:rgba(255,255,255,.03); border:1px solid var(--line); }
+body.desktop .kbv2-card-summary .kbv2-sum-k{ display:flex; align-items:center; gap:6px; font-size:10px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--faint); white-space:nowrap; }
+body.desktop .kbv2-card-summary .kbv2-sum-k svg{ width:14px; height:14px; opacity:.75; flex:none; }
+body.desktop .kbv2-card-summary .kbv2-sum-v{ display:flex; align-items:baseline; gap:8px; min-width:0; justify-content:flex-end; text-align:right; flex-wrap:wrap; }
+body.desktop .kbv2-card-summary .kbv2-sum-main{ font-size:14px; font-weight:800; color:var(--ink); }
+body.desktop .kbv2-card-summary .kbv2-sum-sub{ font-size:11px; font-weight:700; color:var(--faint); }
+body.desktop .kbv2-card-summary.kbv2-sum-empty{ background:transparent; border-style:dashed; }
+body.desktop .kbv2-card-summary.kbv2-sum-empty .kbv2-sum-main{ font-size:12px; font-weight:600; color:var(--faint); }
 
 /* ── NÍVEL 1 — identificação (responsável · origem · cliente · título) ── */
 body.desktop .kbv2-name{ font-size:14px; }
@@ -5677,6 +5718,29 @@ function f354DesignerStrip(activeId){ try{
     return '<button class="f354-dchip'+(d.u.id===activeId?' on':'')+'" data-designerboard="'+d.u.id+'" title="'+esc(d.u.name||'Designer')+' · '+d.count+' tarefa'+(d.count===1?'':'s')+'">'+avatar(d.u,22)+'<span>'+esc((d.u.name||'Designer').split(' ')[0])+'</span><i>'+d.count+'</i></button>';
   }).join('')+'</div>';
 }catch(_){ return ''; } }
+/* F3.5.4W — SOCIAL MEDIAS: seleção AUTOMÁTICA e determinística do quadro (espelha o padrão
+   aprovado dos Designers, F3.5.4 COMMIT B). Ordem: (1) última seleção válida do usuário;
+   (2) o próprio usuário, se for Social Media válida; (3) a 1ª Social Media ativa (A→Z). Estado
+   PURO (nunca element.click), SEM listener novo — reutiliza o snapshot global (subscribeData);
+   persistência por usuário em localStorage; a seleção automática NÃO amplia permissões
+   (socialBoardsList já filtra por isSocialUser/permissão). */
+var SOCIAL_SEL_KEY='idseven.socialSel.v1';
+function f354SocialSelLoad(uid){ try{ var m=JSON.parse(localStorage.getItem(SOCIAL_SEL_KEY)||'{}'); var e=m&&m[String(uid||'')]; return (e&&e.id)?String(e.id):null; }catch(_){ return null; } }
+function f354SocialSelSave(uid,id){ try{ if(!uid||!id)return; var m={}; try{ m=JSON.parse(localStorage.getItem(SOCIAL_SEL_KEY)||'{}')||{}; }catch(_e){ m={}; } if(!m||typeof m!=='object')m={}; m[String(uid)]={id:String(id),at:Date.now(),ctx:'socials'}; localStorage.setItem(SOCIAL_SEL_KEY,JSON.stringify(m)); }catch(_){} }
+function f354SocialAutoPick(){ try{
+  var sz=socialBoardsList(); if(!sz.length) return null;
+  var me=state.user&&state.user.id;
+  var saved=f354SocialSelLoad(me);
+  if(saved&&sz.some(function(s){return s.u&&s.u.id===saved;})) return saved;   // 1) última seleção válida
+  if(me&&sz.some(function(s){return s.u&&s.u.id===me;})) return me;            // 2) o próprio (Social válida)
+  return sz[0].u.id;                                                           // 3) 1ª ativa (A→Z, determinístico)
+}catch(_){ return null; } }
+function f354SocialStrip(activeId){ try{
+  var sz=socialBoardsList(); if(!sz.length) return '';
+  return '<div class="f354-dstrip">'+sz.map(function(d){
+    return '<button class="f354-dchip'+(d.u.id===activeId?' on':'')+'" data-socialboard="'+d.u.id+'" title="'+esc(d.u.name||'Social Media')+' · '+d.count+' tarefa'+(d.count===1?'':'s')+'">'+avatar(d.u,22)+'<span>'+esc((d.u.name||'Social Media').split(' ')[0])+'</span><i>'+d.count+'</i></button>';
+  }).join('')+'</div>';
+}catch(_){ return ''; } }
 // Abas superiores da área de Tarefas: Meu quadro · Cliente · Designers · Social Medias.
 // Cliente/Designers/Social Medias só para Social/Admin (canSeeAll); designer comum vê só Meu quadro.
 // 1.0.103 — aba ATIVA derivada do estado (toolbar única e coerente).
@@ -5694,7 +5758,7 @@ function taskChips(){
   const tabs=[{k:'mine',l:'Meu quadro',a:'data-myboard="1"'}];
   if(see){tabs.push({k:'client',l:'Cliente',a:'data-flowclient="1"'});
     tabs.push({k:'designers',l:'Designers',a:'data-flowdesigners="1"'});
-    tabs.push({k:'socials',l:'Social Midias',a:'data-flowsocials="1"'});}
+    tabs.push({k:'socials',l:'Social Medias',a:'data-flowsocials="1"'});}
   tabs.push({k:'hub',l:'Setores',a:'data-board="hub"'});
   return tabs.map(t=>'<button class="tchip'+(t.k===act?' on':'')+'" '+t.a+'>'+svg(tabIcon(t.k))+'<span>'+esc(t.l)+'</span></button>').join('');
 }
@@ -6359,7 +6423,7 @@ function renderSocialBoard(){
     '<div class="scr-head"><div class="d-board-head"><button class="iconbtn" data-board="flowsocials">'+svg('back')+'</button>'+
     avatar(p,44)+
     '<div style="flex:1;min-width:0"><div class="d-bh-title">Social · '+esc((p.name||'').split(' ')[0]||'Social Media')+'</div><div class="d-bh-sub">Fluxo operacional · '+list.length+' tarefa'+(list.length===1?'':'s')+(late>0?(' · '+late+' em atraso'):'')+'</div></div></div></div>'+
-    '<div class="scr" style="padding-top:0">'+boardToolbar()+
+    '<div class="scr" style="padding-top:0">'+f354SocialStrip(id)+boardToolbar()+
     kbv2BoardHtml(SOCIAL_COLS4.map((c,i)=>({label:c.label,color:c.color,key:c.key,tasks:byCol[i]})));
   return h+'</div>';
 }
@@ -6848,6 +6912,34 @@ function f354fSlaLiveState(marks,now){
   if(now<marks.dueMs) return {vis:true, lvl:(red?'red':'amber'), text:'Faltam '+f354fSpan(marks.dueMs-now,'down')};
   return {vis:true, lvl:'red', text:f354fSpan(now-marks.dueMs,'up')+' em atraso'};
 }
+/* F3.5.4W — RESUMO COMPACTO DE CONTEÚDO no card do quadro. Substitui a LISTA completa de temas/
+   legendas/vídeos e o TEXTO de Legenda/Observações por uma CONTAGEM. NENHUM texto de tema/legenda/
+   roteiro/observação é embutido no DOM do card — altura previsível, sem rolagem interna. O conteúdo
+   integral (textos, quebras de linha, numeração) fica exclusivamente na Central de Detalhes. */
+function kbv2ContentSlot(t, cron, s, clientView, isCron){
+  function box(v, sub, extraCls){
+    return '<div class="kbv2-card-summary'+(extraCls?(' '+extraCls):'')+'">'+
+      '<div class="kbv2-sum-k">'+svg('description')+'<span>Conteúdo</span></div>'+
+      '<div class="kbv2-sum-v"><b class="kbv2-sum-main">'+esc(v)+'</b>'+(sub?'<span class="kbv2-sum-sub">'+esc(sub)+'</span>':'')+'</div></div>';
+  }
+  if(cron&&cron.list&&cron.list.length){
+    var n=cron.list.length;
+    if(cron.videos) return box(n+' vídeo'+(n===1?'':'s')+'/roteiro'+(n===1?'':'s'));
+    var legN=cron.list.filter(function(c){return c&&c.legenda&&String(c.legenda).trim();}).length;
+    var noun=(s&&s.key==='roteiro')?'roteiro':'tema';
+    return box(n+' '+noun+(n===1?'':'s'), legN>0?(legN+' legenda'+(legN===1?'':'s')):'');
+  }
+  if(s&&s.key==='edicao_cards'){
+    var cl=cardsFieldOf(t,'legenda'), co=cardsFieldOf(t,'obs');
+    var parts=[]; if(cl)parts.push('Legenda'); if(co)parts.push('Observações');
+    if(parts.length) return box(parts.join(' · '));
+  }
+  if(!clientView&&isCron){
+    return box('A definir','','kbv2-sum-empty')+
+      '<div class="kbv2-hint">🔒 <span>Preencha ao menos <b>1 tema</b> para liberar o <b>envio ao cliente</b> (Card Premium).</span></div>';
+  }
+  return box('Sem itens vinculados','detalhes na tarefa','kbv2-sum-empty');
+}
 function kbv2Card(t, persp){
   const designerView = persp==='designer' && isClientSector(secOf(t.sector).key) && hasDesigner(t);
   const clientView = persp==='client' && isClientSector(secOf(t.sector).key);
@@ -6925,55 +7017,12 @@ function kbv2Card(t, persp){
        (cron&&cron.label&&cron.label!==s.label?'<span class="kbv2-chip kbv2-chip-soft">'+esc(cron.label)+'</span>':'')+
        (t.priority?'<span class="kbv2-chip" style="color:#F87171;background:'+withAlpha('#EF4444',.18)+';border-color:'+withAlpha('#EF4444',.46)+'"><i class="kbv2-chip-dot" style="background:#EF4444"></i>Prioridade</span>':'')+
      '</div>';
-  /* F3.5.2C — Edição de Cards: Legenda / Observações no card (compacto, até 2 linhas, SÓ quando
-     preenchidos — vazio não reserva espaço). Lê os campos canônicos cardLegenda/cardObs (fallback:
-     parse seguro do desc). Conteúdo completo continua no modal Detalhes. Isolado ao setor. */
-  if(s.key==='edicao_cards'){
-    const _cl=cardsFieldOf(t,'legenda'), _co=cardsFieldOf(t,'obs');
-    /* F3.5.2D — Legenda/Observações vão numa caixa .kbv2-card-notes (o "themes-equivalente" do setor):
-       bloco central elástico que preenche a sobra vertical no MESMO padrão do Cronograma. Só é criado
-       quando há Legenda e/ou Observações — campos vazios NÃO reservam altura nem deixam rótulo solto. */
-    if(_cl||_co){
-      h+='<div class="kbv2-card-notes">'+
-         (_cl?'<div class="kbv2-card-note" title="'+esc(_cl)+'"><div class="kbv2-note-k">'+svg('description')+'<span>Legenda</span></div><div class="kbv2-note-v">'+esc(_cl)+'</div></div>':'')+
-         (_co?'<div class="kbv2-card-note" title="'+esc(_co)+'"><div class="kbv2-note-k">'+svg('notes')+'<span>Observações</span></div><div class="kbv2-note-v">'+esc(_co)+'</div></div>':'')+
-       '</div>';
-    }
-  }
-  // 6) SLOT ESPECÍFICO (cron): TEMAS — F3.5.4B: área CENTRAL do card. TODOS os temas aparecem
-  // (1→1, 4→4, 8→8, 12→12); SEM "+N temas", SEM rolagem interna, SEM altura fixa: o card cresce
-  // naturalmente e quem rola é a COLUNA. Cabeçalho traz a contagem; texto quebra sem cortar.
-  if(cron&&cron.list.length){
-    h+='<div class="kbv2-card-themes"><div class="kbv2-themes-h"><span>'+(cron.list.length>1?'Temas':'Tema')+'</span>'+(cron.list.length>1?'<i class="kbv2-themes-count">'+cron.list.length+'</i>':'')+'</div>'+
-       '<div class="kbv2-themes-list">'+
-       cron.list.map(c=>'<div class="kbv2-theme"><span class="kbv2-theme-n">'+(c._i+1)+'</span><span class="kbv2-theme-t">'+esc(c.tema||'(sem tema)')+'</span></div>').join('')+
-       '</div>'+
-     '</div>';
-  }
-  else if(!clientView&&isCron&&(!cron||!cron.list.length)){
-    /* F3.3.70D3R10I — rascunho SEM temas: estrutura premium NUNCA some (mockup aprovado).
-       Placeholders "a definir" SOMENTE na visao interna (nunca persp 'client'/Card Premium).
-       F3.3.70D3R10I-B — cobre TAMBEM o cronograma 'nunca-tocado' (sem cronContents gravado):
-       o formulario inicia contents:[] e saveTask so grava se houver entrada; sem o campo,
-       cronOf() e null — ainda assim o card interno mostra a caixa Temas (3 placeholders). */
-    const phN=cron?Math.max(1,Math.min(cron.count||2,2)):2;   // F3.5.4 — prévia canônica: ≤2 linhas
-    h+='<div class="kbv2-card-themes"><div class="kbv2-themes-h">Temas</div>'+
-       '<div class="kbv2-themes-list kbv2-themes-ph">'+
-       Array.from({length:phN},(_,i)=>'<div class="kbv2-theme"><span class="kbv2-theme-n">'+(i+1)+'</span><span class="kbv2-theme-t">Tema '+(i+1)+' — a definir</span></div>').join('')+
-       '</div></div>';
-    h+='<div class="kbv2-hint">🔒 <span>Preencha ao menos <b>1 tema</b> para liberar o <b>envio ao cliente</b> (Card Premium).</span></div>';
-  }
-  /* F3.5.4E — SLOT CENTRAL UNIVERSAL: nenhum tipo/status fica sem a seção central do card.
-     Tarefa sem temas E sem legenda ganha um empty state DISCRETO dentro do MESMO painel
-     padrão (mesma caixa do TEMAS) — sem trocar o modelo, sem card compacto, sem altura
-     artificial. Conteúdo real continua variando por DADOS; o SHELL nunca. */
-  else if(!isCron&&!(s.key==='edicao_cards'&&(cardsFieldOf(t,'legenda')||cardsFieldOf(t,'obs')))){
-    h+='<div class="kbv2-card-themes kbv2-slot-empty"><div class="kbv2-themes-h"><span>Conteúdo</span></div>'+
-       '<div class="kbv2-slot-empty-v">Sem itens vinculados — detalhes completos na tarefa</div></div>';
-  }
-  /* F3.5.4E — checklist mostra contagem também quando o array existe VAZIO (0 de 0):
-     o bloco de progresso é o MESMO em todos os cards; só some quando a tarefa nem tem o campo. */
-  if(Array.isArray(t.checklist)){const done=t.checklist.filter(c=>c.d).length;h+='<div class="kbv2-card-chk" title="Checklist: '+done+' de '+t.checklist.length+' itens concluídos (completo em Detalhes)">'+svg('check')+'<span>'+done+' de '+t.checklist.length+' no checklist</span></div>';}
+  /* F3.5.4W — SLOT CENTRAL DE CONTEÚDO: RESUMO compacto (apenas contagem). A lista/texto integral
+     de temas/legendas/roteiros/vídeos e Legenda/Observações vai para a Central de Detalhes; NENHUM
+     desses textos fica no DOM do card. O SHELL central universal é preservado (nunca some). */
+  h+=kbv2ContentSlot(t, cron, s, clientView, isCron);
+  /* F3.5.4W — checklist só quando HÁ itens: some com array vazio (não mostra "0 de 0" inútil). */
+  if(Array.isArray(t.checklist)&&t.checklist.length){const done=t.checklist.filter(c=>c.d).length;h+='<div class="kbv2-card-chk" title="Checklist: '+done+' de '+t.checklist.length+' itens concluídos (completo em Detalhes)">'+svg('check')+'<span>'+done+' de '+t.checklist.length+' no checklist</span></div>';}
   // 7) trilho de progresso + 8) etapa atual + 9) próxima ação
   if(prog){
     let rail='';
@@ -7145,14 +7194,42 @@ async function moveStatus(taskId,newStatus){
   catch(e){ console.warn('moveStatus(social):',e); }
 }
 function detDate(ic,l,v){return '<div class="det-date">'+svg(ic)+'<div class="det-date-m"><div class="det-date-l">'+esc(l)+'</div><div class="det-date-v">'+esc(v)+'</div></div></div>';}
+/* F3.5.4W — Central de Detalhes: rótulo do bloco numerado por tipo de setor (TEMA/ROTEIRO/VÍDEO/CARD). */
+function detItemWord(t){var k=secOf(t.sector).key;
+  if(k==='roteiro')return 'ROTEIRO';
+  if(k==='edicao_midia')return 'VÍDEO';
+  if(String(t&&t.sector||'')==='edicao_cards')return 'CARD';
+  return 'TEMA';}
+/* F3.5.4W — elemento que tinha o foco antes de abrir a Central (retorno de foco ao fechar). */
+var _detReturnEl=null;
+/* F3.5.4W — foco inicial, trap de Tab e acessibilidade da Central de Detalhes. Só atua na
+   superfície marcada com data-detmodal; recriada a cada innerHTML → sem vazamento de listener. */
+function detSetupModalFocus(){
+  try{
+    var back=document.querySelector('.modal-back[data-detmodal]');if(!back)return;
+    var sheet=back.querySelector('.det-sheet');if(sheet&&!sheet.hasAttribute('tabindex'))sheet.setAttribute('tabindex','-1');
+    var xbtn=back.querySelector('.det-x');(xbtn||sheet||back).focus();
+    back.addEventListener('keydown',function(ev){
+      if(ev.key!=='Tab')return;
+      var f=back.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),summary,[tabindex]:not([tabindex="-1"])');
+      var list=[];for(var i=0;i<f.length;i++){var el=f[i];if(el.offsetParent!==null||el===document.activeElement)list.push(el);}
+      if(!list.length)return;var first=list[0],last=list[list.length-1];
+      if(ev.shiftKey){if(document.activeElement===first||!back.contains(document.activeElement)){ev.preventDefault();last.focus();}}
+      else{if(document.activeElement===last){ev.preventDefault();first.focus();}}
+    });
+  }catch(_){}
+}
 function openDetails(taskId){
   const t=state.tasks.find(x=>x.id===taskId);if(!t)return;
+  // F3.5.4W — captura o foco de origem só quando a Central ainda não está aberta (reaberturas
+  // internas, ex.: markItemsAdjusted, não sobrescrevem o elemento de retorno original).
+  if(!document.querySelector('.modal-back[data-detmodal]')){_detReturnEl=(document.activeElement&&document.activeElement!==document.body)?document.activeElement:null;}
   const s=secOf(t.sector);const st=stOf(t.status);
   const asg=respOf(t);const asgName=asg?(asg.name||''):'';
   const req=t.by?state.users.find(u=>u.id===t.by):null;const reqName=req?req.name:'—';
   const cron=cronOf(t);const upd=lastUpdate(t);
   const emptyAv='<div class="av" style="width:44px;height:44px;background:var(--surface2);color:var(--faint)">'+svg('person')+'</div>';
-  let h='<div class="modal-back" data-modalbg="1"><div class="sheet det-sheet">'+
+  let h='<div class="modal-back" data-modalbg="1" data-detmodal="1"><div class="sheet det-sheet" role="dialog" aria-modal="true" aria-label="Central de Detalhes da tarefa">'+
     '<div class="det-head"><div class="det-badge" style="background:'+withAlpha(s.color,.16)+';color:'+s.color+'">'+svg(s.icon)+'<span>'+esc(s.label)+'</span></div>'+
       '<button class="iconbtn det-x" data-modalclose="1">'+svg('close')+'</button></div>'+
     '<div class="det-title">'+esc(t.title||'Sem título')+'</div>'+
@@ -7185,10 +7262,35 @@ function openDetails(taskId){
       detDate('swap','Atualizado em',upd?fmtDateTimeBR(upd):'—')+
       detDate('clock','Prazo final',(t.dueDate||t.due)?(fmtDateBR(t.dueDate||t.due)+(t.dueTime?' às '+t.dueTime:'')):'Não informado')+
     '</div>';
-  // cronograma
+  // cronograma — F3.5.4W: Central de Detalhes com blocos numerados (TEMA/ROTEIRO/VÍDEO NN),
+  // acordeões nativos <details> (preservam parágrafos/quebras via white-space:pre-wrap; esc()
+  // sanitiza; sem innerHTML cru, sem [object Object]) e barra "Expandir/Recolher todos".
   if(cron){
-    h+='<div class="det-sec">'+(secOf(t.sector).key==='roteiro'?'Roteiros':(secOf(t.sector).key==='edicao_midia'?'Vídeos':'Conteúdos do cronograma'))+' <span class="det-sec-c">'+cron.list.length+' / '+cron.count+'</span></div>';
-    h+=cron.list.length?('<div class="det-contents">'+cron.list.map(c=>'<div class="det-content"><div class="det-content-n">'+(c._i+1)+'</div><div class="det-content-m"><div class="det-content-t">'+esc(c.tema||'(sem tema)')+'</div>'+(c.legenda?'<div class="det-content-l">'+esc(c.legenda)+'</div>':'')+'</div></div>').join('')+'</div>'):'<div class="emptyline">Nenhum conteúdo preenchido.</div>';
+    var _word=detItemWord(t);var _openAll=cron.list.length<=5;
+    h+='<div class="det-sec">'+(secOf(t.sector).key==='roteiro'?'Roteiros':(secOf(t.sector).key==='edicao_midia'?'Vídeos':'Conteúdos do cronograma'))+' <span class="det-sec-c">'+cron.list.length+' / '+cron.count+'</span>'+
+      (cron.list.length>1?'<span class="det-acc-tools"><button type="button" class="det-acc-btn" data-detexpand="1">Expandir todos</button><button type="button" class="det-acc-btn" data-detcollapse="1">Recolher todos</button></span>':'')+'</div>';
+    if(cron.list.length){
+      h+='<div class="det-contents">'+cron.list.map(function(c){
+        var num=(c._i+1<10?'0':'')+(c._i+1);
+        var leg=(c.legenda!=null&&String(c.legenda).trim())?String(c.legenda):'';
+        return '<details class="det-acc"'+(_openAll?' open':'')+'>'+
+          '<summary class="det-acc-sum"><span class="det-content-n">'+(c._i+1)+'</span>'+
+            '<span class="det-acc-h"><span class="det-acc-k">'+_word+' '+num+'</span>'+
+            '<span class="det-acc-t">'+esc(c.tema||'(sem tema)')+'</span></span>'+
+            '<span class="det-acc-chev">'+svg('arr')+'</span></summary>'+
+          '<div class="det-acc-body">'+(leg?'<div class="det-acc-l">'+esc(leg)+'</div>':'<div class="det-acc-empty">Sem legenda para este item.</div>')+'</div>'+
+        '</details>';
+      }).join('')+'</div>';
+    }else{h+='<div class="emptyline">Nenhum conteúdo preenchido.</div>';}
+  }else if(String(t.sector||'')==='edicao_cards'){
+    // F3.5.4W — Edição de Cards: Legenda + Observações como blocos rotulados (via cardsFieldOf,
+    // sem alterar schema/regra de negócio); acordeões abertos por padrão. Briefing completo abaixo, se houver.
+    var _leg=cardsFieldOf(t,'legenda'),_obs=cardsFieldOf(t,'obs');
+    h+='<div class="det-sec">Conteúdo do card</div><div class="det-contents">'+
+      '<details class="det-acc" open><summary class="det-acc-sum"><span class="det-content-n">1</span><span class="det-acc-h"><span class="det-acc-k">CARD · LEGENDA</span><span class="det-acc-t">Legenda</span></span><span class="det-acc-chev">'+svg('arr')+'</span></summary><div class="det-acc-body">'+(_leg?'<div class="det-acc-l">'+esc(_leg)+'</div>':'<div class="det-acc-empty">Sem legenda cadastrada.</div>')+'</div></details>'+
+      '<details class="det-acc" open><summary class="det-acc-sum"><span class="det-content-n">2</span><span class="det-acc-h"><span class="det-acc-k">CARD · OBSERVAÇÕES</span><span class="det-acc-t">Observações</span></span><span class="det-acc-chev">'+svg('arr')+'</span></summary><div class="det-acc-body">'+(_obs?'<div class="det-acc-l">'+esc(_obs)+'</div>':'<div class="det-acc-empty">Sem observações.</div>')+'</div></details>'+
+      '</div>';
+    if(t.desc){h+='<div class="det-sec">Briefing completo</div><div class="det-desc">'+esc(t.desc)+'</div>';}
   }else if(t.desc){h+='<div class="det-sec">Briefing</div><div class="det-desc">'+esc(t.desc)+'</div>';}
   // checklist (leitura) — oculto p/ cronograma (sem função no fluxo atual)
   if(!isClientSector(secOf(t.sector).key)&&Array.isArray(t.checklist)&&t.checklist.length){const done=t.checklist.filter(c=>c.d).length;
@@ -7222,6 +7324,7 @@ function openDetails(taskId){
     detFooter(t,cron)+
   '</div></div>';
   document.getElementById('modalRoot').innerHTML=h;
+  detSetupModalFocus();   // F3.5.4W — foco inicial no fechar + trap de Tab + acessibilidade
 }
 /* ═════════ detail-hierarchy-v2 — MÁQUINA DE ESTADOS DO DETALHE (8 estados aprovados) ═════════
    Hierarquia: 1 Status principal · 2 Próxima ação · 3 Responsável · 4 Ações · 5 Detalhes colapsados.
@@ -8739,7 +8842,10 @@ async function deleteTask(taskId){
   catch(e){ alert('Não foi possível remover agora. Tente novamente.'); }
   // Kanban e celular atualizam sozinhos via onSnapshot.
 }
-function closeModal(){document.getElementById('modalRoot').innerHTML='';if(_deferRender){_deferRender=false;render();}}
+function closeModal(){document.getElementById('modalRoot').innerHTML='';
+  // F3.5.4W — retorno de foco: devolve o foco ao elemento que abriu a Central de Detalhes.
+  var _r=_detReturnEl;_detReturnEl=null;if(_r&&_r.focus){try{_r.focus();}catch(_){}}
+  if(_deferRender){_deferRender=false;render();}}
 // 1.0.104 — guarda de edição ESCOPADA. Só adia o render (snapshot do Firestore) quando há
 // uma edição REAL aberta que seria destruída: (a) um modal aberto com campo de edição, ou
 // (b) o wizard de criação (state.form) com um campo em foco DENTRO do #content.
@@ -9747,7 +9853,11 @@ function closeCardMenus(){
 }
 document.addEventListener('scroll',closeCardMenus,true);
 window.addEventListener('resize',closeCardMenus);
-document.addEventListener('keydown',e=>{if(e.key==='Escape')closeCardMenus();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeCardMenus();
+  // F3.5.4W — Esc fecha a Central de Detalhes (superfície de leitura). SÓ a Central é marcada
+  // com data-detmodal — modais de formulário não são afetados (não perdem digitação).
+  if(document.querySelector('.modal-back[data-detmodal]')){closeModal();}
+}});
 document.addEventListener('click',async e=>{
   if(!state.user)return;                       // login tem seu proprio handler
   if(!(e.target&&e.target.closest))return;
@@ -9761,14 +9871,14 @@ document.addEventListener('click',async e=>{
   if(el=g('[data-flowclient]')){state.flowView='client';state.designerBoard=null;state.socialBoard=null;state.personBoard=null;state.roleBoards=false;state.boardSector=null;boardQuery='';render();return;}
   if(el=g('[data-flowdesigners]')){state.flowView='designers';state.designerBoard=f354DesignerAutoPick();state.socialBoard=null;state.personBoard=null;state.roleBoards=false;state.boardSector=null;boardQuery='';render();return;}
   if(el=g('[data-designerboard]')){state.flowView='designers';state.designerBoard=el.dataset.designerboard;f354DesignerSelSave(state.user&&state.user.id,state.designerBoard);state.socialBoard=null;boardQuery='';render();return;}
-  if(el=g('[data-flowsocials]')){state.flowView='socials';state.socialBoard=null;state.designerBoard=null;state.personBoard=null;state.roleBoards=false;state.boardSector=null;boardQuery='';render();return;}
-  if(el=g('[data-socialboard]')){state.flowView='socials';state.socialBoard=el.dataset.socialboard;state.designerBoard=null;boardQuery='';render();return;}
+  if(el=g('[data-flowsocials]')){state.flowView='socials';state.socialBoard=f354SocialAutoPick();state.designerBoard=null;state.personBoard=null;state.roleBoards=false;state.boardSector=null;boardQuery='';render();return;}
+  if(el=g('[data-socialboard]')){state.flowView='socials';state.socialBoard=el.dataset.socialboard;f354SocialSelSave(state.user&&state.user.id,state.socialBoard);state.designerBoard=null;boardQuery='';render();return;}
   if(el=g('[data-board]')){const a=el.dataset.board;
     if(a==='back')state.boardSector=null;
     else if(a==='hub'){state.boardSector=null;state.personBoard=null;state.roleBoards=false;state.flowView=null;state.designerBoard=null;state.socialBoard=null;}
     else if(a==='roleboards'){state.personBoard=null;state.roleBoards=true;}
     else if(a==='flowdesigners'){state.designerBoard=null;state.socialBoard=null;state.flowView='designers';}
-    else if(a==='flowsocials'){state.socialBoard=null;state.designerBoard=null;state.flowView='socials';}
+    else if(a==='flowsocials'){state.socialBoard=f354SocialAutoPick();state.designerBoard=null;state.flowView='socials';}
     else if(a==='new'){openNewTaskWizard();return;}   // F3.3.75A — entry point de criação usa a função canônica (ETAPA 1)
     render();return;}
   if(el=g('[data-bcol]')){boardCol=+el.dataset.bcol;render();return;}
@@ -9813,6 +9923,9 @@ document.addEventListener('click',async e=>{
   if(el=g('[data-resend]')){closeCardMenus();await resendDesignerNotify(el.dataset.resend);return;}
   if(el=g('[data-del]')){openDeleteConfirm(el.dataset.del);return;}
   if(el=g('[data-dodelete]')){await deleteTask(el.dataset.dodelete);return;}
+  // F3.5.4W — Central de Detalhes: Expandir/Recolher TODOS os acordeões da superfície aberta.
+  if(el=g('[data-detexpand]')){var _be=el.closest('.modal-back')||document;_be.querySelectorAll('.det-acc').forEach(function(d){d.open=true;});return;}
+  if(el=g('[data-detcollapse]')){var _bc=el.closest('.modal-back')||document;_bc.querySelectorAll('.det-acc').forEach(function(d){d.open=false;});return;}
   if(el=g('[data-modalclose]')){closeModal();return;}
   if(el=g('[data-formgoto]')){const v=el.dataset.formgoto;if(v==='resp'){state.form.step=1;render();openAssignee();}else{state.form.step=+v;render();}return;}
   if(el=g('[data-sendclient]')){

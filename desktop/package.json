@@ -1,7 +1,7 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.213",
-  "description": "Agenda ID Seven Desktop 1.0.213-session-persistence-startup",
+  "version": "1.0.214",
+  "description": "Agenda ID Seven Desktop 1.0.214-compact-cards-details",
   "main": "dist/main/main.js",
   "private": true,
   "scripts": {

@@ -69,9 +69,15 @@ ok('5  ordem preservada (índice → nº do vídeo, sem reordenar/filtrar)', (()
 ok('6  saveTask persiste TODOS os N vídeos como array estruturado {id,n,tema} (edição/reload preservam)',
   /_sub&&_sub\.videoTema/.test(H) && /for\(let i=0;i<_nV;i\+\+\)\{const v=\(f\.videos&&f\.videos\[i\]\)\|\|\{\};_vids\.push\(\{id:\(v&&v\.id\)\|\|\('v'\+\(i\+1\)\),n:i\+1,tema:/.test(H) && /data\.videos=_vids/.test(H));
 ok('7  reload preserva (fonte de leitura = t.videos no cronOf, sem depender de estado local)', /if\(Array\.isArray\(t\.videos\)&&t\.videos\.length\)\{/.test(H) && /return \{list,count:t\.videos\.length,label:'',videos:true\}/.test(H));
-ok('8  card mostra TODOS (caixa de temas rende cron.list; sem cortar)', /if\(cron&&cron\.list\.length\)\{/.test(H) && /kbv2-themes-list/.test(H) && /cron\.list\.map\(c=>'<div class="kbv2-theme">/.test(H));
+// [ATUALIZADA F3.5.4W] O card deixou de renderizar a LISTA COMPLETA de temas (que crescia sem
+// limite) e passou a um RESUMO compacto via kbv2ContentSlot ("N temas · N legendas"). O invariante
+// real de f3377a (Edição de mídia) é preservado; a mudança do card é AUTORIZADA nesta fase.
+ok('8  card COMPACTO (F3.5.4W): usa kbv2ContentSlot (resumo), sem renderizar a lista completa de temas', /function kbv2ContentSlot\(/.test(H) && /h\+=kbv2ContentSlot\(t, cron, s, clientView, isCron\);/.test(H) && !/cron\.list\.map\(c=>'<div class="kbv2-theme">/.test(H));
 ok('9  detalhes mostram TODOS + rótulo "Vídeos" (sector-aware)', /secOf\(t\.sector\)\.key==='edicao_midia'\?'Vídeos':'Conteúdos do cronograma'/.test(H));
-ok('10 nenhum placeholder p/ Edição de mídia (placeholder só p/ isCron=isClientSector; edicao_midia é false)', /else if\(!clientView&&isCron&&\(!cron\|\|!cron\.list\.length\)\)\{/.test(H) && /function isClientSector\(k\)\{return k==='cronograma'\|\|k==='roteiro';\}/.test(H));
+// [ATUALIZADA F3.5.4W] O placeholder/hint "Preencha 1 tema" migrou para dentro do kbv2ContentSlot,
+// ainda GATED por isCron (=isClientSector). Edição de mídia (edicao_midia) NÃO é setor-cliente ⇒
+// nunca recebe o hint de cliente. Invariante preservado; local do código evoluiu.
+ok('10 Edição de mídia sem hint de cliente (F3.5.4W): hint "1 tema" gated por isCron no kbv2ContentSlot; isClientSector exclui edicao_midia', /if\(!clientView&&isCron\)\{\s*\n\s*return box\('A definir'/.test(H) && /function isClientSector\(k\)\{return k==='cronograma'\|\|k==='roteiro';\}/.test(H));
 
 /* ===================== BLOCO B — ATRIBUIÇÃO 11–20 ===================== */
 ok('11 detailState edicao_midia SEM designer → ação "senddesigner" (Aguardando atribuição)', /secOf\(t\.sector\)\.key==='edicao_midia'\)\{[\s\S]*?actions:\['senddesigner'\]/.test(H));

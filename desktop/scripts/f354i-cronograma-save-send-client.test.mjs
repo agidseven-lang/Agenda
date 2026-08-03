@@ -130,7 +130,10 @@ console.log('\n══ REGRESSÕES CONGELADAS (34-40) — diff 1.0.199→HEAD con
   const dHtml = gitDiffWt(V199, 'desktop/src/renderer/index.html') || '';
   const plus = dHtml.split('\n').filter(l => l.startsWith('+') && !l.startsWith('+++')).join('\n');
   const minus = dHtml.split('\n').filter(l => l.startsWith('-') && !l.startsWith('---')).join('\n');
-  const toks = ['slaib', 'f354gMon', 'sla-monitor', 'kbv2-card', 'notif-toast', 'bgnotify', 'whatsapp', 'buildClientMessage', 'buildShareClientUrl', 'cloudflare', 'og:image', '?v='];
+  // [ATUALIZADA F3.5.4W] 'kbv2-card' REMOVIDO da guarda: o card foi INTENCIONALMENTE evoluído nesta
+  // fase (cards compactos — Deliverable 1). Sino/Monitor/notif/Card Premium(cliente)/cache-bust
+  // permanecem congelados e guardados pelos demais tokens.
+  const toks = ['slaib', 'f354gMon', 'sla-monitor', 'notif-toast', 'bgnotify', 'whatsapp', 'buildClientMessage', 'buildShareClientUrl', 'cloudflare', 'og:image', '?v='];
   const cnt = (s, t) => s.toLowerCase().split(t.toLowerCase()).length - 1;
   const bad = toks.filter(t => cnt(plus, t) !== cnt(minus, t));
   ok(bad.length === 0, '(36,40) diff do renderer NÃO toca sino/Monitor/card/notif/Card Premium/cache-bust (' + bad.length + ' tokens com contagem líquida alterada' + (bad.length ? ': ' + bad.join(',') : '') + ')'); }

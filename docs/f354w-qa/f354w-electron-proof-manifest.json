@@ -1,0 +1,999 @@
+{
+  "feature": "F3.5.4W",
+  "title": "Cards compactos · Central de Detalhes · Avatares · Social Medias",
+  "version": "1.0.214",
+  "electron": "31.3.1(real)",
+  "ranAt": "2026-08-03T20:22:14.279Z",
+  "asar": {
+    "bytes": 1270968,
+    "sha256": "bdb0b74a900257578fa1377b4b76448330068744aff9c2ad0b896552d30e2793"
+  },
+  "rendererSha256": "53e23aab97766dbaa7ffc75dcef6a718f25b3e48a70170cc5bcbc1cdb1d6b5f0",
+  "priorityEngineSha256": "0e04c8c3e301795b717b126d7a887e23eb75290465ba37abaeafe1901772dcfc",
+  "thresholds": {
+    "cardMaxPx": 540,
+    "invarDeltaPx": 8,
+    "minStripHeightPx": 58
+  },
+  "configs": [
+    {
+      "scale": "1x",
+      "screen": "1600x1050x24",
+      "dsf": "1",
+      "scenes": 31,
+      "failures": 0,
+      "ok": true,
+      "lines": [
+        {
+          "scene": "d1_cron12",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1x-01-d1_cron12.png",
+          "m": {
+            "found": true,
+            "offsetHeight": 525,
+            "rectHeight": 525,
+            "hasSummary": true,
+            "summaryFlex": "0/0",
+            "themeNodes": 0,
+            "summaryMain": "12 temas",
+            "summarySub": "12 legendas",
+            "title": "Cronograma Mensal — Junho (12 conteúdos)"
+          }
+        },
+        {
+          "scene": "d1_cron6",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1x-02-d1_cron6.png",
+          "m": {
+            "found": true,
+            "offsetHeight": 525,
+            "rectHeight": 525,
+            "hasSummary": true,
+            "summaryFlex": "0/0",
+            "themeNodes": 0,
+            "summaryMain": "6 temas",
+            "summarySub": "6 legendas",
+            "title": "Cronograma Quinzenal — 1ª quinzena (6 conteúdos)"
+          }
+        },
+        {
+          "scene": "d1_cron3",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1x-03-d1_cron3.png",
+          "m": {
+            "found": true,
+            "offsetHeight": 525,
+            "rectHeight": 525,
+            "hasSummary": true,
+            "summaryFlex": "0/0",
+            "themeNodes": 0,
+            "summaryMain": "3 temas",
+            "summarySub": "3 legendas",
+            "title": "Cronograma Semanal — Semana 23 (3 conteúdos)"
+          }
+        },
+        {
+          "scene": "d1_cron_height_invariance",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1x-04-d1_cron_height_invariance.png",
+          "m": {
+            "h12": 525,
+            "h3": 525,
+            "delta": 0,
+            "main12": "12 temas",
+            "main3": "3 temas",
+            "themeNodes12": 0,
+            "themeNodes3": 0
+          }
+        },
+        {
+          "scene": "d1_no_theme_nodes",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1x-05-d1_no_theme_nodes.png",
+          "m": {
+            "cards": 3,
+            "summaries": 3,
+            "themeNodes": 0
+          }
+        },
+        {
+          "scene": "d1_roteiro",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1x-06-d1_roteiro.png",
+          "m": {
+            "found": true,
+            "offsetHeight": 524,
+            "rectHeight": 524,
+            "hasSummary": true,
+            "summaryFlex": "0/0",
+            "themeNodes": 0,
+            "summaryMain": "8 roteiros",
+            "summarySub": "8 legendas",
+            "title": "Roteiros de Gravação — Campanha 8 vídeos"
+          }
+        },
+        {
+          "scene": "d1_edicao_midia",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1x-07-d1_edicao_midia.png",
+          "m": {
+            "found": true,
+            "offsetHeight": 519,
+            "rectHeight": 519,
+            "hasSummary": true,
+            "summaryFlex": "0/0",
+            "themeNodes": 0,
+            "summaryMain": "12 vídeos/roteiros",
+            "summarySub": "",
+            "title": "Edição — pacote 12 vídeos/roteiros"
+          }
+        },
+        {
+          "scene": "d1_edicao_cards",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1x-08-d1_edicao_cards.png",
+          "m": {
+            "found": true,
+            "offsetHeight": 519,
+            "rectHeight": 519,
+            "hasSummary": true,
+            "summaryFlex": "0/0",
+            "themeNodes": 0,
+            "summaryMain": "Legenda · Observações",
+            "summarySub": "",
+            "title": "Card avulso — Promoção Dia dos Pais"
+          }
+        },
+        {
+          "scene": "d1_social_card",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1x-09-d1_social_card.png",
+          "m": {
+            "found": true,
+            "offsetHeight": 525,
+            "rectHeight": 525,
+            "hasSummary": true,
+            "summaryFlex": "0/0",
+            "themeNodes": 0,
+            "summaryMain": "12 temas",
+            "summarySub": "12 legendas",
+            "title": "Cronograma Mensal — Junho (12 conteúdos)",
+            "socialBoard": "u-soc-ana"
+          }
+        },
+        {
+          "scene": "d2_open_cron",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1x-10-d2_open_cron.png",
+          "m": {
+            "backPresent": true,
+            "detmodal": "1",
+            "sheetPresent": true,
+            "roleDialog": true,
+            "sheetWidth": 1240,
+            "sheetHeight": 856,
+            "innerWidth": 1440,
+            "innerHeight": 973,
+            "expectedWidth": 1240,
+            "widthRatio": 0.861,
+            "accCount": 12,
+            "openCount": 0,
+            "labels": [
+              "TEMA 01",
+              "TEMA 02",
+              "TEMA 03",
+              "TEMA 04",
+              "TEMA 05",
+              "TEMA 06",
+              "TEMA 07",
+              "TEMA 08",
+              "TEMA 09",
+              "TEMA 10",
+              "TEMA 11",
+              "TEMA 12"
+            ],
+            "hasExpand": true,
+            "hasCollapse": true
+          }
+        },
+        {
+          "scene": "d2_cron_expand",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1x-11-d2_cron_expand.png",
+          "m": {
+            "clicked": true,
+            "total": 12,
+            "open": 12
+          }
+        },
+        {
+          "scene": "d2_cron_linebreaks",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1x-12-d2_cron_linebreaks.png",
+          "m": {
+            "total": 12,
+            "withNewline": 12,
+            "whiteSpace": "pre-wrap"
+          }
+        },
+        {
+          "scene": "d2_cron_collapse",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1x-13-d2_cron_collapse.png",
+          "m": {
+            "clicked": true,
+            "total": 12,
+            "open": 0,
+            "closed": 12
+          }
+        },
+        {
+          "scene": "d2_cron_esc",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1x-14-d2_cron_esc.png",
+          "m": {
+            "emptied": true,
+            "childCount": 0
+          }
+        },
+        {
+          "scene": "d2_open_roteiro",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1x-15-d2_open_roteiro.png",
+          "m": {
+            "backPresent": true,
+            "detmodal": "1",
+            "sheetPresent": true,
+            "roleDialog": true,
+            "sheetWidth": 1240,
+            "sheetHeight": 856,
+            "innerWidth": 1440,
+            "innerHeight": 973,
+            "expectedWidth": 1240,
+            "widthRatio": 0.861,
+            "accCount": 8,
+            "openCount": 0,
+            "labels": [
+              "ROTEIRO 01",
+              "ROTEIRO 02",
+              "ROTEIRO 03",
+              "ROTEIRO 04",
+              "ROTEIRO 05",
+              "ROTEIRO 06",
+              "ROTEIRO 07",
+              "ROTEIRO 08"
+            ],
+            "hasExpand": true,
+            "hasCollapse": true
+          }
+        },
+        {
+          "scene": "d2_roteiro_expand",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1x-16-d2_roteiro_expand.png",
+          "m": {
+            "clicked": true,
+            "total": 8,
+            "open": 8
+          }
+        },
+        {
+          "scene": "d2_open_edicao_midia",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1x-17-d2_open_edicao_midia.png",
+          "m": {
+            "backPresent": true,
+            "detmodal": "1",
+            "sheetPresent": true,
+            "roleDialog": true,
+            "sheetWidth": 1240,
+            "sheetHeight": 856,
+            "innerWidth": 1440,
+            "innerHeight": 973,
+            "expectedWidth": 1240,
+            "widthRatio": 0.861,
+            "accCount": 12,
+            "openCount": 0,
+            "labels": [
+              "VÍDEO 01",
+              "VÍDEO 02",
+              "VÍDEO 03",
+              "VÍDEO 04",
+              "VÍDEO 05",
+              "VÍDEO 06",
+              "VÍDEO 07",
+              "VÍDEO 08",
+              "VÍDEO 09",
+              "VÍDEO 10",
+              "VÍDEO 11",
+              "VÍDEO 12"
+            ],
+            "hasExpand": true,
+            "hasCollapse": true
+          }
+        },
+        {
+          "scene": "d2_open_edicao_cards",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1x-18-d2_open_edicao_cards.png",
+          "m": {
+            "backPresent": true,
+            "detmodal": "1",
+            "sheetPresent": true,
+            "roleDialog": true,
+            "sheetWidth": 1240,
+            "sheetHeight": 856,
+            "innerWidth": 1440,
+            "innerHeight": 973,
+            "expectedWidth": 1240,
+            "widthRatio": 0.861,
+            "accCount": 2,
+            "openCount": 2,
+            "labels": [
+              "CARD · LEGENDA",
+              "CARD · OBSERVAÇÕES"
+            ],
+            "hasExpand": false,
+            "hasCollapse": false
+          }
+        },
+        {
+          "scene": "d2_edicao_cards_labels",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1x-19-d2_edicao_cards_labels.png",
+          "m": {
+            "labels": [
+              "CARD · LEGENDA",
+              "CARD · OBSERVAÇÕES"
+            ],
+            "lineBreaks": {
+              "total": 2,
+              "withNewline": 2,
+              "whiteSpace": "pre-wrap"
+            }
+          }
+        },
+        {
+          "scene": "d3_designers_strip",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1x-20-d3_designers_strip.png",
+          "m": {
+            "found": true,
+            "chipCount": 3,
+            "avCount": 3,
+            "minHeight": 58,
+            "overflowY": "hidden",
+            "alignItems": "center",
+            "scrollbarGutter": "stable",
+            "paddingTop": "11px",
+            "paddingBottom": "13px",
+            "stripTop": 78,
+            "stripBottom": 136,
+            "stripHeight": 58,
+            "allAv22": true,
+            "anyClipped": false,
+            "avatars": [
+              {
+                "w": 22,
+                "h": 22,
+                "cssW": "22px",
+                "cssH": "22px",
+                "top": 95,
+                "bottom": 117,
+                "clippedTop": false,
+                "clippedBottom": false
+              },
+              {
+                "w": 22,
+                "h": 22,
+                "cssW": "22px",
+                "cssH": "22px",
+                "top": 95,
+                "bottom": 117,
+                "clippedTop": false,
+                "clippedBottom": false
+              },
+              {
+                "w": 22,
+                "h": 22,
+                "cssW": "22px",
+                "cssH": "22px",
+                "top": 95,
+                "bottom": 117,
+                "clippedTop": false,
+                "clippedBottom": false
+              }
+            ]
+          }
+        },
+        {
+          "scene": "d3_designers_notclip",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1x-21-d3_designers_notclip.png",
+          "m": {
+            "found": true,
+            "chipCount": 3,
+            "avCount": 3,
+            "minHeight": 58,
+            "overflowY": "hidden",
+            "alignItems": "center",
+            "scrollbarGutter": "stable",
+            "paddingTop": "11px",
+            "paddingBottom": "13px",
+            "stripTop": 78,
+            "stripBottom": 136,
+            "stripHeight": 58,
+            "allAv22": true,
+            "anyClipped": false,
+            "avatars": [
+              {
+                "w": 22,
+                "h": 22,
+                "cssW": "22px",
+                "cssH": "22px",
+                "top": 95,
+                "bottom": 117,
+                "clippedTop": false,
+                "clippedBottom": false
+              },
+              {
+                "w": 22,
+                "h": 22,
+                "cssW": "22px",
+                "cssH": "22px",
+                "top": 95,
+                "bottom": 117,
+                "clippedTop": false,
+                "clippedBottom": false
+              },
+              {
+                "w": 22,
+                "h": 22,
+                "cssW": "22px",
+                "cssH": "22px",
+                "top": 95,
+                "bottom": 117,
+                "clippedTop": false,
+                "clippedBottom": false
+              }
+            ]
+          }
+        },
+        {
+          "scene": "d3_social_strip",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1x-22-d3_social_strip.png",
+          "m": {
+            "found": true,
+            "chipCount": 4,
+            "avCount": 4,
+            "minHeight": 58,
+            "overflowY": "hidden",
+            "alignItems": "center",
+            "scrollbarGutter": "stable",
+            "paddingTop": "11px",
+            "paddingBottom": "13px",
+            "stripTop": 78,
+            "stripBottom": 136,
+            "stripHeight": 58,
+            "allAv22": true,
+            "anyClipped": false,
+            "avatars": [
+              {
+                "w": 22,
+                "h": 22,
+                "cssW": "22px",
+                "cssH": "22px",
+                "top": 95,
+                "bottom": 117,
+                "clippedTop": false,
+                "clippedBottom": false
+              },
+              {
+                "w": 22,
+                "h": 22,
+                "cssW": "22px",
+                "cssH": "22px",
+                "top": 95,
+                "bottom": 117,
+                "clippedTop": false,
+                "clippedBottom": false
+              },
+              {
+                "w": 22,
+                "h": 22,
+                "cssW": "22px",
+                "cssH": "22px",
+                "top": 95,
+                "bottom": 117,
+                "clippedTop": false,
+                "clippedBottom": false
+              },
+              {
+                "w": 22,
+                "h": 22,
+                "cssW": "22px",
+                "cssH": "22px",
+                "top": 95,
+                "bottom": 117,
+                "clippedTop": false,
+                "clippedBottom": false
+              }
+            ]
+          }
+        },
+        {
+          "scene": "d3_social_notclip",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1x-23-d3_social_notclip.png",
+          "m": {
+            "found": true,
+            "chipCount": 4,
+            "avCount": 4,
+            "minHeight": 58,
+            "overflowY": "hidden",
+            "alignItems": "center",
+            "scrollbarGutter": "stable",
+            "paddingTop": "11px",
+            "paddingBottom": "13px",
+            "stripTop": 78,
+            "stripBottom": 136,
+            "stripHeight": 58,
+            "allAv22": true,
+            "anyClipped": false,
+            "avatars": [
+              {
+                "w": 22,
+                "h": 22,
+                "cssW": "22px",
+                "cssH": "22px",
+                "top": 95,
+                "bottom": 117,
+                "clippedTop": false,
+                "clippedBottom": false
+              },
+              {
+                "w": 22,
+                "h": 22,
+                "cssW": "22px",
+                "cssH": "22px",
+                "top": 95,
+                "bottom": 117,
+                "clippedTop": false,
+                "clippedBottom": false
+              },
+              {
+                "w": 22,
+                "h": 22,
+                "cssW": "22px",
+                "cssH": "22px",
+                "top": 95,
+                "bottom": 117,
+                "clippedTop": false,
+                "clippedBottom": false
+              },
+              {
+                "w": 22,
+                "h": 22,
+                "cssW": "22px",
+                "cssH": "22px",
+                "top": 95,
+                "bottom": 117,
+                "clippedTop": false,
+                "clippedBottom": false
+              }
+            ]
+          }
+        },
+        {
+          "scene": "d4_autopick_first",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1x-24-d4_autopick_first.png",
+          "m": {
+            "socialBoard": "u-soc-ana",
+            "cols": {
+              "colCount": 4,
+              "colLabels": [
+                "A Fazer",
+                "Em andamento",
+                "Revisão",
+                "Finalizado"
+              ],
+              "stripPresent": true,
+              "chipCount": 4,
+              "cardCount": 6,
+              "header": "Social · Ana"
+            }
+          }
+        },
+        {
+          "scene": "d4_autopick_via_action",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1x-25-d4_autopick_via_action.png",
+          "m": {
+            "socialBoard": "u-soc-ana"
+          }
+        },
+        {
+          "scene": "d4_persist_saved",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1x-26-d4_persist_saved.png",
+          "m": {
+            "socialBoard": "u-soc-diana",
+            "saved": "u-soc-diana"
+          }
+        },
+        {
+          "scene": "d4_zero_task_columns",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1x-27-d4_zero_task_columns.png",
+          "m": {
+            "colCount": 4,
+            "colLabels": [
+              "A Fazer",
+              "Em andamento",
+              "Revisão",
+              "Finalizado"
+            ],
+            "stripPresent": true,
+            "chipCount": 4,
+            "cardCount": 0,
+            "header": "Social · Diana"
+          }
+        },
+        {
+          "scene": "d4_zero_task_col_labels",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1x-28-d4_zero_task_col_labels.png",
+          "m": {
+            "colCount": 4,
+            "colLabels": [
+              "A Fazer",
+              "Em andamento",
+              "Revisão",
+              "Finalizado"
+            ],
+            "stripPresent": true,
+            "chipCount": 4,
+            "cardCount": 0,
+            "header": "Social · Diana",
+            "want": [
+              "A Fazer",
+              "Em andamento",
+              "Revisão",
+              "Finalizado"
+            ]
+          }
+        },
+        {
+          "scene": "d4_strip_chips",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1x-29-d4_strip_chips.png",
+          "m": {
+            "colCount": 4,
+            "colLabels": [
+              "A Fazer",
+              "Em andamento",
+              "Revisão",
+              "Finalizado"
+            ],
+            "stripPresent": true,
+            "chipCount": 4,
+            "cardCount": 0,
+            "header": "Social · Diana"
+          }
+        },
+        {
+          "scene": "d4_board_has_tasks",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1x-30-d4_board_has_tasks.png",
+          "m": {
+            "colCount": 4,
+            "colLabels": [
+              "A Fazer",
+              "Em andamento",
+              "Revisão",
+              "Finalizado"
+            ],
+            "stripPresent": true,
+            "chipCount": 4,
+            "cardCount": 6,
+            "header": "Social · Ana"
+          }
+        },
+        {
+          "scene": "d4_nonnull_guarantee",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1x-31-d4_nonnull_guarantee.png",
+          "m": {
+            "socialBoard": "u-soc-ana",
+            "cardCount": 6
+          }
+        }
+      ]
+    },
+    {
+      "scale": "1.5x",
+      "screen": "2400x1600x24",
+      "dsf": "1.5",
+      "scenes": 6,
+      "failures": 0,
+      "ok": true,
+      "lines": [
+        {
+          "scene": "d1_cron12",
+          "scale": "1.5x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1.5x-01-d1_cron12.png",
+          "m": {
+            "found": true,
+            "offsetHeight": 515,
+            "rectHeight": 515,
+            "hasSummary": true,
+            "summaryFlex": "0/0",
+            "themeNodes": 0,
+            "summaryMain": "12 temas",
+            "summarySub": "12 legendas",
+            "title": "Cronograma Mensal — Junho (12 conteúdos)"
+          }
+        },
+        {
+          "scene": "d1_cron3",
+          "scale": "1.5x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1.5x-02-d1_cron3.png",
+          "m": {
+            "found": true,
+            "offsetHeight": 515,
+            "rectHeight": 515,
+            "hasSummary": true,
+            "summaryFlex": "0/0",
+            "themeNodes": 0,
+            "summaryMain": "3 temas",
+            "summarySub": "3 legendas",
+            "title": "Cronograma Semanal — Semana 23 (3 conteúdos)"
+          }
+        },
+        {
+          "scene": "d1_cron_height_invariance",
+          "scale": "1.5x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1.5x-03-d1_cron_height_invariance.png",
+          "m": {
+            "h12": 515,
+            "h3": 515,
+            "delta": 0,
+            "main12": "12 temas",
+            "main3": "3 temas",
+            "themeNodes12": 0,
+            "themeNodes3": 0
+          }
+        },
+        {
+          "scene": "d3_designers_strip",
+          "scale": "1.5x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1.5x-04-d3_designers_strip.png",
+          "m": {
+            "found": true,
+            "chipCount": 3,
+            "avCount": 3,
+            "minHeight": 58,
+            "overflowY": "hidden",
+            "alignItems": "center",
+            "scrollbarGutter": "stable",
+            "paddingTop": "11px",
+            "paddingBottom": "13px",
+            "stripTop": 78,
+            "stripBottom": 136,
+            "stripHeight": 58,
+            "allAv22": true,
+            "anyClipped": false,
+            "avatars": [
+              {
+                "w": 22,
+                "h": 22,
+                "cssW": "22px",
+                "cssH": "22px",
+                "top": 95,
+                "bottom": 117,
+                "clippedTop": false,
+                "clippedBottom": false
+              },
+              {
+                "w": 22,
+                "h": 22,
+                "cssW": "22px",
+                "cssH": "22px",
+                "top": 95,
+                "bottom": 117,
+                "clippedTop": false,
+                "clippedBottom": false
+              },
+              {
+                "w": 22,
+                "h": 22,
+                "cssW": "22px",
+                "cssH": "22px",
+                "top": 95,
+                "bottom": 117,
+                "clippedTop": false,
+                "clippedBottom": false
+              }
+            ]
+          }
+        },
+        {
+          "scene": "d3_social_strip",
+          "scale": "1.5x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1.5x-05-d3_social_strip.png",
+          "m": {
+            "found": true,
+            "chipCount": 4,
+            "avCount": 4,
+            "minHeight": 58,
+            "overflowY": "hidden",
+            "alignItems": "center",
+            "scrollbarGutter": "stable",
+            "paddingTop": "11px",
+            "paddingBottom": "13px",
+            "stripTop": 78,
+            "stripBottom": 136,
+            "stripHeight": 58,
+            "allAv22": true,
+            "anyClipped": false,
+            "avatars": [
+              {
+                "w": 22,
+                "h": 22,
+                "cssW": "22px",
+                "cssH": "22px",
+                "top": 95,
+                "bottom": 117,
+                "clippedTop": false,
+                "clippedBottom": false
+              },
+              {
+                "w": 22,
+                "h": 22,
+                "cssW": "22px",
+                "cssH": "22px",
+                "top": 95,
+                "bottom": 117,
+                "clippedTop": false,
+                "clippedBottom": false
+              },
+              {
+                "w": 22,
+                "h": 22,
+                "cssW": "22px",
+                "cssH": "22px",
+                "top": 95,
+                "bottom": 117,
+                "clippedTop": false,
+                "clippedBottom": false
+              },
+              {
+                "w": 22,
+                "h": 22,
+                "cssW": "22px",
+                "cssH": "22px",
+                "top": 95,
+                "bottom": 117,
+                "clippedTop": false,
+                "clippedBottom": false
+              }
+            ]
+          }
+        },
+        {
+          "scene": "d2_open_cron",
+          "scale": "1.5x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354w-1.5x-06-d2_open_cron.png",
+          "m": {
+            "backPresent": true,
+            "detmodal": "1",
+            "sheetPresent": true,
+            "roleDialog": true,
+            "sheetWidth": 1215,
+            "sheetHeight": 796,
+            "innerWidth": 1400,
+            "innerHeight": 923,
+            "expectedWidth": 1240,
+            "widthRatio": 0.868,
+            "accCount": 12,
+            "openCount": 0,
+            "labels": [
+              "TEMA 01",
+              "TEMA 02",
+              "TEMA 03",
+              "TEMA 04",
+              "TEMA 05",
+              "TEMA 06",
+              "TEMA 07",
+              "TEMA 08",
+              "TEMA 09",
+              "TEMA 10",
+              "TEMA 11",
+              "TEMA 12"
+            ],
+            "hasExpand": true,
+            "hasCollapse": true
+          }
+        }
+      ]
+    }
+  ],
+  "totalScenes": 37,
+  "totalFailures": 0
+}
