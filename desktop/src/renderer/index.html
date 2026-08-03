@@ -115,6 +115,14 @@
   .banner.ok{background:rgba(52,211,153,.12);color:var(--green)}
   .spinner{width:20px;height:20px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
+  /* F3.5.4V-H1 — splash neutro de restauração de sessão (estado padrão do boot) */
+  #authSplash{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:36px 26px;max-width:480px;margin:0 auto;gap:18px}
+  #authSplash .brand{margin-bottom:2px}
+  .auth-splash-status{display:flex;align-items:center;gap:12px;color:var(--soft);font-size:14px;font-weight:600}
+  .spinner.accent{width:26px;height:26px;border:3px solid rgba(91,108,255,.25);border-top-color:var(--accent)}
+  .auth-splash-hint{color:var(--faint);font-size:12.5px;text-align:center;max-width:320px;line-height:1.55}
+  .auth-splash-hint .lnk{color:var(--accent);font-weight:700;cursor:pointer;text-decoration:underline}
+  @media (prefers-reduced-motion:reduce){.spinner,.spinner.accent{animation-duration:1.6s}}
   .vfooter{margin-top:28px;text-align:center;color:var(--soft);font-size:11px;line-height:1.6}
   .vfooter .pill-ver{display:inline-block;background:rgba(91,108,255,.14);color:var(--accent);font-weight:800;
     padding:4px 10px;border-radius:999px;margin-bottom:5px}
@@ -2403,7 +2411,21 @@ body.desktop .kbv2-name{ white-space:normal; display:-webkit-box; -webkit-box-or
 </head>
 <body>
 
-<section id="login">
+<!-- F3.5.4V-H1 — splash neutro de restauração de sessão. É o estado padrão do boot
+     (visível), para NUNCA mostrar a tela de login enquanto a sessão está sendo restaurada
+     (autostart do Windows com rede/DNS ainda indisponíveis). O #login nasce oculto e só é
+     revelado em negativa REAL (no_session/expired) ou por escape manual. -->
+<section id="authSplash">
+  <div class="brand">
+    <div class="logo lg brandlogo"></div>
+    <h1>ID Seven</h1>
+    <div class="sub">Desktop · Paridade APK</div>
+  </div>
+  <div class="auth-splash-status"><span class="spinner accent"></span><span id="authSplashMsg">Restaurando sessão…</span></div>
+  <div id="authSplashHint" class="auth-splash-hint hidden"></div>
+</section>
+
+<section id="login" class="hidden">
   <div class="brand">
     <div class="logo lg brandlogo"></div>
     <h1>ID Seven</h1>
@@ -2706,7 +2728,7 @@ async function doRegister(){
 }
 function saveSession(u){localStorage.setItem('wp_uid',u.id);localStorage.setItem('wp_name',u.name||'');}
 function clearSession(){localStorage.removeItem('wp_uid');localStorage.removeItem('wp_name');localStorage.removeItem('wp_team_jwt');}
-function startApp(u){state.user=u;try{notifAttrToastSeen={};}catch(_){}saveSession(u);document.body.classList.add("authed");document.getElementById("login").classList.add("hidden");document.getElementById("app").style.display="flex";subscribeData();render();try{window.desktopAPI&&window.desktopAPI.sessionLogin(u.id)}catch(_){}}
+function startApp(u){try{var _sp=document.getElementById('authSplash');if(_sp)_sp.classList.add('hidden');}catch(_){}state.user=u;try{notifAttrToastSeen={};}catch(_){}saveSession(u);document.body.classList.add("authed");document.getElementById("login").classList.add("hidden");document.getElementById("app").style.display="flex";subscribeData();render();try{window.desktopAPI&&window.desktopAPI.sessionLogin(u.id)}catch(_){}}
 async function logout(){
   /* F3.3.56-G5a — FIX: "Sair da conta" também limpa a SESSÃO SERVER-SIDE no
      processo main (userData/session.json). Sem isto, o boot re-logava sozinho
@@ -2714,7 +2736,7 @@ async function logout(){
   try{window.desktopAPI&&window.desktopAPI.diagLog&&window.desktopAPI.diagLog('logout.begin')}catch(_){}
   try{if(window.desktopAPI&&window.desktopAPI.authLogout){await window.desktopAPI.authLogout();}}catch(_){}
   try{window.desktopAPI&&window.desktopAPI.diagLog&&window.desktopAPI.diagLog('logout.afterAuthLogout')}catch(_){}
-  try{window.desktopAPI&&window.desktopAPI.sessionLogout()}catch(_){} for(const k in unsub){if(unsub[k])unsub[k]();unsub[k]=null;}clearSession();state.user=null;state.flowView=null;state.designerBoard=null;state.socialBoard=null;state.personBoard=null;state.roleBoards=false;state.boardSector=null;boardQuery='';try{notifAttrToastSeen={};}catch(_){}document.body.classList.remove('authed');if(typeof closeCardMenus==='function')closeCardMenus();var _ca=document.getElementById('cornerAvatar');if(_ca)_ca.remove();var _sm=document.getElementById('sla-monitor');if(_sm)_sm.remove();var _bl=document.getElementById('slaib-bell');if(_bl)_bl.remove();var _bo=document.getElementById('slaib-ov');if(_bo)_bo.remove();document.getElementById('app').style.display='none';document.getElementById('login').classList.remove('hidden');loginMode='login';try{slaibRefresh();}catch(_){}renderLogin();}
+  try{window.desktopAPI&&window.desktopAPI.sessionLogout()}catch(_){} for(const k in unsub){if(unsub[k])unsub[k]();unsub[k]=null;}clearSession();state.user=null;state.flowView=null;state.designerBoard=null;state.socialBoard=null;state.personBoard=null;state.roleBoards=false;state.boardSector=null;boardQuery='';try{notifAttrToastSeen={};}catch(_){}document.body.classList.remove('authed');if(typeof closeCardMenus==='function')closeCardMenus();var _ca=document.getElementById('cornerAvatar');if(_ca)_ca.remove();var _sm=document.getElementById('sla-monitor');if(_sm)_sm.remove();var _bl=document.getElementById('slaib-bell');if(_bl)_bl.remove();var _bo=document.getElementById('slaib-ov');if(_bo)_bo.remove();document.getElementById('app').style.display='none';document.getElementById('login').classList.remove('hidden');loginMode='login';try{slaibRefresh();}catch(_){}try{authPhase='AUTH_UNAUTHENTICATED_CONFIRMED';}catch(_){}try{if(typeof _hideAuthSplash==='function')_hideAuthSplash();}catch(_){}try{if(typeof _authObs==='function')_authObs('auth.startup.explicit_logout',{});}catch(_){}renderLogin();}
 function subscribeData(){
   /* F3.3.56-G2 — roster via usersPublic (projeção allowlist {id,name,role,admin,
      status,photo,color} mantida pelo trigger syncUsersPublic). O renderer deixa
@@ -10015,27 +10037,44 @@ function stepNext(){const f=state.form;
 /* ---- BOOT ---- */
 try{window.desktopAPI&&window.desktopAPI.onNotifOpen(function(t){if(!state.user)return;if(typeof notifRoute==='function'){notifRoute(t);return;}if(t&&t.indexOf("client/")===0){openClientView(t.slice(7));return;}else if(t&&t.indexOf("board/")===0){state.tab="tarefas";state.boardSector=t.slice(6);}else if(t=="agenda"){state.tab="agenda";state.boardSector=null;}render();})}catch(_){}
 function afterClientView(){const ta=document.getElementById('cvwNote');if(ta){ta.focus();}}
+/* ══ F3.5.4V-H1 — MÁQUINA DE ESTADOS DA RESTAURAÇÃO DA SESSÃO ══════════════════════
+   Causa (PROVADA): a tela de login era o estado ESTÁTICO padrão e renderLogin() rodava
+   INCONDICIONALMENTE como 1ª instrução do boot, ANTES do authSelf() (ligado à rede). No
+   autostart do Windows (DNS/rede ainda indisponíveis) a sessão VÁLIDA em disco (session.json,
+   nunca apagada em erro de rede) não conseguia ser confirmada e a tela de login já pintada
+   permanecia visível — o usuário via "deslogado" com sessão válida. Correção: um SPLASH neutro
+   é o estado padrão do boot; a tela de login SÓ aparece em NEGATIVA REAL (no_session/expired)
+   ou por escape manual. Erro de rede (que só ocorre quando EXISTE sessão local válida no main)
+   MANTÉM o splash e reintenta — nunca vira login. Estados:
+   AUTH_INITIALIZING → AUTH_RESTORING → {AUTHENTICATED | AUTH_OFFLINE_CACHED |
+   AUTH_UNAUTHENTICATED_CONFIRMED | AUTH_REVOKED}. Persistência/userData/partition INTOCADOS. */
+var authPhase='AUTH_INITIALIZING';
+function _showAuthSplash(){try{var s=document.getElementById('authSplash');if(s)s.classList.remove('hidden');var l=document.getElementById('login');if(l)l.classList.add('hidden');}catch(_){}}
+function _hideAuthSplash(){try{var s=document.getElementById('authSplash');if(s)s.classList.add('hidden');}catch(_){}}
+function _authObs(ev,extra){try{if(window.desktopAPI&&window.desktopAPI.diagLog){var on=null;try{on=(typeof navigator!=='undefined'&&navigator&&navigator.onLine!==undefined)?!!navigator.onLine:null;}catch(_n){}var mode='unknown';try{mode=(typeof document!=='undefined'&&document.visibilityState==='hidden')?'autostart':'manual';}catch(_v){}var base={authState:authPhase,networkAvailable:on,manualOrAutostart:mode,appVersion:(window.__APP_VERSION||''),ts:Date.now()};window.desktopAPI.diagLog(ev,Object.assign(base,extra||{}));}}catch(_){}}
+function _revealLogin(reason){_hideAuthSplash();try{var l=document.getElementById('login');if(l)l.classList.remove('hidden');}catch(_){}try{loginMode='login';}catch(_l){}try{renderLogin();}catch(_r){}_authObs('auth.startup.login_rendered',{resultReason:reason||''});}
 (async function boot(){
-  renderLogin();
-  /* F3.3.56-G2 — restauração de sessão SERVER-SIDE: o token vive no processo
-     main; getUserSelf valida e devolve o perfil próprio. O renderer não lê
-     users. Sessão expirada/inexistente => permanece na tela de login. */
-  /* F3.5.4-C4 — RETRY do bootstrap: a restauração era tentada UMA única vez; com autostart no
-     arranque do Windows (rede/DNS ainda indisponíveis) o erro TRANSITÓRIO deixava o app parado
-     na tela de login DENTRO da bandeja — session-login nunca disparava e notifierA/slaScheduler
-     nunca iniciavam (ZERO notificações naquela máquina até reabrir e logar de novo). Agora:
-     re-tenta com backoff capado (3s→60s) enquanto não houver sessão; PARA em sucesso, em
-     negativa REAL (expired/no_session) ou quando o usuário logar manualmente. */
-  var _bootDelay=3000;
+  var _t0=Date.now();
+  authPhase='AUTH_INITIALIZING';_showAuthSplash();_authObs('auth.startup.started',{});
+  authPhase='AUTH_RESTORING';_authObs('auth.startup.restore_started',{});
+  /* F3.5.4-C4 (preservado) — RETRY do bootstrap com backoff capado (3s→60s); PARA em sucesso, em
+     negativa REAL (expired/no_session) ou quando o usuário logar manualmente. F3.5.4V-H1: durante
+     o retry por erro de rede, o SPLASH permanece (nunca login). */
+  var _bootDelay=3000,_tries=0;
   for(;;){
     try{
       const api=window.desktopAPI;
-      if(!(api&&typeof api.authSelf==='function'))return;
+      if(!(api&&typeof api.authSelf==='function')){_revealLogin('no_bridge');return;}
       const r=await api.authSelf();
       try{api.diagLog&&api.diagLog('boot.authSelf',{ok:!!(r&&r.ok),error:r&&r.error,hasSelf:!!(r&&r.self),retryInMs:(r&&r.ok)||((r&&(r.error==='expired'||r.error==='no_session')))?0:_bootDelay})}catch(_){}
       if(state.user)return;                                    // login manual venceu a corrida
-      if(r&&r.ok&&r.self&&r.self.id){startApp(Object.assign({},r.self));return;}
-      if(r&&(r.error==='expired'||r.error==='no_session')){clearSession();return;}
+      if(r&&r.ok&&r.self&&r.self.id){authPhase='AUTHENTICATED';_authObs('auth.startup.restore_succeeded',{restoreDurationMs:Date.now()-_t0});_hideAuthSplash();startApp(Object.assign({},r.self));return;}
+      if(r&&r.error==='no_session'){authPhase='AUTH_UNAUTHENTICATED_CONFIRMED';_authObs('auth.startup.restore_empty',{hasCachedUser:false});clearSession();_revealLogin('no_session');return;}
+      if(r&&r.error==='expired'){authPhase='AUTH_REVOKED';_authObs('auth.startup.revoked',{});clearSession();_revealLogin('revoked');return;}
+      /* network/http_* ⇒ EXISTE sessão local válida no main, mas a rede ainda não respondeu:
+         manter o SPLASH (jamais login) e reintentar. Não apagar sessão (offline != logout). */
+      authPhase='AUTH_OFFLINE_CACHED';_tries++;_authObs('auth.startup.offline_cached',{hasCachedUser:true,retryInMs:_bootDelay,tries:_tries});
+      if(_tries===3){try{var _msg=document.getElementById('authSplashMsg');if(_msg)_msg.textContent='Aguardando conexão…';var _h=document.getElementById('authSplashHint');if(_h){_h.classList.remove('hidden');_h.innerHTML='Sem conexão — tentando reconectar automaticamente. <span class="lnk" id="authManualLogin">Entrar manualmente</span>';var _ml=document.getElementById('authManualLogin');if(_ml)_ml.onclick=function(){_revealLogin('manual_escape');};}}catch(_hh){}}
     }catch(_){}
     await new Promise(function(res){setTimeout(res,_bootDelay);});
     if(state.user)return;

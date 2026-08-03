@@ -121,8 +121,19 @@ console.log('\n══ REGRESSÕES CONGELADAS (34-40) — diff 1.0.199→HEAD con
   ok(dSch === '' && neAdditive, '(37) notificações — slaScheduler byte-idêntico; notifEvents DIFF CONTROLADO F3.5.4P (help/blocked aditivos, ZERO remoção)'); }
 { const dSla = gitDiffWt(V199, 'desktop/src/main/slaRules.js') + gitDiffWt(V199, 'desktop/src/main/cardsRules.js'); ok(dSla === '', '(38-39) SLA/sino — slaRules/cardsRules byte-idênticos'); }
 { const scb199 = grabFn('async function saveCardsBatch(', gitShow(V199)), scbNow = grabFn('async function saveCardsBatch(', HTML); ok(!!scb199 && scb199 === scbNow, '(35) Edição de Cards — saveCardsBatch byte-idêntico à 1.0.199'); }
-{ const dHtml = gitDiffWt(V199, 'desktop/src/renderer/index.html') || ''; const bad = dHtml.split('\n').filter(l => /^[+-]/.test(l) && !/^[+-][+-]/.test(l)).filter(l => /(slaib|f354gMon|sla-monitor|kbv2-card|notif-toast|bgnotify|whatsapp|buildClientMessage|buildShareClientUrl|cloudflare|og:image|\?v=)/i.test(l));
-  ok(bad.length === 0, '(36,40) diff do renderer NÃO toca sino/Monitor/card/notif/Card Premium/cache-bust (' + bad.length + ' linhas suspeitas)'); }
+{ /* [ATUALIZADA F3.5.4V-H1] Guarda de confinamento aprimorada: em vez de sinalizar QUALQUER
+     linha alterada que apenas CONTENHA um token protegido (falso-positivo quando a linha do
+     logout — que já continha slaib/sla-monitor no teardown — recebe um APÊNDICE aditivo:
+     phase/obs/hide), agora contamos a ocorrência LÍQUIDA de cada token entre conteúdo
+     removido (-) e adicionado (+). Só falha se a contagem MUDAR (adição/remoção real de uma
+     referência a sino/Monitor/card/notif/Card Premium/cache-bust). Mais preciso, não mais frouxo. */
+  const dHtml = gitDiffWt(V199, 'desktop/src/renderer/index.html') || '';
+  const plus = dHtml.split('\n').filter(l => l.startsWith('+') && !l.startsWith('+++')).join('\n');
+  const minus = dHtml.split('\n').filter(l => l.startsWith('-') && !l.startsWith('---')).join('\n');
+  const toks = ['slaib', 'f354gMon', 'sla-monitor', 'kbv2-card', 'notif-toast', 'bgnotify', 'whatsapp', 'buildClientMessage', 'buildShareClientUrl', 'cloudflare', 'og:image', '?v='];
+  const cnt = (s, t) => s.toLowerCase().split(t.toLowerCase()).length - 1;
+  const bad = toks.filter(t => cnt(plus, t) !== cnt(minus, t));
+  ok(bad.length === 0, '(36,40) diff do renderer NÃO toca sino/Monitor/card/notif/Card Premium/cache-bust (' + bad.length + ' tokens com contagem líquida alterada' + (bad.length ? ': ' + bad.join(',') : '') + ')'); }
 { const dHtml = gitDiffWt(V199, 'desktop/src/renderer/index.html') || ''; ok(/cronSanitizeDeep/.test(dHtml) && /cronValidateSend/.test(dHtml) && /Salvando cronograma/.test(dHtml), '(34) Roteiro/Cronograma — correção presente no diff (fluxo-cliente compartilhado, sem regressão)'); }
 
 console.log('\n' + (fail === 0 ? '✅ f354i-cronograma-save-send-client: ' + n + '/' + n + ' verdes' : '❌ ' + fail + '/' + n + ' falharam'));

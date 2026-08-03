@@ -132,13 +132,21 @@ ok(/function realQuit\(\)[\s\S]{0,400}stopNotifier\(\)[\s\S]{0,300}slaScheduler\
   'C1d realQuit intocado (região aprovada preservada)');
 
 console.log('\n-- C2/C4: renderer — once-guard por sessão + bootstrap com retry --');
-ok(/function startApp\(u\)\{state\.user=u;try\{notifAttrToastSeen=\{\};\}catch\(_\)\{\}saveSession\(u\);/.test(HTML),
+/* [ATUALIZADA F3.5.4V-H1] startApp passou a ESCONDER o splash de restauração como 1ª
+   ação (try{...authSplash...hidden}); o reset do once-guard (notifAttrToastSeen={})
+   permanece imediatamente após state.user=u — invariante PRESERVADA. */
+ok(/function startApp\(u\)\{[\s\S]{0,140}state\.user=u;try\{notifAttrToastSeen=\{\};\}catch\(_\)\{\}saveSession\(u\);/.test(HTML),
   'C2a startApp reseta o once-guard do toast (novo usuário nunca herda o seen do anterior)');
 ok(/boardQuery='';try\{notifAttrToastSeen=\{\};\}catch\(_\)\{\}document\.body\.classList\.remove\('authed'\)/.test(HTML),
   'C2b logout reseta o once-guard do toast');
 ok(/api\.authSelf\(\)/.test(HTML) && /_bootDelay=Math\.min\(_bootDelay\*2,60000\)/.test(HTML),
   'C4a bootstrap re-tenta com backoff capado em 60s (autostart sem rede deixa de matar as notificações do dia)');
-ok(/if\(r&&\(r\.error==='expired'\|\|r\.error==='no_session'\)\)\{clearSession\(\);return;\}/.test(HTML),
+/* [ATUALIZADA F3.5.4V-H1] O ramo único (expired||no_session)→clearSession()+return foi
+   DIVIDIDO em dois ramos distintos da máquina de estados — no_session→
+   AUTH_UNAUTHENTICATED_CONFIRMED e expired→AUTH_REVOKED — cada um ainda com
+   clearSession()+_revealLogin()+return. Invariante PRESERVADA: negativa REAL PARA o retry. */
+ok(/r\.error==='no_session'\)\{[\s\S]{0,160}clearSession\(\);_revealLogin\('no_session'\);return;\}/.test(HTML) &&
+   /r\.error==='expired'\)\{[\s\S]{0,120}clearSession\(\);_revealLogin\('revoked'\);return;\}/.test(HTML),
   'C4b negativa REAL (expired/no_session) PARA o retry (semântica de sessão preservada)');
 ok(/if\(state\.user\)return;\s*\/\/ login manual venceu a corrida/.test(HTML) || /if\(state\.user\)return;/.test(HTML),
   'C4c login manual interrompe o retry (sem corrida)');

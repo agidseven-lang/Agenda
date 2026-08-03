@@ -64,7 +64,13 @@ ok('clearSession remove wp_uid', /function clearSession\([^)]*\)\{[^}]*wp_uid/.t
    F3.3.56-G2: a sessão é restaurada SERVER-SIDE (token confinado ao main; boot chama
    desktopAPI.authSelf). O renderer NUNCA mais lê wp_uid — é isso que se trava agora. */
 ok('boot: sessão restaurada server-side via desktopAPI.authSelf; renderer NÃO lê wp_uid', !/localStorage\.getItem\('wp_uid'\)/.test(HTML) && /api\.authSelf\(\)/.test(HTML));
-ok('boot: renderLogin() no arranque', /async function boot\(\)\{\s*renderLogin\(\)/.test(HTML));
+/* [ATUALIZADA F3.5.4V-H1] O contrato antigo (boot ABRIA com renderLogin() incondicional)
+   ERA a causa do bug de sessão no autostart do Windows: o login estático aparecia ANTES
+   de o authSelf() confirmar a sessão. A correção mantém o mesmo ancoramento server-side
+   (authSelf; nunca lê wp_uid), mas NÃO pinta login no arranque — mostra SPLASH neutro e só
+   revela o login em NEGATIVA REAL (no_session/expired) via _revealLogin(). */
+ok('boot: NÃO abre com renderLogin() incondicional (splash-first; login só em negativa real)',
+  !/async function boot\(\)\{\s*renderLogin\(\)/.test(HTML) && /_revealLogin\(/.test(HTML) && /api\.authSelf\(\)/.test(HTML));
 ok('render: barra app sem usuário (if(!state.user)return)', /function render\(\)\{[\s\S]{0,80}if\(!state\.user\)return/.test(HTML));
 
 /* ===== 5) R1 preservada: assignment com ator denormalizado ===== */
