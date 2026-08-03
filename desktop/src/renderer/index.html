@@ -1446,7 +1446,7 @@
   .det-date-v{font-size:13px;font-weight:700;margin-top:4px;line-height:1.3}
   .det-contents{display:flex;flex-direction:column;gap:11px}
   .det-content{display:flex;gap:13px;background:var(--surface2);border:1px solid var(--line-soft);border-radius:14px;padding:15px}
-  .det-content-n{flex:none;width:28px;height:28px;border-radius:9px;background:rgba(91,108,255,.18);color:var(--accent);font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center}
+  .det-content-n{flex:none;width:28px;height:28px;border-radius:9px;background:rgba(91,108,255,.18);color:var(--accent);font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;display:flex;align-items:center;justify-content:center}
   .det-content-m{min-width:0;flex:1}
   .det-content-t{font-size:15px;font-weight:800;line-height:1.3;word-break:break-word}
   .det-content-l{font-size:13px;color:var(--soft);margin-top:5px;line-height:1.55;white-space:pre-wrap;word-break:break-word}
@@ -1461,18 +1461,35 @@
   .det-acc>summary:hover{background:rgba(255,255,255,.03)}
   .det-acc>summary>.det-content-n{flex:none}
   .det-acc-h{min-width:0;flex:1;display:flex;flex-direction:column;gap:3px}
-  .det-acc-k{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
-  .det-acc-t{font-size:15px;font-weight:800;line-height:1.3;word-break:break-word}
+  /* F3.5.4W-H1 (E2) — tipografia premium da Central de Detalhes: rótulo discreto (peso 600, faint,
+     tracking amplo, dígitos tabulares) e título com peso equilibrado em --ink (hierarquia clara). */
+  .det-acc-k{font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);font-variant-numeric:tabular-nums}
+  .det-acc-t{font-size:15.5px;font-weight:600;line-height:1.4;letter-spacing:-.005em;color:var(--ink);word-break:break-word}
   .det-acc-chev{flex:none;color:var(--faint);display:flex;transition:transform .18s ease}
   .det-acc-chev svg{width:20px;height:20px}
   .det-acc[open]>summary .det-acc-chev{transform:rotate(90deg)}
   .det-acc-body{padding:0 15px 15px 56px}
-  .det-acc-l{font-size:13.5px;color:var(--soft);line-height:1.6;white-space:pre-wrap;word-break:break-word}
+  .det-acc-l{font-size:14px;font-weight:400;color:var(--soft);line-height:1.65;white-space:pre-wrap;word-break:break-word}
   .det-acc-empty{font-size:13px;color:var(--faint);font-style:italic}
   .det-acc-tools{display:inline-flex;gap:7px;margin-left:auto;text-transform:none}
   .det-acc-btn{font-size:11px;font-weight:700;color:var(--soft);background:var(--surface2);border:1px solid var(--line);border-radius:999px;padding:5px 12px;cursor:pointer;transition:border-color .12s,color .12s}
   .det-acc-btn:hover{border-color:var(--accent);color:var(--ink)}
   .det-acc-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  /* F3.5.4W-H1 (E2) — botão "Copiar tema/legenda" no cabeçalho do acordeão. Ícone discreto; vira "check"
+     verde no sucesso e vermelho na falha (sem alert). NÃO expande/recolhe o acordeão (o handler cancela
+     o toggle nativo do <summary>). Entra no trap de foco por ser <button> (nenhum tabindex necessário). */
+  .det-acc-copy{flex:none;display:inline-flex;align-items:center;gap:6px}
+  .det-acc-cbtn{flex:none;width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;color:var(--faint);background:var(--surface2);border:1px solid var(--line);border-radius:9px;cursor:pointer;transition:color .12s,border-color .12s,background .12s}
+  .det-acc-cbtn svg{width:16px;height:16px}
+  .det-acc-cbtn:hover{color:var(--accent);border-color:var(--accent);background:rgba(91,108,255,.10)}
+  .det-acc-cbtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .det-acc-cbtn.ok{color:var(--green);border-color:var(--green);background:rgba(52,211,153,.12)}
+  .det-acc-cbtn.err{color:var(--red);border-color:var(--red);background:rgba(248,113,113,.12)}
+  /* F3.5.4W-H1 (E5) — Observação interna da Social Media por tema (só interna; NUNCA vai ao cliente).
+     Callout distinto da legenda: fundo/hairline em accent + barra à esquerda. Preserva parágrafos. */
+  .det-acc-note{margin-top:12px;padding:11px 13px;background:rgba(91,108,255,.06);border:1px solid var(--line-soft);border-left:3px solid var(--accent);border-radius:10px}
+  .det-acc-note-k{display:block;font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:5px}
+  .det-acc-note-b{font-size:13.5px;color:var(--soft);line-height:1.6;white-space:pre-wrap;word-break:break-word}
   @media(max-width:560px){.det-acc-body{padding-left:15px}}
   .det-desc{font-size:13.5px;color:var(--soft);line-height:1.6;white-space:pre-wrap;word-break:break-word;background:var(--surface2);border:1px solid var(--line-soft);border-radius:14px;padding:15px}
   .det-check{display:flex;flex-direction:column;gap:2px}
@@ -1786,6 +1803,24 @@
   .dz-dl-f input,.dz-dl-f textarea{background:var(--surface);border:1px solid var(--line-soft);border-radius:11px;color:var(--ink);font:inherit;padding:11px 12px;resize:vertical}
   .dz-dl-f input:focus,.dz-dl-f textarea:focus{outline:none;border-color:var(--accent)}
   .dz-dl-err{color:#F87171;font-size:12.5px;font-weight:600;min-height:16px;margin-top:2px}
+  /* F3.5.4W-H1 (E5) — seção "Observações internas por tema" (opcional) no passo de prazo do Designer.
+     Colapsável; um textarea por tema. Só interna — nunca vai ao cliente (o portal serializa por allowlist). */
+  .dz-notes{text-align:left;margin:0 0 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface2);overflow:hidden}
+  .dz-notes>summary{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;list-style:none;-webkit-user-select:none;user-select:none}
+  .dz-notes>summary::-webkit-details-marker{display:none}
+  .dz-notes>summary:hover{background:rgba(255,255,255,.03)}
+  .dz-notes>summary:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;border-radius:12px}
+  .dz-notes-h{flex:1;font-size:13px;font-weight:700;color:var(--ink)}
+  .dz-notes-opt{font-weight:500;color:var(--faint)}
+  .dz-notes-chev{flex:none;color:var(--faint);display:flex;transition:transform .18s ease}
+  .dz-notes-chev svg{width:18px;height:18px}
+  .dz-notes[open]>summary .dz-notes-chev{transform:rotate(90deg)}
+  .dz-notes-sub{padding:0 14px 6px;font-size:11.5px;color:var(--faint);line-height:1.5}
+  .dz-notes-scroll{max-height:34vh;overflow-y:auto}
+  .dz-note-item{padding:6px 14px 12px;display:flex;flex-direction:column;gap:5px}
+  .dz-note-item label{font-size:11px;font-weight:600;color:var(--soft);letter-spacing:0;text-transform:none}
+  .dz-note-ta{width:100%;box-sizing:border-box;resize:vertical;font:inherit;font-size:13px;color:var(--ink);background:var(--surface);border:1px solid var(--line-soft);border-radius:9px;padding:8px 10px}
+  .dz-note-ta:focus{outline:none;border-color:var(--accent)}
   .dz-card-h{display:flex;align-items:center;gap:11px}
   .dz-card-av{width:38px;height:38px;border-radius:10px;background:rgba(34,211,238,.14);color:#22D3EE;display:flex;align-items:center;justify-content:center;flex:none}
   .dz-card-av svg{width:19px;height:19px}
@@ -6004,6 +6039,9 @@ function socialCol(t){
   if(isTaskCompleted(t))return 'concluido';
   if(isClientSector(secOf(t.sector).key)){const c=clientCol(t);
     if(c==='concluido')return 'concluido';if(c==='revisao')return 'revisao';if(c==='afazer')return 'afazer';
+    // F3.5.4W-H1(E3): designer atribuído mas AINDA NÃO iniciado (designerCol==='afazer') = "A Fazer" também
+    // na visão da Social/Prioridades — coerência com o quadro (col≡chip). Só vira andamento no start real.
+    if(hasDesigner(t)&&designerCol(t)==='afazer')return 'afazer';
     return 'andamento';}                 // enviado/aprovado/producao/reenviado = em andamento (produzindo/acompanhando)
   // F1.1 (fluxo coerente): se há designer atribuído, derivar do eixo do designer
   // (resolve "Social vê A Fazer enquanto designer já avançou" — status genérico congelado).
@@ -6744,7 +6782,7 @@ const FLOW_LABELS={
   planning:{social:{col:'afazer',label:'Em planejamento',color:'#9BA0AB',next:'Criar e enviar ao cliente'},designer:{col:'afazer',label:'A Fazer',color:'#9BA0AB',next:'Aguardando atribuição'},client:{col:'enviado',label:'Em preparação',color:'#6E7480',next:'Aguardar os temas'}},
   themes_sent:{social:{col:'andamento',label:'Temas enviados ao cliente',color:'#7C83FF',next:'Aguardar aprovação dos temas'},designer:{col:'afazer',label:'A Fazer',color:'#9BA0AB',next:'Aguardando atribuição'},client:{col:'analise',label:'Temas para sua aprovação',color:'#22D3EE',next:'Aprovar ou pedir ajuste dos temas'}},
   themes_approved:{social:{col:'andamento',label:'Temas aprovados — enviar ao designer',color:'#34D399',next:'Atribuir e enviar ao designer'},designer:{col:'afazer',label:'A Fazer',color:'#9BA0AB',next:'Aguardando atribuição'},client:{col:'analise',label:'Temas aprovados — produção em breve',color:'#22D3EE',next:'Aguardar a produção das artes'}},
-  awaiting_designer:{social:{col:'andamento',label:'Aguardando designer iniciar',color:'#7C83FF',next:'Aguardar o designer iniciar'},designer:{col:'afazer',label:'A Fazer',color:'#9BA0AB',next:'Iniciar a produção'},client:{col:'analise',label:'Temas aprovados — produção será iniciada',color:'#22D3EE',next:'Equipe inicia a produção'}},
+  awaiting_designer:{social:{col:'afazer',label:'Aguardando designer iniciar',color:'#7C83FF',next:'Aguardar o designer iniciar'},designer:{col:'afazer',label:'A Fazer',color:'#9BA0AB',next:'Iniciar a produção'},client:{col:'analise',label:'Temas aprovados — produção será iniciada',color:'#22D3EE',next:'Equipe inicia a produção'}},
   designer_producing:{social:{col:'andamento',label:'Designer em produção',color:'#A78BFA',next:'Aguardar a entrega do designer'},designer:{col:'andamento',label:'Designer em produção',color:'#F59E0B',next:'Finalizar e entregar'},client:{col:'analise',label:'Equipe em produção',color:'#A78BFA',next:'Aguardar a produção das artes'}},
   designer_revising:{social:{col:'revisao',label:'Designer em revisão/ajuste',color:'#60A5FA',next:'Aguardar a correção do designer'},designer:{col:'revisao',label:'Revisão/Ajuste',color:'#60A5FA',next:'Corrigir o ajuste e reenviar'},client:{col:'analise',label:'A equipe está produzindo as artes',color:'#A78BFA',next:'Aguardar a produção das artes'}},
   designer_delivered:{social:{col:'andamento',label:'Designer entregou — enviar ao cliente',color:'#34D399',next:'Revisar e enviar ao cliente'},designer:{col:'entregue',label:'Entregue',color:'#34D399',next:'Entregue — aguardando a Social'},client:{col:'analise',label:'A equipe está finalizando as artes',color:'#A78BFA',next:'Aguardar a versão final'}},
@@ -7229,7 +7267,7 @@ function openDetails(taskId){
   const req=t.by?state.users.find(u=>u.id===t.by):null;const reqName=req?req.name:'—';
   const cron=cronOf(t);const upd=lastUpdate(t);
   const emptyAv='<div class="av" style="width:44px;height:44px;background:var(--surface2);color:var(--faint)">'+svg('person')+'</div>';
-  let h='<div class="modal-back" data-modalbg="1" data-detmodal="1"><div class="sheet det-sheet" role="dialog" aria-modal="true" aria-label="Central de Detalhes da tarefa">'+
+  let h='<div class="modal-back" data-modalbg="1" data-detmodal="1" data-detsector="'+esc(t.sector||'')+'"><div class="sheet det-sheet" role="dialog" aria-modal="true" aria-label="Central de Detalhes da tarefa">'+
     '<div class="det-head"><div class="det-badge" style="background:'+withAlpha(s.color,.16)+';color:'+s.color+'">'+svg(s.icon)+'<span>'+esc(s.label)+'</span></div>'+
       '<button class="iconbtn det-x" data-modalclose="1">'+svg('close')+'</button></div>'+
     '<div class="det-title">'+esc(t.title||'Sem título')+'</div>'+
@@ -7272,13 +7310,24 @@ function openDetails(taskId){
     if(cron.list.length){
       h+='<div class="det-contents">'+cron.list.map(function(c){
         var num=(c._i+1<10?'0':'')+(c._i+1);
+        var hasTema=(c.tema!=null&&String(c.tema).trim())?1:0;
         var leg=(c.legenda!=null&&String(c.legenda).trim())?String(c.legenda):'';
+        // F3.5.4W-H1 (E2) — botões de cópia no cabeçalho: tema (lê .det-acc-t) e legenda (lê .det-acc-l).
+        // Só aparecem quando há conteúdo real (nunca copiar "(sem tema)"/legenda vazia).
+        var cp='<span class="det-acc-copy">'+
+          (hasTema?'<button type="button" class="det-acc-cbtn" data-detcopytheme="1" aria-label="Copiar tema" title="Copiar tema">'+svg('copy')+'</button>':'')+
+          (leg?'<button type="button" class="det-acc-cbtn" data-detcopycaption="1" aria-label="Copiar legenda" title="Copiar legenda">'+svg('copy')+'</button>':'')+
+        '</span>';
+        // F3.5.4W-H1 (E5) — observação interna por tema (só interna; nunca ao cliente). Só quando não-vazia.
+        var _dnv=(t.designerItemNotes||{})['i'+c._i];var _dn=(_dnv!=null)?String(_dnv).trim():'';
+        var _dnote=_dn?'<div class="det-acc-note"><span class="det-acc-note-k">Observação interna da Social Media</span><div class="det-acc-note-b">'+esc(_dn)+'</div></div>':'';
         return '<details class="det-acc"'+(_openAll?' open':'')+'>'+
           '<summary class="det-acc-sum"><span class="det-content-n">'+(c._i+1)+'</span>'+
             '<span class="det-acc-h"><span class="det-acc-k">'+_word+' '+num+'</span>'+
             '<span class="det-acc-t">'+esc(c.tema||'(sem tema)')+'</span></span>'+
+            cp+
             '<span class="det-acc-chev">'+svg('arr')+'</span></summary>'+
-          '<div class="det-acc-body">'+(leg?'<div class="det-acc-l">'+esc(leg)+'</div>':'<div class="det-acc-empty">Sem legenda para este item.</div>')+'</div>'+
+          '<div class="det-acc-body">'+(leg?'<div class="det-acc-l">'+esc(leg)+'</div>':'<div class="det-acc-empty">Sem legenda para este item.</div>')+_dnote+'</div>'+
         '</details>';
       }).join('')+'</div>';
     }else{h+='<div class="emptyline">Nenhum conteúdo preenchido.</div>';}
@@ -7287,8 +7336,8 @@ function openDetails(taskId){
     // sem alterar schema/regra de negócio); acordeões abertos por padrão. Briefing completo abaixo, se houver.
     var _leg=cardsFieldOf(t,'legenda'),_obs=cardsFieldOf(t,'obs');
     h+='<div class="det-sec">Conteúdo do card</div><div class="det-contents">'+
-      '<details class="det-acc" open><summary class="det-acc-sum"><span class="det-content-n">1</span><span class="det-acc-h"><span class="det-acc-k">CARD · LEGENDA</span><span class="det-acc-t">Legenda</span></span><span class="det-acc-chev">'+svg('arr')+'</span></summary><div class="det-acc-body">'+(_leg?'<div class="det-acc-l">'+esc(_leg)+'</div>':'<div class="det-acc-empty">Sem legenda cadastrada.</div>')+'</div></details>'+
-      '<details class="det-acc" open><summary class="det-acc-sum"><span class="det-content-n">2</span><span class="det-acc-h"><span class="det-acc-k">CARD · OBSERVAÇÕES</span><span class="det-acc-t">Observações</span></span><span class="det-acc-chev">'+svg('arr')+'</span></summary><div class="det-acc-body">'+(_obs?'<div class="det-acc-l">'+esc(_obs)+'</div>':'<div class="det-acc-empty">Sem observações.</div>')+'</div></details>'+
+      '<details class="det-acc" open><summary class="det-acc-sum"><span class="det-content-n">1</span><span class="det-acc-h"><span class="det-acc-k">CARD · LEGENDA</span><span class="det-acc-t">Legenda</span></span>'+(_leg?'<span class="det-acc-copy"><button type="button" class="det-acc-cbtn" data-detcopycaption="1" aria-label="Copiar legenda" title="Copiar legenda">'+svg('copy')+'</button></span>':'')+'<span class="det-acc-chev">'+svg('arr')+'</span></summary><div class="det-acc-body">'+(_leg?'<div class="det-acc-l">'+esc(_leg)+'</div>':'<div class="det-acc-empty">Sem legenda cadastrada.</div>')+'</div></details>'+
+      '<details class="det-acc" open><summary class="det-acc-sum"><span class="det-content-n">2</span><span class="det-acc-h"><span class="det-acc-k">CARD · OBSERVAÇÕES</span><span class="det-acc-t">Observações</span></span>'+(_obs?'<span class="det-acc-copy"><button type="button" class="det-acc-cbtn" data-detcopycaption="1" aria-label="Copiar observações" title="Copiar observações">'+svg('copy')+'</button></span>':'')+'<span class="det-acc-chev">'+svg('arr')+'</span></summary><div class="det-acc-body">'+(_obs?'<div class="det-acc-l">'+esc(_obs)+'</div>':'<div class="det-acc-empty">Sem observações.</div>')+'</div></details>'+
       '</div>';
     if(t.desc){h+='<div class="det-sec">Briefing completo</div><div class="det-desc">'+esc(t.desc)+'</div>';}
   }else if(t.desc){h+='<div class="det-sec">Briefing</div><div class="det-desc">'+esc(t.desc)+'</div>';}
@@ -7778,7 +7827,7 @@ async function sendToDesigner(taskId,designerId,dl){
     history:firebase.firestore.FieldValue.arrayUnion({
       type:'enviado_designer',label:'Enviado ao designer '+(d.name||'')+(dl.endDate?(' · prazo '+fmtDateBR(dl.endDate)+(dl.endTime?' '+dl.endTime:'')):''),
       by:u.name||'',byId:u.id||null,at:now,designerId:designerId,channel:'designer_flow',
-      startDate:dl.startDate||'',startTime:dl.startTime||'',endDate:dl.endDate||'',endTime:dl.endTime||'',note:dl.obs||''
+      startDate:dl.startDate||'',startTime:dl.startTime||'',endDate:dl.endDate||'',endTime:dl.endTime||'',note:dl.obs||'',notesCount:(dl.itemNotesPresent?Object.keys(dl.itemNotes||{}).length:0)
     })
   };
   // F3.3.77A — EDIÇÃO DE MÍDIA = fluxo interno Social→Designer→Finalizado, SEM cliente. Remove os campos
@@ -7793,6 +7842,10 @@ async function sendToDesigner(taskId,designerId,dl){
     delete patch.finalApprovalRequired; delete patch.finalApprovalCompleted;
   }
   if(dl.obs&&String(dl.obs).trim())patch.desc=String(dl.obs).trim();
+  // F3.5.4W-H1 (E5) — observações internas por tema: só grava quando a seção existiu (setor de cliente
+  // com temas). Escreve o mapa COMPLETO (substitui) p/ persistir edições e limpezas; NUNCA vaza ao cliente
+  // (campo top-level; o portal serializa só {i,cs,tema,legenda,feed,story} por allowlist). Retrocompatível.
+  if(dl.itemNotesPresent){ patch.designerItemNotes=(dl.itemNotes&&typeof dl.itemNotes==='object')?dl.itemNotes:{}; }
   // otimista
   // F3.3.17-R5/C4 — estado OTIMISTA = MESMOS campos do patch persistido (menos history), para a UI ler
   // o estado COMPLETO antes do snapshot (inclui socialOwnerId/operationalStatus/finalApprovalCompleted),
@@ -7810,6 +7863,24 @@ function openDesignerDeadline(taskId,designerId){
   const t=state.tasks.find(x=>x.id===taskId);if(!t)return;
   const d=state.users.find(u=>u.id===designerId);if(!d)return;
   const t0=todayStr();const t3=addDaysStr(t0,3);
+  // F3.5.4W-H1 (E5) — observações INTERNAS por tema (opcional), só p/ setor de cliente com temas. Chave
+  // estável = índice do item (_i), espelhando clientItems (i<idx>). Prefill com notas já existentes (edição
+  // na reatribuição). edicao_midia/vídeos ficam fora (mantêm apenas a observação geral #dlObs).
+  var _cronD=isClientSector(secOf(t.sector).key)?cronOf(t):null;
+  var _existNotes=(t.designerItemNotes&&typeof t.designerItemNotes==='object')?t.designerItemNotes:{};
+  var _notesUI='';
+  if(_cronD&&_cronD.list&&_cronD.list.length){
+    _notesUI='<details class="dz-notes"><summary><span class="dz-notes-h">Observação interna para o Designer <span class="dz-notes-opt">— por tema, opcional</span></span><span class="dz-notes-chev">'+svg('arr')+'</span></summary>'+
+      '<div class="dz-notes-sub">Visível apenas para o Designer na Central de Detalhes. Nunca aparece para o cliente.</div>'+
+      '<div class="dz-notes-scroll">'+_cronD.list.map(function(c){
+        var _n=(c._i+1<10?'0':'')+(c._i+1);
+        var _tp=(c.tema!=null&&String(c.tema).trim())?String(c.tema):'(sem tema)';
+        var _cur=(_existNotes['i'+c._i]!=null)?String(_existNotes['i'+c._i]):'';
+        return '<div class="dz-note-item"><label>Tema '+_n+' · '+esc(_tp.length>64?_tp.slice(0,64)+'…':_tp)+'</label>'+
+          '<textarea class="dz-note-ta" data-itemnote="'+c._i+'" rows="2" placeholder="Instrução interna para este tema (opcional)">'+esc(_cur)+'</textarea></div>';
+      }).join('')+'</div>'+
+    '</details>';
+  }
   document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1"><div class="sheet dz-sheet">'+
     '<button class="iconbtn sp-x" data-modalclose="1">'+svg('close')+'</button>'+
     '<div class="dz-ic">'+svg('group')+'</div>'+
@@ -7825,6 +7896,7 @@ function openDesignerDeadline(taskId,designerId){
       '<div class="dz-dl-f"><label>Observação / instrução (opcional)</label><textarea id="dlObs" rows="3" placeholder="Ex.: usar identidade da campanha; priorizar o Feed."></textarea></div>'+
       '<div class="dz-dl-err" id="dlErr"></div>'+
     '</div>'+
+    _notesUI+
     '<div class="sp-actions"><button class="btn ghost" data-senddesigner="'+taskId+'">Voltar</button>'+
       '<button class="btn sp-go" data-designersend="'+taskId+'|'+designerId+'">'+svg('send')+'Enviar para o designer</button></div>'+
   '</div></div>';
@@ -9858,10 +9930,61 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeCardMenus();
   // com data-detmodal — modais de formulário não são afetados (não perdem digitação).
   if(document.querySelector('.modal-back[data-detmodal]')){closeModal();}
 }});
+/* ===== F3.5.4W-H1 (E2) — CÓPIA de tema/legenda na Central de Detalhes ===== */
+// Escreve SÓ texto puro (nunca HTML): 1º IPC do main (determinístico), depois navigator.clipboard,
+// por fim execCommand. Retorna boolean p/ o feedback discreto do botão.
+async function detClipWrite(text){
+  var s=String(text==null?'':text);
+  try{ if(window.desktopAPI&&typeof window.desktopAPI.clipboardWriteText==='function'){ var ok=await window.desktopAPI.clipboardWriteText(s); if(ok)return true; } }catch(_){}
+  try{ if(navigator.clipboard&&navigator.clipboard.writeText){ await navigator.clipboard.writeText(s); return true; } }catch(_){}
+  try{ var ta=document.createElement('textarea'); ta.value=s; ta.setAttribute('readonly',''); ta.style.position='fixed'; ta.style.top='-1000px'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); var r=(document.execCommand&&document.execCommand('copy')); document.body.removeChild(ta); if(r)return true; }catch(_){}
+  return false;
+}
+// Observabilidade SANITIZADA: SÓ metadados. NUNCA texto/tema/legenda/cliente/nome/uid/tarefa/token.
+function detCopyObs(kind, ok, textLen){
+  try{
+    var back=document.querySelector('.modal-back[data-detmodal]');
+    var sector=(back&&back.getAttribute('data-detsector'))||'';
+    var topic='details.copy.'+(kind==='theme'?'theme':'caption')+'_'+(ok?'succeeded':'failed');
+    var payload={contentType:(kind==='theme'?'theme':'caption'),contentLength:(typeof textLen==='number'?textLen:0),taskSector:sector,appVersion:DESK_VER,timestamp:Date.now()};
+    if(window.desktopAPI&&typeof window.desktopAPI.diagLog==='function') window.desktopAPI.diagLog(topic,payload);
+  }catch(_){}
+}
+// Feedback discreto (troca de ícone; sem alert); NÃO expande/recolhe o acordeão, NÃO fecha o modal,
+// NÃO move a tarefa, NÃO gera atividade/notificação/mudança de status.
+async function detCopyFromButton(btn, kind, text){
+  if(!btn)return;
+  if(btn._detOrigTip==null){ btn._detOrigTip=btn.getAttribute('title')||('Copiar '+(kind==='theme'?'tema':'legenda')); }
+  var orig=btn._detOrigTip, len=(text==null?0:String(text).length), ok=false;
+  try{ ok=await detClipWrite(text); }catch(_){ ok=false; }
+  detCopyObs(kind, ok, len);
+  if(btn._detCopyT){ clearTimeout(btn._detCopyT); btn._detCopyT=null; }
+  if(ok){
+    btn.classList.remove('err'); btn.classList.add('ok'); btn.innerHTML=svg('check');
+    var okTip=(kind==='theme'?'Tema copiado':(/observ/i.test(orig)?'Observação copiada':'Legenda copiada'));
+    btn.setAttribute('title',okTip); btn.setAttribute('aria-label',okTip);
+    btn._detCopyT=setTimeout(function(){ btn.classList.remove('ok'); btn.innerHTML=svg('copy'); btn.setAttribute('title',orig); btn.setAttribute('aria-label',orig); btn._detCopyT=null; },1600);
+  }else{
+    btn.classList.remove('ok'); btn.classList.add('err');
+    var errTip='Não foi possível copiar';
+    btn.setAttribute('title',errTip); btn.setAttribute('aria-label',errTip);
+    try{ flashToast('Não foi possível copiar.'); }catch(_){}
+    btn._detCopyT=setTimeout(function(){ btn.classList.remove('err'); btn.setAttribute('title',orig); btn.setAttribute('aria-label',orig); btn._detCopyT=null; },2200);
+  }
+}
 document.addEventListener('click',async e=>{
   if(!state.user)return;                       // login tem seu proprio handler
   if(!(e.target&&e.target.closest))return;
   const g=sel=>e.target.closest(sel);let el;
+  // F3.5.4W-H1 (E2) — Copiar tema/legenda: intercepta ANTES de tudo e cancela o toggle nativo do <summary>.
+  if(el=g('[data-detcopytheme],[data-detcopycaption]')){
+    e.preventDefault(); e.stopPropagation();
+    var _cap=el.hasAttribute('data-detcopycaption'); var _acc=el.closest('.det-acc');
+    var _node=_cap?(_acc&&_acc.querySelector('.det-acc-body .det-acc-l')):(_acc&&_acc.querySelector('.det-acc-t'));
+    var _txt=_node?(_node.textContent||''):'';
+    detCopyFromButton(el, _cap?'caption':'theme', _txt);
+    return;
+  }
   if(el=g('[data-tab]')){state.form=null;state.boardSector=null;state.personBoard=null;state.roleBoards=false;state.flowView=null;state.designerBoard=null;state.socialBoard=null;state.tab=el.dataset.tab;closeModal();render();return;}
   if(el=g('[data-fab]')){state.tab='tarefas';openNewTaskWizard();return;}   // F3.3.75A — sempre ETAPA 1 (Setor), sem reaproveitar estado
   if(el=g('[data-sector]')){state.boardSector=el.dataset.sector;state.personBoard=null;state.roleBoards=false;state.flowView=null;state.designerBoard=null;state.socialBoard=null;boardCol=0;boardMine=false;boardQuery='';render();return;}
@@ -9946,7 +10069,11 @@ document.addEventListener('click',async e=>{
     if(!sd||!st||!ed||!et){fail('Preencha início e término completos (data e hora).');return;}
     const sMs=dtMs(sd,st),eMs=dtMs(ed,et);
     if(eMs!=null&&sMs!=null&&eMs<sMs){fail('O término não pode ser antes do início.');return;}
-    sendToDesigner(p[0],p[1],{startDate:sd,startTime:st,endDate:ed,endTime:et,obs:obs});
+    // F3.5.4W-H1 (E5) — coleta as observações internas por tema (se a seção existir). Chave i<idx> = índice
+    // estável do item. A PRESENÇA da seção manda gravar o mapa completo (persiste inclusive limpezas).
+    var _noteTAs=document.querySelectorAll('textarea[data-itemnote]');var _itemNotes={};
+    _noteTAs.forEach(function(ta){var _ix=ta.getAttribute('data-itemnote');var _v=(ta.value||'').trim();if(_ix!=null&&_v)_itemNotes['i'+_ix]=_v;});
+    sendToDesigner(p[0],p[1],{startDate:sd,startTime:st,endDate:ed,endTime:et,obs:obs,itemNotes:_itemNotes,itemNotesPresent:_noteTAs.length>0});
     return;
   }
   if(el=g('[data-itemfix]')){const p=el.dataset.itemfix.split('|');openItemFix(p[0],+p[1],p[2]);return;}

@@ -1,7 +1,7 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.214",
-  "description": "Agenda ID Seven Desktop 1.0.214-compact-cards-details",
+  "version": "1.0.215",
+  "description": "Agenda ID Seven Desktop 1.0.215-details-workflow-approval",
   "main": "dist/main/main.js",
   "private": true,
   "scripts": {

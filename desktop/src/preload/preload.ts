@@ -34,6 +34,8 @@ contextBridge.exposeInMainWorld("desktopAPI", {
   // F3.5.3 — COLAGEM explícita no formulário (Legenda/Tema/Observações): texto simples do clipboard
   // via módulo do Electron no main (determinístico; independe do accelerator nativo). Nunca HTML.
   clipboardReadText: (): Promise<string> => ipcRenderer.invoke("clipboard-read-text"),
+  // F3.5.4W-H1 (E2) — ESCRITA de texto simples (Copiar tema/legenda na Central de Detalhes). Só texto puro.
+  clipboardWriteText: (s: string): Promise<boolean> => ipcRenderer.invoke("clipboard-write-text", s),
   // F3.3.10 — main -> renderer: CAPTURA p/ a Central de Notificações (histórico local). Capture-only:
   // o main encaminha o MESMO payload já entregue (toast OU nativa), sem alterar roteamento/entrega.
   onNotifHistory: (cb: (payload: any) => void) => {

@@ -1064,6 +1064,10 @@ app.whenReady().then(() => {
   // F3.5.3 — leitura de texto da área de transferência p/ o pipeline explícito de COLAGEM do
   // formulário (Legenda/Tema/Observações). SOMENTE texto simples; nunca HTML executável.
   ipcMain.handle("clipboard-read-text", () => { try { return String(clipboard.readText() || ""); } catch { return ""; } });
+  // F3.5.4W-H1 (E2) — ESCRITA de texto simples na área de transferência p/ os botões "Copiar tema" /
+  // "Copiar legenda" da Central de Detalhes. SOMENTE texto puro (nunca HTML); determinístico via módulo
+  // do Electron no main; espelha clipboard-read-text. Retorna boolean p/ o renderer decidir o feedback.
+  ipcMain.handle("clipboard-write-text", (_e, s: string) => { try { clipboard.writeText(String(s ?? "")); return true; } catch { return false; } });
   ipcMain.handle("autostart-get", () => isAutoStart());
   ipcMain.handle("autostart-set", (_e, v: boolean) => { setAutoStart(v); return isAutoStart(); });
   ipcMain.handle("app-quit", () => { realQuit(); });
