@@ -1,0 +1,685 @@
+{
+  "feature": "F3.5.4W-H1",
+  "ranAt": "2026-08-04T12:02:32.177Z",
+  "node": "v22.22.2",
+  "tree": "HEAD commitado c6fc026 (1.0.215); working tree apenas com os scripts de prova NOVOS (não afetam suites)",
+  "base": "8ede593 (F3.5.4W, 1.0.214)",
+  "method": {
+    "now": "node scripts/<suite>.test.mjs no desktop/ real",
+    "base": "árvore-base materializada com git archive 8ede593 (+symlink node_modules) para suites sem git; suites com git classificadas pelas expectativas pinadas (bytes idênticos à base); fingerprint md5 do conjunto de asserts falhos comparado base×HEAD",
+    "env": "suites playwright exigem NODE_PATH=/opt/node22/lib/node_modules"
+  },
+  "summary": {
+    "GREEN": 56,
+    "GREEN(env)": 2,
+    "BASE-RED": 21,
+    "PIN-RED/NEW-RED": 1
+  },
+  "delta": "ZERO regressão comportamental vs 8ede593. Única mudança de status base→HEAD: f354vh1-session-persistence (39/40; só o assert-pin de versão 1.0.214→1.0.215, bump commitado da própria fase — reportado em destaque).",
+  "suites": [
+    {
+      "suite": "f3311-baseline-freeze.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f332-panel.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f333-notif.test.mjs",
+      "exit": 1,
+      "pass": 1,
+      "fail": 4,
+      "classification": "BASE-RED",
+      "evidence": "executada na árvore-base 8ede593 (git archive): exit=1; conjunto de asserts falhos IDÊNTICO (fingerprint md5 igual base×HEAD)",
+      "tail": " | F3.3.3 NOTIF RESULT: 141 PASS / 5 FAIL |  | ::error::F3.3.3 NOTIF FALHOU"
+    },
+    {
+      "suite": "f334-flow-audit.test.mjs",
+      "exit": 0,
+      "pass": 0,
+      "fail": 3,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f334b-completion-equiv.test.mjs",
+      "exit": 0,
+      "pass": 0,
+      "fail": 32,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f335-contract.test.mjs",
+      "exit": 0,
+      "pass": 0,
+      "fail": 3,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f3356-auth-core.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f336-android-contract.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f337-android-parity.test.mjs",
+      "exit": 0,
+      "pass": 0,
+      "fail": 0,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f3370-d3r10b-card-canonical-pwa-cutoff.test.mjs",
+      "exit": 1,
+      "pass": null,
+      "fail": null,
+      "classification": "BASE-RED",
+      "evidence": "executada na árvore-base 8ede593 (git archive): exit=1; conjunto de asserts falhos IDÊNTICO (fingerprint md5 igual base×HEAD)",
+      "tail": "    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26) |     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5) |  | Node.js v22.22.2"
+    },
+    {
+      "suite": "f3373i3-agenda-create-event.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f3373i6c11-auth-logout-tray-diag.test.mjs",
+      "exit": 1,
+      "pass": 2,
+      "fail": 2,
+      "classification": "BASE-RED",
+      "evidence": "executada na árvore-base 8ede593 (git archive): exit=1; conjunto de asserts falhos IDÊNTICO (fingerprint md5 igual base×HEAD)",
+      "tail": "  FAIL — D2 IPC auth-logout e auth-self diagnosticados (sem expor token) |   FAIL — E2 renderer loga o resultado do authSelf no boot |   FAIL — F3 boot ainda decide login via authSelf (startApp se ok; login se no_session) |   FAIL — F5 tray de fechar/minimizar PRESERVADO (X→hide; só realQuit destrói)"
+    },
+    {
+      "suite": "f3373i6c14-settings-completion.test.mjs",
+      "exit": 1,
+      "pass": null,
+      "fail": null,
+      "classification": "BASE-RED",
+      "evidence": "executada na árvore-base 8ede593 (git archive): exit=1; conjunto de asserts falhos IDÊNTICO (fingerprint md5 igual base×HEAD)",
+      "tail": " | RESULTADO: 30/31 PASS — HÁ FALHAS |  |   FAIL — E5 estrutura D9R2 preservada (cfg-head/cfg-wrap + 8 espaçadores de seção)"
+    },
+    {
+      "suite": "f3373i6c16-roteiro-parity.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f3373i6c18c-card-prewarm.test.mjs",
+      "exit": 1,
+      "pass": null,
+      "fail": null,
+      "classification": "BASE-RED",
+      "evidence": "executada na árvore-base 8ede593 (git archive): exit=1",
+      "tail": " | RESULTADO: 44/45 PASS — HÁ FALHAS |  |   FAIL — A1 versão da candidata (linha 1.0.184 — F3.4.7; aceita -QA/-QA.n no build QA)"
+    },
+    {
+      "suite": "f3373i6c18h-stable-token.test.mjs",
+      "exit": 1,
+      "pass": 29,
+      "fail": 1,
+      "classification": "BASE-RED",
+      "evidence": "executada na árvore-base 8ede593 (git archive): exit=1",
+      "tail": " | RESULTADO: 29 PASS, 1 FAIL |  |   FAIL — H3 [gate20] versão da candidata (linha 1.0.184 — F3.4.7; aceita -QA/-QA.n no build QA)"
+    },
+    {
+      "suite": "f3373i6c2-agenda-crud-lifecycle.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f3373i6c3a-desktop-permanent-delete.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f3374d-restore-contract.test.mjs",
+      "exit": 1,
+      "pass": 16,
+      "fail": 1,
+      "classification": "BASE-RED",
+      "evidence": "executada na árvore-base 8ede593 (git archive): exit=1; conjunto de asserts falhos IDÊNTICO (fingerprint md5 igual base×HEAD)",
+      "tail": " | RESULTADO: 16 PASS, 1 FAIL | HONESTIDADE: prova o CONTRATO restaurado na base 1.0.168; a prova FÍSICA no | WhatsApp pertence à fase 74E (após autorização; sem build nesta fase)."
+    },
+    {
+      "suite": "f3374k-production-invariance.test.mjs",
+      "exit": 1,
+      "pass": 26,
+      "fail": 9,
+      "classification": "BASE-RED",
+      "evidence": "gate congelado de release histórica (pin 1.0.177(-QA.4) + byte-idêntico a tags históricas); bytes da suite idênticos na base; base=1.0.214 ≠ pin ⇒ mesma falha na base",
+      "tail": "  FAIL — K-proc src/main/firebase.ts byte-idêntico ao QA |   FAIL — K-pkg versão QA=1.0.177-QA.4 → candidata=1.0.177 |   FAIL — K-pkg package.json idêntico exceto version |   FAIL — K-builder electron-builder.yml byte-idêntico ao QA"
+    },
+    {
+      "suite": "f3375a-wizard-reset-roteiro-no-designer.test.mjs",
+      "exit": 0,
+      "pass": 25,
+      "fail": 0,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f3376a-sla-red.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f3377a-media-editing.test.mjs",
+      "exit": 0,
+      "pass": 79,
+      "fail": 0,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f3377a-r3-single-producer-clock.test.mjs",
+      "exit": 1,
+      "pass": 19,
+      "fail": 3,
+      "classification": "BASE-RED",
+      "evidence": "executada na árvore-base 8ede593 (git archive): exit=1; conjunto de asserts falhos IDÊNTICO (fingerprint md5 igual base×HEAD)",
+      "tail": "RESULTADO: 19 PASS, 3 FAIL | HONESTIDADE (F3.4.3C): o PRODUTOR ÚNICO agora vive no MAIN (slaScheduler + notifier), que | sobrevive à janela oculta e entrega pelo deliverNotification. O renderer não emite mais SLA/ | atribuição (só visual). Relógio/linha do tempo canônicos preservam os marcos por setor."
+    },
+    {
+      "suite": "f3377a-r4b-http-date-clock.test.mjs",
+      "exit": 0,
+      "pass": 36,
+      "fail": 0,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f338-exec-panel.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f339-reports.test.mjs",
+      "exit": 0,
+      "pass": 0,
+      "fail": 3,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f33A-notif-central.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f33B-form-typing.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f33C-assignment-toast.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f33D-background-notif.test.mjs",
+      "exit": 1,
+      "pass": null,
+      "fail": null,
+      "classification": "BASE-RED",
+      "evidence": "executada na árvore-base 8ede593 (git archive): exit=1; conjunto de asserts falhos IDÊNTICO (fingerprint md5 igual base×HEAD)",
+      "tail": " | F3.3.10 (F3.4.3C) BACKGROUND-NOTIF — produtor único no MAIN: 8 PASS / 10 FAIL |  | ::error:: atribuição em background divergiu do contrato produtor-único-no-main"
+    },
+    {
+      "suite": "f33E-main-notifier.test.mjs",
+      "exit": 1,
+      "pass": null,
+      "fail": null,
+      "classification": "BASE-RED",
+      "evidence": "executada na árvore-base 8ede593 (git archive): exit=1; conjunto de asserts falhos IDÊNTICO (fingerprint md5 igual base×HEAD)",
+      "tail": " | F3.3.10 (F3.4.3C) MAIN-NOTIFIER — produtor único no MAIN: 8 PASS / 13 FAIL |  | ::error:: notifier de atribuição no main divergiu do contrato produtor-único"
+    },
+    {
+      "suite": "f33F-bg-notify.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f33G-editprazo-write.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f33H-hotfix-ui.test.mjs",
+      "exit": 0,
+      "pass": 0,
+      "fail": 3,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f33I-flow-presentation.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f33J-flow-columns.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f33K-notif-actor.test.mjs",
+      "exit": 1,
+      "pass": null,
+      "fail": null,
+      "classification": "BASE-RED",
+      "evidence": "executada na árvore-base 8ede593 (git archive): exit=1; conjunto de asserts falhos IDÊNTICO (fingerprint md5 igual base×HEAD)",
+      "tail": "    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26) |     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5) |  | Node.js v22.22.2"
+    },
+    {
+      "suite": "f33L-account-anchor.test.mjs",
+      "exit": 0,
+      "pass": 0,
+      "fail": 3,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f33N-assign-baseline-fix.test.mjs",
+      "exit": 1,
+      "pass": null,
+      "fail": null,
+      "classification": "BASE-RED",
+      "evidence": "executada na árvore-base 8ede593 (git archive): exit=1; conjunto de asserts falhos IDÊNTICO (fingerprint md5 igual base×HEAD)",
+      "tail": " | 6 PASS / 17 FAIL |  | ::error:: prova do baseline/transição no main falhou"
+    },
+    {
+      "suite": "f33O-flow-audit.test.mjs",
+      "exit": 0,
+      "pass": 0,
+      "fail": 3,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f33P-designer-delivery.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f351f-rollforward-equivalence.test.mjs",
+      "exit": 1,
+      "pass": null,
+      "fail": null,
+      "classification": "BASE-RED",
+      "evidence": "gate congelado de release histórica (pin 1.0.186 (esperado) — falha idêntica em 1.0.214); bytes da suite idênticos na base; base=1.0.214 ≠ pin ⇒ mesma falha na base",
+      "tail": "  FAIL package-lock.json muda além de version: -  \"version\": \"1.0.184\", | +  \"version\": \"1.0.215\", | -      \"version\": \"1.0.184\", | +      \"version\": \"1.0.215\", |   FAIL version == 1.0.215 (esperado 1.0.186) |  | F3.5.1F equivalence GATE: 5 FALHA(S) — 1.0.186 NÃO é roll-forward byte-idêntico da 1.0.184. NÃO PUBLICAR."
+    },
+    {
+      "suite": "f352-cards-channel-substitution.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f352-cards-notify.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f352-cards-recipient.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f352-cards-source-invariance.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f352a-cards-interval.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f352b-cards-kanban-layout.test.mjs",
+      "exit": 1,
+      "pass": 34,
+      "fail": 19,
+      "classification": "BASE-RED",
+      "evidence": "gate congelado de release histórica (pin 1.0.189 + byte-idêntico 1.0.188); bytes da suite idênticos na base; base=1.0.214 ≠ pin ⇒ mesma falha na base",
+      "tail": " - 7g. bgNotify.ts BYTE-IDÊNTICO [got≠expected] |  - 8. Card Premium/cliente — canSendToClient BYTE-IDÊNTICO à 1.0.188 |  - 9. desktop/package.json version == 1.0.189 [got≠expected] |  - 10. NENHUM arquivo fora de desktop/ mudou vs 1.0.188 (Android/Worker/Functions/Rules intactos) [got≠expected]"
+    },
+    {
+      "suite": "f352c-cards-content-move.test.mjs",
+      "exit": 1,
+      "pass": 56,
+      "fail": 24,
+      "classification": "BASE-RED",
+      "evidence": "gate congelado de release histórica (pin 1.0.190 + congelados byte-idênticos); bytes da suite idênticos na base; base=1.0.214 ≠ pin ⇒ mesma falha na base",
+      "tail": " - 6. congelado firebase.ts BYTE-IDÊNTICO |  - 6z. bloco de notas é gated por s.key (não-cards inalterado) |  - 6v. package.json version == 1.0.190 |  - 6w. NENHUM arquivo fora de desktop/ mudou (Android/Worker/Functions/Rules)"
+    },
+    {
+      "suite": "f352d-cards-board-card-proportion.test.mjs",
+      "exit": 1,
+      "pass": 36,
+      "fail": 17,
+      "classification": "BASE-RED",
+      "evidence": "gate congelado de release histórica (pin 1.0.191 + congelados byte-idênticos); bytes da suite idênticos na base; base=1.0.214 ≠ pin ⇒ mesma falha na base",
+      "tail": "  ✗ 5. congelado slaScheduler.ts BYTE-IDÊNTICO a 1.0.190 |   ✗ 5. congelado firebase.ts BYTE-IDÊNTICO a 1.0.190 |   ✗ 6v. package.json version == 1.0.191 |   ✗ 6w. package-lock version == 1.0.191"
+    },
+    {
+      "suite": "f353-durable-notifications.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f353-paste-recovery.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f353a-actor-photo.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f354-designer-autoload.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f354-kanban-unified.test.mjs",
+      "exit": 1,
+      "pass": null,
+      "fail": null,
+      "classification": "BASE-RED",
+      "evidence": "executada na árvore-base 8ede593 (git archive): exit=1; conjunto de asserts falhos IDÊNTICO (fingerprint md5 igual base×HEAD)",
+      "tail": "    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26) |     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5) |  | Node.js v22.22.2"
+    },
+    {
+      "suite": "f354-notifications-reliability.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f354e-card-template-unification.test.mjs",
+      "exit": 1,
+      "pass": null,
+      "fail": null,
+      "classification": "BASE-RED",
+      "evidence": "executada na árvore-base 8ede593 (git archive): exit=1",
+      "tail": "    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26) |     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5) |  | Node.js v22.22.2"
+    },
+    {
+      "suite": "f354f-sla-designer-live-timer.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f354f-task-edit-update-notification.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f354g-bell-notification-panel.test.mjs",
+      "exit": 1,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN(env)",
+      "evidence": "GREEN com NODE_PATH=/opt/node22/lib/node_modules (15/15); verde na base com o mesmo env (sem delta)",
+      "tail": "  ] | } |  | Node.js v22.22.2"
+    },
+    {
+      "suite": "f354g-sla-top-monitor.test.mjs",
+      "exit": 1,
+      "pass": null,
+      "fail": null,
+      "classification": "BASE-RED",
+      "evidence": "ReferenceError kbv2ContentSlot no eval VM (NAMES_CARD congelado sem kbv2ContentSlot, introduzido no próprio 8ede593); pipeline da suite REPRODUZIDO contra os bytes-base ⇒ MESMO ReferenceError",
+      "tail": "    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26) |     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5) |  | Node.js v22.22.2"
+    },
+    {
+      "suite": "f354h-red-notification-boundary.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f354i-cronograma-save-send-client.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f354k-notification-all-window-states.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f354l-sla-central-persistent-reminders.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f354m-visual-fix.test.mjs",
+      "exit": 2,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN(env)",
+      "evidence": "GREEN com NODE_PATH=/opt/node22/lib/node_modules (playwright global); verde na base com o mesmo env (sem delta)",
+      "tail": "Playwright ausente — rode com NODE_PATH=/opt/node22/lib/node_modules"
+    },
+    {
+      "suite": "f354n-startup.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f354n-watchdog.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f354o-common-notification-grouping.test.mjs",
+      "exit": 0,
+      "pass": 0,
+      "fail": 1,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f354p-sla-decision-actions.test.mjs",
+      "exit": 1,
+      "pass": null,
+      "fail": null,
+      "classification": "BASE-RED",
+      "evidence": "executada na árvore-base 8ede593 (git archive): exit=1",
+      "tail": " | F3.5.4P: 125 passaram, 1 falharam → X18 versão 1.0.206 (got \"1.0.215\" exp \"1.0.206\") |  |   ✗ X18 versão 1.0.206 (got \"1.0.215\" exp \"1.0.206\")"
+    },
+    {
+      "suite": "f354q-task-idle-detection.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f354r-priority-assistant.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f354u-h1-notification-hotfix.test.mjs",
+      "exit": 0,
+      "pass": null,
+      "fail": null,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f354u-premium-common-notifications.test.mjs",
+      "exit": 0,
+      "pass": 0,
+      "fail": 108,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f354uh2-atomic-central-alert-processing.test.mjs",
+      "exit": 0,
+      "pass": 0,
+      "fail": 22,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f354v-custom-video-quantity.test.mjs",
+      "exit": 0,
+      "pass": 72,
+      "fail": 0,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f354vh1-session-persistence.test.mjs",
+      "exit": 1,
+      "pass": 39,
+      "fail": 1,
+      "classification": "PIN-RED (estrita/base-exec: NEW-RED)",
+      "evidence": "39/40 PASS; ÚNICO fail = assert 39 \"versão 1.0.214 no package.json\" (pin de release da fase anterior; árvore agora 1.0.215 por bump COMMITADO em 8f7291b). Verde na base por execução direta (exit=0). Nenhum assert comportamental falha. Padrão do repo: 8ede593 re-pinou este assert de 1.0.213→1.0.214 no commit da fase.",
+      "tail": "  PASS — 40 cenários físicos (reinício/Fast Startup/5 reboots/escala) cobertos pelo contrato+prova Electron+físico |  | RESULTADO F3.5.4V-H1: 39 PASS, 1 FAIL | FAIL — 39 versão 1.0.214 no package.json (persistência 1.0.213 preservada)"
+    },
+    {
+      "suite": "f354w-compact-cards-details.test.mjs",
+      "exit": 0,
+      "pass": 53,
+      "fail": 0,
+      "classification": "GREEN",
+      "evidence": ""
+    },
+    {
+      "suite": "f354wh1-details-status-notes.test.mjs",
+      "exit": 0,
+      "pass": 74,
+      "fail": 0,
+      "classification": "GREEN",
+      "evidence": ""
+    }
+  ]
+}

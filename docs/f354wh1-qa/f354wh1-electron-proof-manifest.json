@@ -1,0 +1,795 @@
+{
+  "feature": "F3.5.4W-H1",
+  "title": "Central de Detalhes (tipografia + Copiar tema/legenda) · status Social/Designer · observações internas · card preservado",
+  "version": "1.0.215",
+  "electron": "31.3.1(real)",
+  "ranAt": "2026-08-04T12:00:49.848Z",
+  "asar": {
+    "bytes": 1289430,
+    "sha256": "edc75cbcd9884bce1d418ace1ffdcbb1429500d2a413bb49d30b29332cf9ee83"
+  },
+  "rendererSha256": "7322e8833d6178b295edb79bccbd950114e0a7725284ae22f7f6d82d5985f8ad",
+  "priorityEngineSha256": "0e04c8c3e301795b717b126d7a887e23eb75290465ba37abaeafe1901772dcfc",
+  "thresholds": {
+    "invarDeltaPx": 8,
+    "restoreMs": 1600
+  },
+  "configs": [
+    {
+      "scale": "1x",
+      "screen": "1600x1050x24",
+      "dsf": "1",
+      "scenes": 14,
+      "failures": 0,
+      "ok": true,
+      "lines": [
+        {
+          "scene": "e2_typo_short",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354wh1-1x-01-e2_typo_short.png",
+          "m": {
+            "found": true,
+            "open": true,
+            "kFW": "600",
+            "kFS": "10px",
+            "kColor": "rgb(110, 116, 128)",
+            "tFW": "600",
+            "tFS": "15.5px",
+            "tColor": "rgb(241, 242, 244)",
+            "lFS": "14px",
+            "lLH": "23.1px",
+            "lWS": "pre-wrap",
+            "faintRGB": "rgb(110, 116, 128)",
+            "inkRGB": "rgb(241, 242, 244)",
+            "accentRGB": "rgb(91, 108, 255)",
+            "tText": "Café da manhã",
+            "lHasNL": false,
+            "lLen": 31
+          }
+        },
+        {
+          "scene": "e2_typo_long",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354wh1-1x-02-e2_typo_long.png",
+          "m": {
+            "found": true,
+            "open": true,
+            "kFW": "600",
+            "kFS": "10px",
+            "kColor": "rgb(110, 116, 128)",
+            "tFW": "600",
+            "tFS": "15.5px",
+            "tColor": "rgb(241, 242, 244)",
+            "lFS": "14px",
+            "lLH": "23.1px",
+            "lWS": "pre-wrap",
+            "faintRGB": "rgb(110, 116, 128)",
+            "inkRGB": "rgb(241, 242, 244)",
+            "accentRGB": "rgb(91, 108, 255)",
+            "tText": "Promoção de Inverno — Açaí & Café ☕🔥 \"Dia D\" & 'Noite N' <3…",
+            "lHasNL": true,
+            "lLen": 201,
+            "tOk": true,
+            "lOk": true
+          }
+        },
+        {
+          "scene": "e2_copy_buttons",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354wh1-1x-03-e2_copy_buttons.png",
+          "m": {
+            "detsector": "cronograma",
+            "accCount": 7,
+            "themeBtns": 6,
+            "capBtns": 6,
+            "perAcc": [
+              {
+                "hasTheme": true,
+                "hasCap": true,
+                "t": "Café da manhã"
+              },
+              {
+                "hasTheme": true,
+                "hasCap": true,
+                "t": "Promoção de Inverno — Aç"
+              },
+              {
+                "hasTheme": false,
+                "hasCap": true,
+                "t": "(sem tema)"
+              },
+              {
+                "hasTheme": true,
+                "hasCap": false,
+                "t": "Tema sem legenda (prova "
+              },
+              {
+                "hasTheme": true,
+                "hasCap": true,
+                "t": "Tema 5 — conteúdo de pre"
+              },
+              {
+                "hasTheme": true,
+                "hasCap": true,
+                "t": "Tema 6 — conteúdo de pre"
+              },
+              {
+                "hasTheme": true,
+                "hasCap": true,
+                "t": "Tema 7 — conteúdo de pre"
+              }
+            ]
+          }
+        },
+        {
+          "scene": "e2_copy_theme_click",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354wh1-1x-04-e2_copy_theme_click.png",
+          "m": {
+            "openBefore": false,
+            "openAfter": false,
+            "clipDelta": 1,
+            "clipEq": true,
+            "clipLen": 243,
+            "expLen": 243,
+            "clipHead": "Promoção de Inverno — Açaí & Café ☕🔥 \"Dia D\" & 'Noite N' <3…",
+            "ok": true,
+            "hasCheckPath": true,
+            "title": "Tema copiado",
+            "aria": "Tema copiado",
+            "restTitle": "Copiar tema",
+            "restOk": false,
+            "restCopyGlyph": true,
+            "titleBefore": "Copiar tema",
+            "okShot": "f354wh1-1x-04-e2_copy_theme_click-okstate.png",
+            "pt": {
+              "found": true,
+              "x": 1203,
+              "y": 531,
+              "w": 30,
+              "h": 30
+            }
+          }
+        },
+        {
+          "scene": "e2_copy_caption_click",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354wh1-1x-05-e2_copy_caption_click.png",
+          "m": {
+            "openBefore": false,
+            "openAfter": false,
+            "clipDelta": 1,
+            "clipEq": true,
+            "clipLen": 201,
+            "expLen": 201,
+            "lines": 4,
+            "ok": true,
+            "title": "Legenda copiada",
+            "okShot": "f354wh1-1x-05-e2_copy_caption_click-okstate.png",
+            "pt": {
+              "found": true,
+              "x": 1239,
+              "y": 531,
+              "w": 30,
+              "h": 30
+            }
+          }
+        },
+        {
+          "scene": "e2_copy_obs",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354wh1-1x-06-e2_copy_obs.png",
+          "m": {
+            "events": [
+              "details.copy.theme_succeeded",
+              "details.copy.caption_succeeded"
+            ],
+            "theme": 1,
+            "caption": 1,
+            "failed": 0,
+            "keysOk": true,
+            "payloadOk": true,
+            "leakFree": true,
+            "sample": "{\"contentType\":\"theme\",\"contentLength\":243,\"taskSector\":\"cronograma\",\"appVersion\":\"1.0.215\",\"timestamp\":1785844814057}"
+          }
+        },
+        {
+          "scene": "e2_cards_copy",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354wh1-1x-07-e2_cards_copy.png",
+          "m": {
+            "detsector": "edicao_cards",
+            "accCount": 2,
+            "themeBtns": 0,
+            "capBtns": 2,
+            "label0": "Legenda",
+            "clipDelta": 1,
+            "clipEq": true,
+            "clipIsStaticLabel": false,
+            "clipLen": 144,
+            "expLen": 144,
+            "ok": true,
+            "title": "Legenda copiada"
+          }
+        },
+        {
+          "scene": "e3_social_afazer",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354wh1-1x-08-e3_social_afazer.png",
+          "m": {
+            "found": true,
+            "col": "A Fazer",
+            "chip": "Aguardando designer iniciar",
+            "cards": 9
+          }
+        },
+        {
+          "scene": "e3_designer_afazer_parity",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354wh1-1x-09-e3_designer_afazer_parity.png",
+          "m": {
+            "found": true,
+            "col": "A Fazer",
+            "chip": "Aguardando designer iniciar",
+            "cards": 3
+          }
+        },
+        {
+          "scene": "e3_start_flips",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354wh1-1x-10-e3_start_flips.png",
+          "m": {
+            "designerCol": "Em andamento",
+            "designerChip": "Designer em produção",
+            "socialCol": "Em andamento",
+            "socialChip": "Designer em produção",
+            "shotDesigner": "f354wh1-1x-10-e3_start_flips-designer-andamento.png"
+          }
+        },
+        {
+          "scene": "e3_setores_meuquadro",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354wh1-1x-11-e3_setores_meuquadro.png",
+          "m": {
+            "setoresCol": "A Fazer",
+            "setoresChip": "Aguardando designer iniciar",
+            "meuCol": "A Fazer",
+            "meuChip": "Aguardando designer iniciar",
+            "shotSetores": "f354wh1-1x-11-e3_setores_meuquadro-setores-afazer.png"
+          }
+        },
+        {
+          "scene": "e5_notes_input",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354wh1-1x-12-e5_notes_input.png",
+          "m": {
+            "edm": {
+              "taCount": 0,
+              "indices": [],
+              "hasSection": false,
+              "header": "",
+              "sheet": true,
+              "title": "Prazo para o designer"
+            },
+            "cron": {
+              "taCount": 3,
+              "indices": [
+                "0",
+                "1",
+                "2"
+              ],
+              "hasSection": true,
+              "header": "Observação interna para o Designer — por tema, opcional",
+              "sheet": true,
+              "title": "Prazo para o designer"
+            },
+            "shotEdm": "f354wh1-1x-12-e5_notes_input-edm-zero.png"
+          }
+        },
+        {
+          "scene": "e5_notes_view",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354wh1-1x-13-e5_notes_view.png",
+          "m": {
+            "count": 3,
+            "i0": {
+              "hasNote": true,
+              "label": "Observação interna da Social Media",
+              "body": "Priorizar o feed\ncom CTA"
+            },
+            "i1": {
+              "hasNote": false,
+              "label": "",
+              "body": ""
+            },
+            "i2": {
+              "hasNote": true,
+              "label": "Observação interna da Social Media",
+              "body": "usar referência X"
+            }
+          }
+        },
+        {
+          "scene": "e1_card_preserved",
+          "scale": "1x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354wh1-1x-14-e1_card_preserved.png",
+          "m": {
+            "h1": 538,
+            "h12": 538,
+            "h50": 538,
+            "delta": 0,
+            "main1": "1 tema",
+            "main12": "12 temas",
+            "main50": "50 temas",
+            "themeNodes": [
+              0,
+              0,
+              0
+            ],
+            "audit": {
+              "cards": 7,
+              "summaries": 7,
+              "themeNodes": 0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "scale": "1.25x",
+      "screen": "2000x1320x24",
+      "dsf": "1.25",
+      "scenes": 7,
+      "failures": 0,
+      "ok": true,
+      "lines": [
+        {
+          "scene": "e2_typo_short",
+          "scale": "1.25x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354wh1-1.25x-01-e2_typo_short.png",
+          "m": {
+            "found": true,
+            "open": true,
+            "kFW": "600",
+            "kFS": "10px",
+            "kColor": "rgb(110, 116, 128)",
+            "tFW": "600",
+            "tFS": "15.5px",
+            "tColor": "rgb(241, 242, 244)",
+            "lFS": "14px",
+            "lLH": "23.1px",
+            "lWS": "pre-wrap",
+            "faintRGB": "rgb(110, 116, 128)",
+            "inkRGB": "rgb(241, 242, 244)",
+            "accentRGB": "rgb(91, 108, 255)",
+            "tText": "Café da manhã",
+            "lHasNL": false,
+            "lLen": 31
+          }
+        },
+        {
+          "scene": "e2_typo_long",
+          "scale": "1.25x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354wh1-1.25x-02-e2_typo_long.png",
+          "m": {
+            "found": true,
+            "open": true,
+            "kFW": "600",
+            "kFS": "10px",
+            "kColor": "rgb(110, 116, 128)",
+            "tFW": "600",
+            "tFS": "15.5px",
+            "tColor": "rgb(241, 242, 244)",
+            "lFS": "14px",
+            "lLH": "23.1px",
+            "lWS": "pre-wrap",
+            "faintRGB": "rgb(110, 116, 128)",
+            "inkRGB": "rgb(241, 242, 244)",
+            "accentRGB": "rgb(91, 108, 255)",
+            "tText": "Promoção de Inverno — Açaí & Café ☕🔥 \"Dia D\" & 'Noite N' <3…",
+            "lHasNL": true,
+            "lLen": 201,
+            "tOk": true,
+            "lOk": true
+          }
+        },
+        {
+          "scene": "e2_copy_buttons",
+          "scale": "1.25x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354wh1-1.25x-03-e2_copy_buttons.png",
+          "m": {
+            "detsector": "cronograma",
+            "accCount": 7,
+            "themeBtns": 6,
+            "capBtns": 6,
+            "perAcc": [
+              {
+                "hasTheme": true,
+                "hasCap": true,
+                "t": "Café da manhã"
+              },
+              {
+                "hasTheme": true,
+                "hasCap": true,
+                "t": "Promoção de Inverno — Aç"
+              },
+              {
+                "hasTheme": false,
+                "hasCap": true,
+                "t": "(sem tema)"
+              },
+              {
+                "hasTheme": true,
+                "hasCap": false,
+                "t": "Tema sem legenda (prova "
+              },
+              {
+                "hasTheme": true,
+                "hasCap": true,
+                "t": "Tema 5 — conteúdo de pre"
+              },
+              {
+                "hasTheme": true,
+                "hasCap": true,
+                "t": "Tema 6 — conteúdo de pre"
+              },
+              {
+                "hasTheme": true,
+                "hasCap": true,
+                "t": "Tema 7 — conteúdo de pre"
+              }
+            ]
+          }
+        },
+        {
+          "scene": "e2_copy_theme_click",
+          "scale": "1.25x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354wh1-1.25x-04-e2_copy_theme_click.png",
+          "m": {
+            "openBefore": false,
+            "openAfter": false,
+            "clipDelta": 1,
+            "clipEq": true,
+            "clipLen": 243,
+            "expLen": 243,
+            "clipHead": "Promoção de Inverno — Açaí & Café ☕🔥 \"Dia D\" & 'Noite N' <3…",
+            "ok": true,
+            "hasCheckPath": true,
+            "title": "Tema copiado",
+            "aria": "Tema copiado",
+            "restTitle": "Copiar tema",
+            "restOk": false,
+            "restCopyGlyph": true,
+            "titleBefore": "Copiar tema",
+            "okShot": "f354wh1-1.25x-04-e2_copy_theme_click-okstate.png",
+            "pt": {
+              "found": true,
+              "x": 1184,
+              "y": 506,
+              "w": 30,
+              "h": 30
+            }
+          }
+        },
+        {
+          "scene": "e2_copy_caption_click",
+          "scale": "1.25x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354wh1-1.25x-05-e2_copy_caption_click.png",
+          "m": {
+            "openBefore": false,
+            "openAfter": false,
+            "clipDelta": 1,
+            "clipEq": true,
+            "clipLen": 201,
+            "expLen": 201,
+            "lines": 4,
+            "ok": true,
+            "title": "Legenda copiada",
+            "okShot": "f354wh1-1.25x-05-e2_copy_caption_click-okstate.png",
+            "pt": {
+              "found": true,
+              "x": 1220,
+              "y": 506,
+              "w": 30,
+              "h": 30
+            }
+          }
+        },
+        {
+          "scene": "e2_copy_obs",
+          "scale": "1.25x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354wh1-1.25x-06-e2_copy_obs.png",
+          "m": {
+            "events": [
+              "details.copy.theme_succeeded",
+              "details.copy.caption_succeeded"
+            ],
+            "theme": 1,
+            "caption": 1,
+            "failed": 0,
+            "keysOk": true,
+            "payloadOk": true,
+            "leakFree": true,
+            "sample": "{\"contentType\":\"theme\",\"contentLength\":243,\"taskSector\":\"cronograma\",\"appVersion\":\"1.0.215\",\"timestamp\":1785844831696}"
+          }
+        },
+        {
+          "scene": "e2_cards_copy",
+          "scale": "1.25x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354wh1-1.25x-07-e2_cards_copy.png",
+          "m": {
+            "detsector": "edicao_cards",
+            "accCount": 2,
+            "themeBtns": 0,
+            "capBtns": 2,
+            "label0": "Legenda",
+            "clipDelta": 1,
+            "clipEq": true,
+            "clipIsStaticLabel": false,
+            "clipLen": 144,
+            "expLen": 144,
+            "ok": true,
+            "title": "Legenda copiada"
+          }
+        }
+      ]
+    },
+    {
+      "scale": "1.5x",
+      "screen": "2400x1600x24",
+      "dsf": "1.5",
+      "scenes": 7,
+      "failures": 0,
+      "ok": true,
+      "lines": [
+        {
+          "scene": "e2_typo_short",
+          "scale": "1.5x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354wh1-1.5x-01-e2_typo_short.png",
+          "m": {
+            "found": true,
+            "open": true,
+            "kFW": "600",
+            "kFS": "10px",
+            "kColor": "rgb(110, 116, 128)",
+            "tFW": "600",
+            "tFS": "15.5px",
+            "tColor": "rgb(241, 242, 244)",
+            "lFS": "14px",
+            "lLH": "23.1px",
+            "lWS": "pre-wrap",
+            "faintRGB": "rgb(110, 116, 128)",
+            "inkRGB": "rgb(241, 242, 244)",
+            "accentRGB": "rgb(91, 108, 255)",
+            "tText": "Café da manhã",
+            "lHasNL": false,
+            "lLen": 31
+          }
+        },
+        {
+          "scene": "e2_typo_long",
+          "scale": "1.5x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354wh1-1.5x-02-e2_typo_long.png",
+          "m": {
+            "found": true,
+            "open": true,
+            "kFW": "600",
+            "kFS": "10px",
+            "kColor": "rgb(110, 116, 128)",
+            "tFW": "600",
+            "tFS": "15.5px",
+            "tColor": "rgb(241, 242, 244)",
+            "lFS": "14px",
+            "lLH": "23.1px",
+            "lWS": "pre-wrap",
+            "faintRGB": "rgb(110, 116, 128)",
+            "inkRGB": "rgb(241, 242, 244)",
+            "accentRGB": "rgb(91, 108, 255)",
+            "tText": "Promoção de Inverno — Açaí & Café ☕🔥 \"Dia D\" & 'Noite N' <3…",
+            "lHasNL": true,
+            "lLen": 201,
+            "tOk": true,
+            "lOk": true
+          }
+        },
+        {
+          "scene": "e2_copy_buttons",
+          "scale": "1.5x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354wh1-1.5x-03-e2_copy_buttons.png",
+          "m": {
+            "detsector": "cronograma",
+            "accCount": 7,
+            "themeBtns": 6,
+            "capBtns": 6,
+            "perAcc": [
+              {
+                "hasTheme": true,
+                "hasCap": true,
+                "t": "Café da manhã"
+              },
+              {
+                "hasTheme": true,
+                "hasCap": true,
+                "t": "Promoção de Inverno — Aç"
+              },
+              {
+                "hasTheme": false,
+                "hasCap": true,
+                "t": "(sem tema)"
+              },
+              {
+                "hasTheme": true,
+                "hasCap": false,
+                "t": "Tema sem legenda (prova "
+              },
+              {
+                "hasTheme": true,
+                "hasCap": true,
+                "t": "Tema 5 — conteúdo de pre"
+              },
+              {
+                "hasTheme": true,
+                "hasCap": true,
+                "t": "Tema 6 — conteúdo de pre"
+              },
+              {
+                "hasTheme": true,
+                "hasCap": true,
+                "t": "Tema 7 — conteúdo de pre"
+              }
+            ]
+          }
+        },
+        {
+          "scene": "e2_copy_theme_click",
+          "scale": "1.5x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354wh1-1.5x-04-e2_copy_theme_click.png",
+          "m": {
+            "openBefore": false,
+            "openAfter": false,
+            "clipDelta": 1,
+            "clipEq": true,
+            "clipLen": 243,
+            "expLen": 243,
+            "clipHead": "Promoção de Inverno — Açaí & Café ☕🔥 \"Dia D\" & 'Noite N' <3…",
+            "ok": true,
+            "hasCheckPath": true,
+            "title": "Tema copiado",
+            "aria": "Tema copiado",
+            "restTitle": "Copiar tema",
+            "restOk": false,
+            "restCopyGlyph": true,
+            "titleBefore": "Copiar tema",
+            "okShot": "f354wh1-1.5x-04-e2_copy_theme_click-okstate.png",
+            "pt": {
+              "found": true,
+              "x": 1184,
+              "y": 506,
+              "w": 30,
+              "h": 30
+            }
+          }
+        },
+        {
+          "scene": "e2_copy_caption_click",
+          "scale": "1.5x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354wh1-1.5x-05-e2_copy_caption_click.png",
+          "m": {
+            "openBefore": false,
+            "openAfter": false,
+            "clipDelta": 1,
+            "clipEq": true,
+            "clipLen": 201,
+            "expLen": 201,
+            "lines": 4,
+            "ok": true,
+            "title": "Legenda copiada",
+            "okShot": "f354wh1-1.5x-05-e2_copy_caption_click-okstate.png",
+            "pt": {
+              "found": true,
+              "x": 1220,
+              "y": 506,
+              "w": 30,
+              "h": 30
+            }
+          }
+        },
+        {
+          "scene": "e2_copy_obs",
+          "scale": "1.5x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354wh1-1.5x-06-e2_copy_obs.png",
+          "m": {
+            "events": [
+              "details.copy.theme_succeeded",
+              "details.copy.caption_succeeded"
+            ],
+            "theme": 1,
+            "caption": 1,
+            "failed": 0,
+            "keysOk": true,
+            "payloadOk": true,
+            "leakFree": true,
+            "sample": "{\"contentType\":\"theme\",\"contentLength\":243,\"taskSector\":\"cronograma\",\"appVersion\":\"1.0.215\",\"timestamp\":1785844842673}"
+          }
+        },
+        {
+          "scene": "e2_cards_copy",
+          "scale": "1.5x",
+          "ok": true,
+          "why": "ok",
+          "shot": "f354wh1-1.5x-07-e2_cards_copy.png",
+          "m": {
+            "detsector": "edicao_cards",
+            "accCount": 2,
+            "themeBtns": 0,
+            "capBtns": 2,
+            "label0": "Legenda",
+            "clipDelta": 1,
+            "clipEq": true,
+            "clipIsStaticLabel": false,
+            "clipLen": 144,
+            "expLen": 144,
+            "ok": true,
+            "title": "Legenda copiada"
+          }
+        }
+      ]
+    }
+  ],
+  "totalScenes": 28,
+  "totalFailures": 0
+}
