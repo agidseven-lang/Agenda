@@ -89,15 +89,15 @@ jobs:
         run: |
           set -euo pipefail
           ASAR="dist-installer/win-unpacked/resources/app.asar"; test -f "$ASAR"
-          npx --yes @electron/asar extract "$ASAR" /tmp/asar-x
-          node -e "const p=require('/tmp/asar-x/package.json'); if(p.version!=='1.0.216') process.exit(1);"
-          grep -q "function bgSound(sev)" /tmp/asar-x/src/renderer/bgnotify.html
-          grep -q "suppressed_by_payload" /tmp/asar-x/src/renderer/bgnotify.html
-          grep -q "var _sr=notifSound(sev)" /tmp/asar-x/src/renderer/index.html
-          grep -q "notification.sound.suppressed_by_grouping" /tmp/asar-x/dist/main/main.js
-          grep -q "notification.sound.premium" /tmp/asar-x/dist/main/bgNotify.js
-          SRC=/tmp/asar-x/src/renderer/index.html BG_SRC=/tmp/asar-x/src/renderer/bgnotify.html MAIN_SRC=src/main/main.ts BGM_SRC=src/main/bgNotify.ts node scripts/f354wh2-immediate-notification-sound.test.mjs
-          SRC=/tmp/asar-x/src/renderer/index.html node scripts/f354wh1-details-status-notes.test.mjs
+          npx --yes @electron/asar extract "$ASAR" asar-x
+          node -e "const p=require('./asar-x/package.json'); if(p.version!=='1.0.216') process.exit(1);"
+          grep -q "function bgSound(sev)" asar-x/src/renderer/bgnotify.html
+          grep -q "suppressed_by_payload" asar-x/src/renderer/bgnotify.html
+          grep -q "var _sr=notifSound(sev)" asar-x/src/renderer/index.html
+          grep -q "notification.sound.suppressed_by_grouping" asar-x/dist/main/main.js
+          grep -q "notification.sound.premium" asar-x/dist/main/bgNotify.js
+          SRC=asar-x/src/renderer/index.html BG_SRC=asar-x/src/renderer/bgnotify.html MAIN_SRC=src/main/main.ts BGM_SRC=src/main/bgNotify.ts node scripts/f354wh2-immediate-notification-sound.test.mjs
+          SRC=asar-x/src/renderer/index.html node scripts/f354wh1-details-status-notes.test.mjs
           echo "GATE F3.5.4W-H2 EMPACOTADO: VERIFIED."
       - name: Empacotar bundle + SHA256SUMS + VERSAO-DESKTOP
         working-directory: desktop
