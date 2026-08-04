@@ -130,3 +130,45 @@ ausente (OFF até configurar); privacidade (observabilidade só com hashes/bucke
 - deadlineVersion muda SOMENTE na operação autoritativa de prazo (nunca pelo planner local).
 - Admin SDK: endpoint protegido por autenticação/autorização própria + IAM mínimo; Rules não são
   a única proteção. Provas obrigatórias incluem relógio local ±10min sem efeito na decisão.
+
+---
+
+## ADENDO 3 — EXECUÇÃO DA ARQUITETURA (registro do que foi implantado)
+
+**Backend (produção, ANTES da Desktop — conforme mandato):**
+- Branch `backend/f355a-execution-checkpoint-claims` @ 4a624a1, fast-forward de `app/main`
+  (fonte deployada; precedente F4.2C-INT). `functions/index.js` blob 5dba32b5.
+- Endpoints aditivos session-gated (authVerifySessionToken; POST-only; no-store; rate-limit
+  namespaced; logs mascarados): `claimExecutionCheckpoint` e `respondExecutionCheckpoint` —
+  transação Firestore atômica (Admin SDK) lendo `tasks/<id>` + `executionCheckins/<chave>`,
+  decidindo com o domínio puro BYTE-IDÊNTICO ao Desktop (sha256 5e849c60…) e relógio DO SERVIDOR;
+  persistência com tempos numéricos do servidor (claimedAt/leaseExpiresAt/respondedAt/missedAt/
+  updatedAt) + claimedBySessionHash/claimedByDeviceHash/claimVersion.
+- Harness offline 45/45 + suítes herdadas f33R..f42c todas verdes.
+- Deploy gated `f355a-execution-endpoints-deploy.yml` (main @ 76a72c4; pin commit+blob; alvo FIXO
+  --only 2 functions): dry-run run 30934574821 VERDE; deploy REAL run 30934894269 VERDE com
+  pós-verificação (functions:list + sondas SEM credencial GET=405 / POST-sem-Bearer=401 nos
+  run.app oficiais). Endpoints DORMENTES até a 1.0.217 (e a 1.0.217 sai com flag OFF).
+
+**Modelo de dados (decisão executada):**
+- `executionCheckins/<taskId|designerId|dl<v>|cp<idx>>`: histórico imutável SERVER-ONLY
+  (catch-all das Rules bloqueia clientes; Admin SDK bypassa) — ZERO mudança de Rules.
+- Projeção `tasks/<id>.executionTracking` {v, lastCheckin, timeline(cap 40; observação cap 2000),
+  updatedAt} escrita NA MESMA transação do respond — invalidação multi-device e notificação SM
+  viajam pelo snapshot realtime de `tasks` que todos os devices já assinam (sem canal novo).
+- `deadlineVersion` top-level: incrementado SOMENTE pela operação autoritativa de mudança de
+  prazo (saveCardsEdit, irmão do cardDeadlineRev); momento da atribuição lido de
+  `designerAssignment.assignedAt` (nunca inventado).
+
+**Desktop 1.0.217 (branch desktop/f355a-adaptive-execution-checkins-1.0.217):**
+- Orquestrador ACOPLADO ao taskIdleScheduler por 4 hooks opcionais (mesmo listener/timer/fila;
+  no-op ausentes ⇒ 1.0.216). Autoridade única etAuthority; SHADOW 100% silencioso; ACTIVE só
+  exibe após claim servidor→reelegível→fila→ativo→ACK→som; offline RETRY_ON_RECONNECT; sem backlog.
+- Check-in LARANJA na janela central aprovada (subordinado ao SLA; rascunho preservado na
+  preempção; timer de resposta só pós-ACK; snooze 1x; timeout⇒1 reapresentação⇒MISSED server-side).
+- SM em tempo real (6 eventTypes execution_*; "Sim" sem observação não notifica); Detalhes com
+  "ACOMPANHAMENTO DA EXECUÇÃO" (cliente nunca vê — Worker não seleciona executionTracking);
+  Configurações admin-only com a mensagem literal da jornada; som laranja próprio empacotado
+  (WAVs de SLA byte-intactos).
+- Suítes: 98+38+33+25 novas; regressão canônica 37+74+53+40; provas reais Electron 25/25
+  (manifesto docs/f355a-qa/). Pins de versão wh2/vh1 → 1.0.217 (precedente b12fde2).
