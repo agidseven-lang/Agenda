@@ -21,7 +21,13 @@ const OUT = process.env.PROOF_OUT || path.join(__dirname, "..", "..", "docs", "f
 try { fs.mkdirSync(OUT, { recursive: true }); } catch (_) {}
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function line(o) { try { process.stdout.write("PROOF_LINE " + JSON.stringify(o) + "\n"); } catch (_) {} }
-const sha256 = (p) => crypto.createHash("sha256").update(fs.readFileSync(p)).digest("hex");
+// original-fs: o fs PATCHADO do Electron trata caminho .asar como diretório virtual — para
+// hashear o ARQUIVO do asar é obrigatório o fs original (mesma lição do harness F3.5.5A).
+const ofs = require("original-fs");
+const sha256 = (p) => crypto.createHash("sha256").update(ofs.readFileSync(p)).digest("hex");
+// Qualquer exceção não tratada encerra RUIDOSAMENTE (nunca um processo vivo e mudo no CI).
+process.on("uncaughtException", (e) => { try { process.stdout.write("PROOF_DONE proofs=? failures=999 FATAL=uncaught:" + String((e && e.stack) || e).slice(0, 300) + "\n"); } catch (_) {} app.exit(1); });
+process.on("unhandledRejection", (e) => { try { process.stdout.write("PROOF_DONE proofs=? failures=999 FATAL=unhandled:" + String((e && e.stack) || e).slice(0, 300) + "\n"); } catch (_) {} app.exit(1); });
 
 /* ---- SEMENTE (estado real; formato aprovado da W-H1) ---- */
 const NOW = Date.now();
@@ -66,16 +72,21 @@ const results = [];
 function rec(name, ok, info) { results.push({ name, ok: !!ok, info: info || {} }); line({ proof: name, ok: !!ok, info: info || {} }); }
 
 app.whenReady().then(async () => {
+  // Watchdog: o harness NUNCA segura o job de CI — se algo travar, encerra com FATAL explícito.
+  const WATCHDOG = setTimeout(() => { try { process.stdout.write("PROOF_DONE proofs=" + results.length + " failures=999 FATAL=watchdog_timeout_10min\n"); } catch (_) {} app.exit(1); }, 10 * 60 * 1000);
   try { session.defaultSession.webRequest.onBeforeRequest((d, cb) => { cb({ cancel: /^https?:/i.test(d.url) }); }); } catch (_) {}
   const meta = await packAsar();
   fs.writeFileSync(path.join(os.tmpdir(), "f355ah1-seed.json"), JSON.stringify(seed));
 
-  const win = new BrowserWindow({ width: 1440, height: 940, show: false, webPreferences: {
+  const win = new BrowserWindow({ width: 1440, height: 940, show: true, webPreferences: {
     preload: path.join(__dirname, "f355ah1-proof-preload.js"),
     contextIsolation: false, nodeIntegration: false, sandbox: false, backgroundThrottling: false } });
   const wc = win.webContents;
   const J = (code) => wc.executeJavaScript(code).catch((e) => ({ err: String((e && e.message) || e) }));
-  async function shot(nm) { try { const img = await win.capturePage(); const p = path.join(OUT, nm + ".png"); fs.writeFileSync(p, img.toPNG()); return path.basename(p); } catch (e) { return "pngErr:" + String(e); } }
+  async function shot(nm) { try {
+    const img = await Promise.race([win.capturePage(), new Promise((_, rej) => setTimeout(() => rej(new Error("capture_timeout")), 8000))]);
+    const p = path.join(OUT, nm + ".png"); fs.writeFileSync(p, img.toPNG()); return path.basename(p);
+  } catch (e) { return "pngErr:" + String((e && e.message) || e); } }
 
   let fatal = null;
   try {
@@ -298,6 +309,7 @@ app.whenReady().then(async () => {
   };
   try { fs.writeFileSync(path.join(OUT, "f355ah1-proof-manifest.json"), JSON.stringify(manifest, null, 2)); } catch (_) {}
   process.stdout.write("PROOF_DONE proofs=" + results.length + " failures=" + failures + (fatal ? " FATAL=" + String(fatal).slice(0, 400) : "") + "\n");
+  clearTimeout(WATCHDOG);
   try { win.destroy(); } catch (_) {}
   app.exit(failures === 0 ? 0 : 1);
 });

@@ -1,0 +1,198 @@
+{
+  "feature": "F3.5.5A-H1",
+  "asarSha256": "a03221761f13a3262c99a949d0a385df543bc7d5dacfdfdcd35e5ef9c29165ca",
+  "packagedIndexSha256": "adb1db313768606e122cfa34076ff89d299984ac1958a1b990591dce6ffde9db",
+  "electron": "31.3.1",
+  "proofs": 15,
+  "failures": 0,
+  "fatal": null,
+  "results": [
+    {
+      "name": "P1 lápis por tema: 3 no cron, 2 no roteiro, 0 em mídia/cards; ordem Copiar→Editar→Expandir; aria/título",
+      "ok": true,
+      "info": {
+        "pencils": 3,
+        "boxes": 3,
+        "notes": 0,
+        "aria": "Editar observação interna",
+        "title": "Editar observação interna",
+        "order": true,
+        "rotPencils": 2,
+        "edmPencils": 0,
+        "cardsPencils": 0,
+        "png": "f355ah1-P01-lapis.png"
+      }
+    },
+    {
+      "name": "P2 editor sem expandir acordeão; label/sub literais; UM editor por vez; descarte em 2 cliques; foco volta ao lápis",
+      "ok": true,
+      "info": {
+        "openAfter": true,
+        "editorVisible": true,
+        "label": true,
+        "sub": true,
+        "taEmpty": true,
+        "blockMsg": true,
+        "stillItem0": true,
+        "notOpened1": true,
+        "discardArmed": true,
+        "stillOpenAfter1stCancel": true,
+        "closedAfter2nd": true,
+        "focusOnPencil": true,
+        "png": "f355ah1-P02-editor.png"
+      }
+    },
+    {
+      "name": "P3 salvar: texto sobrevive a snapshot; patch SÓ dot-path+history; history sem texto; exibição+foco+obs sanitizada",
+      "ok": true,
+      "info": {
+        "taAliveAfterRender": true,
+        "patchId": "nh1-cron3",
+        "keys": [
+          "designerItemNotes.i0",
+          "history"
+        ],
+        "dotPathOnly": true,
+        "value": "Priorizar o feed 🎯\n\nCTA no 1º parágrafo — ação, coração, você. \"Aspas\" & <b>não-HTML</b>.",
+        "histType": "obs_interna_tema",
+        "histLabel": "Observação interna do Tema 01 atualizada.",
+        "histLen": 90,
+        "histNoText": true,
+        "editorClosed": true,
+        "noteShown": true,
+        "noteLabel": true,
+        "focusOnPencil": true,
+        "diagOk": true,
+        "localMap": true,
+        "png": "f355ah1-P03-salva.png"
+      }
+    },
+    {
+      "name": "P4 reabrir: textarea prefilled com o texto persistido (parágrafos/emoji/acentos)",
+      "ok": true,
+      "info": {
+        "prefill": true,
+        "png": "f355ah1-P04-prefill.png"
+      }
+    },
+    {
+      "name": "P5 editar: novo valor gravado por dot-path e exibição atualizada in place",
+      "ok": true,
+      "info": {
+        "v": "Texto EDITADO ✔ segunda versão",
+        "shown": true
+      }
+    },
+    {
+      "name": "P6 vazio: FieldValue.delete() na chave; NENHUMA seção vazia; mapa local sem a chave",
+      "ok": true,
+      "info": {
+        "del": true,
+        "noSection": true,
+        "noKey": true,
+        "png": "f355ah1-P06-vazio.png"
+      }
+    },
+    {
+      "name": "P7 Administrador: lápis presente (3 itens)",
+      "ok": true,
+      "info": {
+        "pencils": 3
+      }
+    },
+    {
+      "name": "P8 Designer: zero lápis/caixa; observação visível no item correto; itens sem nota limpos",
+      "ok": true,
+      "info": {
+        "pencils": 0,
+        "boxes": 0,
+        "noteOn3": true,
+        "othersClean": true,
+        "png": "f355ah1-P08-designer.png"
+      }
+    },
+    {
+      "name": "P9 cliente sem acesso: cloudflare-worker.js REAL sem NENHUMA referência a designerItemNotes/obs_interna_tema",
+      "ok": true,
+      "info": {
+        "workerSha256": "76c56831d49cfad1"
+      }
+    },
+    {
+      "name": "P10 texto do tema editado no MESMO índice: a observação permanece no item correto",
+      "ok": true,
+      "info": {
+        "noteOn2": true,
+        "titleEdited": true,
+        "othersClean": true,
+        "png": "f355ah1-P10-tema-editado.png"
+      }
+    },
+    {
+      "name": "P11 item esvaziado some da lista e NENHUMA nota desloca (i2 segue no C; i1 não vaza)",
+      "ok": true,
+      "info": {
+        "items": [
+          "0",
+          "2"
+        ],
+        "twoShown": true,
+        "cNoteRight": true,
+        "hiddenNoteNowhere": true,
+        "aClean": true
+      }
+    },
+    {
+      "name": "P12 modal de atribuição PREFILL da mesma fonte (i0 preenchido; demais vazios; 3 textareas)",
+      "ok": true,
+      "info": {
+        "count": 3,
+        "v0": "Priorizar o feed — CTA",
+        "v1": "",
+        "v2": "",
+        "png": "f355ah1-P12-atribuicao.png"
+      }
+    },
+    {
+      "name": "P13 escala 125%: lápis clicável (área adequada), editor abre, textarea visível, sem corte",
+      "ok": true,
+      "info": {
+        "penW": 29,
+        "penH": 29,
+        "editorOpen": true,
+        "taW": 948,
+        "taH": 104,
+        "noHScroll": true,
+        "png": "f355ah1-P13-escala125.png"
+      }
+    },
+    {
+      "name": "P14 escala 150%: lápis clicável (área adequada), editor abre, textarea visível, sem corte",
+      "ok": true,
+      "info": {
+        "penW": 29,
+        "penH": 29,
+        "editorOpen": true,
+        "taW": 775,
+        "taH": 104,
+        "noHScroll": true,
+        "png": "f355ah1-P14-escala150.png"
+      }
+    },
+    {
+      "name": "P15 falha: editor aberto + texto intacto + mensagem clara + sem sucesso falso; retry grava e fecha",
+      "ok": true,
+      "info": {
+        "failMsg": true,
+        "editorStillOpen": true,
+        "textKept": true,
+        "noFalseSuccess": true,
+        "diagFail": true,
+        "retrySaved": true,
+        "noteShown": true,
+        "editorClosed": true,
+        "png": "f355ah1-P15-falha-retry.png"
+      }
+    }
+  ]
+}

@@ -76,8 +76,9 @@ jobs:
           set -euo pipefail
           sudo apt-get update -y >/dev/null 2>&1 || true
           sudo apt-get install -y xvfb >/dev/null 2>&1 || true
-          xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f355ah1-proof-main.js
-          xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f355a-execution-proof-main.js
+          # timeout explícito por harness: um travamento falha RÁPIDO com log (nunca segura o job 30min)
+          timeout -k 15 600 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f355ah1-proof-main.js
+          timeout -k 15 600 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f355a-execution-proof-main.js
       - name: "Gate ISOLAMENTO — delta vs 1.0.217 SÓ nos arquivos autorizados; congelados diff-vazio"
         run: |
           set -euo pipefail
