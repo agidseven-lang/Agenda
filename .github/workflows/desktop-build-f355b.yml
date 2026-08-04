@@ -1,0 +1,176 @@
+# F3.5.5B — Desktop 1.0.219 (Agenda Premium — cards e detalhes de compromissos) — build GATED, --publish never.
+# Publicação SÓ no desktop-release-f355b.yml (mesmos bytes). Base de código 1.0.218 @ 1a94515
+# (baseline física; ROLLBACK IMEDIATO); rollback adicional 1.0.216 @ e509f43.
+# Delta EXCLUSIVO no renderer index.html (eventCard/openEventDetail + CSS evc2/evd + ícones
+# play/ban/dots + aditivos Esc/teclado/menu ⋯) + suites/provas/docs/workflows + pins de versão
+# (precedente b12fde2). main/preload/slareminder/bgnotify/sons/worker/functions/android
+# CONGELADOS byte a byte vs 1.0.218 — regra máxima do owner: ZERO regressão na baseline.
+name: "[push/manual] F3.5.5B — Desktop 1.0.219 (Agenda Premium) — Desktop Build"
+"on":
+  push:
+    branches: ["desktop/f355b-premium-agenda-redesign-1.0.219"]
+    paths-ignore: [".github/workflows/desktop-release-f355b.yml"]
+  workflow_dispatch: {}
+permissions: { contents: read }
+env:
+  TEST_BRANCH: "desktop/f355b-premium-agenda-redesign-1.0.219"
+  BASE_218_SHA: "1a945159dd563eba5c80657427519d0f22b4b673"
+  BASE_216_SHA: "e509f43ae8f3130a9922791f89db0ba29aa7a410"
+  BASE_213_SHA: "e626d36921e269e28b74494ff51afb9c77f8d94d"
+  APP_DIR: desktop
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: "Gate REF + ANCESTRIA (descende da 1.0.218, 1.0.216 e 1.0.213)"
+        run: |
+          set -euo pipefail
+          [ "${GITHUB_REF_NAME}" = "$TEST_BRANCH" ] || { echo "::error::branch errada"; exit 1; }
+          git merge-base --is-ancestor "$BASE_218_SHA" HEAD || { echo "::error::não descende da 1.0.218"; exit 1; }
+          git merge-base --is-ancestor "$BASE_216_SHA" HEAD || { echo "::error::não descende da 1.0.216"; exit 1; }
+          git merge-base --is-ancestor "$BASE_213_SHA" HEAD || { echo "::error::não descende da 1.0.213"; exit 1; }
+      - name: "Gate VERSAO 1.0.219 (package + lock x2 + description)"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node -e "const p=require('./package.json'); if(p.version!=='1.0.219') process.exit(1); if(!/premium-agenda-redesign/.test(p.description||'')) process.exit(1);"
+          [ "$(grep -c '"version": "1.0.219"' package-lock.json)" -ge 2 ]
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: npm ci + TypeScript + sintaxe dos renderers (index/bgnotify/slareminder)
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          ./node_modules/.bin/tsc --noEmit -p tsconfig.json
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/renderer/bgnotify.html','utf8');const m=s.match(/<script>([\s\S]*?)<\/script>/);new Function(m[1]);"
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/renderer/slareminder.html','utf8');const m=s.match(/<script>([\s\S]*?)<\/script>/);new Function(m[1]);"
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/renderer/index.html','utf8');const b=[...s.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(x=>x[1]);b.sort((a,c)=>c.length-a.length);new Function(b[0]);"
+      - name: "Gate F3.5.5B — Agenda Premium 84 (matriz 30 cards + 35 modal do mandato em contratos)"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f355b-agenda-premium.test.mjs
+      - name: "Gate F3.5.5A-H1 herdado — observações internas 72"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f355ah1-internal-notes.test.mjs
+      - name: "Gate F3.5.5A herdado — planner 98 + orquestrador 38 + central 33 + integração 25 (dist)"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          npm run build
+          node scripts/f355a-execution-planner.test.mjs
+          node scripts/f355a-orchestrator.test.mjs
+          node scripts/f355a-execution-central.test.mjs
+          node scripts/f355a-integration.test.mjs
+      - name: "Gate REGRESSÃO canônica — som 37 + detalhes 74 + cards 53 + sessão 40"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f354wh2-immediate-notification-sound.test.mjs
+          node scripts/f354wh1-details-status-notes.test.mjs
+          node scripts/f354w-compact-cards-details.test.mjs
+          node scripts/f354vh1-session-persistence.test.mjs
+      - name: "Gate PROVAS REAIS Electron — F3.5.5B (20, asar do index REAL) + F3.5.5A-H1 (15) + F3.5.5A (25) — xvfb"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y >/dev/null 2>&1 || true
+          sudo apt-get install -y xvfb >/dev/null 2>&1 || true
+          # timeout explícito por harness: um travamento falha RÁPIDO com log (nunca segura o job 30min)
+          timeout -k 15 600 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f355b-proof-main.js
+          timeout -k 15 600 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f355ah1-proof-main.js
+          timeout -k 15 600 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f355a-execution-proof-main.js
+      - name: "Gate ISOLAMENTO — delta vs 1.0.218 SÓ nos arquivos autorizados; congelados diff-vazio"
+        run: |
+          set -euo pipefail
+          git diff --name-only "$BASE_218_SHA"..HEAD > /tmp/delta.txt; cat /tmp/delta.txt
+          # allowlist F3.5.5B: SÓ o renderer index.html + versão + suites/provas/docs/workflows da fase
+          # + pins de versão nas suítes herdadas (precedente b12fde2: wh2/vh1/f355a-integration/
+          # orchestrator/f355ah1, incluindo o preload de prova herdado com a versão injetada).
+          BAD=$(grep -vE '^(\.github/workflows/desktop-(build|release)-f355b\.yml$|desktop/src/renderer/index\.html$|desktop/package(-lock)?\.json$|desktop/scripts/f355b-|desktop/scripts/f355ah1-|desktop/scripts/f355a-integration\.test\.mjs$|desktop/scripts/f355a-orchestrator\.test\.mjs$|desktop/scripts/f354wh2-immediate-notification-sound\.test\.mjs$|desktop/scripts/f354vh1-session-persistence\.test\.mjs$|docs/f355b(-qa)?/)' /tmp/delta.txt || true)
+          [ -z "$BAD" ] || { echo "::error::fora da allowlist: $BAD"; exit 1; }
+          # CONGELADOS byte-idênticos vs 1.0.218: TODO o main (inclui reminder.ts do lembrete 1h) +
+          # preload + janelas premium/central + sons + worker + backend + android + config de build
+          # (esta fase é 100% renderer index.html).
+          git diff --quiet "$BASE_218_SHA"..HEAD -- desktop/src/main desktop/src/preload desktop/src/renderer/bgnotify.html desktop/src/renderer/slareminder.html desktop/src/renderer/sounds desktop/src/renderer/priorityEngine.js desktop/scripts/copy-renderer.js desktop/tsconfig.json cloudflare-worker.js functions android-native android-native-beta || { echo "::error::módulo congelado alterado"; exit 1; }
+      - name: "Gate MARCADORES F3.5.5B — card data-first + modal premium + ações/permissões preservadas (fonte)"
+        run: |
+          set -euo pipefail
+          grep -q 'evc2-date' desktop/src/renderer/index.html
+          grep -q 'function evDateFull' desktop/src/renderer/index.html
+          grep -q 'data-evdmodal' desktop/src/renderer/index.html
+          grep -q 'function evdSetupModalFocus' desktop/src/renderer/index.html
+          grep -q 'data-evmore' desktop/src/renderer/index.html
+          grep -q 'Duração: ' desktop/src/renderer/index.html
+          grep -q 'Para confirmar, digite EXCLUIR' desktop/src/renderer/index.html
+          grep -q 'evDelConfirm' desktop/src/renderer/index.html
+          grep -qF "if(!i||i.value.trim()!=='EXCLUIR')" desktop/src/renderer/index.html
+          grep -qF "const isAdmin=!!(state.user&&state.user.admin);" desktop/src/renderer/index.html
+          grep -q 'Não foi possível concluir a ação. Verifique a conexão e tente novamente.' desktop/src/renderer/index.html
+          echo "MARCADORES F3.5.5B: VERIFIED."
+  build:
+    needs: verify
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: npm ci + build + electron-builder (--publish never)
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm run build
+          npx electron-builder --win nsis msi --publish never
+      - name: "Gate EMPACOTADO — versão + Agenda Premium no app.asar (suites completas contra o pacote)"
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          ASAR="dist-installer/win-unpacked/resources/app.asar"; test -f "$ASAR"
+          npx --yes @electron/asar extract "$ASAR" asar-x
+          node -e "const p=require('./asar-x/package.json'); if(p.version!=='1.0.219') process.exit(1);"
+          grep -q 'evc2-date' asar-x/src/renderer/index.html
+          grep -q 'evd-when' asar-x/src/renderer/index.html
+          grep -q 'data-evdmodal' asar-x/src/renderer/index.html
+          grep -q 'data-evmore' asar-x/src/renderer/index.html
+          # herdados da 1.0.218 intactos no pacote (observações internas + acompanhamento + sons)
+          grep -q 'data-detnoteedit' asar-x/src/renderer/index.html
+          grep -q 'OBSERVAÇÃO INTERNA PARA O DESIGNER — OPCIONAL' asar-x/src/renderer/index.html
+          grep -q "CHECK-IN DE EXECUÇÃO" asar-x/src/renderer/slareminder.html
+          test -f asar-x/dist/main/executionOrchestrator.js
+          test -f asar-x/dist/main/reminder.js
+          test -f asar-x/src/renderer/sounds/execution-checkin.wav
+          grep -q 'mode: "off"' asar-x/dist/main/main.js
+          # MESMAS suítes rodando contra os BYTES do pacote:
+          SRC=asar-x/src/renderer/index.html node scripts/f355b-agenda-premium.test.mjs
+          SRC=asar-x/src/renderer/index.html node scripts/f355ah1-internal-notes.test.mjs
+          SRC=asar-x/src/renderer/index.html BG_SRC=asar-x/src/renderer/bgnotify.html MAIN_SRC=src/main/main.ts BGM_SRC=src/main/bgNotify.ts node scripts/f354wh2-immediate-notification-sound.test.mjs
+          SRC=asar-x/src/renderer/index.html node scripts/f354wh1-details-status-notes.test.mjs
+          echo "GATE F3.5.5B EMPACOTADO: VERIFIED."
+      - name: Empacotar bundle + SHA256SUMS + VERSAO-DESKTOP
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes @cyclonedx/cyclonedx-npm --omit dev --output-format JSON --output-file "$RUNNER_TEMP/sbom.json" || echo '{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}' > "$RUNNER_TEMP/sbom.json"
+          OUT="$GITHUB_WORKSPACE/dist-pkg"; mkdir -p "$OUT"
+          EXE=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe | head -1); MSI=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.msi | head -1); BM=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap | head -1)
+          cp "$EXE" "$MSI" "$BM" dist-installer/latest.yml "$OUT/"; cp "$RUNNER_TEMP/sbom.json" "$OUT/SBOM-cyclonedx.json"
+          EXE_NAME=$(basename "$EXE"); MSI_NAME=$(basename "$MSI"); BM_NAME=$(basename "$BM")
+          ( cd "$OUT" && sha256sum "$EXE_NAME" "$MSI_NAME" latest.yml "$BM_NAME" SBOM-cyclonedx.json > SHA256SUMS )
+          { echo "productName : Agenda ID Seven Desktop"; echo "versionName : 1.0.219"; echo "rotulo      : 1.0.219-premium-agenda-redesign (CANDIDATA — Agenda Premium: cards e detalhes de compromissos)"; echo "channel     : latest (NADA publicado neste build)"; echo "appId       : br.com.idseven.agenda.desktop"; echo "instalador  : $EXE_NAME"; echo "SHA-256 exe : $(sha256sum "$OUT/$EXE_NAME" | awk '{print $1}')"; echo "instalador2 : $MSI_NAME"; echo "SHA-256 msi : $(sha256sum "$OUT/$MSI_NAME" | awk '{print $1}')"; echo "commit      : $GITHUB_SHA (branch $GITHUB_REF_NAME)"; echo "base-codigo : Desktop 1.0.218 (commit 1a94515)"; echo "rollback    : Desktop 1.0.218 (imediato, commit 1a94515); adicional 1.0.216 (e509f43)"; echo "origem      : F3.5.5B — Agenda Premium: card de compromisso data-first (bloco DOM/dia/mês sempre visível, horário 24h hierarquizado, chip dos 4 estados, título 2 linhas, cliente/local com ellipsis, responsável 1×, trilho por usuário) e detalhe refinado (data por extenso em pt-BR, duração calculada, resumo em grid, observações com parágrafos, ações hierarquizadas com menu ⋯ e exclusão protegida por EXCLUIR, Esc/trap/retorno de foco). APENAS apresentação: mesmas regras, permissões, persistência e notificações da 1.0.218; backend/Worker/Functions/Android intocados."; echo "distribuicao: CANDIDATA — publicação no Latest ocorre no workflow desktop-release-f355b.yml (mesmos bytes)"; } > "$OUT/VERSAO-DESKTOP.txt"
+          echo "== SHA256SUMS =="; cat "$OUT/SHA256SUMS"
+      - uses: actions/upload-artifact@v4
+        with: { name: agenda-id-seven-desktop-1.0.219-installer, path: "dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe\ndist-pkg/Agenda-ID-Seven-Desktop-*-x64.msi", if-no-files-found: error, retention-days: 30 }
+      - uses: actions/upload-artifact@v4
+        with: { name: agenda-id-seven-desktop-1.0.219-updatemeta, path: "dist-pkg/latest.yml\ndist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap\ndist-pkg/SHA256SUMS\ndist-pkg/SBOM-cyclonedx.json\ndist-pkg/VERSAO-DESKTOP.txt", if-no-files-found: error, retention-days: 30 }

@@ -1,0 +1,318 @@
+{
+  "feature": "F3.5.5B",
+  "asarSha256": "e21ce27b4ec10799bfffe322283ed51ce67b5d2deede1296ee4f9dd2474553b1",
+  "packagedIndexSha256": "8e87fd12ff284ddf7001fc7efb31543bae29efb9a14ef353c75b4b4b7047591c",
+  "electron": "31.3.1",
+  "proofs": 20,
+  "failures": 0,
+  "fatal": null,
+  "results": [
+    {
+      "name": "P1 data SEMPRE visível: todo card do Hoje tem bloco DOM/dia/mês; sem rolagem horizontal",
+      "ok": true,
+      "info": {
+        "count": 7,
+        "allDate": true,
+        "todayDd": "4",
+        "expDd": "4",
+        "firstTime": "09:00— 18:30",
+        "sched": true,
+        "prog": true,
+        "futureCount": 5,
+        "noH": true,
+        "png": "f355b-P01-hoje-datas.png"
+      }
+    },
+    {
+      "name": "P2 agendado: chip 'Agendado', 14:00 — 16:00, cliente, local, responsável 1×, tipo, role/aria",
+      "ok": true,
+      "info": {
+        "hasDate": true,
+        "dd": "4",
+        "dw": "TER",
+        "dm": "AGO",
+        "dy": "",
+        "st": "Agendado",
+        "time": "14:00— 16:00",
+        "name": "Ana Beatriz Social Media",
+        "ty": "Gravação",
+        "rail": "background:#F87171",
+        "ow": true,
+        "metas": [
+          "Dra. Daniella Félix",
+          "Estúdio ID Seven — Sala 2"
+        ],
+        "hasClient": true,
+        "hasLoc": true,
+        "roleBtn": true,
+        "aria": true,
+        "png": "f355b-P02-agendado.png"
+      }
+    },
+    {
+      "name": "P3 em andamento: chip 'Em andamento' no card de hoje",
+      "ok": true,
+      "info": {
+        "hasDate": true,
+        "dd": "4",
+        "dw": "TER",
+        "dm": "AGO",
+        "dy": "",
+        "st": "Em andamento",
+        "time": "09:00— 18:30",
+        "name": "Diego Fernandes Designer",
+        "ty": "Edição",
+        "rail": "background:#F87171",
+        "ow": true,
+        "png": "f355b-P03-andamento.png"
+      }
+    },
+    {
+      "name": "P4 finalizado: chip 'Finalizado' na Agenda (dia atual)",
+      "ok": true,
+      "info": {
+        "hasDate": true,
+        "dd": "4",
+        "dw": "TER",
+        "dm": "AGO",
+        "dy": "",
+        "st": "Finalizado",
+        "time": "08:00— 08:45",
+        "name": "Ana Beatriz Social Media",
+        "ty": "Reunião",
+        "rail": "background:#22D3EE",
+        "ow": true,
+        "found": true,
+        "notInHojeRule": true,
+        "png": "f355b-P04-finalizado.png"
+      }
+    },
+    {
+      "name": "P5 cancelado: chip 'Cancelado' visível via toggle; atrasado com trilho vermelho (#F87171)",
+      "ok": true,
+      "info": {
+        "found": true,
+        "st": "Cancelado",
+        "lateRail": "background:#F87171",
+        "lateFound": true,
+        "png": "f355b-P05-cancelado-atrasado.png"
+      }
+    },
+    {
+      "name": "P6 título longo: CSS clampa em 2 linhas (texto completo exigiria mais) e nada sai do card",
+      "ok": true,
+      "info": {
+        "tab": "hoje",
+        "cw": 546,
+        "clampCss": "2",
+        "clampedH": 38,
+        "fullH": 75,
+        "lh": 18.85,
+        "needsClamp": true,
+        "maxTwo": true,
+        "cardNoOverflow": true,
+        "noH": true,
+        "png": "f355b-P06-titulo-longo.png"
+      }
+    },
+    {
+      "name": "P7 local longo: 1 linha (rects=1) com ellipsis ativo e texto truncado; card íntegro",
+      "ok": true,
+      "info": {
+        "tab": "hoje",
+        "disp": "block",
+        "cw": 1018,
+        "sw": 1296,
+        "rects": 1,
+        "ell": true,
+        "truncated": true,
+        "oneLine": true,
+        "cardNoOverflow": true,
+        "png": "f355b-P07-local-longo.png"
+      }
+    },
+    {
+      "name": "P8 sem término: só '10:00' (sem — e sem 00:00 inventado); sem responsável: rodapé sem nome e trilho neutro",
+      "ok": true,
+      "info": {
+        "aTime": "10:00",
+        "aNoDash": true,
+        "bFound": true,
+        "bName": "",
+        "bRail": "background:var(--line)",
+        "png": "f355b-P08-sem-termino-sem-resp.png"
+      }
+    },
+    {
+      "name": "P9 modal agendado: Enter abre; foco no X; DOW+data por extenso; 14:00—16:00; 'Duração: 2 horas'; sem data bruta; observações pre-wrap; trap de Tab; Esc fecha; foco volta ao card",
+      "ok": true,
+      "info": {
+        "opened": true,
+        "xFocused": true,
+        "dow": "Terça-feira",
+        "dfull": "4 de agosto de 2026",
+        "time": "14:00— 16:00",
+        "dur": "Duração: 2 horas",
+        "noRaw": true,
+        "client": true,
+        "notesPre": true,
+        "cells": 6,
+        "trapWrapped": true,
+        "closedByEsc": true,
+        "focusBackOnCard": true,
+        "png": "f355b-P09-modal-agendado.png"
+      }
+    },
+    {
+      "name": "P10 modal em andamento: Finalizar primária (data-evfinish), Cancelar/Editar presentes, sem Iniciar, linha do tempo",
+      "ok": true,
+      "info": {
+        "opened": true,
+        "priTxt": "Finalizar",
+        "priAttr": "evb-prog",
+        "hasCancel": true,
+        "hasEdit": true,
+        "noStart": true,
+        "tl": true,
+        "png": "f355b-P10-modal-andamento.png"
+      }
+    },
+    {
+      "name": "P11 modal finalizado: sem ação primária; Fechar discreto; Editar sim; Cancelar/Iniciar não; linha do tempo",
+      "ok": true,
+      "info": {
+        "opened": true,
+        "noPri": true,
+        "hasClose": true,
+        "hasEdit": true,
+        "noCancel": true,
+        "noStart": true,
+        "tlDone": true,
+        "stChip": true,
+        "png": "f355b-P11-modal-finalizado.png"
+      }
+    },
+    {
+      "name": "P12 data completa pt-BR no modal: 'Sexta-feira' + '14 de agosto de 2026'; 15:30—16:00; 'Duração: 30 minutos'; nunca 2026-08-14",
+      "ok": true,
+      "info": {
+        "dow": "Sexta-feira",
+        "dfull": "14 de agosto de 2026",
+        "time": "15:30— 16:00",
+        "dur": "Duração: 30 minutos",
+        "noRaw": true,
+        "png": "f355b-P12-data-extenso.png"
+      }
+    },
+    {
+      "name": "P13 ações reorganizadas: 1 primária (Iniciar); Excluir SÓ dentro do menu ⋯ (com Finalizar); aria-expanded; Esc fecha o menu sem fechar o modal",
+      "ok": true,
+      "info": {
+        "priCount": 1,
+        "priIsStart": true,
+        "delOutsideMenu": false,
+        "hasMore": true,
+        "menuOpen": true,
+        "ariaExp": true,
+        "menuFinish": true,
+        "menuDelete": true,
+        "menuClosedByEsc": true,
+        "modalStillOpen": true,
+        "png": "f355b-P13-acoes-menu.png"
+      }
+    },
+    {
+      "name": "P14 exclusão segura: só no menu ⋯ + confirmação; vazio/minúsculas BLOQUEADOS com erro; Esc volta ao detalhe; EXCLUIR grava ator e executa delete",
+      "ok": true,
+      "info": {
+        "confirmShown": true,
+        "input": true,
+        "escBackToDetail": true,
+        "blockedEmpty": true,
+        "errShown": true,
+        "blockedLower": true,
+        "deleteRan": true,
+        "actorRecorded": true,
+        "modalClosed": true,
+        "png": "f355b-P14-exclusao-segura.png"
+      }
+    },
+    {
+      "name": "P15 escala 125%: data visível no card; sem corte horizontal; modal cabe na janela; primária clicável",
+      "ok": true,
+      "info": {
+        "dateVisible": true,
+        "noH": true,
+        "cardOk": true,
+        "modalFits": true,
+        "priClickable": true,
+        "dfull": "4 de agosto de 2026",
+        "png": "f355b-P15-escala125.png"
+      }
+    },
+    {
+      "name": "P16 escala 150%: data visível no card; sem corte horizontal; modal cabe na janela; primária clicável",
+      "ok": true,
+      "info": {
+        "dateVisible": true,
+        "noH": true,
+        "cardOk": true,
+        "modalFits": true,
+        "priClickable": true,
+        "dfull": "4 de agosto de 2026",
+        "png": "f355b-P16-escala150.png"
+      }
+    },
+    {
+      "name": "P17 1366×768: datas visíveis, zero corte nos cards, modal dentro da workArea, ações visíveis",
+      "ok": true,
+      "info": {
+        "count": 7,
+        "allDate": true,
+        "allNoOverflow": true,
+        "noH": true,
+        "modalFits": true,
+        "actionsVisible": true,
+        "png": "f355b-P17-1366x768.png"
+      }
+    },
+    {
+      "name": "P18 1920×1080: datas visíveis, zero corte nos cards, modal dentro da workArea, ações visíveis",
+      "ok": true,
+      "info": {
+        "count": 7,
+        "allDate": true,
+        "allNoOverflow": true,
+        "noH": true,
+        "modalFits": true,
+        "actionsVisible": true,
+        "png": "f355b-P18-1920x1080.png"
+      }
+    },
+    {
+      "name": "P19 vários compromissos: 'Próximos' limita a 5; lista da Agenda mostra todos (≥10); ano exibido quando ≠ atual",
+      "ok": true,
+      "info": {
+        "futN": 5,
+        "listN": 11,
+        "nyYear": "2027",
+        "noH": true,
+        "png": "f355b-P19-varios.png"
+      }
+    },
+    {
+      "name": "P20 dashboard sem regressão: 3 stats, Tarefas urgentes renderizadas, 3 seções, navegação presente",
+      "ok": true,
+      "info": {
+        "stats": 3,
+        "urgent": 2,
+        "hasHojeSect": true,
+        "hasTkSect": true,
+        "hasFuSect": true,
+        "nav": true,
+        "noH": true,
+        "png": "f355b-P20-dashboard.png"
+      }
+    }
+  ]
+}
