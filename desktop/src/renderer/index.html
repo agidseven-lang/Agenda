@@ -7314,10 +7314,10 @@ function openDetails(taskId){
         var leg=(c.legenda!=null&&String(c.legenda).trim())?String(c.legenda):'';
         // F3.5.4W-H1 (E2) — botões de cópia no cabeçalho: tema (lê .det-acc-t) e legenda (lê .det-acc-l).
         // Só aparecem quando há conteúdo real (nunca copiar "(sem tema)"/legenda vazia).
-        var cp='<span class="det-acc-copy">'+
+        var cp=(hasTema||leg)?('<span class="det-acc-copy">'+
           (hasTema?'<button type="button" class="det-acc-cbtn" data-detcopytheme="1" aria-label="Copiar tema" title="Copiar tema">'+svg('copy')+'</button>':'')+
           (leg?'<button type="button" class="det-acc-cbtn" data-detcopycaption="1" aria-label="Copiar legenda" title="Copiar legenda">'+svg('copy')+'</button>':'')+
-        '</span>';
+        '</span>'):'';
         // F3.5.4W-H1 (E5) — observação interna por tema (só interna; nunca ao cliente). Só quando não-vazia.
         var _dnv=(t.designerItemNotes||{})['i'+c._i];var _dn=(_dnv!=null)?String(_dnv).trim():'';
         var _dnote=_dn?'<div class="det-acc-note"><span class="det-acc-note-k">Observação interna da Social Media</span><div class="det-acc-note-b">'+esc(_dn)+'</div></div>':'';
@@ -8588,7 +8588,7 @@ function clientReviewColor(s){return {aprovado:'#34D399',revisao:'#F59E0B',edita
 function cvWhen(ms){if(!ms)return'';const d=new Date(Number(ms));if(isNaN(d))return'';const p=n=>('0'+n).slice(-2);return p(d.getDate())+'/'+p(d.getMonth()+1)+' · '+p(d.getHours())+':'+p(d.getMinutes());}
 function cvCs(cs){const m={aprovado:['Aprovado pelo cliente','#34D399'],em_revisao:['Ajuste pedido pelo cliente','#F59E0B'],editado:['Editado pelo cliente','#A78BFA'],em_analise:['Em análise pelo cliente','#60A5FA']};return m[cs]?{label:m[cs][0],color:m[cs][1]}:null;}
 function cvActionMeta(type){const M={approve:['check','#34D399'],approveAll:['check','#34D399'],approveItem:['check','#34D399'],reviseItem:['revise','#F59E0B'],revision:['revise','#F59E0B'],edit_request:['editnote','#A78BFA'],editTheme:['editnote','#A78BFA'],editLegenda:['editnote','#A78BFA'],noteItem:['editnote','#60A5FA'],comment:['editnote','#60A5FA']};return M[type]||['editnote','#60A5FA'];}
-function cvActionLabel(a){const ci=(a&&a.contentIndex!=null&&a.contentIndex!=='')?(' · Conteúdo '+(Number(a.contentIndex)+1)):'';const L={approve:'Aprovou o cronograma',approveAll:'Aprovou o cronograma',approveItem:'Aprovou conteúdo'+ci,reviseItem:'Pediu ajuste'+ci,revision:'Pediu revisão geral',edit_request:'Pediu edição do cronograma',editTheme:'Editou o tema'+ci,editLegenda:'Editou a legenda'+ci,noteItem:'Comentou'+ci,comment:'Comentou no cronograma'};return L[(a&&a.type)]||('Ação'+ci);}
+function cvActionLabel(a){const ci=(a&&a.contentIndex!=null&&a.contentIndex!=='')?(' · Conteúdo '+(Number(a.contentIndex)+1)):'';const L={approve:'Aprovou o cronograma',approveAll:'Aprovou o cronograma',approveItem:'Aprovou conteúdo'+ci,reviseItem:'Pediu ajuste'+ci,revision:'Pediu revisão geral',edit_request:'Pediu edição do cronograma',editTheme:'Editou o tema'+ci,editLegenda:'Editou a legenda'+ci,noteItem:'Comentou'+ci,comment:'Comentou no cronograma',approveAllPending:'Aprovou os conteúdos pendentes (lote)'};return L[(a&&a.type)]||('Ação'+ci);}
 function cliRow(ic,color,label,val){return '<div class="cvw-cli-row"><div class="ci" style="color:'+color+';background:'+withAlpha(color,.14)+'">'+svg(ic)+'</div><div class="cm"><div class="cl">'+esc(label)+'</div><div class="cv">'+esc(String(val)).replace(/\n/g,'<br>')+'</div></div></div>';}
 function clientItemOverlay(c,t){
   const arr=Array.isArray(t.cronContents)?t.cronContents:(Array.isArray(t.cronWeeks)?t.cronWeeks:[]);
@@ -9957,6 +9957,9 @@ async function detCopyFromButton(btn, kind, text){
   if(btn._detOrigTip==null){ btn._detOrigTip=btn.getAttribute('title')||('Copiar '+(kind==='theme'?'tema':'legenda')); }
   var orig=btn._detOrigTip, len=(text==null?0:String(text).length), ok=false;
   try{ ok=await detClipWrite(text); }catch(_){ ok=false; }
+  // fallback execCommand pode ter roubado o foco p/ o <textarea> temporário (removido) — devolve ao
+  // botão p/ o trap de foco do modal continuar íntegro (Tab não escapa da Central).
+  if(document.activeElement===document.body){try{btn.focus();}catch(_){}}
   detCopyObs(kind, ok, len);
   if(btn._detCopyT){ clearTimeout(btn._detCopyT); btn._detCopyT=null; }
   if(ok){

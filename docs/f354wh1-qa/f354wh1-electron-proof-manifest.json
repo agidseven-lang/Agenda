@@ -3,12 +3,12 @@
   "title": "Central de Detalhes (tipografia + Copiar tema/legenda) · status Social/Designer · observações internas · card preservado",
   "version": "1.0.215",
   "electron": "31.3.1(real)",
-  "ranAt": "2026-08-04T12:00:49.848Z",
+  "ranAt": "2026-08-04T12:57:24.895Z",
   "asar": {
-    "bytes": 1289430,
-    "sha256": "edc75cbcd9884bce1d418ace1ffdcbb1429500d2a413bb49d30b29332cf9ee83"
+    "bytes": 1289775,
+    "sha256": "6d3ebb50cb0000f9ccfce166450aa360e1579a77f0c7cc73cd9880b7daf7e350"
   },
-  "rendererSha256": "7322e8833d6178b295edb79bccbd950114e0a7725284ae22f7f6d82d5985f8ad",
+  "rendererSha256": "d2f02efb290b94de06ad6bbcbce62d9cc3e06ffdded193769210096c154ace2e",
   "priorityEngineSha256": "0e04c8c3e301795b717b126d7a887e23eb75290465ba37abaeafe1901772dcfc",
   "thresholds": {
     "invarDeltaPx": 8,
@@ -202,7 +202,7 @@
             "keysOk": true,
             "payloadOk": true,
             "leakFree": true,
-            "sample": "{\"contentType\":\"theme\",\"contentLength\":243,\"taskSector\":\"cronograma\",\"appVersion\":\"1.0.215\",\"timestamp\":1785844814057}"
+            "sample": "{\"contentType\":\"theme\",\"contentLength\":243,\"taskSector\":\"cronograma\",\"appVersion\":\"1.0.215\",\"timestamp\":1785848208564}"
           }
         },
         {
@@ -550,7 +550,7 @@
             "keysOk": true,
             "payloadOk": true,
             "leakFree": true,
-            "sample": "{\"contentType\":\"theme\",\"contentLength\":243,\"taskSector\":\"cronograma\",\"appVersion\":\"1.0.215\",\"timestamp\":1785844831696}"
+            "sample": "{\"contentType\":\"theme\",\"contentLength\":243,\"taskSector\":\"cronograma\",\"appVersion\":\"1.0.215\",\"timestamp\":1785848226551}"
           }
         },
         {
@@ -763,7 +763,7 @@
             "keysOk": true,
             "payloadOk": true,
             "leakFree": true,
-            "sample": "{\"contentType\":\"theme\",\"contentLength\":243,\"taskSector\":\"cronograma\",\"appVersion\":\"1.0.215\",\"timestamp\":1785844842673}"
+            "sample": "{\"contentType\":\"theme\",\"contentLength\":243,\"taskSector\":\"cronograma\",\"appVersion\":\"1.0.215\",\"timestamp\":1785848237404}"
           }
         },
         {
