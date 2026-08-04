@@ -15,6 +15,7 @@
    BASE: env F354WH1_BASE_SRC=<arquivo 39faaaf> OU `git show 39faaaf:cloudflare-worker.js`.
    ===================================================================== */
 import fs from 'fs'; import path from 'path'; import { execSync } from 'child_process';
+import vm from 'vm';
 import { fileURLToPath } from 'url'; import { generateKeyPairSync, webcrypto } from 'crypto';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SRCPATH = path.resolve(__dirname, '..', 'cloudflare-worker.js');
@@ -246,6 +247,21 @@ console.log('== F3.5.4W-H1 (E4) — Aprovar tudo (approveAllPending): RED base �
     clientItems: { i0: { cs: 'aprovado', phase: 'themes' }, i1: { cs: 'aprovado', phase: 'themes' }, i2: { cs: 'aprovado', phase: 'themes' }, i3: { cs: 'aprovado', phase: 'themes' }, i4: { cs: 'aprovado', phase: 'themes' } } }));
   const r = await act(W, t, { action: 'approveAllPending', phase: 'themes' });
   ok('N1  tudo já aprovado+fechado ⇒ no-op idempotente (ok:true, approved=0, ZERO escrita)', r.j.ok === true && r.j.approved === 0 && W.commits.length === 0);
+  ok('N1b alreadyDone sinalizado (a página recarrega p/ a tela de confirmação)', r.j.alreadyDone === true && r.j.finalized === true);
+}
+
+/* ───── REGRESSÃO do achado MAJOR (verify): fase FECHADA + cs limpos (V64.42) ⇒ NUNCA re-fecha ───── */
+{
+  const W = NEW();
+  const t = TK('rcl');
+  // estado PÓS-FECHAMENTO real: fase aprovada + limpeza V64.42 já zerou os cs dos itens.
+  // Sem o gate independente, os 5 itens recontariam como "pendentes" e o lote RE-FECHARIA a fase
+  // (história duplicada + re-notificação + sobrescrita de estado que a equipe pode ter movido).
+  setFix(t, cron5({ clientReviewToken: t, clientFlowStatus: 'aprovado', cronStatus: 'aprovado_cliente',
+    clientReview: { status: 'aprovado', at: 1754310000000, byName: 'Cliente' },
+    clientItems: { i0: { cs: null, phase: 'themes' }, i1: { cs: null, phase: 'themes' }, i2: { cs: null, phase: 'themes' }, i3: { cs: null, phase: 'themes' }, i4: { cs: null, phase: 'themes' } } }));
+  const r = await act(W, t, { action: 'approveAllPending', phase: 'themes' });
+  ok('N2  fase fechada + cs limpos ⇒ alreadyDone no-op (ZERO escrita; nada re-fechado/re-notificado)', r.j.ok === true && r.j.alreadyDone === true && r.j.approved === 0 && W.commits.length === 0);
 }
 
 /* ───── ROTEIRO: legenda exigida mesmo na fase themes (themesOnly=false) ───── */
@@ -300,6 +316,19 @@ console.log('== F3.5.4W-H1 (E4) — Aprovar tudo (approveAllPending): RED base �
   // do botão sempre, mas o guarda bp>0 impede a renderização (provado em U2/U5 + handler S-guards).
   const footAll = htmlAll.slice(htmlAll.indexOf('<div class="gactions">'), htmlAll.indexOf('<div class="scrim"'));
   ok('U6  com tudo aprovado o rodapé volta ao approveAll canônico (sem o botão de lote no .gactions)', !footAll.includes('data-act="approveAllPending"') && footAll.includes('data-act="approveAll"'));
+}
+
+/* ───── SINTAXE do JS SERVIDO (regressão do achado CRÍTICO: \n vira LF real no template) ───── */
+{
+  const W = NEW();
+  const html = W.api.renderClientHtml(cron5({ clientActions: { a1754310000000: { type: 'approveAllPending', at: 1754310000000, approved: 3, pending: 1 } } }), TK('js1'), ENV, ORIGIN);
+  let blocks = 0, bad = 0, firstErr = '';
+  const re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi; let m;
+  while ((m = re.exec(html))) { const code = m[1]; if (!code.trim()) continue; blocks++;
+    try { new vm.Script(code, { filename: 'portal-inline-' + blocks + '.js' }); } catch (e) { bad++; if (!firstErr) firstErr = String(e && e.message).slice(0, 120); } }
+  ok('J1  TODO o JS inline da página do portal PARSEIA (' + blocks + ' blocos; erro: ' + (firstErr || 'nenhum') + ')', blocks > 0 && bad === 0);
+  ok('J2  confirm do lote usa \\n ESCAPADO na página (quebras no confirm, string íntegra)', html.includes("?\\n\\n• '"));
+  ok('J3  história do portal rotula o lote (sem fallback "Ação em")', html.includes('Aprovou os conteúdos pendentes'));
 }
 
 /* ───── PRIVACIDADE (E5×E4): observação interna NUNCA chega ao cliente ───── */

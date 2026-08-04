@@ -52,7 +52,7 @@ env:
   EXPECT_BUILD_NEW: f354wh1-approve-all
   BASE_F350_SHA: 39faaafcab90299dd9de4dd8bd2731b430fed291
   BASE_J6_SHA: db325d9fccbd2111e276d4d3f0e87d7a0a3edf09
-  WORKER_SHA256: "9ff407842cbe8ae8ff958fd38a398ef0cd3bbe5f8cd4181674858ccde2fbc5e6"
+  WORKER_SHA256: "c5c727d6d4ac4af31efc0427012d051c5f0d63d4eeaaa5f899f43bdb35cf9074"
   FS_BASE: "https://firestore.googleapis.com/v1/projects/agenda-id-seven/databases/(default)"
   T_NF: f354wh1proddeploy0000000000000000000000000001
 

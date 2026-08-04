@@ -1662,7 +1662,7 @@ async function handleClientCronogramaAction(token, request, env) {
       else if (b.client === "aprovado") await notifyWorkflowEvent(env, task, "themes_approved_by_client", { token });
     } catch (_) { /* best-effort */ }
     console.log(`[CLIENT-ACTION] task=${task.id} type=${type} phase=${b.phase} approved=${b.approved} pending=${b.pending} finalized=${b.finalized} idem=${idemKey ? "yes" : "no"}`);
-    const outB = { ok: true, type, at: now, phase: b.phase, approved: b.approved, pending: b.pending, approvedIndexes: b.approvedIndexes || [], finalized: b.finalized, final: b.client === "concluido", col: b.col || null, clientFlowStatus: b.client || null };
+    const outB = { ok: true, type, at: now, phase: b.phase, approved: b.approved, pending: b.pending, approvedIndexes: b.approvedIndexes || [], finalized: b.finalized, alreadyDone: b.alreadyDone === true, final: b.client === "concluido", col: b.col || null, clientFlowStatus: b.client || null };
     const respB = json(outB, 200, env);
     if (idemUrl) {
       try {
@@ -3014,9 +3014,16 @@ async function writeClientBatchApprove(env, accessToken, task, e) {
   }
   const approvedNow = newlyIdx.length;
   const complete = total > 0 && (already + approvedNow) === total;
+  // fase JÁ FECHADA ⇒ no-op INDEPENDENTE de approvedNow (a limpeza V64.42 zera os cs dos itens,
+  // então um replay pós-fechamento recontaria "pendentes"; sem este gate, uma aba antiga re-armada
+  // pelo poller poderia re-fechar a fase — duplicando história/notificação e sobrescrevendo estado
+  // que a equipe já moveu). alreadyDone manda a página recarregar p/ a tela de confirmação correta.
   const alreadyClosed = (clientAckedPhase(task) === phaseIn) || (phaseIn === "final" && task.finalApprovalCompleted === true);
-  if (approvedNow === 0 && (!complete || alreadyClosed)) {
-    return { ok: true, phase: phaseIn, approved: 0, pending: pendingLeg, approvedIndexes: [], finalized: !!(alreadyClosed && complete), client: null, col: null, noop: true };
+  if (alreadyClosed) {
+    return { ok: true, phase: phaseIn, approved: 0, pending: pendingLeg, approvedIndexes: [], finalized: true, alreadyDone: true, client: null, col: null, noop: true };
+  }
+  if (approvedNow === 0 && !complete) {
+    return { ok: true, phase: phaseIn, approved: 0, pending: pendingLeg, approvedIndexes: [], finalized: false, client: null, col: null, noop: true };
   }
 
   const aid = "a" + at;
@@ -3704,9 +3711,9 @@ document.addEventListener('click',function(e){
     if(stB.rev>0){toast('Há ajuste pendente — use Enviar feedback.','err');syncFooter();return;}
     if(bpend<=0){toast('Nada pendente para aprovar.','ok');syncFooter();return;}
     var el0=(typeof BATCH_EMPTYLEG==='number')?BATCH_EMPTYLEG:0;
-    var mm='Aprovar todo '+PT.o+'?\n\n• '+bpend+' '+(PHASE==='themes'?PT.itens:'conteúdo(s)')+' pendente(s)'+
-      (el0>0?'\n• '+el0+' sem legenda continuarão pendentes':'')+
-      '\n\nTotal a aprovar agora: '+Math.max(bpend-el0,0)+'.';
+    var mm='Aprovar todo '+PT.o+'?\\n\\n• '+bpend+' '+(PHASE==='themes'?PT.itens:'conteúdo(s)')+' pendente(s)'+
+      (el0>0?'\\n• '+el0+' sem legenda continuarão pendentes':'')+
+      '\\n\\nTotal a aprovar agora: '+Math.max(bpend-el0,0)+'.';
     if(!confirm(mm))return;
     var ik='aap-'+Date.now()+'-'+Math.random().toString(36).slice(2,10);
     postIdem({action:'approveAllPending',phase:phB},a,ik,function(j){
@@ -3714,6 +3721,7 @@ document.addEventListener('click',function(e){
         if(j&&j.error==='stale'){toast('O cronograma foi atualizado — recarregando a página…','err');setTimeout(function(){location.reload();},1200);return;}
         if(j&&j.error==='revision_pending'){toast('Há ajuste pendente — use Enviar feedback.','err');syncFooter();return;}
         toast('Não foi possível aprovar agora. Tente novamente.','err');return;}
+      if(j.alreadyDone){toast('Esta etapa já foi aprovada.','ok');setTimeout(function(){location.reload();},900);return;}
       (j.approvedIndexes||[]).forEach(function(ix){setBadge(ix,'aprovado');});bumpProgress();
       if(j.finalized&&j.final===true){addHist('ok','Aprovou tudo');clientSuccess();return;}
       if(j.finalized&&j.phase==='production'){addHist('ok','Aprovou tudo (legendas e artes)');clientProductionApproved();return;}
@@ -4102,6 +4110,7 @@ function renderClientHtml(task, token, env, origin) {
         revision: ["hb-rev", ICN.revise, "Pediu revisão geral"], edit_request: ["hb-edit", ICN.edit, "Pediu edição"],
         editTheme: ["hb-edit", ICN.edit, "Editou o tema de"], editLegenda: ["hb-edit", ICN.edit, "Editou a legenda de"], noteItem: ["hb-note", ICN.note, "Comentou em"],
         comment: ["hb-note", ICN.note, pt.histComment],
+        approveAllPending: ["hb-ok", ICN.check, "Aprovou os conteúdos pendentes"],   // F3.5.4W-H1 (E4)
       };
       const m = map[a.type] || ["hb-note", ICN.note, "Ação em"];
       const tgt = (a.contentIndex != null && a.contentIndex !== "") ? (" " + pt.itemName + " " + (Number(a.contentIndex) + 1)) : "";
