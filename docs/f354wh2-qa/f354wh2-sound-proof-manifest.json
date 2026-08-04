@@ -1,0 +1,83 @@
+{
+  "phase": "F3.5.4W-H2",
+  "at": "2026-08-04T13:58:51.903Z",
+  "electron": "31.3.1",
+  "results": [
+    {
+      "name": "asar empacotado com renderer REAL",
+      "ok": true,
+      "bytes": 0,
+      "slaWavs": []
+    },
+    {
+      "name": "PREMIUM 1º render TOCA (1 oscilador; ACK sound=played/started)",
+      "ok": true,
+      "osc": 1,
+      "ack": "played",
+      "dedup": "wh2-p1"
+    },
+    {
+      "name": "PREMIUM update de GRUPO NÃO toca (osciladores inalterados)",
+      "ok": true,
+      "osc": 1
+    },
+    {
+      "name": "PREMIUM novo grupo lógico TOCA de novo (2º oscilador)",
+      "ok": true,
+      "osc": 2,
+      "ack": "played"
+    },
+    {
+      "name": "PREMIUM mesmo dedupKey NÃO duplica som (dedup a montante OU duplicate_prevented; ZERO oscilador novo)",
+      "ok": true,
+      "osc": 2,
+      "newAcks": 0,
+      "ack": "played"
+    },
+    {
+      "name": "PREMIUM sound:false NÃO toca (suppressed_by_payload)",
+      "ok": true,
+      "osc": 2,
+      "ack": "suppressed_by_payload"
+    },
+    {
+      "name": "PREMIUM ACK sanitizado (sem título/ator/cliente no ACK)",
+      "ok": true,
+      "keys": [
+        "dedupKey",
+        "severity",
+        "eventType",
+        "isAttr",
+        "count",
+        "sound"
+      ]
+    },
+    {
+      "name": "TOAST carregou o renderer REAL (index.html)",
+      "ok": true,
+      "srcUsed": "asar"
+    },
+    {
+      "name": "TOAST focado: notifSound REAL toca no renderer EMPACOTADO (1 oscilador; resultado 'played')",
+      "ok": true,
+      "osc": 1,
+      "result": "played",
+      "note": "cena DOM fria e limitacao do harness; contrato visual do toast coberto pelas suites f354u/f354k"
+    },
+    {
+      "name": "TOAST sound:false NÃO toca",
+      "ok": true,
+      "osc": 1
+    },
+    {
+      "name": "TOAST update de grupo NÃO toca",
+      "ok": true,
+      "osc": 1
+    }
+  ],
+  "sha256": {
+    "index.html": "f7f8481ba518f867dac2c23b3803c20b5d90253fd5a17bfa118e3d345a36998a",
+    "bgnotify.html": "70b9fd24c1cfed14e7aeda2c3a6bebcdbe2190247022750b5e3bf20d2a91e1b1",
+    "app.asar": "7f5461629aefc574ff9b65f0c8f8b2baf1f745244dfd3ade9cec40d64cb27c20"
+  }
+}

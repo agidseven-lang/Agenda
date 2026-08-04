@@ -1,0 +1,118 @@
+# F3.5.4W-H2 — Desktop 1.0.216 (hotfix do som das notificações imediatas) — build GATED, --publish never.
+# Publicação SÓ no desktop-release-f354wh2.yml (mesmos bytes). Base 1.0.215 @ 5d59587; rollback 1.0.213/1.0.211.
+name: "[push/manual] F3.5.4W-H2 — Desktop 1.0.216 (Som das Notificações Imediatas) — Desktop Build"
+"on":
+  push:
+    branches: ["desktop/f354w-h2-immediate-notification-sound-1.0.216"]
+    paths-ignore: [".github/workflows/desktop-release-f354wh2.yml"]
+  workflow_dispatch: {}
+permissions: { contents: read }
+env:
+  TEST_BRANCH: "desktop/f354w-h2-immediate-notification-sound-1.0.216"
+  BASE_215_SHA: "5d595879176d9f2e90b1ec7b962bab40196d0d84"
+  BASE_213_SHA: "e626d36921e269e28b74494ff51afb9c77f8d94d"
+  APP_DIR: desktop
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: "Gate REF + ANCESTRIA (descende da 1.0.215 e 1.0.213)"
+        run: |
+          set -euo pipefail
+          [ "${GITHUB_REF_NAME}" = "$TEST_BRANCH" ] || { echo "::error::branch errada"; exit 1; }
+          git merge-base --is-ancestor "$BASE_215_SHA" HEAD || { echo "::error::não descende da 1.0.215"; exit 1; }
+          git merge-base --is-ancestor "$BASE_213_SHA" HEAD || { echo "::error::não descende da 1.0.213"; exit 1; }
+      - name: "Gate VERSAO 1.0.216 (package + lock x2)"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node -e "const p=require('./package.json'); if(p.version!=='1.0.216') process.exit(1);"
+          [ "$(grep -c '"version": "1.0.216"' package-lock.json)" -ge 2 ]
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: npm ci + TypeScript + sintaxe dos renderers
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          ./node_modules/.bin/tsc --noEmit -p tsconfig.json
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/renderer/bgnotify.html','utf8');const m=s.match(/<script>([\s\S]*?)<\/script>/);new Function(m[1]);"
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/renderer/index.html','utf8');const b=[...s.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(x=>x[1]);b.sort((a,c)=>c.length-a.length);new Function(b[0]);"
+      - name: "Gate F3.5.4W-H2 — contrato do som (37) + regressão 74+53+40"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f354wh2-immediate-notification-sound.test.mjs
+          node scripts/f354wh1-details-status-notes.test.mjs
+          node scripts/f354w-compact-cards-details.test.mjs
+          node scripts/f354vh1-session-persistence.test.mjs
+      - name: "Gate ISOLAMENTO — delta vs 1.0.215 SÓ nos arquivos autorizados; grouping/slaReminder congelados"
+        run: |
+          set -euo pipefail
+          git diff --name-only "$BASE_215_SHA"..HEAD > /tmp/delta.txt; cat /tmp/delta.txt
+          BAD=$(grep -vE '^(desktop/src/renderer/(index|bgnotify)\.html|desktop/src/main/(main|bgNotify)\.ts|desktop/package(-lock)?\.json|desktop/scripts/f354wh2-|desktop/scripts/f354vh1-session-persistence\.test\.mjs|\.github/workflows/desktop-(build|release)-f354wh2\.yml|docs/f354wh2-qa/)' /tmp/delta.txt || true)
+          [ -z "$BAD" ] || { echo "::error::fora da allowlist: $BAD"; exit 1; }
+          git diff --quiet "$BASE_215_SHA"..HEAD -- desktop/src/main/notificationGrouping.ts desktop/src/main/slaReminder.ts desktop/src/main/slaReminderWindow.ts desktop/src/main/updaterService.ts desktop/src/preload desktop/src/renderer/slareminder.html || { echo "::error::módulo congelado alterado"; exit 1; }
+          if git diff "$BASE_215_SHA"..HEAD -- android/ functions/ cloudflare-worker.js firestore.rules 2>/dev/null | grep -q .; then echo "::error::android/backend/worker tocados"; exit 1; fi
+      - name: "Gate MAIN cirúrgico — main.ts/bgNotify.ts: SÓ observabilidade de som (sem mudança de roteamento)"
+        run: |
+          set -euo pipefail
+          A=$(git diff "$BASE_215_SHA"..HEAD -- desktop/src/main/main.ts | grep -cE '^\+[^+]' ); D=$(git diff "$BASE_215_SHA"..HEAD -- desktop/src/main/main.ts | grep -cE '^-[^-]' || true)
+          [ "$A" = "2" ] && [ "$D" = "0" ] || { echo "::error::main.ts diff != +2/-0 ($A/$D)"; exit 1; }
+          git diff "$BASE_215_SHA"..HEAD -- desktop/src/main/main.ts | grep -E '^\+' | grep -q 'notification.sound.suppressed_by_grouping'
+          git diff "$BASE_215_SHA"..HEAD -- desktop/src/main/main.ts | grep -E '^\+' | grep -q 'notification.sound.native_fallback'
+          A2=$(git diff "$BASE_215_SHA"..HEAD -- desktop/src/main/bgNotify.ts | grep -cE '^\+[^+]'); D2=$(git diff "$BASE_215_SHA"..HEAD -- desktop/src/main/bgNotify.ts | grep -cE '^-[^-]' || true)
+          [ "$A2" = "1" ] && [ "$D2" = "0" ] || { echo "::error::bgNotify.ts diff != +1/-0 ($A2/$D2)"; exit 1; }
+  build:
+    needs: verify
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: npm ci + build + electron-builder (--publish never)
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm run build
+          npx electron-builder --win nsis msi --publish never
+      - name: "Gate EMPACOTADO — versão + som no app.asar (bgnotify/index/main/preload reais)"
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          ASAR="dist-installer/win-unpacked/resources/app.asar"; test -f "$ASAR"
+          npx --yes @electron/asar extract "$ASAR" /tmp/asar-x
+          node -e "const p=require('/tmp/asar-x/package.json'); if(p.version!=='1.0.216') process.exit(1);"
+          grep -q "function bgSound(sev)" /tmp/asar-x/src/renderer/bgnotify.html
+          grep -q "suppressed_by_payload" /tmp/asar-x/src/renderer/bgnotify.html
+          grep -q "var _sr=notifSound(sev)" /tmp/asar-x/src/renderer/index.html
+          grep -q "notification.sound.suppressed_by_grouping" /tmp/asar-x/dist/main/main.js
+          grep -q "notification.sound.premium" /tmp/asar-x/dist/main/bgNotify.js
+          SRC=/tmp/asar-x/src/renderer/index.html BG_SRC=/tmp/asar-x/src/renderer/bgnotify.html MAIN_SRC=src/main/main.ts BGM_SRC=src/main/bgNotify.ts node scripts/f354wh2-immediate-notification-sound.test.mjs
+          SRC=/tmp/asar-x/src/renderer/index.html node scripts/f354wh1-details-status-notes.test.mjs
+          echo "GATE F3.5.4W-H2 EMPACOTADO: VERIFIED."
+      - name: Empacotar bundle + SHA256SUMS + VERSAO-DESKTOP
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes @cyclonedx/cyclonedx-npm --omit dev --output-format JSON --output-file "$RUNNER_TEMP/sbom.json" || echo '{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}' > "$RUNNER_TEMP/sbom.json"
+          OUT="$GITHUB_WORKSPACE/dist-pkg"; mkdir -p "$OUT"
+          EXE=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe | head -1); MSI=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.msi | head -1); BM=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap | head -1)
+          cp "$EXE" "$MSI" "$BM" dist-installer/latest.yml "$OUT/"; cp "$RUNNER_TEMP/sbom.json" "$OUT/SBOM-cyclonedx.json"
+          EXE_NAME=$(basename "$EXE"); MSI_NAME=$(basename "$MSI"); BM_NAME=$(basename "$BM")
+          ( cd "$OUT" && sha256sum "$EXE_NAME" "$MSI_NAME" latest.yml "$BM_NAME" SBOM-cyclonedx.json > SHA256SUMS )
+          { echo "productName : Agenda ID Seven Desktop"; echo "versionName : 1.0.216"; echo "rotulo      : 1.0.216-immediate-notification-sound (CANDIDATA — som das notificações imediatas)"; echo "channel     : latest (NADA publicado neste build)"; echo "appId       : br.com.idseven.agenda.desktop"; echo "instalador  : $EXE_NAME"; echo "SHA-256 exe : $(sha256sum "$OUT/$EXE_NAME" | awk '{print $1}')"; echo "instalador2 : $MSI_NAME"; echo "SHA-256 msi : $(sha256sum "$OUT/$MSI_NAME" | awk '{print $1}')"; echo "commit      : $GITHUB_SHA (branch $GITHUB_REF_NAME)"; echo "base-codigo : Desktop 1.0.215 (commit 5d59587)"; echo "rollback    : Desktop 1.0.213 (imediato, commit e626d36); adicional 1.0.211"; echo "origem      : F3.5.4W-H2 — autoridade única de som por superfície: premium (bgnotify) toca beep WebAudio IDÊNTICO ao toast aprovado SÓ no 1º render (grupo nunca; once por dedupKey); toast/nativa/bloqueado preservados; observabilidade sanitizada. Vs 1.0.215: SÓ renderer index/bgnotify + 2 diags em main.ts + 1 diag em bgNotify.ts."; echo "distribuicao: CANDIDATA — publicação no Latest ocorre no workflow desktop-release-f354wh2.yml (mesmos bytes)"; } > "$OUT/VERSAO-DESKTOP.txt"
+          echo "== SHA256SUMS =="; cat "$OUT/SHA256SUMS"
+      - uses: actions/upload-artifact@v4
+        with: { name: agenda-id-seven-desktop-1.0.216-installer, path: "dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe\ndist-pkg/Agenda-ID-Seven-Desktop-*-x64.msi", if-no-files-found: error, retention-days: 30 }
+      - uses: actions/upload-artifact@v4
+        with: { name: agenda-id-seven-desktop-1.0.216-updatemeta, path: "dist-pkg/latest.yml\ndist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap\ndist-pkg/SHA256SUMS\ndist-pkg/SBOM-cyclonedx.json\ndist-pkg/VERSAO-DESKTOP.txt", if-no-files-found: error, retention-days: 30 }

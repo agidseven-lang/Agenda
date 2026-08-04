@@ -1,7 +1,7 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.215",
-  "description": "Agenda ID Seven Desktop 1.0.215-details-workflow-approval",
+  "version": "1.0.216",
+  "description": "Agenda ID Seven Desktop 1.0.216-immediate-notification-sound",
   "main": "dist/main/main.js",
   "private": true,
   "scripts": {

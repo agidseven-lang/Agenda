@@ -84,6 +84,7 @@ function wireIpc(): void {
   // bg renderer -> main: prova de render — confirma que o card premium foi montado.
   // F3.4.7 — além do log, o ACK cancela o fallback pendente daquele dedupKey.
   ipcMain.on("bgnotify-rendered", (_e, info: unknown) => {
+    try { const inf = (info || {}) as Record<string, unknown>; diag("notification.sound.premium", { eventType: String(inf.eventType || ""), deliverySurface: "premium_window", severity: String(inf.severity || ""), grouped: false, firstInGroup: true, soundEnabled: String(inf.sound || "") !== "suppressed_by_payload", playbackResult: String(inf.sound || ""), appVersion: bgVersion(), timestamp: Date.now() }); } catch { /* F3.5.4W-H2 — observabilidade sanitizada do som da premium */ }
     try { diag("bg.rendered", info as any); } catch { /* */ }
     try { const k = info && (info as any).dedupKey; if (k) ackCancel(String(k)); } catch { /* */ }
   });

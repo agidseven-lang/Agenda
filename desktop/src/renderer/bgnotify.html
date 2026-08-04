@@ -98,6 +98,26 @@
      (janela premium × toast in-app) — o teste de paridade obriga o MESMO DOM. CSP intacta (sem script
      externo). Presentation-only: monta a partir dos campos ESTRUTURADOS (eventType/actorName/taskTitle/
      fromStatus/toStatus/setor/cliente/hora); NÃO usa o body genérico (evita repetir ator/tarefa). */
+  /* F3.5.4W-H2 — AUTORIDADE UNICA DE SOM da superficie premium (desfocado/minimizado/tray).
+     Auditoria provou: a janela premium NUNCA teve som (visual-only; cadeia byte-identica 211-215);
+     a nativa (som do Windows) so dispara como fallback quando a premium NAO renderiza. Beep WebAudio
+     IDENTICO ao notifSound do toast in-app aprovado (mesmas frequencias/envelope) - sem arquivo, sem
+     CDN, sem mudanca de CSP (WebAudio nao e regido por media-src). Toca SO no 1o render de uma
+     entrega logica (render(p), once por dedupKey); renderGroupUpdate NUNCA toca. Resultado
+     sanitizado segue no ACK bgnotify-rendered (sem titulo/cliente/conteudo). */
+  var _bgAC=null; var _bgSndSeen={};
+  function bgSound(sev){
+    try{
+      var AC=window.AudioContext||window.webkitAudioContext; if(!AC) return 'no_audiocontext';
+      _bgAC=_bgAC||new AC(); var ac=_bgAC;
+      if(ac.state==='suspended'){ try{ var rp=ac.resume(); if(rp&&rp.catch) rp.catch(function(){}); }catch(_){} }
+      var seq=sev==='critical'?[[880,0],[660,0.12],[880,0.24]]:(sev==='warning'?[[740,0],[600,0.12]]:[[660,0]]);
+      seq.forEach(function(pr){ var o=ac.createOscillator(),g=ac.createGain(),t0=ac.currentTime+pr[1]; o.type='sine'; o.frequency.value=pr[0];
+        g.gain.setValueAtTime(0.0001,t0); g.gain.exponentialRampToValueAtTime(0.16,t0+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t0+0.18);
+        o.connect(g); g.connect(ac.destination); o.start(t0); o.stop(t0+0.2); });
+      return (ac.state==='running')?'played':('started_state_'+String(ac.state));
+    }catch(e){ return 'failed:'+String((e&&e.name)||'err'); }
+  }
   var PREMIUM_TYPES={task_moved:1,task_assigned:1,task_reassigned:1,task_updated:1,task_completed:1,task_reopened:1,designer_assigned:1};
   function premiumUse(p){ return !!(p&&p._premiumCommon===true&&PREMIUM_TYPES[String(p.eventType||'')]); }
   function premiumSevIcon(s){ return s==='critical'?'!':(s==='warning'?'⏱':(s==='success'?'✓':'i')); }
@@ -185,7 +205,8 @@
     el.__ntfDismiss=dismiss; el.__ntfFirstAt=Date.now(); el.__ntfTimer=setTimeout(dismiss,ttl);
     // limita a 5 cards visíveis
     while(stack.children.length>5){ stack.removeChild(stack.firstChild); }
-    try{ if(window.bgAPI)bgAPI.rendered({dedupKey:key,severity:sev,eventType:p.eventType||'',isAttr:isAttr,count:stack.children.length}); }catch(_){ }
+    var _snd; if(p.sound===false){ _snd='suppressed_by_payload'; } else if(_bgSndSeen[key]){ _snd='duplicate_prevented'; } else { _bgSndSeen[key]=1; _snd=bgSound(sev); }  // F3.5.4W-H2
+    try{ if(window.bgAPI)bgAPI.rendered({dedupKey:key,severity:sev,eventType:p.eventType||'',isAttr:isAttr,count:stack.children.length,sound:_snd}); }catch(_){ }
   }
 
   // F3.5.4O — ATUALIZAÇÃO DE GRUPO COMUM: morfa EM VIGOR o card existente (data-group) para o card

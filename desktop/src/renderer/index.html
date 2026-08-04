@@ -4135,12 +4135,13 @@ var _notifAC=null;
 function notifSound(sev){
   try{
     var AC=window.AudioContext||window.webkitAudioContext; if(!AC) return;
-    _notifAC=_notifAC||new AC(); var ac=_notifAC; if(ac.state==='suspended'){ try{ ac.resume(); }catch(_){} }
+    _notifAC=_notifAC||new AC(); var ac=_notifAC; if(ac.state==='suspended'){ try{ var _rp=ac.resume(); if(_rp&&_rp.catch) _rp.catch(function(){}); }catch(_){} }  // F3.5.4W-H2 — Promise tratada
     var seq=sev==='critical'?[[880,0],[660,0.12],[880,0.24]]:(sev==='warning'?[[740,0],[600,0.12]]:[[660,0]]);
     seq.forEach(function(pr){ var o=ac.createOscillator(),g=ac.createGain(),t0=ac.currentTime+pr[1]; o.type='sine'; o.frequency.value=pr[0];
       g.gain.setValueAtTime(0.0001,t0); g.gain.exponentialRampToValueAtTime(0.16,t0+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t0+0.18);
       o.connect(g); g.connect(ac.destination); o.start(t0); o.stop(t0+0.2); });
-  }catch(_){}
+    return (ac.state==='running')?'played':('started_state_'+String(ac.state));  // F3.5.4W-H2 — resultado sanitizado (aditivo; chamadas antigas ignoram)
+  }catch(e){ return 'failed:'+String((e&&e.name)||'err'); }
 }
 
 /* TOAST in-app premium (fila/stack, severidade, clique→abrir, X, auto-dismiss) */
@@ -4338,7 +4339,8 @@ function notifShowToast(p){
     var dismiss=function(){ try{ if(premiumUse(p)&&typeof ncDiag==='function') ncDiag('notification.premium.closed',{eventType:p.eventType,deliverySurface:'toast'}); }catch(_){} try{ el.classList.remove('in'); setTimeout(function(){ if(el&&el.parentNode) el.parentNode.removeChild(el); },200); }catch(_){} }; // F3.5.4U — observabilidade sanitizada (só premium)
     var xb=el.querySelector('.ntf-x'); if(xb) xb.addEventListener('click',function(ev){ ev.stopPropagation(); dismiss(); });
     var cd=el.querySelector('.ntf-card'); if(cd) cd.addEventListener('click',function(){ try{ if(premiumUse(p)&&typeof ncDiag==='function') ncDiag('notification.premium.opened',{eventType:p.eventType,deliverySurface:'toast'}); }catch(_){} notifRoute(p.action&&p.action.deep); dismiss(); }); // F3.5.4U — clique abre a tarefa (deep-link atual); não movimenta/conclui a tarefa
-    if(p.sound!==false) notifSound(sev);
+    if(p.sound!==false){ var _sr=notifSound(sev); try{ if(typeof ncDiag==='function') ncDiag('notification.sound.playback',{eventType:String(p.eventType||''),deliverySurface:'toast',severity:sev,grouped:false,firstInGroup:true,soundEnabled:true,playbackResult:String(_sr||''),appVersion:(window.desktopAPI&&window.desktopAPI.version)||'',timestamp:Date.now()}); }catch(_){} }
+    else { try{ if(typeof ncDiag==='function') ncDiag('notification.sound.suppressed_by_payload',{eventType:String(p.eventType||''),deliverySurface:'toast',soundEnabled:false,appVersion:(window.desktopAPI&&window.desktopAPI.version)||'',timestamp:Date.now()}); }catch(_){} }  // F3.5.4W-H2 — observabilidade sanitizada; som identico
     var ttl=sev==='critical'?11000:(sev==='warning'?8000:6000);
     // F3.5.4O — guarda dismiss/timer/1º instante no elemento p/ a atualização de grupo religar handlers
     // e REFRESCAR o TTL com teto de permanência (caminho não-agrupado inalterado — mesmo ttl/dismiss).

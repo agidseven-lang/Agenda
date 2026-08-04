@@ -213,6 +213,7 @@ function nativeNotify(p: NotifPayload, key: string, deep: string): boolean {
     });
     n.show();
     nlog("notify.native.sent", { dedupKey: key, taskId: nmask(p.taskId) });
+    try { diag("notification.sound.native_fallback", { eventType: String(p.eventType || ""), deliverySurface: "native", soundEnabled: p.sound !== false, appVersion: app.getVersion(), timestamp: Date.now() }); } catch { /* F3.5.4W-H2 — observabilidade sanitizada */ }
     return true;
   } catch (e2) { nlog("notify.native.failed", { dedupKey: key, errorCode: String(((e2 as any) && (e2 as any).message) || e2) }); diag("native.fallback.error", { err: String(((e2 as any) && (e2 as any).message) || e2) }); return false; }
 }
@@ -268,6 +269,7 @@ function deliverNotification(p: NotifPayload): { ok: boolean; channel: string } 
       try { if (__group.view) (__group.view as any)._premiumCommon = premiumCommonEnabled; } catch { /* */ }
       try { mainWin?.webContents.send("notif-group-update", __group.view); } catch { /* atualização do toast é best-effort */ }
       try { if (typeof updateBgGroup === "function") updateBgGroup(__group.view); } catch { /* atualização da premium é best-effort */ }
+      try { diag("notification.sound.suppressed_by_grouping", { eventType: String(p.eventType || ""), deliverySurface: "group_update", grouped: true, firstInGroup: false, appVersion: app.getVersion(), timestamp: Date.now() }); } catch { /* F3.5.4W-H2 — observabilidade sanitizada */ }
       markSeen();
       notifTele.lastAt = Date.now(); notifTele.lastChannel = "grouped"; notifTele.lastEventType = String(p.eventType || "");
       try { if (typeof groupTele !== "undefined") { groupTele.updates++; groupTele.lastUpdateAt = Date.now(); } } catch { /* */ }
