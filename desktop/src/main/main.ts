@@ -887,9 +887,18 @@ app.whenReady().then(() => {
       onCheckinDecide: async (input) => { try { return slaReminderCtl ? await slaReminderCtl.onCheckinDecide(input) : { status: "ignored" }; } catch (e) { diag("task.idle.oncheckin.error", { err: String(((e as any) && (e as any).message) || e) }); return { status: "error", error: "onCheckinDecide" }; } },
       onCheckinDraft: (key, draft) => { try { if (slaReminderCtl) slaReminderCtl.onCheckinDraft(key, draft); } catch { /* */ } },
       onCheckinDismiss: (key) => { try { if (slaReminderCtl) slaReminderCtl.dismissCheckin(key); } catch { /* */ } },
+      onCheckinRendered: (key) => { try { if (slaReminderCtl) slaReminderCtl.onExecutionRendered(key); } catch { /* F3.5.5A — timer do laranja só pós-ACK */ } },
       onCheckinResolveHelp: (taskId, key) => resolveSlaHelpViaRenderer(taskId, key),
     });
     slaReminderCtl = createSlaReminderController({
+      // F3.5.5A — resposta/perda do CHECK-IN DE EXECUÇÃO via operação TRANSACIONAL server-side
+      // (respondExecutionCheckpoint; relógio do servidor; deviceHash hasheado; token confinado).
+      executionRespond: async (req: any) => {
+        const r = await authedBackendPost(ET_RESPOND_URL, Object.assign({}, req, { deviceHash: executionDeviceHash() }));
+        if (!r.ok || !r.json) throw new Error(String(r.error || ("http_" + r.status)));
+        return r.json;
+      },
+      onExecutionClosed: (key: string, state: string) => { try { executionOrch && executionOrch.notifyClosed(key, state); } catch { /* */ } },
       surface: slaSurface, store: slaReminderStore, now: () => Date.now(),
       appVersion: (() => { try { return app.getVersion(); } catch { return "dev"; } })(),
       isLocked: () => sessionLocked, getUid: () => currentUid,

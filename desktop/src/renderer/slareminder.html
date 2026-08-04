@@ -85,7 +85,17 @@
   .statebox .txt{ font-size:14px; color:var(--ink); line-height:1.4; margin:4px 6px 12px; }
   .errbanner{ margin-top:10px; font-size:12.5px; color:var(--red-d); background:rgba(220,38,38,.08); border:1px solid rgba(220,38,38,.25); border-radius:9px; padding:9px 10px; text-align:left; }
   /* ── F3.5.4Q — CHECK-IN DE TAREFA PARADA (identidade AZUL/neutra, NÃO acusatória) ── */
-  :root{ --blue:#2563EB; --blue-d:#1E40AF; }
+  :root{ --blue:#2563EB; --blue-d:#1E40AF; --orange:#EA7A17; --orange-d:#C2590A; }
+  /* F3.5.5A — CHECK-IN DE EXECUÇÃO (laranja): mesma casca do checkin, cor própria */
+  .card.exec::before{ background:var(--orange); }
+  .card.exec .kicker{ color:var(--orange-d); }
+  .av.exec{ box-shadow:0 10px 24px -4px rgba(2,6,23,.34), 0 0 0 3px rgba(234,122,23,.24); }
+  .card.exec .dbtn.primary{ background:var(--orange); box-shadow:0 8px 18px -8px rgba(234,122,23,.7); }
+  .card.exec .chip.sel{ border-color:var(--orange); background:rgba(234,122,23,.12); color:var(--orange-d); }
+  .card.exec .rrow.sel .dot{ border-color:var(--orange); background:radial-gradient(circle,var(--orange) 0 5px, transparent 6px); }
+  .card.exec .btn2.go{ background:var(--orange); }
+  .card.exec .spin{ border-top-color:var(--orange); }
+  .card.exec .ok{ background:var(--orange); box-shadow:0 8px 18px -6px rgba(234,122,23,.7); }
   .card.checkin::before{ background:var(--blue); }
   .card.checkin .kicker{ color:var(--blue-d); }
   .av.checkin{ box-shadow:0 10px 24px -4px rgba(2,6,23,.34), 0 0 0 3px rgba(37,99,235,.22); }
@@ -363,6 +373,19 @@
   if(api.onCard) api.onCard(function(v){
     if(!v) return;
     // F3.5.4Q — CHECK-IN de tarefa parada usa a MESMA janela central (view AZUL, kind:'checkin').
+    if(v.kind==="checkin" && String(v.checkinKind||"")==="execution"){
+      // F3.5.5A — CHECK-IN DE EXECUÇÃO (laranja): mesma janela/fila; respostas e decide próprios (server-side)
+      var eprev=ecur;
+      if(!eprev || eprev.key!==v.key){ emode="idle"; ebusy=false; eerr=""; emsgState=null; try{ api.setProcessing && api.setProcessing(false); }catch(_e){}
+        edraft={ answer:"", reasonCode:"", observation:"", waitingOrigin:"", pauseSel:"", progressPct:"" }; }
+      if(v.draft && typeof v.draft==="object" && v.draft.exec===true){   // RESTORE pós-preempção crítica: texto preservado
+        edraft.answer=v.draft.answer||""; edraft.reasonCode=v.draft.reasonCode||""; edraft.observation=v.draft.observation||"";
+        edraft.waitingOrigin=v.draft.waitingOrigin||""; edraft.pauseSel=v.draft.pauseSel||""; edraft.progressPct=v.draft.progressPct||"";
+        var em=String(v.draft.mode||"idle"); if(["idle","sim","nao"].indexOf(em)>=0) emode=em;
+      }
+      renderExecution(v);
+      return;
+    }
     if(v.kind==="checkin"){
       var cprev=ccur;
       if(!cprev || cprev.key!==v.key){   // ciclo novo ⇒ reset total
@@ -421,6 +444,119 @@
     if(c.preselect && c.reason==="preselected"){ draft.helpRecipientId=String(c.preselect.id||""); draft.helpRecipientName=String(c.preselect.name||""); }
     renderFoot(cur); resizeSelf();
   });
+
+  // ═══════════════ F3.5.5A — CHECK-IN DE EXECUÇÃO (view LARANJA; decide SERVER-SIDE) ═══════════════
+  var ecur=null, emode="idle", ebusy=false, eerr="", emsgState=null;
+  var edraft={ answer:"", reasonCode:"", observation:"", waitingOrigin:"", pauseSel:"", progressPct:"" };
+  var EREASONS=[["nao_nao_iniciei","Ainda não iniciei"],["nao_bloqueado","Estou bloqueado"],["nao_aguardando_material","Aguardando material ou retorno"],["nao_conclui_minha_parte","Concluí minha parte"],["nao_outro","Outro"]];
+  function ePushDraft(){ try{ api.checkinDraft && api.checkinDraft({ key:(ecur&&ecur.key)||"", draft:{ exec:true, mode:emode, answer:edraft.answer, reasonCode:edraft.reasonCode, observation:edraft.observation, waitingOrigin:edraft.waitingOrigin, pauseSel:edraft.pauseSel, progressPct:edraft.progressPct } }); }catch(_e){} }
+  function renderExecHeader(v){
+    var card=document.getElementById("card"); card.className="card checkin exec";
+    document.getElementById("kicker").textContent="CHECK-IN DE EXECUÇÃO";
+    var av=document.getElementById("av"); av.className="av checkin exec";
+    if(v.actorAvatar){ av.style.background="#E2E8F0 center/cover no-repeat"; av.style.backgroundImage="url('"+String(v.actorAvatar).replace(/'/g,"")+"')"; av.textContent=""; }
+    else { av.style.backgroundImage=""; av.style.background=colorFor(v.actorName); av.textContent=initials(v.actorName); }
+    document.getElementById("name").textContent=v.actorName||"";
+    document.getElementById("msg").textContent=String(v.message||"Você está executando esta tarefa neste momento?");
+    var tk=v.taskTitle||"Tarefa"; if(v.clientName) tk+=" — "+v.clientName;
+    document.getElementById("task").textContent=tk;
+    document.getElementById("ctx").textContent=(v.etapa||"Em andamento");
+    document.getElementById("pend").textContent="";
+  }
+  function eFootMsg(){ var st=emsgState||{}; var a=""; if(st.action==="dismiss"){ a='<button class="ok" id="em_dismiss" type="button">Fechar</button>'; } else if(st.action==="back"){ a='<button class="ok" id="em_back" type="button">Voltar</button>'; } return '<div class="statebox"><div class="txt">'+esc(st.text||"")+'</div>'+a+'</div>'; }
+  function renderExecFoot(v){
+    var foot=document.getElementById("foot"); var html="";
+    if(!ebusy){ unfreezeFoot(); }
+    if(emode==="msg"){ html=eFootMsg(); }
+    else if(ebusy){ html='<div class="busy"><span class="spin"></span><span>Registrando…</span></div>'; }
+    else if(emode==="idle"){
+      var snz=(v.snoozeAllowed!==false && !(v.draft&&v.draft.snoozeUsed))?'<button class="dbtn ghost" id="e_snz" type="button">Responder em 10 minutos</button>':"";
+      html='<div class="decisions">'
+        +'<button class="dbtn primary" id="e_sim" type="button"><span class="ic">✅</span>Sim, estou executando</button>'
+        +'<button class="dbtn" id="e_nao" type="button"><span class="ic">✋</span>Não</button>'
+        +snz
+        +'<button class="dbtn ghost" id="e_open" type="button">Abrir tarefa</button>'
+        +'</div>';
+    }
+    else if(emode==="sim"){
+      html='<div class="subpanel"><div class="sp-title">Ótimo! Quer registrar um avanço? (opcional)</div>'
+        +'<textarea id="e_obs" rows="2" maxlength="2000" placeholder="Observação de progresso (opcional)">'+esc(edraft.observation)+'</textarea>'
+        +'<div class="sp-note">A observação vai para os Detalhes da tarefa e o Social Media é avisado em tempo real.</div></div>'
+        +eConfirmRow("Confirmar", true);
+    }
+    else if(emode==="nao"){
+      var rows=""; for(var i=0;i<EREASONS.length;i++){ var r=EREASONS[i]; rows+='<div class="rrow'+(edraft.reasonCode===r[0]?' sel':'')+'" data-erc="'+r[0]+'"><span class="dot"></span><span>'+esc(r[1])+'</span></div>'; }
+      var extra="";
+      if(edraft.reasonCode==="nao_aguardando_material"){
+        extra='<input id="e_worig" type="text" maxlength="200" placeholder="De quem/do que está aguardando?" value="'+esc(edraft.waitingOrigin)+'" style="width:100%;margin-top:8px;padding:8px;border:1px solid #CBD5E1;border-radius:8px;font:inherit">'
+          +'<div class="sp-note" style="margin-top:6px">Pausar novos check-ins por: '
+          +'<select id="e_pause" style="font:inherit;padding:4px 6px;border-radius:6px;border:1px solid #CBD5E1">'
+          +'<option value=""'+(edraft.pauseSel===""?" selected":"")+'>não pausar</option>'
+          +'<option value="60"'+(edraft.pauseSel==="60"?" selected":"")+'>1 hora</option>'
+          +'<option value="120"'+(edraft.pauseSel==="120"?" selected":"")+'>2 horas</option>'
+          +'<option value="240"'+(edraft.pauseSel==="240"?" selected":"")+'>4 horas</option>'
+          +'</select></div>';
+      }
+      if(edraft.reasonCode==="nao_conclui_minha_parte"){
+        extra='<div class="sp-note" style="margin-top:6px">Confirma que a sua parte está concluída? A tarefa segue para o fluxo de Revisão.</div>';
+      }
+      var needObs=(v.requireObservationOnNegative===true);
+      var obs='<textarea id="e_obs2" rows="2" maxlength="2000" placeholder="Observação'+(needObs?" (obrigatória)":" (opcional)")+'">'+esc(edraft.observation)+'</textarea>';
+      var valid=!!edraft.reasonCode && (!needObs || (edraft.observation||"").trim().length>0) && (edraft.reasonCode!=="nao_outro" || (edraft.observation||"").trim().length>0);
+      html='<div class="subpanel"><div class="sp-title">O que está acontecendo?</div><div class="reason-list">'+rows+'</div>'+extra+obs
+        +'<div class="sp-note">O Social Media é notificado em tempo real. Os alertas de prazo continuam valendo.</div></div>'
+        +eConfirmRow(edraft.reasonCode==="nao_conclui_minha_parte"?"Confirmar conclusão":"Registrar", valid);
+    }
+    if(eerr && emode!=="msg" && !ebusy){ html+='<div class="errbanner">'+esc(eerr)+'</div>'; }
+    foot.innerHTML=html; ewire(v);
+  }
+  function eConfirmRow(goLabel, enabled){ return '<div class="confirm-row"><button class="btn2" id="ec_back" type="button">Voltar</button><button class="btn2 go" id="ec_go" type="button"'+(enabled?"":" disabled")+'>'+esc(goLabel)+'</button></div>'; }
+  function eShowMsg(text, action){ emode="msg"; ebusy=false; eerr=""; try{ api.setProcessing && api.setProcessing(false); }catch(_e){} emsgState={text:text,action:action}; if(ecur) renderExecFoot(ecur); resizeSelf(); }
+  function eShowError(text){ eerr=text; ebusy=false; try{ api.setProcessing && api.setProcessing(false); }catch(_e){} if(ecur) renderExecFoot(ecur); resizeSelf(); }
+  function ewire(v){
+    if(emode==="msg"){ bind("em_dismiss","click",function(){ try{ api.checkinDismiss && api.checkinDismiss(ecur.key); }catch(_e){} }); bind("em_back","click",function(){ emode="idle"; eerr=""; ePushDraft(); renderExecFoot(ecur); resizeSelf(); }); return; }
+    if(ebusy) return;
+    if(emode==="idle"){
+      bind("e_sim","click",function(){ emode="sim"; eerr=""; edraft.answer="sim"; ePushDraft(); renderExecFoot(ecur); resizeSelf(); });
+      bind("e_nao","click",function(){ emode="nao"; eerr=""; edraft.answer="nao"; ePushDraft(); renderExecFoot(ecur); resizeSelf(); });
+      bind("e_snz","click",function(){ eSend({ executionSnooze:true }); });
+      bind("e_open","click",function(){ try{ api.open && api.open((ecur&&ecur.deep)||""); }catch(_e){} });   // abre a tarefa; NÃO resolve o check-in
+      return;
+    }
+    bind("ec_back","click",function(){ emode="idle"; eerr=""; ePushDraft(); renderExecFoot(ecur); resizeSelf(); });
+    if(emode==="sim"){
+      var o=document.getElementById("e_obs"); if(o){ o.addEventListener("input",function(){ edraft.observation=o.value; ePushDraft(); }); }
+      bind("ec_go","click",function(){ eSend({ executionResponseType:"sim", observation:(edraft.observation||"").trim() }); });
+      return;
+    }
+    if(emode==="nao"){
+      var rr=document.querySelectorAll(".rrow[data-erc]");
+      for(var i=0;i<rr.length;i++){ (function(el){ el.addEventListener("click",function(){ edraft.reasonCode=el.getAttribute("data-erc"); ePushDraft(); renderExecFoot(ecur); resizeSelf(); }); })(rr[i]); }
+      var o2=document.getElementById("e_obs2"); if(o2){ o2.addEventListener("input",function(){ edraft.observation=o2.value; ePushDraft(); var go=document.getElementById("ec_go"); if(go){ var needObs=(ecur&&ecur.requireObservationOnNegative===true); var valid=!!edraft.reasonCode && (!needObs || (o2.value||"").trim().length>0) && (edraft.reasonCode!=="nao_outro" || (o2.value||"").trim().length>0); if(valid) go.removeAttribute("disabled"); else go.setAttribute("disabled","disabled"); } }); }
+      var wo=document.getElementById("e_worig"); if(wo){ wo.addEventListener("input",function(){ edraft.waitingOrigin=wo.value; ePushDraft(); }); }
+      var ps=document.getElementById("e_pause"); if(ps){ ps.addEventListener("change",function(){ edraft.pauseSel=ps.value; ePushDraft(); }); }
+      bind("ec_go","click",function(){
+        if(!edraft.reasonCode) return;
+        var payload={ executionResponseType: edraft.reasonCode, observation:(edraft.observation||"").trim() };
+        if(edraft.reasonCode==="nao_aguardando_material"){ payload.waitingOrigin=(edraft.waitingOrigin||"").trim(); var mins=parseInt(edraft.pauseSel||"",10); if(mins>0) payload.pauseUntilMs=Date.now()+mins*60000; }
+        if(edraft.reasonCode==="nao_conclui_minha_parte"){ payload.confirmPartComplete=true; }
+        eSend(payload);
+      });
+      return;
+    }
+  }
+  function eSend(extra){
+    if(ebusy) return;
+    if(extra.executionSnooze){ try{ api.checkinDecide && api.checkinDecide({ key:(ecur&&ecur.key)||"", executionSnooze:true }); }catch(_e){} return; }
+    freezeFoot(); ebusy=true; eerr="";
+    try{ api.setProcessing && api.setProcessing(true); }catch(_e){}   // main CONGELA os bounds (semântica 1.0.211)
+    var payload={ key:(ecur&&ecur.key)||"" };
+    for(var k in extra){ if(Object.prototype.hasOwnProperty.call(extra,k)) payload[k]=extra[k]; }
+    renderExecFoot(ecur);             // troca ATÔMICA só do #foot → "Registrando…" (mesma altura). SEM resizeSelf.
+    sendObs("execution_"+String(extra.executionResponseType||"decide"));
+    try{ api.checkinDecide && api.checkinDecide(payload); }catch(_e){ ebusy=false; eShowError("Não foi possível registrar a resposta. Tente novamente."); }
+  }
+  function renderExecution(v){ ecur=v; renderExecHeader(v); renderExecFoot(v); resizeSelf(); try{ api.rendered && api.rendered(v.key); }catch(_e){} playSound(v); }
 
   // ═══════════════════════════ F3.5.4Q — CHECK-IN DE TAREFA PARADA (view AZUL) ═══════════════════════════
   var ccur=null, cmode="idle", cbusy=false, cerr="", cmsgState=null;
@@ -526,7 +662,19 @@
   }
   function renderCheckin(v){ ccur=v; renderCheckinHeader(v); renderCheckinFoot(v); resizeSelf(); try{ api.rendered && api.rendered(v.key); }catch(_e){} playSound(v); }
   if(api.onCheckinResult) api.onCheckinResult(function(r){
-    r=r||{}; cbusy=false;
+    r=r||{};
+    if(ecur && ebusy){   // F3.5.5A — resultado do decide de EXECUÇÃO (server-side)
+      ebusy=false;
+      if(r.status==="already_answered"){ eShowMsg("Este check-in já foi respondido neste ou em outro dispositivo.","dismiss"); }
+      else if(r.status==="activity_changed"){ eShowMsg("Este check-in não vale mais (prazo ou responsável mudou).","dismiss"); }
+      else if(r.status==="queued"){ eShowError("Sem conexão no momento. Seu texto foi mantido — tente novamente."); }
+      else if(r.status==="error"){
+        if(r.error==="observation_required"){ eShowError("Descreva a observação antes de registrar."); }
+        else { eShowError("Não foi possível registrar a resposta. Verifique e tente novamente."); }
+      }
+      return; // committed ⇒ janela fechada pelo main
+    }
+    cbusy=false;
     if(r.status==="already_answered"){ cShowMsg("Este check-in já foi respondido neste ou em outro dispositivo.","dismiss"); }
     else if(r.status==="activity_changed"){ cShowMsg("A tarefa recebeu uma nova atualização. Este check-in não é mais necessário.","dismiss"); }
     else if(r.status==="task_completed"){ cShowMsg("Esta tarefa foi concluída — nada a registrar.","dismiss"); }

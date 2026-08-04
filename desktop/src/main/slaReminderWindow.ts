@@ -44,6 +44,7 @@ export type SlaReminderSurfaceDeps = {
   onResolveHelp?: (taskId: string, key: string) => Promise<any>;       // resolve destinatário da ajuda (renderer)
   // F3.5.4Q — check-in de tarefa parada
   onCheckinDecide?: (input: CheckinDecisionInput) => Promise<CheckinPublicResult>; // 4 decisões → transação (renderer)
+  onCheckinRendered?: (key: string) => void;           // F3.5.5A — ACK de render (timer do laranja SÓ após isto)
   onCheckinDraft?: (key: string, draft: any) => void;                  // rascunho (suspend/restore)
   onCheckinDismiss?: (key: string) => void;                            // fecha o check-in após mensagem
   onCheckinResolveHelp?: (taskId: string, key: string) => Promise<any>; // resolve destinatário da ajuda (reusa 1.0.206)
@@ -194,7 +195,7 @@ export function createSlaReminderSurface(deps: SlaReminderSurfaceDeps): Reminder
   };
 
   // IPC do card (registrado uma vez)
-  ipcMain.on("slareminder-rendered", (_e, key) => { if (String(key || "") === curKey) { clearRenderProof(); log("sla.reminder.rendered", { key: mask(curKey) }); cobs("central_alert.render_ack"); } });
+  ipcMain.on("slareminder-rendered", (_e, key) => { if (String(key || "") === curKey) { clearRenderProof(); log("sla.reminder.rendered", { key: mask(curKey) }); cobs("central_alert.render_ack"); try { if (deps.onCheckinRendered) deps.onCheckinRendered(String(key || "")); } catch { /* F3.5.5A */ } } });
   ipcMain.on("slareminder-resize", (_e, h) => { center(Number(h) || 260); });
   // F3.5.4U-H2 — o renderer sinaliza início/fim do PROCESSAMENTO (spinner "Registrando…"). Enquanto true,
   // center() congela os bounds (nenhum setBounds/move na janela transparente visível) — mata o artefato de

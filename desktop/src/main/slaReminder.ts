@@ -117,6 +117,14 @@ export type CheckinView = {
   draft?: any;                 // rascunho preservado (suspend/restore): {responseType,reasonCode,reasonText,helpText,helpRecipientId,...}
   state?: CheckinState;        // estado exibido (default 'prompt')
   queueLen?: number;           // sempre 0 no check-in (não expõe contador de SLA)
+  // F3.5.5A — CHECK-IN DE EXECUÇÃO (laranja) na MESMA janela/fila (subordinado ao SLA como o azul):
+  checkinKind?: string;        // "execution" ⇒ view laranja + respostas próprias + decide server-side
+  message?: string;            // "Você está executando esta tarefa neste momento?"
+  checkpointIndex?: number;
+  deadlineVersion?: number;
+  responseMin?: number;        // janela de resposta (minutos) — timer SÓ após render+ACK
+  snoozeAllowed?: boolean;     // "Responder em 10 minutos" (1x por checkpoint)
+  requireObservationOnNegative?: boolean;
 };
 
 /** View central (SLA amarelo/vermelho OU check-in azul). */
@@ -173,6 +181,10 @@ type QueueItem = { key: string; base: string; level: ReminderLevel; view: Remind
 
 export type SlaReminderControllerOpts = {
   surface: ReminderSurface;
+  // F3.5.5A — CHECK-IN DE EXECUÇÃO (laranja): resposta/perda via operação TRANSACIONAL server-side
+  // (respondExecutionCheckpoint; relógio do SERVIDOR). Opcionais ⇒ ausentes, trilha azul intacta.
+  executionRespond?: (req: any) => Promise<any>;
+  onExecutionClosed?: (key: string, state: string) => void;
   store: {
     isAcked: (k: string) => boolean;
     markPending: (rec: any) => void;
@@ -242,13 +254,23 @@ export function createSlaReminderController(opts: SlaReminderControllerOpts) {
   const persistDecision = opts.persistDecision || (async () => ({ status: "offline" as DecisionPersistStatus }));
   const decisionsEnabled = opts.decisionsEnabled || (() => true);
   // F3.5.4Q — CHECK-IN DE TAREFA PARADA (estado ISOLADO; prioridade ABAIXO de qualquer SLA)
-  type CheckinItem = { key: string; view: CheckinView; taskId: string; recipientUid: string; enqueuedAt: number };
+  type CheckinItem = { key: string; view: CheckinView; taskId: string; recipientUid: string; enqueuedAt: number;
+    // F3.5.5A — máquina do CHECK-IN DE EXECUÇÃO (laranja): timer de resposta só pós-ACK; snooze 1x;
+    // 1 reapresentação; depois MISSED (registrado server-side pelo detentor).
+    execution?: { representedCount: number; snoozeUsed: boolean; notBefore?: number };
+  };
   const checkinQueue: CheckinItem[] = [];
   let activeCheckin: CheckinItem | null = null;
   const checkinInFlight = new Set<string>();
   const persistIdleResponse = opts.persistIdleResponse || (async () => ({ status: "offline" as IdlePersistStatus }));
   const idleEnabled = opts.idleEnabled || (() => true);
   const idleStore = opts.idleStore || null;
+  // F3.5.5A — resposta/perda do check-in de EXECUÇÃO via operação transacional server-side
+  // (respondExecutionCheckpoint); relógio do SERVIDOR; nunca gravação local como autoridade.
+  const executionRespond = (opts as any).executionRespond as ((req: any) => Promise<any>) | undefined;
+  const onExecutionClosed = (opts as any).onExecutionClosed as ((key: string, state: string) => void) | undefined;
+  let execTimer: any = null;                 // timer ÚNICO da trilha de execução (resposta/snooze/reshow)
+  function execClearTimer(): void { if (execTimer) { try { clearTimeout(execTimer); } catch { /* */ } execTimer = null; } }
 
   function baseOf(p: any): string { return String((p && p.taskId) || "") + ":" + String((p && p.targetUserId) || (p && p.recipientUid) || ""); }
   function recipientOf(p: any): string { return String((p && p.targetUserId) || (p && p.recipientUid) || ""); }
@@ -363,12 +385,128 @@ export function createSlaReminderController(opts: SlaReminderControllerOpts) {
       thresholdVersion: String((p && p.thresholdVersion) || ""),
       state: "prompt",
       queueLen: 0,
+      // F3.5.5A — campos do CHECK-IN DE EXECUÇÃO (ausentes no azul ⇒ view azul intacta)
+      checkinKind: String((p && p.checkinKind) || ""),
+      message: String((p && p.message) || ""),
+      checkpointIndex: Number((p && p.checkpointIndex)) || 0,
+      deadlineVersion: Number((p && p.deadlineVersion)) || 0,
+      responseMin: Number((p && p.responseMin)) || 10,
+      snoozeAllowed: !(p && p.snoozeAllowed === false),
+      requireObservationOnNegative: !!(p && p.requireObservationOnNegative),
     };
+  }
+
+  /* ══════ F3.5.5A — CHECK-IN DE EXECUÇÃO: timer pós-ACK, snooze 1x, 1 reapresentação, MISSED ══════ */
+  function execIsExecution(it: CheckinItem | null): boolean { return !!(it && it.view && String((it.view as any).checkinKind || "") === "execution"); }
+  /** Reagenda a reexibição do primeiro item com notBefore futuro (janela fechada nesse meio tempo). */
+  function execArmReshow(): void {
+    execClearTimer();
+    if (stopped) return;
+    let best = 0;
+    for (const it of checkinQueue) { const nb = (it.execution && it.execution.notBefore) || 0; if (nb > now() && (!best || nb < best)) best = nb; }
+    if (best) execTimer = setTimeout(() => { execTimer = null; try { showNext(); } catch { /* */ } }, Math.max(250, best - now() + 100));
+  }
+  /** ACK de render do check-in de EXECUÇÃO ⇒ inicia a janela de resposta (NUNCA antes do ACK). */
+  function onExecutionRendered(key: string): void {
+    const cur = activeCheckin;
+    if (!cur || cur.key !== String(key || "") || !execIsExecution(cur)) return;
+    execClearTimer();
+    const mins = Number((cur.view as any).responseMin) || 10;
+    log("execution.checkin.response_window_started", { key: mask(cur.key), responseMin: mins });
+    execTimer = setTimeout(() => { execTimer = null; execOnResponseTimeout(cur.key); }, Math.max(60000, mins * 60000));
+  }
+  /** Timeout sem resposta: 1ª vez ⇒ oculta SEM perder (reapresenta 1x); 2ª ⇒ MISSED server-side. */
+  function execOnResponseTimeout(key: string): void {
+    const cur = activeCheckin;
+    if (stopped || !cur || cur.key !== key || !execIsExecution(cur)) return;
+    const st = cur.execution || { representedCount: 0, snoozeUsed: false };
+    if (st.representedCount < 1) {
+      st.representedCount += 1; st.notBefore = now() + 60000;    // reapresenta UMA vez (~1min depois, janela livre)
+      cur.execution = st;
+      checkinQueue.unshift(cur); activeCheckin = null;
+      try { surface.close(); } catch { /* */ }
+      log("execution.checkin.timeout_hidden_for_represent", { key: mask(key), representedCount: st.representedCount });
+      execArmReshow();
+      return;
+    }
+    // Segunda janela sem resposta ⇒ MISSED (transação server-side pelo DETENTOR do claim)
+    log("execution.checkin.missed_timeout", { key: mask(key) });
+    void execCommitRespond(cur, { kind: "missed" }, true);
+  }
+  /** Snooze "Responder em 10 minutos" — permitido UMA vez por checkpoint (config snoozeAllowed). */
+  function execSnooze(key: string): { status: string } {
+    const cur = activeCheckin;
+    if (!cur || cur.key !== String(key || "") || !execIsExecution(cur)) return { status: "ignored" };
+    const st = cur.execution || { representedCount: 0, snoozeUsed: false };
+    if ((cur.view as any).snoozeAllowed === false || st.snoozeUsed) return { status: "ignored" };
+    st.snoozeUsed = true; st.notBefore = now() + 10 * 60000;
+    cur.execution = st;
+    execClearTimer();
+    checkinQueue.unshift(cur); activeCheckin = null;
+    try { surface.close(); } catch { /* */ }
+    log("execution.checkin.snoozed", { key: mask(key) });
+    execArmReshow();
+    return { status: "queued" };
+  }
+  /** Commit transacional da resposta/perda no SERVIDOR + fechamento local (histórico único). */
+  async function execCommitRespond(cur: CheckinItem, input: any, isMissed: boolean): Promise<CheckinPublicResult> {
+    const key = cur.key;
+    if (checkinInFlight.has(key)) { log("execution.checkin.inflight.ignored", { key: mask(key) }); return { status: "ignored" }; }
+    checkinInFlight.add(key);
+    try {
+      if (!executionRespond) return { status: "error", error: "no-respond-endpoint" };
+      const v: any = cur.view;
+      const req: any = {
+        taskId: cur.taskId, checkinId: key,
+        deadlineVersion: Number(v.deadlineVersion) || 0, checkpointIndex: Number(v.checkpointIndex) || 0,
+        kind: isMissed ? "missed" : "respond",
+        responseType: isMissed ? "missed" : String(input.executionResponseType || ""),
+        observation: String(input.observation || "").slice(0, 2000),
+        displayedAtMs: cur.enqueuedAt,
+      };
+      if (Number(input.progressPct) >= 0 && Number(input.progressPct) <= 100) req.progressPct = Math.round(Number(input.progressPct));
+      if (input.waitingOrigin) req.waitingOrigin = String(input.waitingOrigin).slice(0, 200);
+      if (Number(input.pauseUntilMs) > 0) req.pauseUntilMs = Number(input.pauseUntilMs);
+      log("execution.checkin.persist_started", { key: mask(key), kind: req.kind, responseType: req.responseType });
+      let r: any = null;
+      try { r = await executionRespond(req); }
+      catch (e) { log("execution.checkin.respond.threw", { key: mask(key), err: errMsg(e) }); return { status: "queued" }; } // offline/rede: mantém texto; retry manual
+      const dec = String((r && r.decision) || "");
+      const closeLocal = (state: string) => {
+        execClearTimer();
+        if (activeCheckin === cur) { activeCheckin = null; try { surface.close(); } catch { /* */ } showNext(); }
+        else { for (let i = checkinQueue.length - 1; i >= 0; i--) if (checkinQueue[i].key === key) checkinQueue.splice(i, 1); }
+        try { if (onExecutionClosed) onExecutionClosed(key, state); } catch { /* */ }
+      };
+      if (dec === "responded" || dec === "missed") { log("execution.checkin.persist_success", { key: mask(key), decision: dec }); closeLocal(dec === "missed" ? "MISSED" : "RESPONDED"); return { status: "committed", deep: (cur.view as any).deep }; }
+      if (dec === "already_responded") { log("execution.checkin.already_responded", { key: mask(key) }); closeLocal("RESPONDED"); return { status: "already_answered" }; }
+      if (dec === "deny") {
+        const reason = String((r && r.reason) || "denied");
+        if (reason === "claim_held_by_other") { log("execution.checkin.claim_held_by_other", { key: mask(key) }); closeLocal("SUPPRESSED"); return { status: "already_answered" }; }
+        if (reason.indexOf("checkpoint_closed_") === 0 || reason === "deadline_changed" || reason === "designer_changed") { log("execution.checkin.superseded_remote", { key: mask(key), reason }); closeLocal("SUPERSEDED"); return { status: "activity_changed" }; }
+        log("execution.checkin.deny", { key: mask(key), reason });
+        return { status: "error", error: reason };
+      }
+      return { status: "queued" };  // resposta HTTP inesperada ⇒ preserva texto p/ retry
+    } finally { checkinInFlight.delete(key); }
+  }
+  /** DECISÃO do check-in de EXECUÇÃO (mesma IPC do azul; branch por checkinKind). */
+  async function execOnDecide(cur: CheckinItem, input: any): Promise<CheckinPublicResult> {
+    if (input && input.executionSnooze === true) return execSnooze(cur.key) as CheckinPublicResult;
+    const rt = String((input && input.executionResponseType) || "");
+    const NEG = ["nao_nao_iniciei", "nao_bloqueado", "nao_aguardando_material", "nao_conclui_minha_parte", "nao_outro"];
+    if (rt !== "sim" && NEG.indexOf(rt) < 0) return { status: "ignored" };
+    if (rt === "nao_conclui_minha_parte" && !(input && input.confirmPartComplete === true)) return { status: "ignored" }; // confirmação explícita (flui p/ Revisão)
+    if ((cur.view as any).requireObservationOnNegative && NEG.indexOf(rt) >= 0 && !String((input && input.observation) || "").trim()) {
+      return { status: "error", error: "observation_required" };
+    }
+    return execCommitRespond(cur, input || {}, false);
   }
 
   /** Suspende (preservando rascunho) o check-in ativo quando um SLA precisa da janela central. */
   function suspendActiveCheckinForSla(): void {
     if (!activeCheckin) return;
+    if (execIsExecution(activeCheckin)) execClearTimer();   // F3.5.5A — laranja recolhe: timer pausa; texto preservado no draft
     checkinQueue.unshift(activeCheckin);   // volta à FRENTE da fila; rascunho preservado em .view.draft
     log("task.idle.check_suspended_for_sla", { key: mask(activeCheckin.key) });
     activeCheckin = null;
@@ -381,7 +519,14 @@ export function createSlaReminderController(opts: SlaReminderControllerOpts) {
     if (active || queue.length) return;         // SLA tem PRIORIDADE absoluta sobre o check-in
     if (activeCheckin) return;
     // descarta itens já respondidos (qualquer estado) — o ciclo não deve reaparecer
-    while (checkinQueue.length && idleStore && idleStore.getResponse(checkinQueue[0].key)) checkinQueue.shift();
+    // (execução NÃO usa o idleStore: o ciclo dela fecha via servidor/execCommitRespond)
+    while (checkinQueue.length && !checkinQueue[0].execution && idleStore && idleStore.getResponse(checkinQueue[0].key)) checkinQueue.shift();
+    // F3.5.5A — snooze/reapresentação: item com notBefore FUTURO não exibe agora (reagenda e fecha)
+    if (checkinQueue.length && checkinQueue[0].execution && ((checkinQueue[0].execution.notBefore || 0) > now())) {
+      execArmReshow();
+      if (surface.isOpen()) { try { surface.close(); } catch { /* */ } }
+      return;
+    }
     if (!checkinQueue.length) { centralObs("central_alert.queue_empty", {}, "", { queueDepth: 0 }); if (surface.isOpen()) { try { surface.close(); } catch { /* */ } } return; }
     const it = checkinQueue.shift()!;
     if (!taskValid(it.taskId, it.recipientUid)) { log("task.idle.cancelled_gone", { key: mask(it.key) }); return showNextCheckin(); }
@@ -670,7 +815,9 @@ export function createSlaReminderController(opts: SlaReminderControllerOpts) {
       if (idleStore && idleStore.getResponse(key)) return { ok: true, channel: "idle-answered" };   // já respondido ⇒ não reabrir
       if ((activeCheckin && activeCheckin.key === key) || checkinQueue.some((q) => q.key === key)) return { ok: true, channel: "idle-dup" };
       const view = buildCheckinView(p);
-      checkinQueue.push({ key, view, taskId: view.taskId, recipientUid: view.recipientUid, enqueuedAt: now() });
+      const item: CheckinItem = { key, view, taskId: view.taskId, recipientUid: view.recipientUid, enqueuedAt: now() };
+      if (String((view as any).checkinKind || "") === "execution") item.execution = { representedCount: 0, snoozeUsed: false }; // F3.5.5A
+      checkinQueue.push(item);
       log("task.idle.check_queued", { key: mask(key), pending: checkinPendingCount() });
       if (!active && !queue.length && !activeCheckin) showNextCheckin();   // só quando a janela central está livre de SLA
       return { ok: true, channel: "idle-central" };
@@ -686,8 +833,13 @@ export function createSlaReminderController(opts: SlaReminderControllerOpts) {
     /** DECISÃO do check-in — TRANSAÇÃO real; 1ª vence; 2ª already_answered; nova atividade activity_changed. */
     async onCheckinDecide(input: CheckinDecisionInput): Promise<CheckinPublicResult> {
       if (stopped) return { status: "ignored" };
+      const k0 = String((input && input.key) || "");
+      // F3.5.5A — CHECK-IN DE EXECUÇÃO: mesma IPC, decide TRANSACIONAL server-side (nunca a via idle)
+      if (activeCheckin && activeCheckin.key === k0 && execIsExecution(activeCheckin)) {
+        return execOnDecide(activeCheckin, input as any);
+      }
       if (!idleEnabled()) { log("task.idle.disabled.ignored", {}); return { status: "ignored" }; }
-      const k = String((input && input.key) || "");
+      const k = k0;
       if (!k || !activeCheckin || activeCheckin.key !== k) { log("task.idle.stale.ignored", { key: mask(k) }); return { status: "ignored" }; }
       const cur = activeCheckin;
       const responseType = String((input && input.responseType) || "") as CheckinResponseType;
@@ -736,7 +888,7 @@ export function createSlaReminderController(opts: SlaReminderControllerOpts) {
     /** Fecha o check-in ativo após uma mensagem (already_answered / activity_changed / task_completed / task_deleted / queued). */
     dismissCheckin(key: string): void {
       const kk = String(key || "");
-      if (activeCheckin && activeCheckin.key === kk) { activeCheckin = null; try { surface.close(); } catch { /* */ } log("task.idle.dismissed", { key: mask(kk) }); showNext(); }
+      if (activeCheckin && activeCheckin.key === kk) { if (execIsExecution(activeCheckin)) execClearTimer(); activeCheckin = null; try { surface.close(); } catch { /* */ } log("task.idle.dismissed", { key: mask(kk) }); showNext(); }
       else { for (let i = checkinQueue.length - 1; i >= 0; i--) if (checkinQueue[i].key === kk) checkinQueue.splice(i, 1); }
     },
 
@@ -770,8 +922,10 @@ export function createSlaReminderController(opts: SlaReminderControllerOpts) {
     status() { return { open: surface.isOpen(), activeKey: active ? mask(active.key) : "", queueLen: pendingCount() }; },
     _debug() { return { active, queue: queue.slice() }; },
     /** Logout / troca de usuário: fecha a janela e limpa a memória (store PRESERVADO; o próximo login reexibe os pendentes do novo uid). */
-    clearActive() { try { surface.close(); } catch { /* */ } active = null; queue.length = 0; completedTasks.clear(); activeCheckin = null; checkinQueue.length = 0; },
-    stop() { stopped = true; try { surface.close(); } catch { /* */ } queue.length = 0; active = null; checkinQueue.length = 0; activeCheckin = null; },
+    /** F3.5.5A — ACK de render do check-in de EXECUÇÃO ⇒ inicia a janela de resposta (nunca antes). */
+    onExecutionRendered(key: string): void { onExecutionRendered(key); },
+    clearActive() { try { surface.close(); } catch { /* */ } active = null; queue.length = 0; completedTasks.clear(); activeCheckin = null; checkinQueue.length = 0; execClearTimer(); },
+    stop() { stopped = true; try { surface.close(); } catch { /* */ } queue.length = 0; active = null; checkinQueue.length = 0; activeCheckin = null; execClearTimer(); },
   };
 }
 
