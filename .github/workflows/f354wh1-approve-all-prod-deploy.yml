@@ -127,9 +127,16 @@ jobs:
         run: |
           set -euo pipefail
           API="https://api.cloudflare.com/client/v4"; AUTH="Authorization: Bearer $CLOUDFLARE_API_TOKEN"; ACC="$CLOUDFLARE_ACCOUNT_ID"
-          PV=$(curl -sS --max-time 25 "$PROD_URL/" | jq -r '.version')
-          PB=$(curl -sS --max-time 25 "$PROD_URL/" | jq -r '.build')
-          { [ "$PV" = "$EXPECT_VERSION_OLD" ] && [ "$PB" = "$EXPECT_BUILD_OLD" ]; } || { echo "::error::produção não está na f350 esperada (version=$PV build=$PB)"; exit 1; }
+          # Identidade viva com CONSISTÊNCIA (anti-corrida de propagação do edge): version e build
+          # lidos da MESMA resposta; exige 3 leituras consecutivas idênticas dentro do prazo.
+          OKS=0; DEADLINE=$(( $(date +%s) + 120 )); PV=""; PB=""
+          while [ "$(date +%s)" -lt "$DEADLINE" ] && [ "$OKS" -lt 3 ]; do
+            J=$(curl -sS --max-time 15 "$PROD_URL/" 2>/dev/null || true)
+            PV=$(echo "$J" | jq -r '.version' 2>/dev/null || true); PB=$(echo "$J" | jq -r '.build' 2>/dev/null || true)
+            if [ "$PV" = "$EXPECT_VERSION_OLD" ] && [ "$PB" = "$EXPECT_BUILD_OLD" ]; then OKS=$((OKS+1)); else OKS=0; fi
+            sleep 2
+          done
+          [ "$OKS" -ge 3 ] || { echo "::error::produção não está ESTÁVEL na f350 esperada (última leitura: version=$PV build=$PB)"; exit 1; }
           DEP=$(curl -sS --max-time 30 -H "$AUTH" "$API/accounts/$ACC/workers/scripts/idseven-push/deployments")
           PVID=$(echo "$DEP" | jq -r '.result.deployments[0].versions[0].version_id')
           PPCT=$(echo "$DEP" | jq -r '.result.deployments[0].versions[0].percentage')
@@ -161,15 +168,19 @@ jobs:
         run: |
           set -uo pipefail
           FAIL=0
+          # Espera de propagação com CONSISTÊNCIA (anti-corrida do edge, causa provada no run 1:
+          # version NOVA + build ANTIGA na mesma URL = isolates mistos em curls separadas).
+          # version e build saem da MESMA resposta; exige 3 leituras consecutivas NOVAS por URL.
           for U in "$PROD_URL" "$PROD_WDEV"; do
-            DEADLINE=$(( $(date +%s) + 150 )); V=""
-            while [ "$(date +%s)" -lt "$DEADLINE" ]; do
-              V=$(curl -sS --max-time 15 "$U/" | jq -r '.version' 2>/dev/null || true)
-              [ "$V" = "$EXPECT_VERSION_NEW" ] && break; sleep 3
+            OKS=0; DEADLINE=$(( $(date +%s) + 240 )); V=""; B=""
+            while [ "$(date +%s)" -lt "$DEADLINE" ] && [ "$OKS" -lt 3 ]; do
+              J=$(curl -sS --max-time 15 "$U/" 2>/dev/null || true)
+              V=$(echo "$J" | jq -r '.version' 2>/dev/null || true); B=$(echo "$J" | jq -r '.build' 2>/dev/null || true)
+              if [ "$V" = "$EXPECT_VERSION_NEW" ] && [ "$B" = "$EXPECT_BUILD_NEW" ]; then OKS=$((OKS+1)); else OKS=0; fi
+              sleep 3
             done
-            B=$(curl -sS --max-time 15 "$U/" | jq -r '.build' 2>/dev/null || true)
-            echo "$U -> version=$V build=$B"
-            { [ "$V" = "$EXPECT_VERSION_NEW" ] && [ "$B" = "$EXPECT_BUILD_NEW" ]; } || FAIL=1
+            echo "$U -> version=$V build=$B (leituras consecutivas novas: $OKS/3)"
+            [ "$OKS" -ge 3 ] || FAIL=1
           done
           API="https://api.cloudflare.com/client/v4"; AUTH="Authorization: Bearer $CLOUDFLARE_API_TOKEN"; ACC="$CLOUDFLARE_ACCOUNT_ID"
           DEP=$(curl -sS --max-time 30 -H "$AUTH" "$API/accounts/$ACC/workers/scripts/idseven-push/deployments")
@@ -178,8 +189,14 @@ jobs:
           { [ "$LVID" = "${{ steps.deploy.outputs.new_vid }}" ] && [ "$LPCT" = "100" ]; } || FAIL=1
           # DISCRIMINADOR COMPORTAMENTAL da ação nova (token SINTÉTICO inexistente ⇒ 404 na NOVA;
           # a base antiga devolveria 400 "ação inválida"). Zero toque em dados reais.
-          AC=$(curl -sS --max-time 30 -o out/act404.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
-            -d '{"action":"approveAllPending","phase":"themes"}' "$PROD_URL/cliente/cronograma/$T_NF/action")
+          # Com retry-até-deadline: um 400 aqui pode ser isolate ANTIGO remanescente (corrida de
+          # propagação, provada no run 1) — insiste até obter o 404 da NOVA ou estourar o prazo.
+          AC=""; DEADLINE=$(( $(date +%s) + 180 ))
+          while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+            AC=$(curl -sS --max-time 30 -o out/act404.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
+              -d '{"action":"approveAllPending","phase":"themes"}' "$PROD_URL/cliente/cronograma/$T_NF/action" 2>/dev/null || true)
+            [ "$AC" = "404" ] && break; sleep 3
+          done
           echo "approveAllPending(token inexistente): HTTP $AC $(cat out/act404.json)"
           [ "$AC" = "404" ] || FAIL=1
           # ação inventada segue 400 (gate ALLOWED vivo)
@@ -231,9 +248,17 @@ jobs:
             "$API/accounts/$ACC/workers/scripts/idseven-push/deployments" \
             -d "{\"strategy\":\"percentage\",\"versions\":[{\"version_id\":\"$PREV\",\"percentage\":100}]}" >/dev/null \
             && echo "rollback enviado" || echo "::error::rollback via API falhou — executar manualmente: wrangler rollback $PREV"
-          for i in $(seq 1 30); do V=$(curl -sS --max-time 15 "$PROD_URL/" | jq -r '.version' 2>/dev/null || true); [ "$V" = "$EXPECT_VERSION_OLD" ] && break; sleep 3; done
-          echo "produção após rollback: version=$V (esperado $EXPECT_VERSION_OLD)"
-          [ "$V" = "$EXPECT_VERSION_OLD" ] && echo "ROLLBACK CONFIRMADO: f350 anterior de volta a 100%" || echo "::error::confirmar rollback manualmente"
+          # Confirmação com CONSISTÊNCIA: 3 leituras consecutivas (version+build da MESMA resposta)
+          # na identidade ANTIGA — uma leitura solta pode ser isolate defasado (corrida provada no run 1).
+          OKS=0; DEADLINE=$(( $(date +%s) + 150 )); V=""; B=""
+          while [ "$(date +%s)" -lt "$DEADLINE" ] && [ "$OKS" -lt 3 ]; do
+            J=$(curl -sS --max-time 15 "$PROD_URL/" 2>/dev/null || true)
+            V=$(echo "$J" | jq -r '.version' 2>/dev/null || true); B=$(echo "$J" | jq -r '.build' 2>/dev/null || true)
+            if [ "$V" = "$EXPECT_VERSION_OLD" ] && [ "$B" = "$EXPECT_BUILD_OLD" ]; then OKS=$((OKS+1)); else OKS=0; fi
+            sleep 3
+          done
+          echo "produção após rollback: version=$V build=$B (leituras consecutivas antigas: $OKS/3)"
+          [ "$OKS" -ge 3 ] && echo "ROLLBACK CONFIRMADO: f350 anterior de volta a 100%" || echo "::error::confirmar rollback manualmente"
 
       - name: Upload evidências
         if: always()
