@@ -1,7 +1,7 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.216",
-  "description": "Agenda ID Seven Desktop 1.0.216-immediate-notification-sound",
+  "version": "1.0.217",
+  "description": "Agenda ID Seven Desktop 1.0.217-adaptive-execution-checkins (Acompanhamento Inteligente de Execução, flag OFF)",
   "main": "dist/main/main.js",
   "private": true,
   "scripts": {

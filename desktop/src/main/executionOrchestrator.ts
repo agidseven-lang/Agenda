@@ -65,7 +65,7 @@ export function adaptTask(raw: any, nowMs: number): any {
     adminOnly: t.adminOnly === true,
     sector: String(t.sector || t.setor || ""),
     startMs: Number(t.startAt) || 0,                       // início explícito (F3.5.2A)
-    assignedAtMs: Number(t.assignedAt) || 0,               // momento da atribuição (carimbado na operação autoritativa)
+    assignedAtMs: Number(t.assignedAt) || Number(t.designerAssignment && t.designerAssignment.assignedAt) || 0, // momento REAL da atribuição (nunca inventado)
     deadlineVersion: Number(t.deadlineVersion) || 0,
     lastMeaningfulAtMs: Number(t.executionLastMeaningfulAt) || 0,
     title: String(t.title || "Tarefa"),

@@ -78,6 +78,9 @@ contextBridge.exposeInMainWorld("desktopAPI", {
   // F3.5.4Q — DETECÇÃO DE TAREFA PARADA (Configurações → Notificações): ligar/desligar SOMENTE o
   // check-in de inatividade (OFF ⇒ nenhum novo check-in; não apaga histórico; não altera SLA/backend).
   taskIdleGet: (): Promise<any> => ipcRenderer.invoke("task-idle-get"),
+  // F3.5.5A — Acompanhamento de execução (Configurações; escrita global SÓ Admin no main)
+  executionTrackingGet: (): Promise<any> => ipcRenderer.invoke("execution-tracking-get"),
+  executionTrackingSet: (cfg: unknown): Promise<any> => ipcRenderer.invoke("execution-tracking-set", cfg),
   taskIdleSet: (v: boolean): Promise<any> => ipcRenderer.invoke("task-idle-set", v),
   // abrir URL externa (WhatsApp app/web, browser) via shell.openExternal
   openExternal: (url: string): Promise<boolean> => ipcRenderer.invoke("open-external", url),

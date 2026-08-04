@@ -7259,6 +7259,34 @@ function detSetupModalFocus(){
     });
   }catch(_){}
 }
+/* F3.5.5A — Central de Detalhes: seção "ACOMPANHAMENTO DA EXECUÇÃO" (timeline dos check-ins
+   laranja: respostas/observações/perdas projetadas pelo SERVIDOR em task.executionTracking).
+   Superfície INTERNA da equipe — o portal do cliente (Worker) não seleciona executionTracking. */
+function execTrackingLabel(e){
+  var k=String((e&&e.kind)||''), rt=String((e&&e.responseType)||'');
+  if(k==='missed'||rt==='missed') return {ic:'⏳', l:'Check-in sem resposta (perdido)'};
+  if(rt==='sim') return {ic:'✅', l:'Confirmou que está executando'};
+  if(rt==='nao_nao_iniciei') return {ic:'🕒', l:'Ainda não iniciou'};
+  if(rt==='nao_bloqueado') return {ic:'⛔', l:'Bloqueado'};
+  if(rt==='nao_aguardando_material') return {ic:'📥', l:'Aguardando material ou retorno'};
+  if(rt==='nao_conclui_minha_parte') return {ic:'📤', l:'Concluiu a parte dele (segue p/ Revisão)'};
+  if(rt==='nao_outro') return {ic:'📝', l:'Outro (ver observação)'};
+  return {ic:'•', l:'Check-in de execução'};
+}
+function execTrackingBlock(t){
+  var tr=t&&t.executionTracking; var tl=(tr&&Array.isArray(tr.timeline))?tr.timeline:[];
+  if(!tl.length) return '';
+  var rows='';
+  for(var i=tl.length-1;i>=0;i--){ var e=tl[i]||{}; var m=execTrackingLabel(e);
+    rows+='<div class="det-flow-ev"><span style="margin-right:6px">'+m.ic+'</span><b>'+esc(m.l)+'</b>'
+      +' <span style="color:var(--faint)">· '+esc(fmtDateTimeBR(Number(e.at)||0))+' · checkpoint '+String((Number(e.checkpointIndex)||0)+1)+'</span>'
+      +(e.waitingOrigin?('<div style="margin:2px 0 0 22px;color:var(--muted)">Origem: '+esc(String(e.waitingOrigin))+'</div>'):'')
+      +(e.observation?('<div style="margin:2px 0 0 22px;white-space:pre-wrap">'+esc(String(e.observation))+'</div>'):'')
+      +'</div>'; }
+  return '<div class="det-sec">Acompanhamento da execução</div>'
+    +'<details class="det-acc" open><summary class="det-acc-sum"><span class="det-acc-h"><span class="det-acc-k">ACOMPANHAMENTO DA EXECUÇÃO</span><span class="det-acc-t">Check-ins do Designer ('+tl.length+')</span></span><span class="det-acc-chev">'+svg('arr')+'</span></summary>'
+    +'<div class="det-acc-body">'+rows+'</div></details>';
+}
 function openDetails(taskId){
   const t=state.tasks.find(x=>x.id===taskId);if(!t)return;
   // F3.5.4W — captura o foco de origem só quando a Central ainda não está aberta (reaberturas
@@ -7294,6 +7322,7 @@ function openDetails(taskId){
     detailHeroBlock(t)+
     detailSlaBlock(t)+
     flowDetailsBlock(t)+
+    execTrackingBlock(t)+
     // datas
     '<div class="det-sec">Datas</div><div class="det-dates">'+
       detDate('calendar','Criado em',fmtDateTimeBR(t.createdAt))+
@@ -9077,6 +9106,10 @@ function renderConfig(){
   /* F3.5.4N — INICIALIZAÇÃO COM O WINDOWS: liga/desliga o início automático (minimizado na bandeja) +
      estado REAL do SO (verify). Preenchido em afterConfig() via desktopAPI.startupGet() (async). */
   h+='<div style="height:18px"></div><div class="lbl">Inicialização com o Windows</div><div class="card" id="startupCard">'+startupCardHtml(null)+'</div>';
+  /* F3.5.5A — ACOMPANHAMENTO DE EXECUÇÃO: modo OFF/SHADOW/ACTIVE + jornada (dias/horários) + limites.
+     Escrita GLOBAL só Admin (o main valida o papel server-verified); ACTIVE exige jornada completa
+     (mensagem literal do mandato quando incompleta). Preenchido async em afterConfig(). */
+  h+='<div style="height:18px"></div><div class="lbl">Acompanhamento de execução</div><div class="card" id="execTrackCard"><div class="settrow" style="cursor:default"><div class="icb">'+svg('bell')+'</div><div class="sm"><div class="sl">Carregando…</div><div class="ss">Check-ins de execução do Designer</div></div></div></div>';
   /* F3.3.73I6C14 — Aparência REAL client-side: chips aplicam na hora (appearSet) e ficam
      salvos neste computador (localStorage). Sem backend; padrão = Escuro/100%/desligado. */
   const ap=appearLoad();
@@ -9167,7 +9200,68 @@ function startupFill(){
     } else { card.innerHTML=startupCardHtml({supported:false}); }
   }catch(_){}
 }
-function afterConfig(){ try{ notifDiagFill(); }catch(_){} try{ startupFill(); }catch(_){} }
+function afterConfig(){ try{ notifDiagFill(); }catch(_){} try{ startupFill(); }catch(_){} try{ execTrackFill(); }catch(_){} }
+/* F3.5.5A — painel "Acompanhamento de execução" (Configurações). Estado vem do main
+   (execution-tracking-get). Admin edita modo/jornada/limites; demais papéis: leitura.
+   ACTIVE bloqueado sem jornada completa — o main recusa e a UI mostra a mensagem literal. */
+var _etCfgCache=null;
+function execTrackDayChip(d,lbl,sel){ return '<button class="chip etday" data-etday="'+d+'" style="'+(sel?'background:var(--accent);border-color:transparent;color:#fff':'')+'">'+lbl+'</button>'; }
+function execTrackModeLabel(m){ return m==='active'?'Ativo':(m==='shadow'?'Sombra (silencioso)':'Desligado'); }
+async function execTrackFill(){
+  var el=document.getElementById('execTrackCard'); if(!el) return;
+  if(!(window.desktopAPI&&window.desktopAPI.executionTrackingGet)){ el.innerHTML='<div class="settrow" style="cursor:default"><div class="sm"><div class="sl">Indisponível nesta versão</div></div></div>'; return; }
+  var r=null; try{ r=await window.desktopAPI.executionTrackingGet(); }catch(_e){}
+  var cfg=(r&&r.cfg)||{}; _etCfgCache=cfg;
+  var sch=cfg.schedule||{}; var days=Array.isArray(sch.days)?sch.days:[];
+  var isAdmin=!!(state.user&&state.user.admin===true);
+  var mode=String(cfg.mode||'off');
+  var toHM=function(min){ min=Number(min)||0; var h=Math.floor(min/60), m=min%60; return (h<10?'0':'')+h+':'+(m<10?'0':'')+m; };
+  var head='<div class="settrow" style="cursor:default"><div class="icb">'+svg('bell')+'</div><div class="sm"><div class="sl">Check-ins de execução do Designer</div><div class="ss">Modo atual: <b>'+esc(execTrackModeLabel(mode))+'</b>'+((r&&!r.activeAllowed)?' · jornada incompleta':'')+'</div></div></div>';
+  if(!isAdmin){ el.innerHTML=head+'<div class="settrow" style="cursor:default"><div class="sm"><div class="ss">Somente administradores alteram esta configuração.</div></div></div>'; return; }
+  var mchips='';
+  [['off','Desligado'],['shadow','Sombra'],['active','Ativo']].forEach(function(p){ mchips+='<button class="chip etmode" data-etmode="'+p[0]+'" style="'+(mode===p[0]?'background:var(--accent);border-color:transparent;color:#fff':'')+'">'+p[1]+'</button>'; });
+  var DL=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']; var dchips='';
+  for(var d=0; d<7; d++){ dchips+=execTrackDayChip(d,DL[d],days.indexOf(d)>=0); }
+  var body='<div style="padding:10px 14px;display:flex;flex-direction:column;gap:10px">'
+    +'<div><div class="ss" style="margin-bottom:6px">Modo</div><div style="display:flex;gap:6px;flex-wrap:wrap">'+mchips+'</div></div>'
+    +'<div><div class="ss" style="margin-bottom:6px">Dias da jornada</div><div style="display:flex;gap:6px;flex-wrap:wrap">'+dchips+'</div></div>'
+    +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">'
+      +'<label class="ss">Início <input id="etStart" type="time" value="'+toHM(sch.startMin)+'" style="font:inherit;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:var(--surface2);color:var(--text)"></label>'
+      +'<label class="ss">Fim <input id="etEnd" type="time" value="'+toHM(sch.endMin||1080)+'" style="font:inherit;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:var(--surface2);color:var(--text)"></label>'
+      +'<label class="ss">Máx/dia <input id="etMaxDay" type="number" min="1" max="6" value="'+String(Number(cfg.maxPerDay)||3)+'" style="width:56px;font:inherit;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:var(--surface2);color:var(--text)"></label>'
+      +'<label class="ss">Intervalo mín (min) <input id="etGap" type="number" min="5" max="240" value="'+String(Number(cfg.minGapMin)||20)+'" style="width:64px;font:inherit;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:var(--surface2);color:var(--text)"></label>'
+      +'<label class="ss">Resposta (min) <input id="etResp" type="number" min="3" max="60" value="'+String(Number(cfg.responseMin)||10)+'" style="width:56px;font:inherit;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:var(--surface2);color:var(--text)"></label>'
+    +'</div>'
+    +'<div style="display:flex;gap:12px;flex-wrap:wrap">'
+      +'<label class="ss" style="display:flex;gap:6px;align-items:center"><input id="etSnooze" type="checkbox" '+(cfg.snoozeAllowed!==false?'checked':'')+'> Permitir “Responder em 10 minutos”</label>'
+      +'<label class="ss" style="display:flex;gap:6px;align-items:center"><input id="etReqObs" type="checkbox" '+(cfg.requireObservationOnNegative===true?'checked':'')+'> Observação obrigatória nas negativas</label>'
+    +'</div>'
+    +'<div id="etMsg" class="ss" style="color:#F87171"></div>'
+    +'<div><button class="chip" id="etSave" style="background:var(--accent);border-color:transparent;color:#fff">Salvar configuração</button></div>'
+  +'</div>';
+  el.innerHTML=head+body;
+  var pendMode=mode, pendDays=days.slice();
+  el.querySelectorAll('.etmode').forEach(function(b){ b.addEventListener('click',function(){ pendMode=b.getAttribute('data-etmode'); el.querySelectorAll('.etmode').forEach(function(x){ x.style.cssText=(x===b)?'background:var(--accent);border-color:transparent;color:#fff':''; }); }); });
+  el.querySelectorAll('.etday').forEach(function(b){ b.addEventListener('click',function(){ var d=Number(b.getAttribute('data-etday')); var i=pendDays.indexOf(d); if(i>=0){pendDays.splice(i,1); b.style.cssText='';} else {pendDays.push(d); b.style.cssText='background:var(--accent);border-color:transparent;color:#fff';} }); });
+  var save=el.querySelector('#etSave');
+  if(save) save.addEventListener('click', async function(){
+    var hm=function(id,def){ var v=(el.querySelector(id)||{}).value||''; var m=/^(\d{1,2}):(\d{2})$/.exec(v); return m?(Number(m[1])*60+Number(m[2])):def; };
+    var startMin=hm('#etStart',0), endMin=hm('#etEnd',0);
+    var next={ mode:pendMode,
+      schedule:{ configured: pendDays.length>0 && endMin>startMin, days:pendDays.slice().sort(), startMin:startMin, endMin:endMin, tzOffsetMin: -new Date().getTimezoneOffset() },
+      maxPerDay:Number((el.querySelector('#etMaxDay')||{}).value)||3,
+      minGapMin:Number((el.querySelector('#etGap')||{}).value)||20,
+      responseMin:Number((el.querySelector('#etResp')||{}).value)||10,
+      snoozeAllowed:!!(el.querySelector('#etSnooze')||{}).checked,
+      requireObservationOnNegative:!!(el.querySelector('#etReqObs')||{}).checked };
+    var res=null; try{ res=await window.desktopAPI.executionTrackingSet(next); }catch(_e){}
+    var msg=el.querySelector('#etMsg');
+    if(res&&res.ok){ if(msg){msg.style.color='var(--ok,#34D399)'; msg.textContent='Configuração salva.';} execTrackFill(); }
+    else if(res&&res.error==='schedule_incomplete'){ if(msg){msg.textContent=String(res.message||'Conclua a configuração da jornada antes de ativar os check-ins.');} }
+    else if(res&&res.error==='not_admin'){ if(msg){msg.textContent='Somente administradores alteram esta configuração.';} }
+    else { if(msg){msg.textContent='Não foi possível salvar. Tente novamente.';} }
+  });
+}
 /* F3.5.4N — REDE: reporta o estado REAL do SO (navigator.onLine + eventos online/offline) ao main.
    O firebase.ts reconecta sozinho; isto só informa o supervisor (watchdog) p/ estado + reconcile único. */
 (function(){
@@ -9896,6 +9990,10 @@ async function saveCardsEdit(){
       fields:fields, forId:f.assigneeId||null, forName:(respChanged?(u.name||''):(t.assignee||u.name||'')),
       prevDueDate:prev.dueDate||'', prevDueTime:prev.dueTime||'', newDueDate:c.endDate, newDueTime:c.endTime }) };
   if(dueChanged) patch.cardDeadlineRev=(Number(t.cardDeadlineRev)||1)+1;
+  /* F3.5.5A — deadlineVersion: SOMENTE a operação autoritativa de mudança de prazo incrementa
+     (nunca o planner local). Invalida/recalcula os check-ins de execução por construção
+     (chave determinística inclui dl<versão>; servidor nega claim/resposta de versão antiga). */
+  if(dueChanged) patch.deadlineVersion=(Number(t.deadlineVersion)||0)+1;
   if(f._saving)return; f._saving=true;
   try{
     await db.collection('tasks').doc(f.id).update(patch);

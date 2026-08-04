@@ -801,10 +801,61 @@ function startUserListeners(uid: string): void {
           if (ch.type === "removed") { if (slaReminderCtl) slaReminderCtl.noteCompleted(String(id)); continue; }
           const d: any = (ch.doc.data && ch.doc.data()) || {};
           try { if (_slaRulesRt.slaPanelDelivered(Object.assign({ id }, d)) && slaReminderCtl) slaReminderCtl.noteCompleted(String(id)); } catch { /* */ }
+          try { deriveExecutionSmEvent(String(id), d); } catch { /* F3.5.5A — derivação nunca derruba a escuta */ }
         }
       } catch { /* escuta de conclusão nunca derruba nada */ }
     });
   } catch { /* */ }
+}
+
+/* F3.5.5A — NOTIFICAÇÃO AO SOCIAL MEDIA em tempo real (observação/risco/bloqueio/não-início/
+   sem-resposta/parte-concluída): deriva do RESUMO projetado PELO SERVIDOR no task doc
+   (executionTracking.lastCheckin — só existe se um Designer em ACTIVE respondeu/perdeu um
+   check-in; SHADOW não escreve nada). Entrega pela MESMA notificação comum premium
+   (deliverNotification: dedup/agrupamento por tarefa/1 som/deep-link herdados; eventTypes
+   NOVOS execution_* nunca reutilizam sla_*; classifyReminderLevel não intercepta execution_*).
+   Regras: NUNCA notifica "Sim" sem observação; destinatário = SM/Admin locais (papel
+   server-verified); o próprio Designer que respondeu não é notificado. Preview truncado —
+   texto integral SÓ nos Detalhes. */
+const _etSmSeen = new Map<string, string>();
+function deriveExecutionSmEvent(taskId: string, d: any): void {
+  const tr = d && d.executionTracking; const lc = tr && tr.lastCheckin;
+  if (!lc || !lc.key || !(lc.state === "RESPONDED" || lc.state === "MISSED")) return;
+  const sig = String(lc.key) + "|" + String(lc.state);
+  if (_etSmSeen.get(taskId) === sig) return;
+  _etSmSeen.set(taskId, sig);
+  const au = getAuthUser();
+  if (!au) return;
+  const role = String(au.role || "").toLowerCase();
+  const isSm = au.admin === true || role.indexOf("social") >= 0;         // SM/Admin recebem
+  if (!isSm) return;
+  if (String(d.assigneeId || "") === String(au.id)) return;              // quem respondeu não se auto-notifica
+  const tl = Array.isArray(tr.timeline) ? tr.timeline : [];
+  const last = tl.length ? tl[tl.length - 1] : {};
+  const rt = String(lc.responseType || "");
+  const obsTxt = String((last && last.observation) || "").trim();
+  let eventType = ""; let title = ""; let sev = "info";
+  if (lc.state === "MISSED" || rt === "missed") { eventType = "execution_checkin_missed"; title = "Check-in de execução sem resposta"; sev = "warning"; }
+  else if (rt === "nao_nao_iniciei") { eventType = "execution_not_started"; title = "Designer ainda não iniciou a tarefa"; sev = "warning"; }
+  else if (rt === "nao_bloqueado") { eventType = "execution_blocked"; title = "Designer está bloqueado"; sev = "warning"; }
+  else if (rt === "nao_aguardando_material") { eventType = "execution_waiting_dependency"; title = "Designer aguardando material ou retorno"; sev = "warning"; }
+  else if (rt === "nao_conclui_minha_parte") { eventType = "execution_part_completed"; title = "Designer concluiu a parte dele"; sev = "info"; }
+  else if ((rt === "sim" || rt === "nao_outro") && obsTxt) { eventType = "execution_checkin_note"; title = "Observação do Designer no check-in"; sev = "info"; }
+  else return;                                                            // "Sim" sem observação NÃO notifica
+  const preview = obsTxt ? (obsTxt.length > 90 ? obsTxt.slice(0, 90) + "…" : obsTxt) : "";
+  const p: any = {
+    dedupKey: "execution|" + String(lc.key) + "|" + String(lc.state),
+    eventId: "execution|" + String(lc.key) + "|" + String(lc.state),
+    eventType, severity: sev, title,
+    taskId, taskTitle: String(d.title || d.cardTema || "Tarefa"), clientName: String(d.client || ""),
+    actorName: String(d.assignee || d.designerResponsibleName || "Designer"),
+    body: preview, preview,
+    _premiumCommon: true, sound: true,
+    action: { type: "detail", deep: "detail/" + taskId },
+    createdAt: Date.now(), source: "desktop-" + app.getVersion(),
+  };
+  diag("execution_tracking.sm_notified", { eventType, taskIdHash: crypto.createHash("sha256").update(taskId).digest("hex").slice(0, 16), responseType: rt });
+  try { deliverNotification(p); } catch { /* */ }
 }
 
 // F3.5.4N — ÚLTIMO RECURSO do watchdog: PARA a geração antiga ANTES de iniciar a nova (single-active por
