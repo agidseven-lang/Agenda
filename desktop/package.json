@@ -1,7 +1,7 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.217",
-  "description": "Agenda ID Seven Desktop 1.0.217-adaptive-execution-checkins (Acompanhamento Inteligente de Execução, flag OFF)",
+  "version": "1.0.218",
+  "description": "Agenda ID Seven Desktop 1.0.218-edit-internal-notes-per-theme (Observações Internas por Tema na Central de Detalhes)",
   "main": "dist/main/main.js",
   "private": true,
   "scripts": {

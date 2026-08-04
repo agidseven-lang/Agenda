@@ -1,4 +1,4 @@
-// F3.5.5A — INTEGRAÇÃO renderer/main (versão 1.0.217; deadlineVersion autoritativo; Detalhes;
+// F3.5.5A — INTEGRAÇÃO renderer/main (versão 1.0.218 — pin atualizado pela F3.5.5A-H1; deadlineVersion autoritativo; Detalhes;
 // isolamento do portal do cliente; notificação SM em tempo real; painel de Configurações).
 import fs from 'node:fs'; import path from 'node:path'; import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -9,10 +9,10 @@ const main = R('src/main/main.ts');
 let n = 0, fail = 0;
 const ok = (t, c) => { n++; if (c) console.log('  ✓', n, t); else { fail++; console.error('  ✗', n, t); } };
 
-console.log('— A) versão 1.0.217 —');
+console.log('— A) versão 1.0.218 —');
 const pkg = JSON.parse(R('package.json'));
-ok('A1 package.json 1.0.217 + description da candidata', pkg.version === '1.0.217' && /adaptive-execution-checkins/.test(pkg.description || ''));
-ok('A2 package-lock 1.0.217', JSON.parse(R('package-lock.json')).version === '1.0.217');
+ok('A1 package.json 1.0.218 + description da candidata', pkg.version === '1.0.218' && /edit-internal-notes-per-theme/.test(pkg.description || ''));
+ok('A2 package-lock 1.0.218', JSON.parse(R('package-lock.json')).version === '1.0.218');
 
 console.log('— B) deadlineVersion SÓ na operação autoritativa de prazo —');
 ok('B1 saveCardsEdit incrementa deadlineVersion JUNTO do cardDeadlineRev (mesma condição dueChanged)', idx.includes('if(dueChanged) patch.deadlineVersion=(Number(t.deadlineVersion)||0)+1;'));

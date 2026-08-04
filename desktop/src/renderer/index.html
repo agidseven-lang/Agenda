@@ -1490,6 +1490,23 @@
   .det-acc-note{margin-top:12px;padding:11px 13px;background:rgba(91,108,255,.06);border:1px solid var(--line-soft);border-left:3px solid var(--accent);border-radius:10px}
   .det-acc-note-k{display:block;font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:5px}
   .det-acc-note-b{font-size:13.5px;color:var(--soft);line-height:1.6;white-space:pre-wrap;word-break:break-word}
+  /* F3.5.5A-H1 — editor inline da observação interna por tema (fora do <details>: abrir o
+     editor NUNCA expande/recolhe o accordion). Visual coerente com .det-acc-note. */
+  .det-acc-item{display:flex;flex-direction:column;min-width:0}
+  .det-note-ed{margin-top:8px;padding:12px 13px;background:var(--surface2);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:10px}
+  .det-note-ed-k{display:block;font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:4px}
+  .det-note-ed-sub{font-size:11.5px;color:var(--faint);margin-bottom:8px}
+  .det-note-ta{width:100%;min-height:84px;resize:vertical;font:inherit;font-size:13.5px;line-height:1.6;color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 11px;white-space:pre-wrap}
+  .det-note-ta:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+  .det-note-ed-msg{font-size:12px;color:#F87171;margin-top:7px;min-height:14px}
+  .det-note-ed-msg.ok{color:var(--green,#34D399)}
+  .det-note-ed-act{display:flex;gap:8px;justify-content:flex-end;margin-top:9px}
+  .det-note-btn{font:inherit;font-size:12.5px;font-weight:600;padding:7px 13px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--soft);cursor:pointer}
+  .det-note-btn:hover{border-color:var(--accent);color:var(--accent)}
+  .det-note-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .det-note-btn.save{background:var(--accent);border-color:transparent;color:#fff}
+  .det-note-btn.save:hover{filter:brightness(1.06);color:#fff}
+  .det-note-btn[disabled]{opacity:.6;cursor:default;pointer-events:none}
   @media(max-width:560px){.det-acc-body{padding-left:15px}}
   .det-desc{font-size:13.5px;color:var(--soft);line-height:1.6;white-space:pre-wrap;word-break:break-word;background:var(--surface2);border:1px solid var(--line-soft);border-radius:14px;padding:15px}
   .det-check{display:flex;flex-direction:column;gap:2px}
@@ -7292,12 +7309,15 @@ function openDetails(taskId){
   // F3.5.4W — captura o foco de origem só quando a Central ainda não está aberta (reaberturas
   // internas, ex.: markItemsAdjusted, não sobrescrevem o elemento de retorno original).
   if(!document.querySelector('.modal-back[data-detmodal]')){_detReturnEl=(document.activeElement&&document.activeElement!==document.body)?document.activeElement:null;}
+  // F3.5.5A-H1 — reconstrução do modal (ex.: markItemsAdjusted) NUNCA perde texto digitado:
+  // captura o rascunho do editor de observação aberto ANTES de reconstruir o HTML.
+  try{detNoteCaptureDraft();}catch(_e){}
   const s=secOf(t.sector);const st=stOf(t.status);
   const asg=respOf(t);const asgName=asg?(asg.name||''):'';
   const req=t.by?state.users.find(u=>u.id===t.by):null;const reqName=req?req.name:'—';
   const cron=cronOf(t);const upd=lastUpdate(t);
   const emptyAv='<div class="av" style="width:44px;height:44px;background:var(--surface2);color:var(--faint)">'+svg('person')+'</div>';
-  let h='<div class="modal-back" data-modalbg="1" data-detmodal="1" data-detsector="'+esc(t.sector||'')+'"><div class="sheet det-sheet" role="dialog" aria-modal="true" aria-label="Central de Detalhes da tarefa">'+
+  let h='<div class="modal-back" data-modalbg="1" data-detmodal="1" data-detsector="'+esc(t.sector||'')+'" data-dettaskid="'+esc(t.id||'')+'"><div class="sheet det-sheet" role="dialog" aria-modal="true" aria-label="Central de Detalhes da tarefa">'+
     '<div class="det-head"><div class="det-badge" style="background:'+withAlpha(s.color,.16)+';color:'+s.color+'">'+svg(s.icon)+'<span>'+esc(s.label)+'</span></div>'+
       '<button class="iconbtn det-x" data-modalclose="1">'+svg('close')+'</button></div>'+
     '<div class="det-title">'+esc(t.title||'Sem título')+'</div>'+
@@ -7339,27 +7359,38 @@ function openDetails(taskId){
     h+='<div class="det-sec">'+(secOf(t.sector).key==='roteiro'?'Roteiros':(secOf(t.sector).key==='edicao_midia'?'Vídeos':'Conteúdos do cronograma'))+' <span class="det-sec-c">'+cron.list.length+' / '+cron.count+'</span>'+
       (cron.list.length>1?'<span class="det-acc-tools"><button type="button" class="det-acc-btn" data-detexpand="1">Expandir todos</button><button type="button" class="det-acc-btn" data-detcollapse="1">Recolher todos</button></span>':'')+'</div>';
     if(cron.list.length){
+      // F3.5.5A-H1 — lápis "Editar observação interna" SÓ p/ Admin/Social (canSeeAll) em setor de
+      // cliente com temas (cronograma/roteiro — MESMO escopo das notas da atribuição). Designer só
+      // visualiza; o cliente não tem acesso ao app e o campo nunca é serializado pelo portal.
+      var _canEdit=(isClientSector(secOf(t.sector).key)&&state.user&&canSeeAll(state.user))?1:0;
       h+='<div class="det-contents">'+cron.list.map(function(c){
         var num=(c._i+1<10?'0':'')+(c._i+1);
         var hasTema=(c.tema!=null&&String(c.tema).trim())?1:0;
         var leg=(c.legenda!=null&&String(c.legenda).trim())?String(c.legenda):'';
         // F3.5.4W-H1 (E2) — botões de cópia no cabeçalho: tema (lê .det-acc-t) e legenda (lê .det-acc-l).
         // Só aparecem quando há conteúdo real (nunca copiar "(sem tema)"/legenda vazia).
-        var cp=(hasTema||leg)?('<span class="det-acc-copy">'+
+        // F3.5.5A-H1 — ordem visual: [Copiar] [Editar] [Expandir]; o lápis nunca copia nem expande.
+        var _edB=_canEdit?('<button type="button" class="det-acc-cbtn" data-detnoteedit="'+c._i+'" aria-label="Editar observação interna" title="Editar observação interna">'+svg('editnote')+'</button>'):'';
+        var cp=(hasTema||leg||_edB)?('<span class="det-acc-copy">'+
           (hasTema?'<button type="button" class="det-acc-cbtn" data-detcopytheme="1" aria-label="Copiar tema" title="Copiar tema">'+svg('copy')+'</button>':'')+
           (leg?'<button type="button" class="det-acc-cbtn" data-detcopycaption="1" aria-label="Copiar legenda" title="Copiar legenda">'+svg('copy')+'</button>':'')+
+          _edB+
         '</span>'):'';
         // F3.5.4W-H1 (E5) — observação interna por tema (só interna; nunca ao cliente). Só quando não-vazia.
         var _dnv=(t.designerItemNotes||{})['i'+c._i];var _dn=(_dnv!=null)?String(_dnv).trim():'';
         var _dnote=_dn?'<div class="det-acc-note"><span class="det-acc-note-k">Observação interna da Social Media</span><div class="det-acc-note-b">'+esc(_dn)+'</div></div>':'';
-        return '<details class="det-acc"'+(_openAll?' open':'')+'>'+
+        // F3.5.5A-H1 — o editor mora FORA do <details>: abrir o editor não expande/recolhe o accordion.
+        return '<div class="det-acc-item" data-detnoteitem="'+c._i+'">'+
+        '<details class="det-acc"'+(_openAll?' open':'')+'>'+
           '<summary class="det-acc-sum"><span class="det-content-n">'+(c._i+1)+'</span>'+
             '<span class="det-acc-h"><span class="det-acc-k">'+_word+' '+num+'</span>'+
             '<span class="det-acc-t">'+esc(c.tema||'(sem tema)')+'</span></span>'+
             cp+
             '<span class="det-acc-chev">'+svg('arr')+'</span></summary>'+
           '<div class="det-acc-body">'+(leg?'<div class="det-acc-l">'+esc(leg)+'</div>':'<div class="det-acc-empty">Sem legenda para este item.</div>')+_dnote+'</div>'+
-        '</details>';
+        '</details>'+
+        (_canEdit?'<div class="det-note-ed" data-detnotebox="'+c._i+'" hidden></div>':'')+
+        '</div>';
       }).join('')+'</div>';
     }else{h+='<div class="emptyline">Nenhum conteúdo preenchido.</div>';}
   }else if(String(t.sector||'')==='edicao_cards'){
@@ -7405,6 +7436,8 @@ function openDetails(taskId){
   '</div></div>';
   document.getElementById('modalRoot').innerHTML=h;
   detSetupModalFocus();   // F3.5.4W — foco inicial no fechar + trap de Tab + acessibilidade
+  // F3.5.5A-H1 — se havia editor de observação aberto NESTA tarefa, restaura com o rascunho.
+  try{detNoteRestore(taskId);}catch(_e){}
 }
 /* ═════════ detail-hierarchy-v2 — MÁQUINA DE ESTADOS DO DETALHE (8 estados aprovados) ═════════
    Hierarquia: 1 Status principal · 2 Próxima ação · 3 Responsável · 4 Ações · 5 Detalhes colapsados.
@@ -10075,11 +10108,162 @@ async function detCopyFromButton(btn, kind, text){
     btn._detCopyT=setTimeout(function(){ btn.classList.remove('err'); btn.setAttribute('title',orig); btn.setAttribute('aria-label',orig); btn._detCopyT=null; },2200);
   }
 }
+/* ===== F3.5.5A-H1 — Observação interna por tema: editor inline na Central de Detalhes =====
+   Fonte ÚNICA de dados: tasks.designerItemNotes['i<idx>'] — a MESMA do fluxo de atribuição
+   (openDesignerDeadline/sendToDesigner). Salva SÓ a chave do item por dot-path; vazio REMOVE a
+   chave (FieldValue.delete). NUNCA: move status/coluna/prazo, atribui Designer, notifica o
+   cliente ou pede nova aprovação. O cliente NUNCA vê (o Worker não seleciona o campo). */
+var _detNote={open:null}; // {taskId, idx, baseline, draft, conflictAck, discardArmed, discardT}
+function detNoteHash(s){ s=String(s==null?'':s); var h=0,i; for(i=0;i<s.length;i++){ h=((h<<5)-h+s.charCodeAt(i))|0; } return (h>>>0).toString(16); }
+// Observabilidade SANITIZADA (allowlist): taskIdHash/itemIndex/action/contentLength/actorRole/
+// appVersion/timestamp. NUNCA o texto da observação/tema/cliente/nome/uid/token.
+function detNoteObs(action, extra){
+  try{
+    var st=_detNote.open||{}; var u=state.user||{};
+    var payload=Object.assign({
+      taskIdHash:detNoteHash(st.taskId||''), itemIndex:(typeof st.idx==='number'?st.idx:-1),
+      action:String(action||''), contentLength:0,
+      actorRole:(u.admin===true?'admin':(roleCat(u)==='MANAGER'?'social':'other')),
+      appVersion:DESK_VER, timestamp:Date.now()
+    },(extra&&typeof extra==='object')?extra:{});
+    if(window.desktopAPI&&typeof window.desktopAPI.diagLog==='function') window.desktopAPI.diagLog('details.note.'+String(action||''),payload);
+  }catch(_){}
+}
+function detNoteEl(sel){var back=document.querySelector('.modal-back[data-detmodal]');return back?back.querySelector(sel):null;}
+function detNoteTa(){var st=_detNote.open;return st?detNoteEl('[data-detnoteta="'+st.idx+'"]'):null;}
+function detNoteMsg(txt, ok){var st=_detNote.open;if(!st)return;var m=detNoteEl('[data-detnotemsg="'+st.idx+'"]');if(m){m.textContent=String(txt||'');m.classList.toggle('ok',!!ok);}}
+function detNoteLive(taskId, idx){var t=state.tasks.find(function(x){return x.id===taskId;});var v=(t&&t.designerItemNotes&&typeof t.designerItemNotes==='object')?t.designerItemNotes['i'+idx]:null;return (v!=null)?String(v):'';}
+function detNoteCaptureDraft(){var st=_detNote.open;if(!st)return;var ta=detNoteTa();if(ta)st.draft=String(ta.value||'');}
+function detNoteBoxHtml(st){
+  return '<span class="det-note-ed-k">OBSERVAÇÃO INTERNA PARA O DESIGNER — OPCIONAL</span>'+
+    '<div class="det-note-ed-sub">Visível apenas para a equipe (Designer, Social Media e Administração). Nunca aparece para o cliente.</div>'+
+    '<textarea class="det-note-ta" data-detnoteta="'+st.idx+'" rows="4" placeholder="Instrução interna para este item (opcional)">'+esc(st.draft!=null?st.draft:st.baseline)+'</textarea>'+
+    '<div class="det-note-ed-msg" data-detnotemsg="'+st.idx+'" aria-live="polite"></div>'+
+    '<div class="det-note-ed-act">'+
+      '<button type="button" class="det-note-btn" data-detnotecancel="'+st.idx+'">Cancelar</button>'+
+      '<button type="button" class="det-note-btn save" data-detnotesave="'+st.idx+'">Salvar observação</button>'+
+    '</div>';
+}
+function detNoteOpenEditor(taskId, idx, focusTa){
+  var box=detNoteEl('[data-detnotebox="'+idx+'"]'); if(!box)return false;
+  var st=_detNote.open; if(!st)return false;
+  box.innerHTML=detNoteBoxHtml(st); box.hidden=false;
+  if(focusTa!==false){var ta=detNoteTa();if(ta){try{ta.focus();var n=(ta.value||'').length;if(ta.setSelectionRange)ta.setSelectionRange(n,n);}catch(_e){}}}
+  return true;
+}
+function detNoteOpen(taskId, idx){
+  var u=state.user||{};
+  if(!canSeeAll(u))return;                                   // gate defensivo (o lápis nem renderiza p/ Designer)
+  var cur=_detNote.open;
+  if(cur){
+    if(cur.taskId===taskId&&cur.idx===idx){var ta0=detNoteTa();if(ta0){try{ta0.focus();}catch(_e){}}return;}
+    detNoteCaptureDraft();
+    var dirty=(cur.draft!=null)&&String(cur.draft)!==String(cur.baseline);
+    if(dirty){detNoteMsg('Salve ou cancele esta observação antes de editar outro tema.');var taX=detNoteTa();if(taX){try{taX.focus();}catch(_e){}}return;} // UM editor ativo por vez
+    detNoteCloseEditor(false);                               // limpo → fecha silencioso
+  }
+  _detNote.open={taskId:String(taskId||''), idx:idx, baseline:detNoteLive(taskId,idx), draft:null, conflictAck:false, discardArmed:false, discardT:null};
+  if(!detNoteOpenEditor(taskId, idx)){_detNote.open=null;return;}
+  detNoteObs('opened',{contentLength:_detNote.open.baseline.length});
+}
+function detNoteCloseEditor(focusPencil){
+  var st=_detNote.open; if(!st)return;
+  if(st.discardT){clearTimeout(st.discardT);st.discardT=null;}
+  var box=detNoteEl('[data-detnotebox="'+st.idx+'"]'); if(box){box.hidden=true;box.innerHTML='';}
+  var pen=detNoteEl('[data-detnoteedit="'+st.idx+'"]');
+  _detNote.open=null;
+  if(focusPencil&&pen){try{pen.focus();}catch(_e){}}         // retorno de foco ao lápis
+}
+function detNoteCancel(){
+  var st=_detNote.open; if(!st)return;
+  detNoteCaptureDraft();
+  var dirty=(st.draft!=null)&&String(st.draft)!==String(st.baseline);
+  if(dirty&&!st.discardArmed){
+    st.discardArmed=true;
+    var b=detNoteEl('[data-detnotecancel="'+st.idx+'"]'); if(b)b.textContent='Descartar alterações?';
+    detNoteMsg('Há texto não salvo. Clique novamente em "Descartar alterações?" para descartar.');
+    st.discardT=setTimeout(function(){ if(_detNote.open===st){ st.discardArmed=false; st.discardT=null; var b2=detNoteEl('[data-detnotecancel="'+st.idx+'"]'); if(b2)b2.textContent='Cancelar'; detNoteMsg(''); } },4000);
+    return;                                                  // confirmação DISCRETA antes de descartar
+  }
+  detNoteObs('cancelled',{contentLength:String(st.draft!=null?st.draft:st.baseline).length});
+  detNoteCloseEditor(true);                                  // descarta; o texto persistido permanece o anterior
+}
+function detNoteRenderSaved(taskId, idx){
+  // Atualiza a exibição aprovada (.det-acc-note) DENTRO do item, in place — sem reabrir o modal.
+  var back=document.querySelector('.modal-back[data-detmodal]'); if(!back)return;
+  if(back.getAttribute('data-dettaskid')!==String(taskId))return;
+  var item=back.querySelector('[data-detnoteitem="'+idx+'"]'); if(!item)return;
+  var body=item.querySelector('.det-acc-body'); if(!body)return;
+  var val=detNoteLive(taskId, idx).trim();
+  var noteEl=body.querySelector('.det-acc-note');
+  if(!val){ if(noteEl)noteEl.remove(); return; }             // vazio ⇒ NENHUMA seção vazia
+  if(!noteEl){ noteEl=document.createElement('div'); noteEl.className='det-acc-note'; body.appendChild(noteEl); }
+  noteEl.innerHTML='<span class="det-acc-note-k">Observação interna da Social Media</span><div class="det-acc-note-b">'+esc(val)+'</div>';
+}
+async function detNoteSave(){
+  var st=_detNote.open; if(!st)return;
+  var u=state.user||{};
+  if(!canSeeAll(u)){detNoteMsg('Somente Social Media e Administradores alteram esta observação.');return;} // autorização também no caminho de persistência
+  var t=state.tasks.find(function(x){return x.id===st.taskId;});
+  if(!t){detNoteMsg('Tarefa não encontrada. Feche e abra os Detalhes novamente.');return;}
+  detNoteCaptureDraft();
+  var val=String(st.draft!=null?st.draft:'').trim();
+  var live=detNoteLive(st.taskId, st.idx);
+  if(String(live)!==String(st.baseline)&&!st.conflictAck){
+    // Mudou em outro computador — NUNCA sobrescreve silenciosamente: avisa, rebaseia e exige novo Salvar.
+    st.baseline=String(live); st.conflictAck=true;
+    detNoteMsg('Esta observação foi alterada em outro computador. Seu texto foi mantido — revise e clique em Salvar novamente para confirmar.');
+    return;
+  }
+  var sBtn=detNoteEl('[data-detnotesave="'+st.idx+'"]'); var cBtn=detNoteEl('[data-detnotecancel="'+st.idx+'"]');
+  if(sBtn){sBtn.disabled=true;sBtn.textContent='Salvando…';} if(cBtn)cBtn.disabled=true;
+  var word=detItemWord(t); word=word.charAt(0)+word.slice(1).toLowerCase();
+  var num=(st.idx+1<10?'0':'')+(st.idx+1);
+  var patch={};
+  // dot-path: toca SÓ a chave deste item (nunca o mapa inteiro) — edições simultâneas em itens
+  // diferentes não se sobrescrevem; vazio remove a chave (mesma semântica de limpeza da W-H1).
+  patch['designerItemNotes.i'+st.idx]= val ? val : firebase.firestore.FieldValue.delete();
+  patch.history=firebase.firestore.FieldValue.arrayUnion({type:'obs_interna_tema',
+    label:'Observação interna do '+word+' '+num+' atualizada.',
+    contentIndex:st.idx, contentLength:val.length,
+    by:(u.name||''), byId:(u.id||null), at:Date.now(), channel:'social_edit'});
+  var ok=false;
+  try{ await db.collection('tasks').doc(st.taskId).update(patch); ok=true; }
+  catch(e){ console.warn('detNoteSave',(e&&e.code)||e); }
+  if(!ok){
+    if(sBtn){sBtn.disabled=false;sBtn.textContent='Salvar observação';} if(cBtn)cBtn.disabled=false;
+    detNoteMsg('Não foi possível salvar. Verifique a conexão e tente novamente.');
+    detNoteObs('save_failed',{contentLength:val.length});
+    return;                                                  // texto preservado; editor aberto; SEM sucesso falso
+  }
+  // otimista local APÓS o sucesso REAL (o snapshot confirma na sequência)
+  if(!t.designerItemNotes||typeof t.designerItemNotes!=='object')t.designerItemNotes={};
+  if(val)t.designerItemNotes['i'+st.idx]=val; else delete t.designerItemNotes['i'+st.idx];
+  detNoteObs('save_succeeded',{contentLength:val.length});
+  var _tid=st.taskId,_idx=st.idx;
+  detNoteCloseEditor(true);
+  detNoteRenderSaved(_tid,_idx);
+  try{flashToast('Observação salva.');}catch(_e){}
+}
+function detNoteRestore(taskId){
+  var st=_detNote.open; if(!st||st.taskId!==String(taskId||''))return;
+  detNoteOpenEditor(st.taskId, st.idx, false);               // reabre com o rascunho preservado
+}
 document.addEventListener('click',async e=>{
   if(!state.user)return;                       // login tem seu proprio handler
   if(!(e.target&&e.target.closest))return;
   const g=sel=>e.target.closest(sel);let el;
   // F3.5.4W-H1 (E2) — Copiar tema/legenda: intercepta ANTES de tudo e cancela o toggle nativo do <summary>.
+  // F3.5.5A-H1 — lápis/editor da observação interna por tema (Central de Detalhes).
+  // preventDefault+stopPropagation: NUNCA expande/recolhe o acordeão, NUNCA copia, NUNCA fecha a Central.
+  if(el=g('[data-detnoteedit]')){
+    e.preventDefault(); e.stopPropagation();
+    var _nb=el.closest('.modal-back[data-detmodal]');
+    detNoteOpen((_nb&&_nb.getAttribute('data-dettaskid'))||'', Number(el.getAttribute('data-detnoteedit'))||0);
+    return;
+  }
+  if(el=g('[data-detnotecancel]')){e.preventDefault();e.stopPropagation();detNoteCancel();return;}
+  if(el=g('[data-detnotesave]')){e.preventDefault();e.stopPropagation();detNoteSave();return;}
   if(el=g('[data-detcopytheme],[data-detcopycaption]')){
     e.preventDefault(); e.stopPropagation();
     var _cap=el.hasAttribute('data-detcopycaption'); var _acc=el.closest('.det-acc');
