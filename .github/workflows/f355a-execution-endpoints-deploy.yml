@@ -1,0 +1,226 @@
+# =====================================================================
+# [manual] F3.5.5A — Deploy das 2 Functions de EXECUTION CHECK-INS (Admin SDK).
+# Publica SOMENTE os endpoints server-side de claim/lease e resposta dos
+# check-ins de execução (Acompanhamento Inteligente de Execução):
+#   claimExecutionCheckpoint, respondExecutionCheckpoint
+# SEPARADO do deploy total (firebase-functions-deploy.yml), do endpoint-only
+# notifPrefs (firebase-functions-deploy-endpoint.yml) e do users-write.
+#
+# CONTEXTO (CORREÇÃO ARQUITETURAL OBRIGATÓRIA do owner — claim/lease
+# SERVER-SIDE): o Desktop 1.0.217 NUNCA decide lease/expiração/takeover/
+# concorrência localmente; a autoridade FINAL é a transação atômica destas
+# functions com RELÓGIO DO SERVIDOR. Endpoints ADITIVOS e DORMENTES até a
+# 1.0.217 (que sai com a feature OFF): nenhum consumidor existente muda.
+#
+# SEGURANCA:
+#   - workflow_dispatch ONLY (NAO roda em push/PR/schedule).
+#   - dry_run=true por PADRAO: valida + planeja + functions:list, sem deploy.
+#   - Deploy real EXIGE dry_run=false E confirm_deploy == DEPLOY_EXECUTION_ENDPOINTS.
+#   - Alvo FIXO = as 2 functions (--only functions:<nome> x2). Trava final
+#     rejeita alvo total ("functions") ou curinga. NUNCA toca Rules/Hosting/
+#     Firestore data (executionCheckins segue BLOQUEADA a clientes pelas Rules
+#     vivas; Admin SDK das functions bypassa Rules — zero mudanca de Rules).
+#   - Checkout PINADO em app/main@4a624a1; blob de functions/index.js conferido
+#     (5dba32b5). Pre-checks: node --check + harness f355a 45/45 + suites
+#     herdadas f33R..f42c (todas) + presenca dos 2 exports + endpoints legados
+#     intactos (loginUser/getUserSelf/issueFirebaseAuthToken byte-presentes).
+#   - O segredo AUTH_SESSION_SECRET JA possui versao real no Secret Manager
+#     (set por auth-session-secret-set.yml; usado por loginUser em producao).
+#     Este fluxo NAO cria/le/imprime segredo algum; validacao pos-deploy por
+#     metadados + sondas 401/405 SEM credencial (nenhum token real).
+# =====================================================================
+name: "[manual] F3.5.5A Firebase Functions Deploy — EXECUTION CHECK-INS (2 endpoints Admin SDK)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_deploy:
+        description: "Digite DEPLOY_EXECUTION_ENDPOINTS para confirmar (qualquer outro valor aborta o deploy real)"
+        required: true
+        default: ""
+      dry_run:
+        description: "true = valida/planeja/list (NAO faz deploy); false = deploy real das 2 functions"
+        required: true
+        default: "true"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ff-deploy-execution-endpoints
+  cancel-in-progress: false
+
+env:
+  GCP_PROJECT: "agenda-id-seven"
+  PINNED_COMMIT: "4a624a17a9d823954f0898600a93aa9541dd4148"
+  PINNED_FUNCTIONS_BLOB: "5dba32b578344328c2f413136341c712a99f1a02"
+  # Alvo FIXO — as 2 functions de execution check-ins, uma a uma em --only (nunca alvo total).
+  DEPLOY_TARGET: "functions:claimExecutionCheckpoint,functions:respondExecutionCheckpoint"
+
+jobs:
+  deploy-execution-endpoints:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Guard dry_run (default true; so 'false' habilita deploy real)
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: |
+          set -eu
+          case "$DRY_RUN" in
+            true|false) echo "dry_run=$DRY_RUN" ;;
+            *) echo "::error:: dry_run deve ser 'true' ou 'false' (recebido: '$DRY_RUN')"; exit 1 ;;
+          esac
+
+      - name: Guard confirm_deploy (deploy real exige == DEPLOY_EXECUTION_ENDPOINTS)
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm_deploy }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: |
+          set -eu
+          if [ "$DRY_RUN" = "false" ] && [ "$CONFIRM" != "DEPLOY_EXECUTION_ENDPOINTS" ]; then
+            echo "::error:: deploy real pedido (dry_run=false) mas confirm_deploy != DEPLOY_EXECUTION_ENDPOINTS — abortando."
+            exit 1
+          fi
+          echo "confirm/dry_run coerentes."
+
+      - name: Guard DEPLOY_TARGET (2 alvos fixos; rejeita alvo total/curinga)
+        run: |
+          set -eu
+          T="$DEPLOY_TARGET"
+          EXPECTED="functions:claimExecutionCheckpoint,functions:respondExecutionCheckpoint"
+          [ "$T" = "$EXPECTED" ] || { echo "::error:: DEPLOY_TARGET adulterado"; exit 1; }
+          case "$T" in
+            *"*"*) echo "::error:: curinga proibido no alvo"; exit 1 ;;
+          esac
+          IFS=','; for tok in $T; do
+            case "$tok" in
+              functions|functions:) echo "::error:: alvo total bloqueado ($tok)"; exit 1 ;;
+              functions:*) : ;;
+              *) echo "::error:: token de alvo invalido: $tok"; exit 1 ;;
+            esac
+          done
+          echo "Alvo OK (2 functions): $T"
+
+      - name: Checkout (PIN app/main@4a624a1)
+        uses: actions/checkout@v4
+        with:
+          ref: 4a624a17a9d823954f0898600a93aa9541dd4148
+          fetch-depth: 0
+
+      - name: Confirmar commit e blob pinados
+        run: |
+          set -eu
+          HEAD_SHA="$(git rev-parse HEAD)"
+          [ "$HEAD_SHA" = "$PINNED_COMMIT" ] || { echo "::error:: HEAD ($HEAD_SHA) != PINNED_COMMIT ($PINNED_COMMIT)"; exit 1; }
+          B="$(git rev-parse HEAD:functions/index.js)"
+          [ "$B" = "$PINNED_FUNCTIONS_BLOB" ] || { echo "::error:: functions/index.js ($B) != pin ($PINNED_FUNCTIONS_BLOB)"; exit 1; }
+          echo "Pin OK — commit $HEAD_SHA; functions/index.js blob $B"
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Pre-checks (syntax + f355a 45/45 + suites herdadas + 2 exports + legados intactos)
+        run: |
+          set -eu
+          node --check functions/index.js
+          for t in f33R-notif-prefs-log f33S-notif-prefs-endpoint f33T-notif-prefs-token-issuer f33U-notif-send-prefs-integration f33V-notif-hardening f33X-notifprefs-selfread-endpoint f33AA-auth-login-user f33AC-auth-session-scope f33AD-auth-get-user-contact f42c-issue-firebase-auth-token f355a-execution-checkpoint-endpoints; do
+            echo "==== $t ===="; node "scripts/worker-ops/$t.test.mjs"
+          done
+          for FN in claimExecutionCheckpoint respondExecutionCheckpoint; do
+            grep -qE "exports\.${FN} = onRequest" functions/index.js || { echo "::error:: export ausente: $FN"; exit 1; }
+          done
+          for FN in loginUser getUserSelf issueFirebaseAuthToken registerFcmToken; do
+            grep -qE "exports\.${FN} = onRequest" functions/index.js || { echo "::error:: endpoint legado sumiu: $FN"; exit 1; }
+          done
+          echo "Pre-checks OK (syntax; f355a 45/45; herdadas verdes; 2 exports novos; legados presentes)."
+
+      - name: Auth gcloud (service account via secret -> arquivo temporario)
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+        run: |
+          set -eu
+          [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ] || { echo "::error:: service account ausente."; exit 1; }
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/gcp-sa.json" >> "$GITHUB_ENV"
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/gcp-sa.json"
+          gcloud auth activate-service-account --key-file="$RUNNER_TEMP/gcp-sa.json" >/dev/null
+          gcloud config set project "$GCP_PROJECT" >/dev/null
+
+      - name: Preflight — AUTH_SESSION_SECRET existe (metadados; NUNCA le valor)
+        run: |
+          set -eu
+          npm install -g firebase-tools >/dev/null 2>&1
+          if gcloud secrets describe AUTH_SESSION_SECRET --project "$GCP_PROJECT" >/dev/null 2>&1; then
+            echo "AUTH_SESSION_SECRET presente no Secret Manager (metadados)."
+          else
+            echo "::error:: AUTH_SESSION_SECRET ausente — endpoints session-gated nao podem subir dormentes-quebrados."
+            exit 1
+          fi
+
+      - name: Estado ANTES (functions:list — leitura)
+        run: firebase functions:list --project "$GCP_PROJECT" | tee before.txt || true
+
+      - name: functions/.env SEM flags (somente RESET_EMAIL_*; codebase-wide defineString)
+        env:
+          RESET_EMAIL_FROM: ${{ secrets.RESET_EMAIL_FROM }}
+          RESET_EMAIL_FROM_NAME: ${{ secrets.RESET_EMAIL_FROM_NAME }}
+          RESET_EMAIL_PROVIDER: ${{ secrets.RESET_EMAIL_PROVIDER }}
+        run: |
+          set -eu
+          # O firebase analisa o codebase INTEIRO; as funcoes de password-reset declaram
+          # defineString(RESET_EMAIL_*), exigidas em --non-interactive mesmo com --only.
+          # Grava SOMENTE RESET_EMAIL_* (defaults seguros). NUNCA flags; NUNCA segredo.
+          FROM="${RESET_EMAIL_FROM:-no-reply@agendaidseven.com.br}"
+          {
+            printf 'RESET_EMAIL_FROM=%s\n' "$FROM"
+            printf 'RESET_EMAIL_FROM_NAME=%s\n' "${RESET_EMAIL_FROM_NAME:-ID Seven Agenda}"
+            printf 'RESET_EMAIL_PROVIDER=%s\n' "${RESET_EMAIL_PROVIDER:-resend}"
+          } > "functions/.env.${GCP_PROJECT}"
+          if grep -qE 'ENABLE_|SECRET|TOKEN|PASS' "functions/.env.${GCP_PROJECT}"; then
+            echo "::error:: .env contem chave proibida"; exit 1
+          fi
+          echo ".env gravado sem flags/segredos."
+
+      - name: Deploy das 2 Functions (SOMENTE se dry_run=false)
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: |
+          set -eu
+          ( cd functions && if [ -f package-lock.json ]; then npm ci; else npm install; fi )
+          case "$DEPLOY_TARGET" in
+            functions|functions:) echo "::error:: alvo total bloqueado"; exit 1 ;;
+          esac
+          if [ "$DRY_RUN" = "false" ]; then
+            echo "DEPLOY real — alvo: $DEPLOY_TARGET"
+            firebase deploy --only "$DEPLOY_TARGET" --project "$GCP_PROJECT" --non-interactive --force
+          else
+            echo "DRY-RUN=true — nenhum deploy executado. Alvo planejado: $DEPLOY_TARGET"
+          fi
+
+      - name: Validacao POS-deploy (metadados + sondas 401/405 SEM credencial; SOMENTE se dry_run=false)
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        run: |
+          set -eu
+          firebase functions:list --project "$GCP_PROJECT" | tee after.txt
+          for FN in claimExecutionCheckpoint respondExecutionCheckpoint; do
+            if ! grep -qiE "(^|[^A-Za-z])${FN}([^A-Za-z]|$)" after.txt; then
+              echo "::error:: alvo $FN ausente apos deploy"; exit 1
+            fi
+          done
+          # Sondas comportamentais SEM credencial (nenhum token/segredo): o padrao gen2
+          # dos endpoints deste backend expoe https://<lowercase(fn)>-de36pi7vza-uc.a.run.app
+          # (mesmo sufixo de loginUser/getUserSelf em producao).
+          for FN in claimexecutioncheckpoint respondexecutioncheckpoint; do
+            URL="https://${FN}-de36pi7vza-uc.a.run.app"
+            C_GET=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || echo 000)
+            C_POST=$(curl -s -o /dev/null -w "%{http_code}" -X POST -H "Content-Type: application/json" -d '{}' "$URL" || echo 000)
+            echo "$FN: GET=$C_GET (esperado 405) POST-sem-Bearer=$C_POST (esperado 401)"
+            [ "$C_GET" = "405" ] || { echo "::error:: $FN GET != 405"; exit 1; }
+            [ "$C_POST" = "401" ] || { echo "::error:: $FN POST sem sessao != 401"; exit 1; }
+          done
+          echo "POS-deploy OK: 2 functions presentes; session-gate vivo (401); metodo restrito (405); deploy --only limitado."
+
+      - name: Limpeza (service account + .env temporario)
+        if: always()
+        run: rm -f "$RUNNER_TEMP/gcp-sa.json" functions/.env.* before.txt after.txt 2>/dev/null || true
