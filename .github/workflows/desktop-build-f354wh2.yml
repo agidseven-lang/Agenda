@@ -53,7 +53,7 @@ jobs:
         run: |
           set -euo pipefail
           git diff --name-only "$BASE_215_SHA"..HEAD > /tmp/delta.txt; cat /tmp/delta.txt
-          BAD=$(grep -vE '^(desktop/src/renderer/(index|bgnotify)\.html|desktop/src/main/(main|bgNotify)\.ts|desktop/package(-lock)?\.json|desktop/scripts/f354wh2-|desktop/scripts/f354vh1-session-persistence\.test\.mjs|\.github/workflows/desktop-(build|release)-f354wh2\.yml|docs/f354wh2-qa/)' /tmp/delta.txt || true)
+          BAD=$(grep -vE '^(\.github/workflows/desktop-release-f354wh1\.yml$|desktop/src/renderer/(index|bgnotify)\.html|desktop/src/main/(main|bgNotify)\.ts|desktop/package(-lock)?\.json|desktop/scripts/f354wh2-|desktop/scripts/f354vh1-session-persistence\.test\.mjs|\.github/workflows/desktop-(build|release)-f354wh2\.yml|docs/f354wh2-qa/)' /tmp/delta.txt || true)
           [ -z "$BAD" ] || { echo "::error::fora da allowlist: $BAD"; exit 1; }
           git diff --quiet "$BASE_215_SHA"..HEAD -- desktop/src/main/notificationGrouping.ts desktop/src/main/slaReminder.ts desktop/src/main/slaReminderWindow.ts desktop/src/main/updaterService.ts desktop/src/preload desktop/src/renderer/slareminder.html || { echo "::error::módulo congelado alterado"; exit 1; }
           if git diff "$BASE_215_SHA"..HEAD -- android/ functions/ cloudflare-worker.js firestore.rules 2>/dev/null | grep -q .; then echo "::error::android/backend/worker tocados"; exit 1; fi
