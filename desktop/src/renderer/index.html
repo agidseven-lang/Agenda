@@ -241,6 +241,9 @@
   .vqty-input{width:96px;flex:none;text-align:center;font-weight:800;font-size:16px;-moz-appearance:textfield}
   .vqty-input::-webkit-outer-spin-button,.vqty-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
   .vqty-suffix{color:var(--soft);font-size:13px;font-weight:700}
+  /* F3.5.5C — validação visível da quantidade de roteiros (nunca corrigir em silêncio) */
+  .sq-err{margin:6px 0 12px;font-size:12.5px;color:#F87171;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.25);border-radius:9px;padding:8px 11px}
+  .sq-err[hidden]{display:none}
   /* F3.4.6 — GRADE DIÁRIA da Agenda/Mês: restaura as MOLDURAS individuais de cada dia (visual
      aprovado da linhagem PWA .cell): cada data na sua própria célula com superfície+borda (linhas
      e colunas delimitadas), fora-do-mês discreto porém VISÍVEL, hoje contornado, seleção em accent.
@@ -9497,7 +9500,7 @@ function openSheet(which){
 }
 
 /* ---- TASK FORM (wizard) ---- */
-function newForm(sector){return {id:null,step:0,sector:sector||null,title:'',client:'',assigneeId:null,assignee:'',status:'afazer',startDate:'',startTime:'',endDate:'',endTime:'',dueDate:'',dueTime:'',priority:false,subtype:null,videoQty:null,fields:{},contents:[],items:[],videos:[],checklist:[],link:'',obs:'',_openContent:null,_sendAfterSave:false,_sending:false,_draftId:null,/* F3.5.4I — estado de envio + id idempotente do draft *//* F3.5.2 — Edição de Cards (aditivo): N cards avulsos + quantidade. F3.5.2A: cada card com INTERVALO
+function newForm(sector){return {id:null,step:0,sector:sector||null,title:'',client:'',assigneeId:null,assignee:'',status:'afazer',startDate:'',startTime:'',endDate:'',endTime:'',dueDate:'',dueTime:'',priority:false,subtype:null,videoQty:null,scriptQty:null,fields:{},contents:[],items:[],videos:[],checklist:[],link:'',obs:'',_openContent:null,_sendAfterSave:false,_sending:false,_draftId:null,/* F3.5.4I — estado de envio + id idempotente do draft *//* F3.5.2 — Edição de Cards (aditivo): N cards avulsos + quantidade. F3.5.2A: cada card com INTERVALO
    completo {tema,legenda,obs,startDate,startTime,endDate,endTime} (início + término; término=prazo) */cards:[],cardsQty:1};}
 /* F3.5.2 — quem pode CRIAR tarefas de Edição de Cards: Social Media / Administrador (contrato atual
    de supervisão). Designer recebe/movimenta, mas não cria em nome da Social. Gate SÓ do novo setor. */
@@ -9510,6 +9513,10 @@ var CARDS_MAX_BATCH=50;
    operação real (exemplos do owner vão a ~20). NÃO é aplicado em silêncio: ao exceder, mostra
    mensagem clara e mantém o teto. Sem teto MÍNIMO arbitrário além do inteiro ≥1 exigido. */
 var VIDEO_QTY_MAX=500;
+/* F3.5.5C — Roteiro: teto TÉCNICO idêntico ao dos vídeos (render de N blocos de tema/legenda no
+   DOM e documento único da tarefa ≤1MiB no Firestore). NÃO é limite de negócio; ao exceder,
+   mensagem clara e valor mantido no teto (nunca em silêncio). */
+var SCRIPT_QTY_MAX=500;
 function cardsQtyOf(f){var n=Math.floor(Number(f&&f.cardsQty)||0);return (n>=1&&n<=CARDS_MAX_BATCH)?n:(n<1?1:CARDS_MAX_BATCH);}
 function openTaskForm(sector){closeModal();if(sector&&secOf(sector).descontinuado)sector=null;state.form=newForm(sector);if(sector)state.form.step=1;render();}
 // F3.3.75A — função CANÔNICA de "Nova tarefa": TODO entry point de CRIAÇÃO recomeça na ETAPA 1
@@ -9563,11 +9570,84 @@ function synthVideoSub(n){
     fields:[{k:'orientacoes',l:'Orientações',kind:'text',ph:'Cortes, ritmo, trilha, identidade…'}],
     checklist:['Receber materiais','Editar '+n+' vídeos','Revisar','Aprovar','Entregar']};
 }
+/* ══ F3.5.5C — ROTEIRO: QUANTIDADE PERSONALIZADA (espelho fiel do padrão F3.5.4V aprovado) ══
+   Inteiro ≥1; '' = vazio (o campo era e PERMANECE opcional — os chips q4/q6/q8/q12 também não
+   eram obrigatórios para avançar); zero/negativo→1; decimal→piso; letras/lixo→''; acima do
+   teto técnico → mantém no teto com aviso claro. A correção nunca é silenciosa: a superfície
+   mostra a mensagem literal "Informe uma quantidade inteira igual ou superior a 1." quando o
+   valor digitado é inválido (f._sqErr). */
+function normScriptQty(raw){
+  var s=String(raw==null?'':raw).trim();
+  if(s==='')return '';
+  var n=Math.floor(Number(s));
+  if(!isFinite(n))return '';
+  if(n<1)return 1;
+  if(n>SCRIPT_QTY_MAX){ try{ if(typeof flashToast==='function')flashToast('Quantidade máxima por tarefa: '+SCRIPT_QTY_MAX+' roteiros (limite técnico). Para mais, divida em tarefas.'); }catch(_){ } return SCRIPT_QTY_MAX; }
+  return n;
+}
+/* Quantidade CANÔNICA de roteiros do form: scriptQty (fonte da verdade na criação). Fallback
+   defensivo SÓ em modo edição (f.id): cronSub legado q4/q6/q8/q12 → 4/6/8/12, ou o tamanho REAL
+   do array de conteúdos — tarefas antigas abrem com a contagem verdadeira, sem migração. */
+function scriptQtyOf(f){
+  if(!f)return null;
+  var raw=f.scriptQty;
+  if(raw!==null&&raw!==undefined&&String(raw).trim()!==''){
+    var n=Math.floor(Number(raw));
+    return (isFinite(n)&&n>=1)?Math.min(n,SCRIPT_QTY_MAX):null;
+  }
+  if(f.id){
+    var m={q4:4,q6:6,q8:8,q12:12}; if(f.subtype&&m[f.subtype])return m[f.subtype];
+    if(Array.isArray(f.contents)&&f.contents.length)return Math.min(f.contents.length,SCRIPT_QTY_MAX);
+  }
+  return null;
+}
+/* Subtipo SINTÉTICO do Roteiro dirigido por N — MESMO contrato (formTitle/contentCount/fields/
+   checklist) que o mapa q4/q6/q8/q12 usava; TODO o pipeline a jusante (blocos tema/legenda,
+   revisão, composedDesc, cronContents, portal) permanece idêntico — só a ORIGEM da contagem
+   muda. O checklist do Roteiro é independente de N (não é re-semeado ao mudar a quantidade). */
+function synthScriptSub(n){
+  if(!(isFinite(n)&&n>=1))return null;
+  return {label:n+(n===1?' roteiro':' roteiros'),formTitle:'Roteiro de gravação de vídeos — '+n+(n===1?' roteiro':' roteiros'),contentCount:n,fields:[],
+    checklist:['Escrever roteiros','Revisar','Aprovar com o cliente','Enviar para gravação']};
+}
+/* COMMIT central da quantidade de roteiros (digitação/colagem/setas via change, botões −/+).
+   Aumentar NUNCA toca itens existentes (novos blocos nascem vazios). Diminuir: itens excedentes
+   VAZIOS são cortados direto; com QUALQUER conteúdo (tema/legenda/rico) → confirmação explícita
+   (Cancelar mantém tudo; Confirmar remove SÓ os excedentes). Nada é perdido em silêncio. */
+function scriptQtyCommit(newRaw){
+  var f=state.form; if(!f)return;
+  var prevN=scriptQtyOf(f)||0;
+  var raw=String(newRaw==null?'':newRaw).trim();
+  f._sqErr=(raw!==''&&!(/^\d+$/.test(raw)&&Number(raw)>=1));
+  var norm=normScriptQty(newRaw);
+  var newN=(norm===''?null:norm);
+  var extra=0;
+  if(newN!==null&&Array.isArray(f.contents)){
+    for(var i=newN;i<f.contents.length;i++){var c=f.contents[i];
+      if(c&&((c.tema&&String(c.tema).trim())||(c.legenda&&String(c.legenda).trim())||c.temaRich||c.legendaRich))extra++;}
+  }
+  if(newN!==null&&newN<prevN&&extra>0){ f._sqPend=newN; openScriptShrinkConfirm(extra,prevN,newN); return; }
+  f.scriptQty=norm;
+  if(newN!==null&&Array.isArray(f.contents)&&f.contents.length>newN)f.contents.length=newN; /* só vazios chegam aqui */
+  if(typeof f._openContent==='number'&&newN!==null&&f._openContent>=newN)f._openContent=null;
+  render();
+}
+function openScriptShrinkConfirm(extra,prevN,newN){
+  document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg-keep="1"><div class="sheet" style="max-width:460px"><div class="grab"></div>'+
+    '<div style="font-size:18px;font-weight:800;margin-bottom:8px">Reduzir para '+newN+(newN===1?' roteiro':' roteiros')+'?</div>'+
+    '<div style="font-size:13.5px;color:var(--soft);line-height:1.55;margin-bottom:6px">Existem <b style="color:var(--ink)">'+extra+(extra===1?' roteiro preenchido':' roteiros preenchidos')+'</b> além do roteiro '+newN+'. Ao confirmar, esses itens excedentes serão <b style="color:#F87171">removidos</b> do formulário.</div>'+
+    '<div style="font-size:12.5px;color:var(--faint);margin-bottom:14px">Os roteiros 1 a '+newN+' permanecem exatamente como estão. Cancelar mantém todos os dados.</div>'+
+    '<div class="del-actions"><button class="btn ghost" data-sqshrinkcancel="1">Cancelar</button><button class="btn btn-danger" data-sqshrinkok="1">Remover e reduzir</button></div>'+
+  '</div></div>';
+}
 function curSub(){
   const t=tpl(); if(!t)return null;
   /* F3.5.4V — Edição de vídeos usa QUANTIDADE personalizada (subtipo sintético), não mais os chips
      fixos p4/p6/p12. Demais setores (Cronograma/Copywriting/Roteiro) mantêm t.subtypes intactos. */
   if(secOf(state.form.sector).key==='edicao_midia')return synthVideoSub(videoQtyOf(state.form));
+  /* F3.5.5C — Roteiro usa QUANTIDADE personalizada (subtipo sintético) no lugar dos chips
+     q4/q6/q8/q12. Cronograma/Copywriting mantêm t.subtypes intactos. */
+  if(secOf(state.form.sector).key==='roteiro')return synthScriptSub(scriptQtyOf(state.form));
   return (t.subtypes&&state.form.subtype)?t.subtypes[state.form.subtype]:null;
 }
 function renderForm(){
@@ -9685,6 +9765,20 @@ function stepBriefing(){const f=state.form;const t=tpl();const s=secOf(f.sector)
           +'<button type="button" class="vqty-btn" data-vqplus="1" aria-label="Aumentar quantidade">+</button>'
           +'<span class="vqty-suffix">vídeos/roteiros</span>'
         +'</div>';
+    }else if(secOf(f.sector).key==='roteiro'){
+      /* F3.5.5C — Roteiro: QUANTIDADE personalizada [−][N][+] no lugar dos chips fixos
+         q4/q6/q8/q12 (mesmo componente aprovado da F3.5.4V). Inteiro ≥1; digitação direta,
+         apagar, colar, setas do teclado e Tab funcionam no input nativo type=number. */
+      var _sqn=scriptQtyOf(f);
+      var _sq=(f.scriptQty===0||f.scriptQty)?f.scriptQty:(_sqn||'');
+      h+='<div class="lbl">Quantidade de roteiros</div>'
+        +'<div class="vqty-row">'
+          +'<button type="button" class="vqty-btn" data-sqminus="1" aria-label="Diminuir quantidade"'+((!(_sqn>1))?' disabled':'')+'>−</button>'
+          +'<input class="inp vqty-input" id="fScriptQty" type="number" min="1" step="1" inputmode="numeric" placeholder="Ex.: 6" aria-label="Quantidade de roteiros" value="'+esc(_sq)+'">'
+          +'<button type="button" class="vqty-btn" data-sqplus="1" aria-label="Aumentar quantidade">+</button>'
+          +'<span class="vqty-suffix">'+(_sqn===1?'roteiro':'roteiros')+'</span>'
+        +'</div>'
+        +'<div class="sq-err" id="sqErr" role="alert"'+(f._sqErr?'':' hidden')+'>Informe uma quantidade inteira igual ou superior a 1.</div>';
     }else{
       h+='<div class="lbl">'+esc(t.subLabel||'Tipo')+'</div><div class="chips" style="margin-bottom:14px">'+Object.keys(t.subtypes).map(k=>'<button class="chip" data-fsub="'+k+'" style="'+(f.subtype===k?'background:var(--accent);border-color:transparent;color:#fff':'')+'">'+esc(t.subtypes[k].label)+'</button>').join('')+'</div>';
     }
@@ -9773,7 +9867,7 @@ function stepReview(){const f=state.form;const s=secOf(f.sector);const sub=curSu
       revItem('today','Término',f.endDate?fmtDateBR(f.endDate)+(f.endTime?' '+f.endTime:''):'—')+
       revItem('calendar','Prazo final',prazo+(f.dueTime?' às '+f.dueTime:''))+
       revItem('grid','Setor',s.label)+
-      (sub?revItem('description',secOf(f.sector).key==='edicao_midia'?'Quantidade de vídeos/roteiros':'Subtipo',sub.label||sub.formTitle):'')+
+      (sub?revItem('description',secOf(f.sector).key==='edicao_midia'?'Quantidade de vídeos/roteiros':(secOf(f.sector).key==='roteiro'?'Quantidade de roteiros':'Subtipo'),sub.label||sub.formTitle):'')+
     '</div>'+
     '<div class="rev-divider"></div>'+
     '<div class="rev-resp">'+
@@ -9839,6 +9933,10 @@ function afterForm(){
      (change/blur/Enter/setas nativas) normaliza (inteiro ≥1, teto técnico) e re-renderiza os N blocos. */
   bind('#fVideoQty',e=>{state.form.videoQty=e.value;});
   {var _vqEl=c.querySelector('#fVideoQty'); if(_vqEl){_vqEl.onchange=function(ev){var _prev=state.form.videoQty;state.form.videoQty=normVideoQty(ev&&ev.target?ev.target.value:_vqEl.value);if(String(_prev)!==String(state.form.videoQty))state.form.checklist=[];/* re-semeia "Editar N vídeos"; PRESERVA videos/link/obs */render();};}}
+  /* F3.5.5C — Roteiro: oninput só guarda o rascunho (sem re-render: não perde foco ao digitar);
+     o COMMIT (change/blur/Enter/setas) valida+normaliza+confirma corte via scriptQtyCommit. */
+  bind('#fScriptQty',e=>{state.form.scriptQty=e.value;});
+  {var _sqEl=c.querySelector('#fScriptQty'); if(_sqEl){_sqEl.onchange=function(ev){scriptQtyCommit(ev&&ev.target?ev.target.value:_sqEl.value);};}}
   bind('[data-cardtema]',e=>{const i=+e.dataset.cardtema;state.form.cards[i]=state.form.cards[i]||{};state.form.cards[i].tema=e.value;});
   bind('[data-cardleg]',e=>{const i=+e.dataset.cardleg;state.form.cards[i]=state.form.cards[i]||{};state.form.cards[i].legenda=e.value;});
   bind('[data-cardobs]',e=>{const i=+e.dataset.cardobs;state.form.cards[i]=state.form.cards[i]||{};state.form.cards[i].obs=e.value;});
@@ -10718,6 +10816,14 @@ document.addEventListener('click',async e=>{
      teto técnico via normVideoQty); '−' decrementa sem descer abaixo de 1 (vazio/1 = sem efeito). */
   if(el=g('[data-vqplus]')){var _vqp=Math.floor(Number(state.form.videoQty));state.form.videoQty=normVideoQty((isFinite(_vqp)&&_vqp>=1?_vqp:0)+1);state.form.checklist=[];render();return;}
   if(el=g('[data-vqminus]')){var _vqm=Math.floor(Number(state.form.videoQty));if(isFinite(_vqm)&&_vqm>1){state.form.videoQty=_vqm-1;state.form.checklist=[];}render();return;}
+  /* F3.5.5C — Roteiro: '+' incrementa a partir do valor atual (vazio → 1); '−' decrementa sem
+     descer abaixo de 1. AMBOS passam pelo commit central (confirmação quando o corte atingiria
+     roteiros preenchidos; nunca perda silenciosa). Checklist do Roteiro NÃO é re-semeado (é
+     independente de N — preserva edições do usuário). */
+  if(el=g('[data-sqplus]')){var _sqp=Math.floor(Number(state.form&&state.form.scriptQty));var _sqb=(isFinite(_sqp)&&_sqp>=1)?_sqp:(scriptQtyOf(state.form)||0);scriptQtyCommit(_sqb+1);return;}
+  if(el=g('[data-sqminus]')){var _sqm=Math.floor(Number(state.form&&state.form.scriptQty));var _sqc=(isFinite(_sqm)&&_sqm>=1)?_sqm:(scriptQtyOf(state.form)||0);if(_sqc>1)scriptQtyCommit(_sqc-1);return;}
+  if(el=g('[data-sqshrinkok]')){var _f1=state.form;if(_f1&&typeof _f1._sqPend==='number'){_f1.scriptQty=_f1._sqPend;if(Array.isArray(_f1.contents))_f1.contents.length=_f1._sqPend;if(typeof _f1._openContent==='number'&&_f1._openContent>=_f1._sqPend)_f1._openContent=null;delete _f1._sqPend;_f1._sqErr=false;}closeModal();render();return;}
+  if(el=g('[data-sqshrinkcancel]')){var _f2=state.form;if(_f2){delete _f2._sqPend;}closeModal();render();return;}
   if(el=g('[data-fchoice]')){const p=el.dataset.fchoice.split('|');state.form.fields[p[0]]=p[1];render();return;}
   if(el=g('[data-fbool]')){const k=el.dataset.fbool;state.form.fields[k]=!state.form.fields[k];render();return;}
   if(el=g('[data-content]')){state.form._openContent=(state.form._openContent===+el.dataset.content)?null:+el.dataset.content;render();return;}

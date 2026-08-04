@@ -65,7 +65,7 @@ ok('nenhuma mudança em slaReminder no main (enqueue intacto)', main.includes('c
 
 console.log('— F) Versão 1.0.216 —');
 const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'package.json'), 'utf8'));
-ok('package.json version 1.0.219 (pin atualizado pela F3.5.5B)', pkg.version === '1.0.219');
-ok('description da candidata F3.5.5B (premium-agenda-redesign)', /1\.0\.219-premium-agenda-redesign/.test(pkg.description || ''));
+ok('package.json version 1.0.220 (pin atualizado pela F3.5.5C)', pkg.version === '1.0.220');
+ok('description da candidata F3.5.5C (custom-script-quantity-rich-editor)', /1\.0\.220-custom-script-quantity-rich-editor/.test(pkg.description || ''));
 console.log(`\nf354wh2: ${n - fail}/${n} verdes`);
 if (fail) process.exit(1);

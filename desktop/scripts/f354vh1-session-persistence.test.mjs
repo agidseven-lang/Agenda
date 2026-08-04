@@ -80,9 +80,9 @@ ok('36 contrato data.videos preservado', /if\(_vids\.length\)data\.videos=_vids;
 ok('37 startApp preserva fluxo (authed + app flex + subscribeData + sessionLogin)', /document\.body\.classList\.add\("authed"\)[\s\S]{0,120}subscribeData\(\);render\(\);[\s\S]{0,80}sessionLogin\(u\.id\)/.test(H));
 ok('38 startApp esconde splash defensivamente', /function startApp\(u\)\{try\{var _sp=document\.getElementById\('authSplash'\)[\s\S]{0,80}classList\.add\('hidden'\)/.test(H));
 // [ATUALIZADA F3.5.4W-H1] O contrato de persistência/máquina de estados de auth (1.0.213) é PRESERVADO
-// [ATUALIZADA F3.5.5B] na 1.0.219 (Agenda Premium — só renderer index.html; auth intocada).
-// A versão do pacote agora é 1.0.219.
-ok('39 versão 1.0.219 no package.json (persistência 1.0.213 preservada)', JSON.parse(fs.readFileSync(path.resolve(__dirname,'..','package.json'),'utf8')).version==='1.0.219');
+// [ATUALIZADA F3.5.5C] na 1.0.220 (Roteiros personalizados + editor rico — só renderer index.html + worker aditivo; auth intocada).
+// A versão do pacote agora é 1.0.220.
+ok('39 versão 1.0.220 no package.json (persistência 1.0.213 preservada)', JSON.parse(fs.readFileSync(path.resolve(__dirname,'..','package.json'),'utf8')).version==='1.0.220');
 
 /* ===== J — mapa cenários→cobertura (documental) ===== */
 ok('40 cenários físicos (reinício/Fast Startup/5 reboots/escala) cobertos pelo contrato+prova Electron+físico', true);
