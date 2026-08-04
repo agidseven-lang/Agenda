@@ -125,5 +125,19 @@ ok('CLAIMED ⇒ SUPERSEDED', ET.etSlaZoneTransition('CLAIMED') === 'SUPERSEDED')
 ok('DISPLAYED ⇒ SUPERSEDED (recolhe e cede ao crítico; texto preservado pela UI)', ET.etSlaZoneTransition('DISPLAYED') === 'SUPERSEDED');
 ok('estados fechados inalterados', ET.etSlaZoneTransition('RESPONDED') === 'RESPONDED');
 
+console.log('— H5) CORREÇÃO ARQUITETURAL: deny-matrix server-side do claim + resposta —');
+ok('tarefa inelegível ⇒ deny', ET.etClaimDecision(null, SN, 'd1', 60000, { eligible: false }).reason === 'task_not_eligible');
+ok('zona SLA ⇒ deny', ET.etClaimDecision(null, SN, 'd1', 60000, { inSlaZone: true }).reason === 'sla_zone');
+ok('prazo mudou (deadlineVersion) ⇒ deny', ET.etClaimDecision(null, SN, 'd1', 60000, { deadlineVersionCurrent: 5, expectedDeadlineVersion: 4 }).reason === 'deadline_changed');
+ok('Designer mudou ⇒ deny', ET.etClaimDecision(null, SN, 'd1', 60000, { designerIdCurrent: 'dB', expectedDesignerId: 'dA' }).reason === 'designer_changed');
+ok('2º dispositivo ⇒ LEASED_BY_OTHER (razão nomeada)', ET.etClaimDecision({ state: 'CLAIMED', claimDeviceId: 'dev1', leaseExpiresAt: SN + 9 }, SN, 'dev2', 60000, {}).reason === 'LEASED_BY_OTHER');
+ok('decisão INDEPENDE do relógio local (só serverNow entra): ±10min locais irrelevantes', (() => { const a = ET.etClaimDecision({ state: 'CLAIMED', claimDeviceId: 'x', leaseExpiresAt: SN + 100 }, SN, 'y', 60000, {}); return a.decision === 'leased'; })());
+ok('resposta: claim vigente de outro ⇒ deny', ET.etRespondDecision({ state: 'DISPLAYED', claimDeviceId: 'dev1', leaseExpiresAt: SN + 999 }, SN, 'dev2', {}).reason === 'claim_held_by_other');
+ok('resposta: já respondido ⇒ already_responded (histórico único)', ET.etRespondDecision({ state: 'RESPONDED' }, SN, 'dev1', {}).decision === 'already_responded');
+ok('resposta: transição válida CLAIMED/DISPLAYED ⇒ RESPONDED', ET.etRespondDecision({ state: 'CLAIMED', claimDeviceId: 'dev1', leaseExpiresAt: SN + 999 }, SN, 'dev1', {}).state === 'RESPONDED');
+ok('resposta: SUPERSEDED/CANCELLED ⇒ deny fechado', ET.etRespondDecision({ state: 'SUPERSEDED' }, SN, 'dev1', {}).reason === 'checkpoint_closed_superseded');
+ok('resposta: prazo mudado ⇒ deny', ET.etRespondDecision({ state: 'CLAIMED', claimDeviceId: 'dev1', leaseExpiresAt: SN + 9 }, SN, 'dev1', { deadlineVersionCurrent: 2, expectedDeadlineVersion: 1 }).reason === 'deadline_changed');
+ok('resposta: PLANNED sem claim ⇒ transição inválida', ET.etRespondDecision({ state: 'PLANNED' }, SN, 'dev1', {}).reason === 'invalid_transition_from_planned');
+
 console.log(`\nf355a-planner: ${n - fail}/${n} verdes`);
 if (fail) process.exit(1);

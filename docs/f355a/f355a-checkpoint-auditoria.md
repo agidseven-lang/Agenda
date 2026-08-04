@@ -110,3 +110,23 @@ ausente (OFF até configurar); privacidade (observabilidade só com hashes/bucke
 8) Publicação (OFF) só após provar: OFF equivalente à 1.0.216; SHADOW silencioso; ACTIVE com
    autoridade única; claim transacional; amarelo/vermelho sem atraso; sem duplicação do idle;
    jornada incompleta bloqueia ACTIVE; zero vazamento ao cliente; gates verdes.
+
+## ADENDO 2 — CORREÇÃO ARQUITETURAL OBRIGATÓRIA (claim/lease SERVER-SIDE; vinculante)
+- etClaimDecision/etRespondDecision permanecem funções PURAS de domínio/teste — FONTE ÚNICA da
+  lógica, consumidas pelo SERVIDOR. O renderer NUNCA decide lease/expiração/takeover/concorrência,
+  nunca calcula claimedAt/leaseExpiresAt, nunca escreve claim offline.
+- Operações server-side autenticadas em functions/ (padrão issueFirebaseAuthToken/loginUser):
+  claimExecutionCheckpoint — valida auth + Designer atribuído + ids; transação atômica com relógio
+  do SERVIDOR; concede só se {inexistente | lease expirada | mesmo dispositivo idempotente};
+  nega {lease vigente de outro=LEASED_BY_OTHER | RESPONDED | SUPERSEDED | CANCELLED | inelegível |
+  prazo/Designer mudado | zona SLA}; persiste state/claimedAt/leaseExpiresAt(server)/
+  claimedBySessionHash/claimedByDeviceHash/claimVersion/updatedAt(server).
+  respondExecutionCheckpoint — valida claim vigente + mesmo Designer + aberto + deadlineVersion
+  atual + sem resposta anterior + transição válida; RESPONDED invalida os demais dispositivos
+  (fecham superfícies; sem som/reapresentação; histórico ÚNICO).
+- Offline ⇒ OFFLINE/RETRY_ON_RECONNECT (sem alerta/som/fila/histórico/claim local pendente);
+  reavaliação integral na reconexão. Desktop só apresenta o laranja APÓS claim confirmado →
+  ainda elegível → fila central → ativo → ACK do renderer → só então o som.
+- deadlineVersion muda SOMENTE na operação autoritativa de prazo (nunca pelo planner local).
+- Admin SDK: endpoint protegido por autenticação/autorização própria + IAM mínimo; Rules não são
+  a única proteção. Provas obrigatórias incluem relógio local ±10min sem efeito na decisão.

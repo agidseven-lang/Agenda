@@ -233,23 +233,53 @@ function etActiveAllowed(cfg) {
   return { allowed: true, reason: "", missing: [] };
 }
 
-/* ---- 1) DECISÃO DE CLAIM (corpo PURO da transação; autoridade final = transação Firestore
-   protegida por Rules com serverTimestamp — o renderer só SOLICITA; nunca relógio local
-   como autoridade de plannedAt/claimedAt/leaseExpiresAt/respondedAt/missedAt). ----
-   existing = doc atual (null se não existe); serverNow = tempo de SERVIDOR lido na transação. */
-function etClaimDecision(existing, serverNow, deviceId, leaseMs) {
+/* ---- 1) DECISÃO DE CLAIM — função PURA de DOMÍNIO/TESTE (correção arquitetural do owner):
+   a AUTORIDADE FINAL é a operação SERVER-SIDE autenticada claimExecutionCheckpoint
+   (functions/), que executa transação atômica com RELÓGIO DO SERVIDOR e consome ESTA MESMA
+   lógica (fonte única). O renderer NUNCA decide lease/expiração/takeover/concorrência,
+   NUNCA calcula claimedAt/leaseExpiresAt e NUNCA faz escrita offline de claim
+   (offline ⇒ OFFLINE/RETRY_ON_RECONNECT, sem alerta/som/fila/histórico/claim local).
+   ctx (validações do servidor): { eligible, inSlaZone, deadlineVersionCurrent,
+   expectedDeadlineVersion, designerIdCurrent, expectedDesignerId } */
+function etClaimDecision(existing, serverNow, deviceId, leaseMs, ctx) {
   leaseMs = leaseMs > 0 ? leaseMs : 3 * 60000;
+  if (ctx) {
+    if (ctx.eligible === false) return { decision: "deny", reason: "task_not_eligible" };
+    if (ctx.inSlaZone === true) return { decision: "deny", reason: "sla_zone" };
+    if (ctx.deadlineVersionCurrent !== undefined && ctx.expectedDeadlineVersion !== undefined &&
+        ctx.deadlineVersionCurrent !== ctx.expectedDeadlineVersion) return { decision: "deny", reason: "deadline_changed" };
+    if (ctx.designerIdCurrent !== undefined && ctx.expectedDesignerId !== undefined &&
+        String(ctx.designerIdCurrent) !== String(ctx.expectedDesignerId)) return { decision: "deny", reason: "designer_changed" };
+  }
   if (!existing) return { decision: "claim", state: "CLAIMED", leaseUntil: serverNow + leaseMs };
   var st = String(existing.state || "");
   if (st === "RESPONDED" || st === "MISSED" || st === "CANCELLED" || st === "SUPERSEDED" || st === "SUPPRESSED")
     return { decision: "closed", state: st };
   if (st === "CLAIMED" || st === "DISPLAYED") {
     if (String(existing.claimDeviceId || "") === String(deviceId || "")) return { decision: "own", state: st };
-    if (existing.leaseExpiresAt > serverNow) return { decision: "leased", state: st, leaseExpiresAt: existing.leaseExpiresAt };
-    return { decision: "takeover_expired", state: "CLAIMED", leaseUntil: serverNow + leaseMs }; // lease venceu ⇒ novo claim
+    if (existing.leaseExpiresAt > serverNow) return { decision: "leased", state: st, reason: "LEASED_BY_OTHER", leaseExpiresAt: existing.leaseExpiresAt };
+    return { decision: "takeover_expired", state: "CLAIMED", leaseUntil: serverNow + leaseMs }; // lease venceu (no relógio do SERVIDOR)
   }
   return { decision: "claim", state: "CLAIMED", leaseUntil: serverNow + leaseMs }; // PLANNED/DUE
 }
+
+/* ---- 9) DECISÃO DE RESPOSTA — corpo puro consumido por respondExecutionCheckpoint (server) ---- */
+function etRespondDecision(existing, serverNow, deviceId, ctx) {
+  if (!existing) return { decision: "deny", reason: "checkpoint_not_found" };
+  if (ctx && ctx.deadlineVersionCurrent !== undefined && ctx.expectedDeadlineVersion !== undefined &&
+      ctx.deadlineVersionCurrent !== ctx.expectedDeadlineVersion) return { decision: "deny", reason: "deadline_changed" };
+  if (ctx && ctx.designerIdCurrent !== undefined && ctx.expectedDesignerId !== undefined &&
+      String(ctx.designerIdCurrent) !== String(ctx.expectedDesignerId)) return { decision: "deny", reason: "designer_changed" };
+  var st = String(existing.state || "");
+  if (st === "RESPONDED") return { decision: "already_responded" };
+  if (st === "CANCELLED" || st === "SUPERSEDED" || st === "SUPPRESSED" || st === "MISSED")
+    return { decision: "deny", reason: "checkpoint_closed_" + st.toLowerCase() };
+  if (!(st === "CLAIMED" || st === "DISPLAYED")) return { decision: "deny", reason: "invalid_transition_from_" + st.toLowerCase() };
+  if (String(existing.claimDeviceId || "") !== String(deviceId || "") && existing.leaseExpiresAt > serverNow)
+    return { decision: "deny", reason: "claim_held_by_other" };
+  return { decision: "respond", state: "RESPONDED" }; // respondedAt = server time (na transação)
+}
+module.exports.etRespondDecision = etRespondDecision;
 
 /* ---- 4) Cancelamento na zona SLA (transições explícitas; vermelho/amarelo NUNCA esperam) ---- */
 function etSlaZoneTransition(cpState) {
