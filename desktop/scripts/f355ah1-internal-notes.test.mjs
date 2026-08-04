@@ -12,10 +12,10 @@ let n = 0, fail = 0;
 const ok = (t, c) => { n++; if (c) console.log('  ✓', n, t); else { fail++; console.error('  ✗', n, t); } };
 const seg = (from, len) => { const i = idx.indexOf(from); return i < 0 ? '' : idx.slice(i, i + (len || 4000)); };
 
-console.log('— A) versão 1.0.218 —');
+console.log('— A) versão 1.0.219 —');
 const pkg = JSON.parse(R('package.json'));
-ok('A1 package.json 1.0.218 + description edit-internal-notes-per-theme', pkg.version === '1.0.218' && /edit-internal-notes-per-theme/.test(pkg.description || ''));
-ok('A2 package-lock 1.0.218', JSON.parse(R('package-lock.json')).version === '1.0.218');
+ok('A1 package.json 1.0.219 (pin F3.5.5B; base traz as observações internas)', pkg.version === '1.0.219' && /premium-agenda-redesign/.test(pkg.description || ''));
+ok('A2 package-lock 1.0.219', JSON.parse(R('package-lock.json')).version === '1.0.219');
 
 console.log('— B) lápis por tema (ordem Copiar → Editar → Expandir; gates) —');
 const renderSeg = seg('var _canEdit=(isClientSector(secOf(t.sector).key)&&state.user&&canSeeAll(state.user))', 3200);

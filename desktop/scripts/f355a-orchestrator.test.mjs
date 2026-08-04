@@ -40,7 +40,7 @@ function mk(mode, over) {
     isCentralBusySla: () => !!(over && over.busySla),
     sectorWarn: () => 30,
     soundDataUri: () => 'data:audio/wav;base64,QUJD',
-    appVersion: '1.0.218',
+    appVersion: '1.0.219',
     store: { read: () => ({}), write: () => {} },
     onRemoteClose: (k) => calls.closes.push(k),
     onLog: (t, d) => calls.logs.push({ t, d }),

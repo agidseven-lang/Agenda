@@ -174,16 +174,34 @@
   .stat.accent .v,.stat.accent .l{color:#fff}
   .stat.accent .l{color:rgba(255,255,255,.85)}
 
-  .evc{display:flex;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px 16px 14px;margin-bottom:10px}
-  .evc .bar{width:4px;border-radius:3px;flex:none;align-self:stretch;min-height:46px}
-  .evc .main{flex:1;min-width:0}
-  .evc .toprow{display:flex;align-items:flex-start;gap:10px}
-  .evc .ti{font-size:17px;font-weight:800;flex:1;min-width:0}
-  .evc .time{text-align:right}
-  .evc .time .s{font-size:16px;font-weight:800}
-  .evc .time .e{font-size:12px;color:var(--faint)}
-  .evc .meta{display:flex;align-items:center;gap:6px;font-size:13.5px;color:var(--soft);margin-top:7px}
-  .evc .meta svg{width:16px;height:16px;flex:none}
+  /* F3.5.5B — AGENDA PREMIUM: card de compromisso data-first (evc2-*). A data é
+     informação principal (bloco DOM/10/AGO sempre visível); horário com hierarquia
+     início>término; chip de status p/ os 4 estados; título 2 linhas; meta com
+     ellipsis. Só tokens var(--…) + cores semânticas → compatível dark/light/HC. */
+  .evc{display:flex;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px;cursor:pointer;text-align:left;transition:background .12s}
+  body.desktop .evc:hover{background:var(--surface2)}
+  .evc:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .evc .evc2-rail{width:3px;border-radius:999px;flex:none;align-self:stretch;min-height:56px}
+  .evc .evc2-date{flex:none;width:54px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;background:var(--surface2);border:1px solid var(--line-soft);border-radius:11px;padding:7px 0;align-self:flex-start}
+  .evc .evc2-dw{font-size:9.5px;font-weight:800;letter-spacing:.08em;color:var(--faint)}
+  .evc .evc2-dd{font-size:21px;font-weight:800;line-height:1.1;color:var(--ink);font-variant-numeric:tabular-nums}
+  .evc .evc2-dm{font-size:9.5px;font-weight:800;letter-spacing:.08em;color:var(--soft)}
+  .evc .evc2-dy{font-size:9px;font-weight:700;color:var(--faint);margin-top:1px}
+  .evc .evc2-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+  .evc .evc2-top{display:flex;align-items:center;gap:8px;min-width:0}
+  .evc .evc2-time{display:inline-flex;align-items:center;gap:6px;font-size:14.5px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;min-width:0;white-space:nowrap}
+  .evc .evc2-time svg{width:15px;height:15px;color:var(--faint);flex:none}
+  .evc .evc2-te{font-weight:600;color:var(--soft);font-size:13px}
+  .evc .evc2-st{margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:800;letter-spacing:.03em;padding:3px 8px;border-radius:999px;white-space:nowrap;flex:none}
+  .evc .evc2-std{width:5px;height:5px;border-radius:50%;background:currentColor;flex:none}
+  .evc .evc2-ti{font-size:14.5px;font-weight:700;line-height:1.3;color:var(--ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+  .evc .evc2-meta{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--soft);min-width:0}
+  .evc .evc2-meta svg{width:15px;height:15px;flex:none;color:var(--faint)}
+  .evc .evc2-meta span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+  .evc .evc2-foot{display:flex;align-items:center;gap:7px;margin-top:2px;min-width:0}
+  .evc .evc2-name{font-size:12px;font-weight:600;color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+  .evc .evc2-ty{margin-left:auto;flex:none;display:inline-flex;align-items:center;font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;padding:3px 8px;border-radius:7px;white-space:nowrap}
+  @media (prefers-reduced-motion: reduce){.evc{transition:none}}
   /* F3.3.73I4A — ícone do CTA "Novo compromisso" da Agenda. svg() nao emite
      width/height (dimensionamento vem sempre do ancestral); sem regra o svg
      inline caía no default 300x150 (elemento branco gigante). Escopado. */
@@ -1140,6 +1158,71 @@
   .sheet.ev-sheet .row{gap:12px}
   .sheet.ev-sheet .row>div{min-width:0}
   body.desktop .sheet.ev-sheet{width:min(720px,calc(100vw - 48px));max-width:min(720px,calc(100vw - 48px))}
+  /* F3.5.5B — AGENDA PREMIUM: detalhe do compromisso (evd-*). Cabeçalho com X isolado,
+     bloco principal de data/horário por extenso em pt-BR, resumo em grid, observações
+     com parágrafos preservados, linha do tempo discreta e ações hierarquizadas
+     (primária/secundária/menu ⋯/destrutiva). Nunca maior que a workArea (.sheet 88vh). */
+  .sheet.evd-sheet{box-sizing:border-box;overflow-x:hidden;overflow-y:auto}
+  body.desktop .sheet.evd-sheet{width:min(560px,calc(100vw - 48px));max-width:min(560px,calc(100vw - 48px));max-height:calc(100vh - 48px)}
+  .evd-head{display:flex;align-items:flex-start;gap:10px}
+  .evd-chips{display:flex;align-items:center;gap:7px;flex-wrap:wrap;flex:1;min-width:0}
+  .evd-x{flex:none;width:32px;height:32px;border-radius:9px;border:1px solid var(--line);background:transparent;color:var(--soft);display:flex;align-items:center;justify-content:center;cursor:pointer;margin-left:auto;transition:background .12s}
+  .evd-x svg{width:17px;height:17px}
+  body.desktop .evd-x:hover{background:var(--surface2);color:var(--ink)}
+  .evd-x:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .evd-title{font-size:19px;font-weight:800;line-height:1.25;margin-top:10px;overflow-wrap:anywhere}
+  .evd-client{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--soft);margin-top:4px;min-width:0}
+  .evd-client svg{width:15px;height:15px;color:var(--faint);flex:none}
+  .evd-when{margin-top:14px;background:var(--surface2);border:1px solid var(--line-soft);border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .evd-when-l{flex:1;min-width:180px}
+  .evd-dow{font-size:10px;font-weight:800;letter-spacing:.09em;color:var(--faint);text-transform:uppercase}
+  .evd-dfull{font-size:16.5px;font-weight:700;color:var(--ink);margin-top:3px}
+  .evd-when-r{flex:none;text-align:right}
+  .evd-time{display:inline-flex;align-items:center;gap:7px;font-size:16px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums}
+  .evd-time svg{width:16px;height:16px;color:var(--faint);flex:none}
+  .evd-te{color:var(--soft);font-weight:700}
+  .evd-dur{font-size:11.5px;color:var(--faint);margin-top:3px}
+  .evd-grid{margin-top:12px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  @media(max-width:560px){.evd-grid{grid-template-columns:1fr}}
+  .evd-cell{background:var(--surface2);border:1px solid var(--line-soft);border-radius:11px;padding:9px 11px;min-width:0}
+  .evd-cl{font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+  .evd-cv{font-size:13.5px;font-weight:600;color:var(--ink);margin-top:3px;display:flex;align-items:center;gap:7px;min-width:0}
+  .evd-cv svg{width:15px;height:15px;color:var(--faint);flex:none}
+  .evd-cv span{min-width:0;overflow-wrap:anywhere}
+  .evd-sec{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin:14px 0 6px}
+  .evd-notes{font-size:13.5px;line-height:1.55;color:var(--ink);white-space:pre-wrap;overflow-wrap:anywhere;background:var(--surface2);border:1px solid var(--line-soft);border-radius:11px;padding:11px 13px}
+  .evd-tl{display:flex;flex-direction:column;gap:5px;margin-top:2px}
+  .evd-tl-row{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--soft)}
+  .evd-tl-row svg{width:14px;height:14px;flex:none}
+  .evd-err{display:none;margin-top:12px;font-size:12.5px;color:#F87171;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.25);border-radius:10px;padding:9px 12px}
+  .evd-err.show{display:block}
+  .evd-actions{margin-top:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;position:relative}
+  .evd-btn{height:40px;padding:0 16px;border-radius:11px;font-size:13.5px;font-weight:700;display:inline-flex;align-items:center;gap:7px;cursor:pointer;border:1px solid transparent;flex:none;background:transparent;color:var(--ink);transition:background .12s}
+  .evd-btn svg{width:16px;height:16px;flex:none}
+  .evd-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .evd-btn.pri{background:var(--accent);color:#fff;margin-left:auto}
+  .evd-btn.pri:active{filter:brightness(.94)}
+  .evd-btn.sec{border-color:var(--line);color:var(--soft)}
+  body.desktop .evd-btn.sec:hover{background:var(--surface2);color:var(--ink)}
+  .evd-btn.danger-sec{border-color:rgba(248,113,113,.3);color:#F87171}
+  body.desktop .evd-btn.danger-sec:hover{background:rgba(248,113,113,.08)}
+  .evd-btn.danger{background:#F8717122;border-color:rgba(248,113,113,.45);color:#F87171;font-weight:800}
+  body.desktop .evd-btn.danger:hover{background:rgba(248,113,113,.22)}
+  .evd-btn.more{width:40px;padding:0;justify-content:center;border-color:var(--line);color:var(--soft)}
+  body.desktop .evd-btn.more:hover{background:var(--surface2);color:var(--ink)}
+  .evd-btn.push{margin-left:auto}
+  .evd-menu{position:absolute;bottom:calc(100% + 8px);left:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 16px 44px -12px rgba(0,0,0,.55);padding:6px;min-width:220px;display:none;z-index:5}
+  .evd-menu.open{display:block}
+  .evd-mi{display:flex;align-items:center;gap:9px;width:100%;padding:9px 11px;border-radius:8px;background:transparent;border:none;color:var(--ink);font-size:13px;font-weight:600;cursor:pointer;text-align:left}
+  body.desktop .evd-mi:hover{background:var(--surface2)}
+  .evd-mi:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+  .evd-mi svg{width:15px;height:15px;color:var(--soft);flex:none}
+  .evd-mi.danger{color:#F87171}
+  .evd-mi.danger svg{color:#F87171}
+  .evd-confirm{margin-top:14px;background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.22);border-radius:12px;padding:13px 15px}
+  .evd-confirm-t{font-size:14px;font-weight:800;color:var(--ink)}
+  .evd-confirm-s{font-size:13px;color:var(--soft);margin-top:5px;line-height:1.5}
+  @media (prefers-reduced-motion: reduce){.evd-btn,.evd-x{transition:none}}
   @keyframes dpop{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
   body.desktop .sheet .settrow,body.desktop .sheet .moveopt{transition:background .12s,transform .08s}
   body.desktop .sheet .settrow:hover,body.desktop .sheet .moveopt:hover{background:rgba(255,255,255,.05)}
@@ -2710,6 +2793,9 @@ const ICON={
   close:'<path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>',
   clock:'<circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" fill="none"/><path d="M12 7v5l3 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
   swap:'<path d="M7 7h11l-3-3M17 17H6l3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>',
+  play:'<path d="M8 5.5v13l11-6.5-11-6.5z" stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round"/>',
+  ban:'<circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="2" fill="none"/><path d="M6.2 6.2l11.6 11.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+  dots:'<circle cx="5" cy="12" r="1.7" fill="currentColor"/><circle cx="12" cy="12" r="1.7" fill="currentColor"/><circle cx="19" cy="12" r="1.7" fill="currentColor"/>',
   trash:'<path d="M4 7h16M9 7V5.2A1.2 1.2 0 0 1 10.2 4h3.6A1.2 1.2 0 0 1 15 5.2V7M6.5 7l.8 12.1A1.2 1.2 0 0 0 8.5 20.2h7a1.2 1.2 0 0 0 1.2-1.1L17.5 7M10 11v5M14 11v5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
   place:'<path d="M12 22s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12z" stroke="currentColor" stroke-width="2" fill="none"/><circle cx="12" cy="10" r="2.5" stroke="currentColor" stroke-width="2" fill="none"/>',
   notes:'<path d="M5 5h14M5 10h14M5 15h9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
@@ -5411,16 +5497,55 @@ function urgentRow(t,d){const s=secOf(t.sector);const asg=state.users.find(u=>u.
     '<div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--faint);margin-top:2px"><span style="width:7px;height:7px;border-radius:50%;background:'+s.color+'"></span>'+esc(s.label)+(t.client?' · '+esc(t.client):'')+'</div></div>'+
     (d?'<span class="pill" style="background:'+withAlpha(d.color,.16)+';color:'+d.color+'">'+esc(d.text)+'</span>':'')+'</div>';
 }
+/* ══════════ F3.5.5B — AGENDA PREMIUM: card de compromisso data-first ══════════
+   A DATA é informação principal (bloco DOM/10/AGO sempre visível no card — nunca
+   exigir clique para descobrir o dia). Horário 24h com início em destaque e término
+   secundário (término ausente ⇒ só o início; nada é inventado). Chip de status para
+   os 4 estados (Agendado/Em andamento/Finalizado/Cancelado — não depende só de cor).
+   Título em até 2 linhas com ellipsis; cliente/local com ellipsis de 1 linha;
+   responsável 1× no rodapé (avatar+nome). Identidade: trilho 3px na cor do usuário
+   responsável (semântica preservada; vermelho quando atrasado; neutro sem responsável).
+   Parse de data SEMPRE manual/local (split('-')) — nunca new Date('YYYY-MM-DD') (UTC
+   deslocaria o dia). Mesmo contrato de clique: data-evdetail → openEventDetail. */
+var DOWFULL=['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
+function evDateParts(date){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date||''))return null;
+  var p=date.split('-').map(Number);var dt=new Date(p[0],p[1]-1,p[2]);
+  return {y:p[0],m:p[1],d:p[2],dow:dt.getDay()};
+}
+function evDateFull(date){var dp=evDateParts(date);if(!dp)return '';return dp.d+' de '+MONTHS[dp.m-1].toLowerCase()+' de '+dp.y;}
+function evDowFull(date){var dp=evDateParts(date);return dp?DOWFULL[dp.dow]:'';}
+function evTimeOk(t){return /^\d{2}:\d{2}$/.test(t||'');}
+function evDurationText(e){
+  if(!e||!evTimeOk(e.start)||!evTimeOk(e.end))return '';
+  var a=e.start.split(':'),b=e.end.split(':');
+  var min=(Number(b[0])*60+Number(b[1]))-(Number(a[0])*60+Number(a[1]));
+  if(!(min>0))return '';
+  var h=Math.floor(min/60),r=min%60;
+  if(!h)return r+(r===1?' minuto':' minutos');
+  var hs=h+(h===1?' hora':' horas');
+  return r?hs+' e '+r+(r===1?' minuto':' minutos'):hs;
+}
 function eventCard(e){
-  const ty=typeOf(e.type);const owner=state.users.find(u=>u.id===e.ownerId)||{name:e.owner,id:e.ownerId};const col=userColor(owner.id);const late=eventLate(e);
-  return '<div class="evc" data-evdetail="'+e.id+'" style="cursor:pointer"><div class="bar" style="background:'+(late?'#F87171':col)+'"></div><div class="main">'+
-    '<div class="toprow">'+avatar(owner,40)+'<div class="ti">'+esc(e.title||'Sem título')+'<div style="font-size:12.5px;font-weight:700;color:'+col+';margin-top:2px">'+esc(owner.name||'')+'</div></div>'+
-    '<div class="time"><div class="s">'+esc(e.start||'')+'</div><div class="e">'+esc(e.end||'')+'</div></div></div>'+
-    '<div style="margin-top:11px"><span class="pill" style="background:'+withAlpha(ty.color,.16)+';color:'+ty.color+'">'+esc(ty.label)+'</span>'+(function(){var st=evStatus(e);if(st==='in_progress'||st==='completed'){var sm=evStatusMeta(st);return ' <span class="pill" style="background:'+withAlpha(sm.color,.16)+';color:'+sm.color+'">'+sm.label+'</span>';}return '';})()+'</div>'+
-    (e.client?'<div class="meta">'+svg('person')+esc(e.client)+'</div>':'')+
-    (e.location?'<div class="meta">'+svg('place')+esc(e.location)+'</div>':'')+
-    (e.notes?'<div class="meta">'+svg('notes')+esc(e.notes)+'</div>':'')+
-  '</div></div>';
+  const ty=typeOf(e.type);const owner=state.users.find(u=>u.id===e.ownerId)||{name:e.owner,id:e.ownerId};const late=eventLate(e);
+  const col=(owner&&owner.id)?userColor(owner.id):'';
+  const st=evStatus(e);const sm=evStatusMeta(st);
+  const dp=evDateParts(e.date);const nowY=new Date().getFullYear();
+  const dateB=dp?('<div class="evc2-date" aria-hidden="true"><span class="evc2-dw">'+DOW[dp.dow]+'</span><span class="evc2-dd">'+dp.d+'</span><span class="evc2-dm">'+MONTHS[dp.m-1].slice(0,3).toUpperCase()+'</span>'+(dp.y!==nowY?'<span class="evc2-dy">'+dp.y+'</span>':'')+'</div>'):'';
+  const t1=evTimeOk(e.start)?e.start:'';const t2=evTimeOk(e.end)?e.end:'';
+  const timeH=t1?('<span class="evc2-time">'+svg('clock')+esc(t1)+(t2?'<span class="evc2-te">— '+esc(t2)+'</span>':'')+'</span>'):'';
+  const hasOwner=!!(((owner&&owner.name)||'').trim()||(owner&&owner.id));
+  const lbl='Compromisso: '+(e.title||'Sem título')+(dp?(', '+DOW[dp.dow]+' '+dp.d+' de '+MONTHS[dp.m-1].toLowerCase()):'')+(t1?(', '+t1+(t2?' às '+t2:'')):'');
+  return '<div class="evc" data-evdetail="'+e.id+'" role="button" tabindex="0" aria-label="'+esc(lbl)+'">'+
+    '<div class="evc2-rail" style="background:'+(late?'#F87171':(col||'var(--line)'))+'"></div>'+
+    dateB+
+    '<div class="evc2-main">'+
+      '<div class="evc2-top">'+timeH+'<span class="evc2-st" style="background:'+withAlpha(sm.color,.14)+';color:'+sm.color+'"><span class="evc2-std"></span>'+sm.label+'</span></div>'+
+      '<div class="evc2-ti">'+esc(e.title||'Sem título')+'</div>'+
+      (e.client?'<div class="evc2-meta">'+svg('person')+'<span>'+esc(e.client)+'</span></div>':'')+
+      (e.location?'<div class="evc2-meta">'+svg('place')+'<span>'+esc(e.location)+'</span></div>':'')+
+      '<div class="evc2-foot">'+(hasOwner?(avatar(owner,20)+'<span class="evc2-name">'+esc((owner&&owner.name)||'')+'</span>'):'')+'<span class="evc2-ty" style="background:'+withAlpha(ty.color,.14)+';color:'+ty.color+'">'+esc(ty.label)+'</span></div>'+
+    '</div></div>';
 }
 function eventLate(e){if(e.done)return false;const ms=dtMs(e.date,e.end||e.start||'23:59');return ms&&Date.now()>ms;}
 /* F3.3.73I3 — Agenda compartilhada em tempo real: criação de compromisso. Grava em
@@ -5488,7 +5613,7 @@ async function saveEvent(){
 async function evLifecycle(id,patch){
   if(_evBusy)return;_evBusy=true;
   try{await db.collection('events').doc(id).update(patch);evEditId=null;closeModal();render();}
-  catch(e){console.warn('evLifecycle',e);try{openEventDetail(id);}catch(_){}}
+  catch(e){console.warn('evLifecycle',e);_evdErr='1';try{openEventDetail(id);}catch(_){}}
   finally{_evBusy=false;}
 }
 function evStart(id){evLifecycle(id,{startedAt:Date.now(),startedBy:state.user.id});}
@@ -5508,44 +5633,98 @@ async function evDeletePermanent(id){
     await db.collection('events').doc(id).update({deletedBy:state.user.id,deletedAt:Date.now()});
     await db.collection('events').doc(id).delete();
     evEditId=null;closeModal();render();
-  }catch(e){console.warn('evDeletePermanent',e);try{openEventDetail(id);}catch(_){}}
+  }catch(e){console.warn('evDeletePermanent',e);_evdErr='1';try{openEventDetail(id);}catch(_){}}
   finally{_evBusy=false;}
+}
+/* ══════════ F3.5.5B — AGENDA PREMIUM: detalhe do compromisso ══════════
+   Superfície refinada no lugar da tabela técnica: cabeçalho (chips tipo/status +
+   X isolado), bloco principal de DATA POR EXTENSO em pt-BR (nunca 2026-08-10) com
+   horário e duração (só quando calculável), resumo operacional em grid, observações
+   com parágrafos preservados, linha do tempo discreta e AÇÕES HIERARQUIZADAS:
+   primária (Iniciar/Finalizar) · secundárias (Editar/Cancelar) · menu ⋯ (menos
+   frequentes + Excluir definitivamente, só Admin) · Fechar discreto. As MESMAS
+   ações, MESMOS gates de status/permissão, MESMOS atributos data-ev e MESMOS ids
+   de confirmação da 1.0.218 — zero mudança de regra de negócio. Esc fecha (em confirmação, volta ao
+   detalhe); trap de Tab; retorno de foco ao card de origem via _detReturnEl. */
+var _evdErr='';
+function evdSetupModalFocus(){
+  try{
+    var back=document.querySelector('.modal-back[data-evdmodal]');if(!back)return;
+    var sheet=back.querySelector('.evd-sheet');if(sheet&&!sheet.hasAttribute('tabindex'))sheet.setAttribute('tabindex','-1');
+    var xbtn=back.querySelector('.evd-x');(xbtn||sheet||back).focus();
+    back.addEventListener('keydown',function(ev){
+      if(ev.key!=='Tab')return;
+      var f=back.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),summary,[tabindex]:not([tabindex="-1"])');
+      var list=[];for(var i=0;i<f.length;i++){var el=f[i];if(el.offsetParent!==null||el===document.activeElement)list.push(el);}
+      if(!list.length)return;var first=list[0],last=list[list.length-1];
+      if(ev.shiftKey){if(document.activeElement===first||!back.contains(document.activeElement)){ev.preventDefault();last.focus();}}
+      else{if(document.activeElement===last){ev.preventDefault();first.focus();}}
+    });
+  }catch(_){}
 }
 function openEventDetail(id,confirm){
   const e=state.events.find(x=>x.id===id);if(!e)return;
   const ty=typeOf(e.type);const owner=state.users.find(u=>u.id===e.ownerId)||{name:e.owner,id:e.ownerId};const creator=state.users.find(u=>u.id===e.by);
   const st=evStatus(e);const sm=evStatusMeta(st);const isAdmin=!!(state.user&&state.user.admin);
-  const row=(lbl,val)=>val?'<div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--line-soft)"><div style="width:110px;color:var(--faint);font-size:13px">'+lbl+'</div><div style="flex:1;font-size:13.5px;color:var(--ink)">'+esc(val)+'</div></div>':'';
-  let actions;
+  // Retorno de foco: captura o elemento de origem só na 1ª abertura (transições
+  // detalhe↔confirmação preservam o card original; padrão da Central de Detalhes).
+  if(!document.querySelector('.modal-back[data-evdmodal]')){_detReturnEl=(document.activeElement&&document.activeElement!==document.body)?document.activeElement:null;}
+  const chip=(txt,color)=>'<span class="pill" style="background:'+withAlpha(color,.16)+';color:'+color+'">'+esc(txt)+'</span>';
+  const cell=(ic,lbl,val)=>val?('<div class="evd-cell"><div class="evd-cl">'+lbl+'</div><div class="evd-cv">'+(ic?svg(ic):'')+'<span>'+val+'</span></div></div>'):'';
+  const t1=evTimeOk(e.start)?e.start:'';const t2=evTimeOk(e.end)?e.end:'';
+  const dur=evDurationText(e);
+  const when='<div class="evd-when"><div class="evd-when-l"><div class="evd-dow">'+esc(evDowFull(e.date)||'Data')+'</div><div class="evd-dfull">'+esc(evDateFull(e.date)||'Sem data definida')+'</div></div>'+
+    (t1?('<div class="evd-when-r"><span class="evd-time">'+svg('clock')+esc(t1)+(t2?'<span class="evd-te">— '+esc(t2)+'</span>':'')+'</span>'+(dur?'<div class="evd-dur">Duração: '+esc(dur)+'</div>':'')+'</div>'):'')+'</div>';
+  let body;
   if(confirm==='cancel'){
-    actions='<div style="margin-top:12px;font-size:13.5px;color:var(--ink)">Cancelar este compromisso para toda a equipe? Ele sai da agenda ativa (não é apagado).</div>'+
-      '<div class="del-actions" style="margin-top:12px"><button class="btn ghost" data-evdetail="'+e.id+'">Voltar</button><button class="btn btn-danger" data-evcancelyes="'+e.id+'">Sim, cancelar</button></div>';
+    body=when+'<div class="evd-confirm"><div class="evd-confirm-t">Cancelar este compromisso?</div>'+
+      '<div class="evd-confirm-s">Ele sai da agenda ativa para toda a equipe (não é apagado).</div>'+
+      '<div class="evd-actions" style="margin-top:12px"><button type="button" class="evd-btn sec" data-evdetail="'+e.id+'">Voltar</button><button type="button" class="evd-btn danger push" data-evcancelyes="'+e.id+'">'+svg('ban')+'Sim, cancelar</button></div></div>';
   }else if(confirm==='delete'){
-    actions='<div style="margin-top:12px;font-size:13.5px;color:var(--ink)"><b style="color:#F87171">Esta ação é permanente e não poderá ser desfeita.</b> O compromisso será removido definitivamente de events para toda a equipe.</div>'+
-      '<div class="lbl" style="margin-top:10px">Para confirmar, digite EXCLUIR</div><input class="inp" id="evDelConfirm" placeholder="EXCLUIR" style="margin-bottom:8px" autocomplete="off">'+
-      '<div id="evDelErr" style="color:#F87171;font-size:13px;margin-bottom:10px;display:none"></div>'+
-      '<div class="del-actions"><button class="btn ghost" data-evdetail="'+e.id+'">Voltar</button><button class="btn btn-danger" data-evdeleteyes="'+e.id+'">Excluir definitivamente</button></div>';
+    body=when+'<div class="evd-confirm"><div class="evd-confirm-t">Excluir definitivamente?</div>'+
+      '<div class="evd-confirm-s"><b style="color:#F87171">Esta ação é permanente e não poderá ser desfeita.</b> O compromisso será removido definitivamente de events para toda a equipe.</div>'+
+      '<div class="lbl" style="margin-top:12px">Para confirmar, digite EXCLUIR</div><input class="inp" id="evDelConfirm" placeholder="EXCLUIR" autocomplete="off">'+
+      '<div id="evDelErr" style="color:#F87171;font-size:13px;margin-top:8px;display:none"></div>'+
+      '<div class="evd-actions" style="margin-top:12px"><button type="button" class="evd-btn sec" data-evdetail="'+e.id+'">Voltar</button><button type="button" class="evd-btn danger push" data-evdeleteyes="'+e.id+'">'+svg('trash')+'Excluir definitivamente</button></div></div>';
   }else{
-    var b=[];
-    if(st!=='cancelled')b.push('<button class="btn ghost" data-evedit="'+e.id+'">Editar</button>');
-    if(st==='scheduled')b.push('<button class="btn" data-evstart="'+e.id+'">Iniciar</button>');
-    if(st==='scheduled'||st==='in_progress')b.push('<button class="btn" data-evfinish="'+e.id+'">Finalizar</button>');
-    if(st==='scheduled'||st==='in_progress')b.push('<button class="btn btn-danger" data-evcancel="'+e.id+'">Cancelar</button>');
-    // F3.3.73I6C3A — Excluir definitivamente (hard delete): SÓ admin, em QUALQUER estado.
-    if(isAdmin)b.push('<button class="btn btn-danger" data-evdelete="'+e.id+'">Excluir definitivamente</button>');
-    b.push('<button class="btn ghost" data-modalclose="1">Fechar</button>');
-    actions='<div class="del-actions" style="margin-top:14px;flex-wrap:wrap;gap:8px">'+b.join('')+'</div>';
+    const grid='<div class="evd-grid">'+
+      cell('person','Cliente',e.client?esc(e.client):'')+
+      cell('place','Local',e.location?esc(e.location):'')+
+      (((owner&&owner.name)||'').trim()?('<div class="evd-cell"><div class="evd-cl">Responsável</div><div class="evd-cv">'+avatar(owner,20)+'<span>'+esc(owner.name)+'</span></div></div>'):'')+
+      cell('','Criado por',(creator&&creator.name)?esc(creator.name):'')+
+      cell('','Tipo',esc(ty.label))+
+      cell('','Status',esc(sm.label))+
+    '</div>';
+    const notes=(e.notes&&String(e.notes).trim())?('<div class="evd-sec">Observações</div><div class="evd-notes">'+esc(e.notes)+'</div>'):'';
+    var tl='';
+    if(e.startedAt)tl+='<div class="evd-tl-row">'+svg('play')+'<span>Iniciado · '+esc(evWhen(e.startedAt))+(evActorName(e.startedBy)?' · '+esc(evActorName(e.startedBy)):'')+'</span></div>';
+    if(e.done&&e.doneAt)tl+='<div class="evd-tl-row">'+svg('check')+'<span>Finalizado · '+esc(evWhen(e.doneAt))+(evActorName(e.doneBy)?' · '+esc(evActorName(e.doneBy)):'')+'</span></div>';
+    if(st==='cancelled'&&e.cancelledAt)tl+='<div class="evd-tl-row">'+svg('ban')+'<span>Cancelado · '+esc(evWhen(e.cancelledAt))+(evActorName(e.cancelledBy)?' · '+esc(evActorName(e.cancelledBy)):'')+'</span></div>';
+    if(tl)tl='<div class="evd-sec">Linha do tempo</div><div class="evd-tl">'+tl+'</div>';
+    const err='<div id="evdErr" class="evd-err'+(_evdErr?' show':'')+'" role="alert">Não foi possível concluir a ação. Verifique a conexão e tente novamente.</div>';
+    // AÇÕES — mesmos gates da 1.0.218: Editar st!=='cancelled'; Iniciar scheduled;
+    // Finalizar scheduled||in_progress; Cancelar scheduled||in_progress; Excluir SÓ admin.
+    var more=[];
+    if(st==='scheduled')more.push('<button type="button" class="evd-mi" role="menuitem" data-evfinish="'+e.id+'">'+svg('check')+'Finalizar</button>');
+    if(isAdmin)more.push('<button type="button" class="evd-mi danger" role="menuitem" data-evdelete="'+e.id+'">'+svg('trash')+'Excluir definitivamente</button>');
+    var acts='<div class="evd-actions">';
+    if(more.length)acts+='<button type="button" class="evd-btn more" data-evmore="1" aria-label="Mais opções" title="Mais opções" aria-haspopup="true" aria-expanded="false">'+svg('dots')+'</button><div class="evd-menu" data-evmenu="1" role="menu">'+more.join('')+'</div>';
+    if(st==='scheduled'||st==='in_progress')acts+='<button type="button" class="evd-btn danger-sec" data-evcancel="'+e.id+'">'+svg('ban')+'Cancelar</button>';
+    if(st!=='cancelled')acts+='<button type="button" class="evd-btn sec" data-evedit="'+e.id+'">'+svg('editnote')+'Editar</button>';
+    if(st==='scheduled')acts+='<button type="button" class="evd-btn pri" data-evstart="'+e.id+'">'+svg('play')+'Iniciar</button>';
+    else if(st==='in_progress')acts+='<button type="button" class="evd-btn pri" data-evfinish="'+e.id+'">'+svg('check')+'Finalizar</button>';
+    else acts+='<button type="button" class="evd-btn sec push" data-modalclose="1">Fechar</button>';
+    acts+='</div>';
+    body=when+grid+notes+tl+err+acts;
   }
-  document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1"><div class="sheet"><div class="grab"></div>'+
-    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap"><span class="pill" style="background:'+withAlpha(ty.color,.16)+';color:'+ty.color+'">'+esc(ty.label)+'</span><span class="pill" style="background:'+withAlpha(sm.color,.16)+';color:'+sm.color+'">'+sm.label+'</span></div>'+
-    '<div style="font-size:19px;font-weight:800;margin-bottom:12px">'+esc(e.title||'Sem título')+'</div>'+
-    row('Cliente',e.client)+row('Data',e.date)+row('Início',e.start)+row('Término',e.end)+row('Local',e.location)+row('Responsável',owner&&owner.name)+row('Criado por',creator&&creator.name)+
-    (e.startedAt?row('Iniciado',evWhen(e.startedAt)+(evActorName(e.startedBy)?' · '+evActorName(e.startedBy):'')):'')+
-    ((e.done&&e.doneAt)?row('Finalizado',evWhen(e.doneAt)+(evActorName(e.doneBy)?' · '+evActorName(e.doneBy):'')):'')+
-    ((st==='cancelled'&&e.cancelledAt)?row('Cancelado',evWhen(e.cancelledAt)+(evActorName(e.cancelledBy)?' · '+evActorName(e.cancelledBy):'')):'')+
-    row('Observações',e.notes)+
-    actions+
+  _evdErr='';
+  document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1" data-evdmodal="'+esc(e.id)+'"><div class="sheet evd-sheet" role="dialog" aria-modal="true" aria-label="Detalhes do compromisso"><div class="grab"></div>'+
+    '<div class="evd-head"><div class="evd-chips">'+chip(ty.label,ty.color)+chip(sm.label,sm.color)+'</div><button type="button" class="evd-x" data-modalclose="1" aria-label="Fechar detalhes" title="Fechar">'+svg('close')+'</button></div>'+
+    '<div class="evd-title">'+esc(e.title||'Sem título')+'</div>'+
+    (e.client?'<div class="evd-client">'+svg('person')+'<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(e.client)+'</span></div>':'')+
+    body+
   '</div></div>';
+  evdSetupModalFocus();
 }
 function emptyState(ic,t,s){return '<div class="empty"><div class="ebox">'+svg(ic)+'</div><div class="et">'+esc(t)+'</div><div class="es">'+esc(s)+'</div></div>';}
 
@@ -10062,7 +10241,21 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeCardMenus();
   // F3.5.4W — Esc fecha a Central de Detalhes (superfície de leitura). SÓ a Central é marcada
   // com data-detmodal — modais de formulário não são afetados (não perdem digitação).
   if(document.querySelector('.modal-back[data-detmodal]')){closeModal();}
+  // F3.5.5B — Esc no detalhe do compromisso: 1º fecha o menu ⋯ se aberto; em tela de
+  // confirmação volta ao detalhe (não descarta o modal inteiro); senão fecha o modal.
+  else{var _eb=document.querySelector('.modal-back[data-evdmodal]');
+    if(_eb){var _mn=_eb.querySelector('[data-evmenu].open');
+      if(_mn){_mn.classList.remove('open');var _mb=_eb.querySelector('[data-evmore]');if(_mb){_mb.setAttribute('aria-expanded','false');try{_mb.focus();}catch(_){}}}
+      else if(_eb.querySelector('[data-evcancelyes],[data-evdeleteyes]')){openEventDetail(_eb.getAttribute('data-evdmodal'));}
+      else{closeModal();}}}
 }});
+/* F3.5.5B — cards de compromisso acionáveis por teclado (role=button + tabindex=0):
+   Enter/Espaço abre o detalhe, como o clique. Escopado ao próprio card focado. */
+document.addEventListener('keydown',function(e){
+  if(e.key!=='Enter'&&e.key!==' ')return;
+  var t=e.target;
+  if(t&&t.matches&&t.matches('.evc[data-evdetail]')){e.preventDefault();openEventDetail(t.getAttribute('data-evdetail'));}
+});
 /* ===== F3.5.4W-H1 (E2) — CÓPIA de tema/legenda na Central de Detalhes ===== */
 // Escreve SÓ texto puro (nunca HTML): 1º IPC do main (determinístico), depois navigator.clipboard,
 // por fim execCommand. Retorna boolean p/ o feedback discreto do botão.
@@ -10294,6 +10487,12 @@ document.addEventListener('click',async e=>{
   if(el=g('[data-bcol]')){boardCol=+el.dataset.bcol;render();return;}
   if(el=g('[data-bmine]')){boardMine=!boardMine;render();return;}
   if(el=g('[data-ag]')){const a=el.dataset.ag;if(a==='new'){openEventForm();return;}if(a==='togglecancel'){agShowCancelled=!agShowCancelled;render();return;}if(a==='today'){agCursor=new Date();agSel=todayStr();}else if(a==='prev')agCursor.setMonth(agCursor.getMonth()-1);else if(a==='next')agCursor.setMonth(agCursor.getMonth()+1);else if(a==='vmonth')agView='month';else if(a==='vlist')agView='list';render();return;}
+  // F3.5.5B — menu "Mais opções" (⋯) do detalhe do compromisso: toggle + fechar ao
+  // clicar fora dele (os itens internos têm data-evfinish/data-evdelete e seguem
+  // pelos handlers existentes; a re-renderização do modal descarta o menu aberto).
+  {var _omn=document.querySelector('.modal-back[data-evdmodal] [data-evmenu].open');
+   if(_omn&&!g('[data-evmenu]')&&!g('[data-evmore]')){_omn.classList.remove('open');var _omb=document.querySelector('.modal-back[data-evdmodal] [data-evmore]');if(_omb)_omb.setAttribute('aria-expanded','false');}}
+  if(el=g('[data-evmore]')){var _mn2=el.parentElement&&el.parentElement.querySelector('[data-evmenu]');if(_mn2){var _op=_mn2.classList.toggle('open');el.setAttribute('aria-expanded',_op?'true':'false');}return;}
   if(el=g('[data-evdetail]')){openEventDetail(el.dataset.evdetail);return;}
   if(el=g('[data-evsave]')){saveEvent();return;}
   if(el=g('[data-evedit]')){openEventForm(el.dataset.evedit);return;}

@@ -1,7 +1,7 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.218",
-  "description": "Agenda ID Seven Desktop 1.0.218-edit-internal-notes-per-theme (Observações Internas por Tema na Central de Detalhes)",
+  "version": "1.0.219",
+  "description": "Agenda ID Seven Desktop 1.0.219-premium-agenda-redesign (Agenda Premium — cards e detalhes de compromissos)",
   "main": "dist/main/main.js",
   "private": true,
   "scripts": {
