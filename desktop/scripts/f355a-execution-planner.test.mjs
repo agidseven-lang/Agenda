@@ -95,5 +95,35 @@ ok('início real + revisão reduzem risco', ET.etRisk({ notStartedAnswer: true, 
 ok('previsão vencida eleva', ET.etRisk({ etaOverdue: true }).level === 'medium');
 ok('score nunca negativo', ET.etRisk({ startedReal: true, reviewSent: true }).score === 0);
 
+console.log('— H) COMPLEMENTO: autoridade única por tarefa (modo × elegibilidade) —');
+ok('OFF ⇒ legado = 1.0.216 (adaptativo nem observa)', JSON.stringify(ET.etAuthority('OFF', true)) === JSON.stringify({ authority: 'legacy', legacySuppressed: false, adaptiveObserves: false }));
+ok('SHADOW ⇒ legado segue autoridade REAL; adaptativo só observa', JSON.stringify(ET.etAuthority('SHADOW', true)) === JSON.stringify({ authority: 'legacy', legacySuppressed: false, adaptiveObserves: true }));
+ok('ACTIVE+elegível ⇒ adaptativo único; legado suprimido', JSON.stringify(ET.etAuthority('ACTIVE', true)) === JSON.stringify({ authority: 'adaptive', legacySuppressed: true, adaptiveObserves: false }));
+ok('ACTIVE+inelegível ⇒ legado permanece', ET.etAuthority('ACTIVE', false).authority === 'legacy' && ET.etAuthority('ACTIVE', false).legacySuppressed === false);
+ok('nenhum cenário com DUAS autoridades', ['OFF','SHADOW','ACTIVE'].every(m => [true,false].every(e => { const a = ET.etAuthority(m, e); return (a.authority === 'adaptive') !== (a.authority === 'legacy'); })));
+
+console.log('— H2) COMPLEMENTO: ACTIVE bloqueado com jornada incompleta —');
+const fullCfg = { schedule: { days: [1,2,3,4,5], startMin: 540, endMin: 1080, tzOffsetMin: -180 }, minIntervalMs: 20*M, maxPerDay: 1 };
+ok('config completa ⇒ ACTIVE permitido', ET.etActiveAllowed(fullCfg).allowed === true);
+const inc = ET.etActiveAllowed({ schedule: { days: [1] } });
+ok('config incompleta ⇒ bloqueado com mensagem exigida', inc.allowed === false && inc.reason === 'schedule_incomplete' && inc.message === 'Conclua a configuração da jornada antes de ativar os check-ins.');
+ok('faltantes nomeados (sem padrão silencioso)', inc.missing.includes('horario_inicial') && inc.missing.includes('timezone') && inc.missing.includes('limite_diario'));
+
+console.log('— H3) COMPLEMENTO: decisão de claim (corpo puro da transação; serverNow) —');
+const SN = 1000000;
+ok('inexistente ⇒ CLAIMED com lease (serverNow+lease)', (() => { const d = ET.etClaimDecision(null, SN, 'dev1', 60000); return d.decision === 'claim' && d.leaseUntil === SN + 60000; })());
+ok('claim vigente de OUTRO dispositivo ⇒ leased (2º NUNCA ganha)', ET.etClaimDecision({ state: 'CLAIMED', claimDeviceId: 'dev1', leaseExpiresAt: SN + 999 }, SN, 'dev2', 60000).decision === 'leased');
+ok('mesmo dispositivo ⇒ own (idempotente)', ET.etClaimDecision({ state: 'DISPLAYED', claimDeviceId: 'dev1', leaseExpiresAt: SN + 999 }, SN, 'dev1', 60000).decision === 'own');
+ok('lease expirada ⇒ takeover permitido (app fechado antes do ACK libera)', ET.etClaimDecision({ state: 'CLAIMED', claimDeviceId: 'dev1', leaseExpiresAt: SN - 1 }, SN, 'dev2', 60000).decision === 'takeover_expired');
+ok('RESPONDED em outro dispositivo ⇒ closed (invalida os demais)', ET.etClaimDecision({ state: 'RESPONDED' }, SN, 'dev2', 60000).decision === 'closed');
+ok('SUPERSEDED/CANCELLED ⇒ closed (sem reapresentação pós-reconexão)', ET.etClaimDecision({ state: 'SUPERSEDED' }, SN, 'dev2', 60000).decision === 'closed' && ET.etClaimDecision({ state: 'CANCELLED' }, SN, 'dev2', 60000).decision === 'closed');
+
+console.log('— H4) COMPLEMENTO: zona SLA — transições e prioridade absoluta —');
+ok('PLANNED ⇒ CANCELLED na zona', ET.etSlaZoneTransition('PLANNED') === 'CANCELLED');
+ok('DUE não exibido ⇒ SUPERSEDED (sem som/promoção)', ET.etSlaZoneTransition('DUE') === 'SUPERSEDED');
+ok('CLAIMED ⇒ SUPERSEDED', ET.etSlaZoneTransition('CLAIMED') === 'SUPERSEDED');
+ok('DISPLAYED ⇒ SUPERSEDED (recolhe e cede ao crítico; texto preservado pela UI)', ET.etSlaZoneTransition('DISPLAYED') === 'SUPERSEDED');
+ok('estados fechados inalterados', ET.etSlaZoneTransition('RESPONDED') === 'RESPONDED');
+
 console.log(`\nf355a-planner: ${n - fail}/${n} verdes`);
 if (fail) process.exit(1);

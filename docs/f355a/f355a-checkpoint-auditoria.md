@@ -85,3 +85,28 @@ Duplicidade legado×novo (roteamento por cobertura + testes 1..20 supressão); a
 (trilha checkin já é subordinada; testes de prioridade 1..15); multidispositivo (claim transacional +
 lease; testes 1..16); offline (reavaliação de relevância no reconcile; sem fila histórica); jornada
 ausente (OFF até configurar); privacidade (observabilidade só com hashes/buckets; provas V*).
+
+## ADENDO — COMPLEMENTO OBRIGATÓRIO (aprovado pelo owner; vinculante)
+1) CLAIM: renderer só SOLICITA; autoridade final = transação Firestore protegida por Rules
+   (estado atual + lease + chave determinística); dois dispositivos NUNCA com claim válido
+   simultâneo; TODOS os tempos persistidos (plannedAt/claimedAt/leaseExpiresAt/respondedAt/
+   missedAt/expiração) via tempo de SERVIDOR — nunca relógio local como autoridade.
+2) SHADOW 100% silencioso: sem janela/som/fila/notificação comum/SM/sino/timeline visível/
+   risco real/interferência no taskIdleScheduler/resposta fictícia; só plano + decisões
+   "exibiria/suprimiria/adiaria/cancelaria" + observabilidade sanitizada + métricas agregadas.
+3) Autoridade única: OFF⇒legado 1.0.216; SHADOW⇒legado é a autoridade REAL (adaptativo observa);
+   ACTIVE+elegível⇒adaptativo único (legado suprime a tarefa); ACTIVE+inelegível⇒legado.
+   Prova obrigatória: nenhum cenário com dois check-ins (etAuthority + testes H).
+4) Zona SLA: PLANNED⇒CANCELLED; DUE não exibido⇒SUPERSEDED; fila⇒SUPERSEDED; sem som/promoção/
+   reapresentação pós-reconexão; laranja ativo recolhe preservando texto digitado e cede ao
+   crítico (depois normalmente SUPERSEDED). Vermelho/amarelo NUNCA esperam (etSlaZoneTransition).
+5) Prazos curtos: <30min sem laranja; 30–60min sem laranja quando a zona amarela ocupa parte
+   relevante (só com distância operacional segura provada); nunca criar check-in por quantidade.
+6) Config incompleta (dias/horários/timezone/intervalo/limite) ⇒ ACTIVE BLOQUEADO com a mensagem
+   literal "Conclua a configuração da jornada antes de ativar os check-ins." (etActiveAllowed).
+7) Prova multidispositivo REAL: claims simultâneos (1 CLAIMED, 2º leased), vencedor único com
+   janela+som, resposta invalida os demais, lease expirada permite takeover, app fechado pré-ACK
+   libera, zero duplicidade de janela/som/histórico.
+8) Publicação (OFF) só após provar: OFF equivalente à 1.0.216; SHADOW silencioso; ACTIVE com
+   autoridade única; claim transacional; amarelo/vermelho sem atraso; sem duplicação do idle;
+   jornada incompleta bloqueia ACTIVE; zero vazamento ao cliente; gates verdes.

@@ -204,3 +204,65 @@ module.exports = {
   etLastMeaningful: etLastMeaningful, etShouldSuppress: etShouldSuppress,
   etStillRelevant: etStillRelevant, etRisk: etRisk, etOnDeadlineChange: etOnDeadlineChange,
 };
+
+/* ==== COMPLEMENTO OBRIGATÓRIO F3.5.5A (aprovado pelo owner) ==== */
+
+/* ---- 3) AUTORIDADE ÚNICA POR TAREFA (matriz modo × elegibilidade) ----
+   OFF: legado = 1.0.216. SHADOW: legado segue AUTORIDADE REAL; adaptativo só observa.
+   ACTIVE+elegível: adaptativo é a ÚNICA autoridade (legado suprime p/ a tarefa).
+   ACTIVE+não-elegível: legado permanece. Nenhum cenário gera dois check-ins. */
+function etAuthority(mode, eligible) {
+  mode = String(mode || "OFF");
+  if (mode === "ACTIVE" && eligible) return { authority: "adaptive", legacySuppressed: true, adaptiveObserves: false };
+  if (mode === "SHADOW") return { authority: "legacy", legacySuppressed: false, adaptiveObserves: true };
+  return { authority: "legacy", legacySuppressed: false, adaptiveObserves: false }; // OFF ou ACTIVE+inelegível
+}
+
+/* ---- 6) ACTIVE bloqueado com jornada incompleta (sem padrões silenciosos) ---- */
+function etActiveAllowed(cfg) {
+  cfg = cfg || {}; var sc = cfg.schedule || {};
+  var missing = [];
+  if (!(sc.days && sc.days.length)) missing.push("dias");
+  if (!(sc.startMin >= 0)) missing.push("horario_inicial");
+  if (!(sc.endMin > 0)) missing.push("horario_final");
+  if (typeof sc.tzOffsetMin !== "number") missing.push("timezone");
+  if (!(cfg.minIntervalMs > 0)) missing.push("intervalo_minimo");
+  if (!(cfg.maxPerDay > 0)) missing.push("limite_diario");
+  if (missing.length) return { allowed: false, reason: "schedule_incomplete", missing: missing,
+    message: "Conclua a configuração da jornada antes de ativar os check-ins." };
+  return { allowed: true, reason: "", missing: [] };
+}
+
+/* ---- 1) DECISÃO DE CLAIM (corpo PURO da transação; autoridade final = transação Firestore
+   protegida por Rules com serverTimestamp — o renderer só SOLICITA; nunca relógio local
+   como autoridade de plannedAt/claimedAt/leaseExpiresAt/respondedAt/missedAt). ----
+   existing = doc atual (null se não existe); serverNow = tempo de SERVIDOR lido na transação. */
+function etClaimDecision(existing, serverNow, deviceId, leaseMs) {
+  leaseMs = leaseMs > 0 ? leaseMs : 3 * 60000;
+  if (!existing) return { decision: "claim", state: "CLAIMED", leaseUntil: serverNow + leaseMs };
+  var st = String(existing.state || "");
+  if (st === "RESPONDED" || st === "MISSED" || st === "CANCELLED" || st === "SUPERSEDED" || st === "SUPPRESSED")
+    return { decision: "closed", state: st };
+  if (st === "CLAIMED" || st === "DISPLAYED") {
+    if (String(existing.claimDeviceId || "") === String(deviceId || "")) return { decision: "own", state: st };
+    if (existing.leaseExpiresAt > serverNow) return { decision: "leased", state: st, leaseExpiresAt: existing.leaseExpiresAt };
+    return { decision: "takeover_expired", state: "CLAIMED", leaseUntil: serverNow + leaseMs }; // lease venceu ⇒ novo claim
+  }
+  return { decision: "claim", state: "CLAIMED", leaseUntil: serverNow + leaseMs }; // PLANNED/DUE
+}
+
+/* ---- 4) Cancelamento na zona SLA (transições explícitas; vermelho/amarelo NUNCA esperam) ---- */
+function etSlaZoneTransition(cpState) {
+  switch (String(cpState || "")) {
+    case "PLANNED": return "CANCELLED";
+    case "DUE": return "SUPERSEDED";      // devido e ainda não exibido ⇒ some sem som/promoção
+    case "CLAIMED": return "SUPERSEDED";
+    case "DISPLAYED": return "SUPERSEDED"; // laranja ativo recolhe (texto preservado pela UI) e cede ao crítico
+    default: return String(cpState || "");
+  }
+}
+
+module.exports.etAuthority = etAuthority;
+module.exports.etActiveAllowed = etActiveAllowed;
+module.exports.etClaimDecision = etClaimDecision;
+module.exports.etSlaZoneTransition = etSlaZoneTransition;
