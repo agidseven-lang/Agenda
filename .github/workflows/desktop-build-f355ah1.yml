@@ -1,0 +1,158 @@
+# F3.5.5A-H1 — Desktop 1.0.218 (Observações Internas por Tema na Central de Detalhes) — build GATED, --publish never.
+# Publicação SÓ no desktop-release-f355ah1.yml (mesmos bytes). Base de código 1.0.217 @ 311ed81;
+# baseline física/rollback imediato 1.0.216 @ e509f43; rollback adicional 1.0.213 @ e626d36.
+# Delta EXCLUSIVO no renderer index.html (lápis + editor inline reutilizando designerItemNotes) +
+# suites/provas/docs/workflows + pins de versão (precedente b12fde2). main/preload/slareminder/
+# bgnotify/sons/worker/functions/android CONGELADOS byte a byte vs 1.0.217.
+name: "[push/manual] F3.5.5A-H1 — Desktop 1.0.218 (Observações Internas por Tema) — Desktop Build"
+"on":
+  push:
+    branches: ["desktop/f355a-h1-edit-internal-notes-per-theme-1.0.218"]
+    paths-ignore: [".github/workflows/desktop-release-f355ah1.yml"]
+  workflow_dispatch: {}
+permissions: { contents: read }
+env:
+  TEST_BRANCH: "desktop/f355a-h1-edit-internal-notes-per-theme-1.0.218"
+  BASE_217_SHA: "311ed816d71f5cd743b33fa84b022cc84bb7a30d"
+  BASE_216_SHA: "e509f43ae8f3130a9922791f89db0ba29aa7a410"
+  BASE_213_SHA: "e626d36921e269e28b74494ff51afb9c77f8d94d"
+  APP_DIR: desktop
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: "Gate REF + ANCESTRIA (descende da 1.0.217, 1.0.216 e 1.0.213)"
+        run: |
+          set -euo pipefail
+          [ "${GITHUB_REF_NAME}" = "$TEST_BRANCH" ] || { echo "::error::branch errada"; exit 1; }
+          git merge-base --is-ancestor "$BASE_217_SHA" HEAD || { echo "::error::não descende da 1.0.217"; exit 1; }
+          git merge-base --is-ancestor "$BASE_216_SHA" HEAD || { echo "::error::não descende da 1.0.216"; exit 1; }
+          git merge-base --is-ancestor "$BASE_213_SHA" HEAD || { echo "::error::não descende da 1.0.213"; exit 1; }
+      - name: "Gate VERSAO 1.0.218 (package + lock x2 + description)"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node -e "const p=require('./package.json'); if(p.version!=='1.0.218') process.exit(1); if(!/edit-internal-notes-per-theme/.test(p.description||'')) process.exit(1);"
+          [ "$(grep -c '"version": "1.0.218"' package-lock.json)" -ge 2 ]
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: npm ci + TypeScript + sintaxe dos renderers (index/bgnotify/slareminder)
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          ./node_modules/.bin/tsc --noEmit -p tsconfig.json
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/renderer/bgnotify.html','utf8');const m=s.match(/<script>([\s\S]*?)<\/script>/);new Function(m[1]);"
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/renderer/slareminder.html','utf8');const m=s.match(/<script>([\s\S]*?)<\/script>/);new Function(m[1]);"
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/renderer/index.html','utf8');const b=[...s.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(x=>x[1]);b.sort((a,c)=>c.length-a.length);new Function(b[0]);"
+      - name: "Gate F3.5.5A-H1 — observações internas 72 (matriz de 45 itens do mandato em contratos)"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f355ah1-internal-notes.test.mjs
+      - name: "Gate F3.5.5A herdado — planner 98 + orquestrador 38 + central 33 + integração 25 (dist)"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          npm run build
+          node scripts/f355a-execution-planner.test.mjs
+          node scripts/f355a-orchestrator.test.mjs
+          node scripts/f355a-execution-central.test.mjs
+          node scripts/f355a-integration.test.mjs
+      - name: "Gate REGRESSÃO canônica — som 37 + detalhes 74 + cards 53 + sessão 40"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f354wh2-immediate-notification-sound.test.mjs
+          node scripts/f354wh1-details-status-notes.test.mjs
+          node scripts/f354w-compact-cards-details.test.mjs
+          node scripts/f354vh1-session-persistence.test.mjs
+      - name: "Gate PROVAS REAIS Electron — F3.5.5A-H1 (15, asar do index REAL) + F3.5.5A (25) — xvfb"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y >/dev/null 2>&1 || true
+          sudo apt-get install -y xvfb >/dev/null 2>&1 || true
+          xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f355ah1-proof-main.js
+          xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f355a-execution-proof-main.js
+      - name: "Gate ISOLAMENTO — delta vs 1.0.217 SÓ nos arquivos autorizados; congelados diff-vazio"
+        run: |
+          set -euo pipefail
+          git diff --name-only "$BASE_217_SHA"..HEAD > /tmp/delta.txt; cat /tmp/delta.txt
+          # allowlist F3.5.5A-H1: SÓ o renderer index.html + versão + suites/provas/docs/workflows da fase
+          # + pins de versão nas suítes herdadas (precedente b12fde2: wh2/vh1/f355a-integration/orchestrator).
+          BAD=$(grep -vE '^(\.github/workflows/desktop-(build|release)-f355ah1\.yml$|desktop/src/renderer/index\.html$|desktop/package(-lock)?\.json$|desktop/scripts/f355ah1-|desktop/scripts/f355a-integration\.test\.mjs$|desktop/scripts/f355a-orchestrator\.test\.mjs$|desktop/scripts/f354wh2-immediate-notification-sound\.test\.mjs$|desktop/scripts/f354vh1-session-persistence\.test\.mjs$|docs/f355a-h1(-qa)?/)' /tmp/delta.txt || true)
+          [ -z "$BAD" ] || { echo "::error::fora da allowlist: $BAD"; exit 1; }
+          # CONGELADOS byte-idênticos vs 1.0.217: TODO o main + preload + janelas premium/central + sons
+          # + worker + backend + android + config de build (esta fase é 100% renderer index.html).
+          git diff --quiet "$BASE_217_SHA"..HEAD -- desktop/src/main desktop/src/preload desktop/src/renderer/bgnotify.html desktop/src/renderer/slareminder.html desktop/src/renderer/sounds desktop/src/renderer/priorityEngine.js desktop/scripts/copy-renderer.js desktop/tsconfig.json cloudflare-worker.js functions android-native android-native-beta || { echo "::error::módulo congelado alterado"; exit 1; }
+      - name: "Gate MARCADORES F3.5.5A-H1 — lápis/editor/dot-path/permissão (fonte)"
+        run: |
+          set -euo pipefail
+          grep -q 'data-detnoteedit' desktop/src/renderer/index.html
+          grep -q 'OBSERVAÇÃO INTERNA PARA O DESIGNER — OPCIONAL' desktop/src/renderer/index.html
+          grep -q "patch\['designerItemNotes.i'+st.idx\]" desktop/src/renderer/index.html
+          grep -q 'firebase.firestore.FieldValue.delete()' desktop/src/renderer/index.html
+          grep -q 'Observação interna do ' desktop/src/renderer/index.html
+          grep -q 'isClientSector(secOf(t.sector).key)&&state.user&&canSeeAll(state.user)' desktop/src/renderer/index.html
+          grep -q 'Salve ou cancele esta observação antes de editar outro tema.' desktop/src/renderer/index.html
+          echo "MARCADORES F3.5.5A-H1: VERIFIED."
+  build:
+    needs: verify
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: npm ci + build + electron-builder (--publish never)
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm run build
+          npx electron-builder --win nsis msi --publish never
+      - name: "Gate EMPACOTADO — versão + observações internas no app.asar (suite completa contra o pacote)"
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          ASAR="dist-installer/win-unpacked/resources/app.asar"; test -f "$ASAR"
+          npx --yes @electron/asar extract "$ASAR" asar-x
+          node -e "const p=require('./asar-x/package.json'); if(p.version!=='1.0.218') process.exit(1);"
+          grep -q 'data-detnoteedit' asar-x/src/renderer/index.html
+          grep -q 'OBSERVAÇÃO INTERNA PARA O DESIGNER — OPCIONAL' asar-x/src/renderer/index.html
+          grep -q 'det-note-ed' asar-x/src/renderer/index.html
+          grep -q 'Observação interna da Social Media' asar-x/src/renderer/index.html
+          # herdados da 1.0.217 intactos no pacote
+          grep -q "CHECK-IN DE EXECUÇÃO" asar-x/src/renderer/slareminder.html
+          test -f asar-x/dist/main/executionOrchestrator.js
+          test -f asar-x/src/renderer/sounds/execution-checkin.wav
+          grep -q 'mode: "off"' asar-x/dist/main/main.js
+          # MESMAS suítes rodando contra os BYTES do pacote:
+          SRC=asar-x/src/renderer/index.html node scripts/f355ah1-internal-notes.test.mjs
+          SRC=asar-x/src/renderer/index.html BG_SRC=asar-x/src/renderer/bgnotify.html MAIN_SRC=src/main/main.ts BGM_SRC=src/main/bgNotify.ts node scripts/f354wh2-immediate-notification-sound.test.mjs
+          SRC=asar-x/src/renderer/index.html node scripts/f354wh1-details-status-notes.test.mjs
+          echo "GATE F3.5.5A-H1 EMPACOTADO: VERIFIED."
+      - name: Empacotar bundle + SHA256SUMS + VERSAO-DESKTOP
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes @cyclonedx/cyclonedx-npm --omit dev --output-format JSON --output-file "$RUNNER_TEMP/sbom.json" || echo '{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}' > "$RUNNER_TEMP/sbom.json"
+          OUT="$GITHUB_WORKSPACE/dist-pkg"; mkdir -p "$OUT"
+          EXE=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe | head -1); MSI=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.msi | head -1); BM=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap | head -1)
+          cp "$EXE" "$MSI" "$BM" dist-installer/latest.yml "$OUT/"; cp "$RUNNER_TEMP/sbom.json" "$OUT/SBOM-cyclonedx.json"
+          EXE_NAME=$(basename "$EXE"); MSI_NAME=$(basename "$MSI"); BM_NAME=$(basename "$BM")
+          ( cd "$OUT" && sha256sum "$EXE_NAME" "$MSI_NAME" latest.yml "$BM_NAME" SBOM-cyclonedx.json > SHA256SUMS )
+          { echo "productName : Agenda ID Seven Desktop"; echo "versionName : 1.0.218"; echo "rotulo      : 1.0.218-edit-internal-notes-per-theme (CANDIDATA — Observações Internas por Tema na Central de Detalhes)"; echo "channel     : latest (NADA publicado neste build)"; echo "appId       : br.com.idseven.agenda.desktop"; echo "instalador  : $EXE_NAME"; echo "SHA-256 exe : $(sha256sum "$OUT/$EXE_NAME" | awk '{print $1}')"; echo "instalador2 : $MSI_NAME"; echo "SHA-256 msi : $(sha256sum "$OUT/$MSI_NAME" | awk '{print $1}')"; echo "commit      : $GITHUB_SHA (branch $GITHUB_REF_NAME)"; echo "base-codigo : Desktop 1.0.217 (commit 311ed81)"; echo "rollback    : Desktop 1.0.216 (imediato, commit e509f43); adicional 1.0.213 (e626d36)"; echo "origem      : F3.5.5A-H1 — Observações Internas por Tema: lápis por item na Central de Detalhes p/ a Social Media registrar/editar a observação interna ANTES da atribuição, na MESMA fonte do fluxo de atribuição (designerItemNotes; chave estável por índice); Designer visualiza; cliente NUNCA vê; sem mover status/atribuir/notificar. Acompanhamento Inteligente (OFF/SOMBRA/ATIVO), alertas amarelo/vermelho/laranja e todas as notificações 1.0.217 preservados byte a byte."; echo "distribuicao: CANDIDATA — publicação no Latest ocorre no workflow desktop-release-f355ah1.yml (mesmos bytes)"; } > "$OUT/VERSAO-DESKTOP.txt"
+          echo "== SHA256SUMS =="; cat "$OUT/SHA256SUMS"
+      - uses: actions/upload-artifact@v4
+        with: { name: agenda-id-seven-desktop-1.0.218-installer, path: "dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe\ndist-pkg/Agenda-ID-Seven-Desktop-*-x64.msi", if-no-files-found: error, retention-days: 30 }
+      - uses: actions/upload-artifact@v4
+        with: { name: agenda-id-seven-desktop-1.0.218-updatemeta, path: "dist-pkg/latest.yml\ndist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap\ndist-pkg/SHA256SUMS\ndist-pkg/SBOM-cyclonedx.json\ndist-pkg/VERSAO-DESKTOP.txt", if-no-files-found: error, retention-days: 30 }
