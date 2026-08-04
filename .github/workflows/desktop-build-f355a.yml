@@ -1,0 +1,150 @@
+# F3.5.5A — Desktop 1.0.217 (Acompanhamento Inteligente de Execução; feature flag OFF) — build GATED, --publish never.
+# Publicação SÓ no desktop-release-f355a.yml (mesmos bytes). Base 1.0.216 @ e509f43; rollback 1.0.216 (imediato) / 1.0.213.
+# Backend server-side já em produção (claimExecutionCheckpoint/respondExecutionCheckpoint @ app/main 4a624a1; deploy run 30934894269, sondas 401/405 verdes).
+name: "[push/manual] F3.5.5A — Desktop 1.0.217 (Acompanhamento Inteligente de Execução) — Desktop Build"
+"on":
+  push:
+    branches: ["desktop/f355a-adaptive-execution-checkins-1.0.217"]
+    paths-ignore: [".github/workflows/desktop-release-f355a.yml"]
+  workflow_dispatch: {}
+permissions: { contents: read }
+env:
+  TEST_BRANCH: "desktop/f355a-adaptive-execution-checkins-1.0.217"
+  BASE_216_SHA: "e509f43ae8f3130a9922791f89db0ba29aa7a410"
+  BASE_213_SHA: "e626d36921e269e28b74494ff51afb9c77f8d94d"
+  APP_DIR: desktop
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: "Gate REF + ANCESTRIA (descende da 1.0.216 e 1.0.213)"
+        run: |
+          set -euo pipefail
+          [ "${GITHUB_REF_NAME}" = "$TEST_BRANCH" ] || { echo "::error::branch errada"; exit 1; }
+          git merge-base --is-ancestor "$BASE_216_SHA" HEAD || { echo "::error::não descende da 1.0.216"; exit 1; }
+          git merge-base --is-ancestor "$BASE_213_SHA" HEAD || { echo "::error::não descende da 1.0.213"; exit 1; }
+      - name: "Gate VERSAO 1.0.217 (package + lock x2 + description)"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node -e "const p=require('./package.json'); if(p.version!=='1.0.217') process.exit(1); if(!/adaptive-execution-checkins/.test(p.description||'')) process.exit(1);"
+          [ "$(grep -c '"version": "1.0.217"' package-lock.json)" -ge 2 ]
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: npm ci + TypeScript + sintaxe dos renderers (index/bgnotify/slareminder)
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          ./node_modules/.bin/tsc --noEmit -p tsconfig.json
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/renderer/bgnotify.html','utf8');const m=s.match(/<script>([\s\S]*?)<\/script>/);new Function(m[1]);"
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/renderer/slareminder.html','utf8');const m=s.match(/<script>([\s\S]*?)<\/script>/);new Function(m[1]);"
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/renderer/index.html','utf8');const b=[...s.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(x=>x[1]);b.sort((a,c)=>c.length-a.length);new Function(b[0]);"
+      - name: "Gate F3.5.5A — planner 98 + orquestrador 38 + central 33 + integração 25 (build dist p/ suites funcionais)"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          npm run build
+          node scripts/f355a-execution-planner.test.mjs
+          node scripts/f355a-orchestrator.test.mjs
+          node scripts/f355a-execution-central.test.mjs
+          node scripts/f355a-integration.test.mjs
+      - name: "Gate REGRESSÃO 1.0.216 — som 37 + detalhes 74 + cards 53 + sessão 40"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f354wh2-immediate-notification-sound.test.mjs
+          node scripts/f354wh1-details-status-notes.test.mjs
+          node scripts/f354w-compact-cards-details.test.mjs
+          node scripts/f354vh1-session-persistence.test.mjs
+      - name: "Gate PROVAS REAIS Electron (25) — janela laranja/decide/preempção/dual-device (xvfb)"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y >/dev/null 2>&1 || true
+          sudo apt-get install -y xvfb >/dev/null 2>&1 || true
+          xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f355a-execution-proof-main.js
+      - name: "Gate ISOLAMENTO — delta vs 1.0.216 SÓ nos arquivos autorizados; congelados diff-vazio"
+        run: |
+          set -euo pipefail
+          git diff --name-only "$BASE_216_SHA"..HEAD > /tmp/delta.txt; cat /tmp/delta.txt
+          # allowlist F3.5.5A: planner/orquestrador novos + acoplamento cirúrgico (scheduler/slaReminder/
+          # janela/auth postAuthed/main/preload/renderers) + som laranja + suites/provas + docs + workflows
+          # desta fase + releases HERDADOS do fork da branch (wh1/wh2, já publicados) + pins de versão
+          # nas suítes wh2/vh1 (precedente b12fde2).
+          BAD=$(grep -vE '^(\.github/workflows/desktop-release-f354wh[12]\.yml$|\.github/workflows/desktop-(build|release)-f355a\.yml$|desktop/src/main/(executionTracking\.js|executionOrchestrator\.ts|taskIdleScheduler\.ts|slaReminder\.ts|slaReminderWindow\.ts|auth-core\.ts|auth\.ts|main\.ts)$|desktop/src/preload/preload\.ts$|desktop/src/renderer/(index|slareminder)\.html$|desktop/src/renderer/sounds/execution-checkin\.wav$|desktop/scripts/copy-renderer\.js$|desktop/scripts/f355a-|desktop/scripts/f354wh2-immediate-notification-sound\.test\.mjs$|desktop/scripts/f354vh1-session-persistence\.test\.mjs$|desktop/package(-lock)?\.json$|docs/f355a(-qa)?/)' /tmp/delta.txt || true)
+          [ -z "$BAD" ] || { echo "::error::fora da allowlist: $BAD"; exit 1; }
+          # CONGELADOS byte-idênticos vs 1.0.216 (produtores/entrega aprovados + sons de SLA):
+          git diff --quiet "$BASE_216_SHA"..HEAD -- desktop/src/main/notificationGrouping.ts desktop/src/main/slaScheduler.ts desktop/src/main/notifierA.ts desktop/src/main/notifEvents.js desktop/src/main/slaRules.js desktop/src/main/cardsRules.js desktop/src/main/updaterService.ts desktop/src/main/bgNotify.ts desktop/src/main/taskIdle.ts desktop/src/main/taskIdleStore.ts desktop/src/renderer/bgnotify.html desktop/src/renderer/sounds/sla-warning.wav desktop/src/renderer/sounds/sla-critical.wav || { echo "::error::módulo congelado alterado"; exit 1; }
+          if git diff "$BASE_216_SHA"..HEAD -- android-native/ android-native-beta/ functions/ cloudflare-worker.js 2>/dev/null | grep -q .; then echo "::error::android/backend/worker tocados NESTA branch (backend foi via backend/f355a-execution-checkpoint-claims)"; exit 1; fi
+      - name: "Gate AUTORIDADE ÚNICA + OFF-default (marcadores do código)"
+        run: |
+          set -euo pipefail
+          grep -q 'legacyGate' desktop/src/main/taskIdleScheduler.ts
+          grep -q 'suppressed_by_execution_authority' desktop/src/main/taskIdleScheduler.ts
+          grep -q 'mode: "off", sectors: \[\]' desktop/src/main/main.ts
+          grep -q 'claimexecutioncheckpoint-de36pi7vza-uc.a.run.app' desktop/src/main/main.ts
+          grep -q 'respondexecutioncheckpoint-de36pi7vza-uc.a.run.app' desktop/src/main/main.ts
+          grep -q 'Conclua a configuração da jornada antes de ativar os check-ins.' desktop/src/main/executionTracking.js
+          echo "AUTORIDADE/OFF-DEFAULT: VERIFIED."
+  build:
+    needs: verify
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: npm ci + build + electron-builder (--publish never)
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm run build
+          npx electron-builder --win nsis msi --publish never
+      - name: "Gate EMPACOTADO — versão + execução no app.asar (renderers/dist/sons reais)"
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          ASAR="dist-installer/win-unpacked/resources/app.asar"; test -f "$ASAR"
+          npx --yes @electron/asar extract "$ASAR" asar-x
+          node -e "const p=require('./asar-x/package.json'); if(p.version!=='1.0.217') process.exit(1);"
+          grep -q "CHECK-IN DE EXECUÇÃO" asar-x/src/renderer/slareminder.html
+          grep -q "Você está executando esta tarefa neste momento?" asar-x/src/renderer/slareminder.html
+          grep -q "card.exec::before" asar-x/src/renderer/slareminder.html
+          grep -q "ACOMPANHAMENTO DA EXECUÇÃO" asar-x/src/renderer/index.html
+          grep -q "Conclua a configuração da jornada antes de ativar os check-ins." asar-x/src/renderer/index.html
+          test -f asar-x/dist/main/executionOrchestrator.js
+          test -f asar-x/dist/main/executionTracking.js
+          test -f asar-x/src/renderer/sounds/execution-checkin.wav
+          grep -q "claimexecutioncheckpoint-de36pi7vza-uc.a.run.app" asar-x/dist/main/main.js
+          grep -q "deriveExecutionSmEvent" asar-x/dist/main/main.js
+          grep -q 'mode: "off"' asar-x/dist/main/main.js
+          grep -q "executionRespond" asar-x/dist/main/slaReminder.js
+          # sons de SLA aprovados byte-idênticos no pacote + regressão empacotada do som (37)
+          SRC=asar-x/src/renderer/index.html BG_SRC=asar-x/src/renderer/bgnotify.html MAIN_SRC=src/main/main.ts BGM_SRC=src/main/bgNotify.ts node scripts/f354wh2-immediate-notification-sound.test.mjs
+          SRC=asar-x/src/renderer/index.html node scripts/f354wh1-details-status-notes.test.mjs
+          echo "GATE F3.5.5A EMPACOTADO: VERIFIED."
+      - name: Empacotar bundle + SHA256SUMS + VERSAO-DESKTOP
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes @cyclonedx/cyclonedx-npm --omit dev --output-format JSON --output-file "$RUNNER_TEMP/sbom.json" || echo '{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}' > "$RUNNER_TEMP/sbom.json"
+          OUT="$GITHUB_WORKSPACE/dist-pkg"; mkdir -p "$OUT"
+          EXE=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe | head -1); MSI=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.msi | head -1); BM=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap | head -1)
+          cp "$EXE" "$MSI" "$BM" dist-installer/latest.yml "$OUT/"; cp "$RUNNER_TEMP/sbom.json" "$OUT/SBOM-cyclonedx.json"
+          EXE_NAME=$(basename "$EXE"); MSI_NAME=$(basename "$MSI"); BM_NAME=$(basename "$BM")
+          ( cd "$OUT" && sha256sum "$EXE_NAME" "$MSI_NAME" latest.yml "$BM_NAME" SBOM-cyclonedx.json > SHA256SUMS )
+          { echo "productName : Agenda ID Seven Desktop"; echo "versionName : 1.0.217"; echo "rotulo      : 1.0.217-adaptive-execution-checkins (CANDIDATA — Acompanhamento Inteligente de Execução, flag OFF)"; echo "channel     : latest (NADA publicado neste build)"; echo "appId       : br.com.idseven.agenda.desktop"; echo "instalador  : $EXE_NAME"; echo "SHA-256 exe : $(sha256sum "$OUT/$EXE_NAME" | awk '{print $1}')"; echo "instalador2 : $MSI_NAME"; echo "SHA-256 msi : $(sha256sum "$OUT/$MSI_NAME" | awk '{print $1}')"; echo "commit      : $GITHUB_SHA (branch $GITHUB_REF_NAME)"; echo "base-codigo : Desktop 1.0.216 (commit e509f43)"; echo "rollback    : Desktop 1.0.216 (imediato, commit e509f43); adicional 1.0.213 (e626d36)"; echo "origem      : F3.5.5A — Acompanhamento Inteligente de Execução: check-ins laranja adaptativos (planner determinístico; claim/resposta SERVER-SIDE transacionais com relógio do servidor; autoridade única por tarefa; OFF/SHADOW/ACTIVE default OFF; SM em tempo real; timeline nos Detalhes; jornada configurável). Alertas amarelo/vermelho e todas as notificações 1.0.216 preservados."; echo "distribuicao: CANDIDATA — publicação no Latest ocorre no workflow desktop-release-f355a.yml (mesmos bytes)"; } > "$OUT/VERSAO-DESKTOP.txt"
+          echo "== SHA256SUMS =="; cat "$OUT/SHA256SUMS"
+      - uses: actions/upload-artifact@v4
+        with: { name: agenda-id-seven-desktop-1.0.217-installer, path: "dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe\ndist-pkg/Agenda-ID-Seven-Desktop-*-x64.msi", if-no-files-found: error, retention-days: 30 }
+      - uses: actions/upload-artifact@v4
+        with: { name: agenda-id-seven-desktop-1.0.217-updatemeta, path: "dist-pkg/latest.yml\ndist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap\ndist-pkg/SHA256SUMS\ndist-pkg/SBOM-cyclonedx.json\ndist-pkg/VERSAO-DESKTOP.txt", if-no-files-found: error, retention-days: 30 }

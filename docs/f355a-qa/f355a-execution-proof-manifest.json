@@ -1,0 +1,145 @@
+{
+  "phase": "F3.5.5A",
+  "at": "2026-08-04T18:07:26.306Z",
+  "electron": "31.3.1",
+  "results": [
+    {
+      "name": "P1 asar empacotado com renderer REAL + som laranja próprio",
+      "ok": true,
+      "wavs": [
+        "execution-checkin.wav",
+        "sla-critical.wav",
+        "sla-warning.wav"
+      ]
+    },
+    {
+      "name": "P2 janela central REAL exibe a view LARANJA (card exec; título literal)",
+      "ok": true,
+      "cls": "card checkin exec",
+      "kick": "CHECK-IN DE EXECUÇÃO"
+    },
+    {
+      "name": "P3 pergunta LITERAL do mandato no card real",
+      "ok": true,
+      "msg": "Você está executando esta tarefa neste momento?"
+    },
+    {
+      "name": "P4 som PRÓPRIO laranja tocou 1x no render (Audio via soundDataUri)",
+      "ok": true,
+      "audio": 1
+    },
+    {
+      "name": "P5 ACK real de render recebido no main (timer só depois disto)",
+      "ok": true,
+      "acks": 1
+    },
+    {
+      "name": "P6 respostas reais presentes (SIM/NÃO/snooze/Abrir tarefa)",
+      "ok": true,
+      "btns": "true,true,true,true"
+    },
+    {
+      "name": "P7 re-render da MESMA chave NÃO duplica som (1 por checkpoint)",
+      "ok": true,
+      "audio": 1
+    },
+    {
+      "name": "P8 'Registrando…' real após confirmar (freeze 1.0.211)",
+      "ok": true,
+      "busy": true
+    },
+    {
+      "name": "P9 decide REAL via IPC com identidade + resposta + observação",
+      "ok": true,
+      "d1": {
+        "key": "taskProva01|desProva01|dl0|cp1",
+        "rt": "sim"
+      }
+    },
+    {
+      "name": "P10 falha de rede: erro exibido e TEXTO PRESERVADO p/ retry",
+      "ok": true,
+      "errShown": true,
+      "obsKept": "Finalizando a arte final"
+    },
+    {
+      "name": "P11 NÃO abre as 5 razões reais",
+      "ok": true,
+      "rowsN": 5
+    },
+    {
+      "name": "P12 decide NÃO/bloqueado com observação (payload real)",
+      "ok": true,
+      "rt": "nao_bloqueado"
+    },
+    {
+      "name": "P13 rascunho exec preservado via draft IPC (exec:true)",
+      "ok": true,
+      "drafts": 6
+    },
+    {
+      "name": "P14 'já respondido em outro dispositivo' na superfície real",
+      "ok": true,
+      "msgBox": true
+    },
+    {
+      "name": "P15 crítico ASSUME a janela (laranja recolhe; classe muda)",
+      "ok": true,
+      "cls2": "card red"
+    },
+    {
+      "name": "P16 laranja RESTAURADO com o texto digitado após o crítico",
+      "ok": true,
+      "obsRest": "Aguardando logo do cliente"
+    },
+    {
+      "name": "P17 restore NÃO toca som novo (mesma chave)",
+      "ok": true,
+      "audio": 1
+    },
+    {
+      "name": "P18 snooze real emite decide {executionSnooze:true}",
+      "ok": true,
+      "snz": "ok"
+    },
+    {
+      "name": "P19 DUAL-DEVICE: claim simultâneo ⇒ UM CLAIMED no servidor (claimVersion=1)",
+      "ok": true,
+      "holder": "aaaa"
+    },
+    {
+      "name": "P20 SÓ o vencedor exibe (o outro suprime LEASED_BY_OTHER; zero janela/som duplicados)",
+      "ok": true,
+      "a": 1,
+      "b": 0
+    },
+    {
+      "name": "P21 claimedAt/leaseExpiresAt vieram do RELÓGIO DO SERVIDOR (persistidos no doc)",
+      "ok": true
+    },
+    {
+      "name": "P22 resposta registrada em outro device INVALIDA quem está EXIBINDO (onRemoteClose no vencedor) e o suprimido não refecha (idempotente)",
+      "ok": true,
+      "winner": 1,
+      "loser": 0
+    },
+    {
+      "name": "P23 lease VENCIDO (no servidor) permite takeover (claimVersion++)",
+      "ok": true
+    },
+    {
+      "name": "P24 relógio local ±10min NÃO afeta a decisão (domínio só recebe serverNow)",
+      "ok": true
+    },
+    {
+      "name": "P25 OFF ⇒ orquestrador inerte (zero claim/emissão; comportamento 1.0.216)",
+      "ok": true
+    }
+  ],
+  "sha256": {
+    "slareminder.html": "29633e7bd0ef7f747e057c825414f5c6e242f5eb7fa95c4743e794360345ac49",
+    "index.html": "a5b223f0b390bca47678be5f5aafa61d272836bd6ac0e772881f2393cbb30190",
+    "execution-checkin.wav": "937909295dae08e83806aaa67bf45f41471f04de77772017a06978488bca7965",
+    "app.asar": "ecf28c73e6080982d97ac0bf2b656b2742742bccae2823d9a74dc66ac6031bc2"
+  }
+}
