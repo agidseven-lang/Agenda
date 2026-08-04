@@ -2470,3 +2470,349 @@ exports.syncUsersPublic = onDocumentWritten({ document: "users/{uid}", region: "
 
 // Exporta logica pura p/ o harness (NAO afeta runtime; testavel com mocks; sem deploy).
 exports._handleSyncUsersPublic = handleSyncUsersPublic;
+
+/* ============================================================================
+   F3.5.5A — ACOMPANHAMENTO INTELIGENTE DE EXECUÇÃO: claim/lease e resposta
+   SERVER-SIDE (autoridade FINAL de concorrência dos check-ins de execução).
+   ----------------------------------------------------------------------------
+   - CORREÇÃO ARQUITETURAL OBRIGATÓRIA (owner): o renderer/desktop PODE pedir,
+     mas quem CONFIRMA claim/resposta é o servidor, em TRANSAÇÃO ATÔMICA com
+     RELÓGIO DO SERVIDOR. O cliente NUNCA decide expiração de lease, takeover,
+     concorrência entre dispositivos, nem calcula claimedAt/leaseExpiresAt.
+   - Domínio PURO (etKey/etClaimDecision/etRespondDecision) copiado VERBATIM de
+     desktop/src/main/executionTracking.js (mesma fonte lógica dos testes do
+     Desktop; sha256 do trecho verbatim:
+     5e849c603119393fdc877811cd6a7001a944b31f9ecabb0e226633cf939602c9).
+   - Session-gated (authVerifySessionToken; uid SÓ da sessão verificada). O
+     Designer autenticado precisa ser o Designer ATRIBUÍDO da tarefa (assigneeId
+     do doc lido NA transação) — divergência => deny designer_changed.
+   - Transação Firestore (Admin SDK bypassa Rules; a coleção executionCheckins
+     permanece BLOQUEADA para clientes pelo catch-all das Rules — nenhum client
+     lê/escreve histórico direto). Lê tasks/<taskId> + executionCheckins/<key>,
+     decide via domínio puro com serverNow = relógio DO SERVIDOR e persiste
+     tempos NUMÉRICOS calculados no servidor (claimedAt/leaseExpiresAt/
+     respondedAt/missedAt/updatedAt). Nenhum tempo do cliente vira autoridade.
+   - Concessão de claim SOMENTE quando {doc ausente | lease vencido no relógio
+     do servidor | retomada idempotente do MESMO dispositivo}. Negação quando
+     {lease válido de outro dispositivo (LEASED_BY_OTHER) | RESPONDED |
+     SUPERSEDED | CANCELLED | MISSED | SUPPRESSED | tarefa inelegível |
+     deadlineVersion mudou | Designer mudou | zona SLA}.
+   - Zona SLA no servidor (defesa em profundidade; só pode ficar MAIS
+     conservadora): body.slaZone === true OU dueAtMs informado com
+     (dueAtMs - serverNow) <= (max(30, sectorWarnMinutes) + 10) minutos => deny
+     sla_zone. O corte EXATO por setor segue no planner do Desktop (que suprime
+     antes mesmo de pedir claim); o cliente não consegue ENFRAQUECER a proteção
+     por aqui (omitir os campos só remove a checagem adicional do servidor).
+   - respondExecutionCheckpoint: valida claim vigente (mesmo Designer, mesmo
+     dispositivo OU lease vencido), checkpoint aberto, deadlineVersion atual,
+     sem resposta anterior, transição válida; persiste RESPONDED (ou MISSED no
+     kind="missed" reportado pelo detentor após timeout+reapresentação) e
+     PROJETA resumo+timeline em tasks/<taskId>.executionTracking na MESMA
+     transação — invalidação multi-device viaja pelo snapshot realtime de
+     tasks que TODOS os devices já assinam (sem canal novo, sem Rules novas).
+   - already_responded é IDEMPOTENTE (200, sem regravar histórico). Histórico
+     NUNCA é sobrescrito: respond/missed só transiciona estados abertos.
+   - Observação do Designer: texto operacional digitado no check-in (cap 2000
+     chars) — NUNCA senha/token/dado externo; NUNCA logada (logs só uid/task
+     mascarados + razões técnicas). Timeline no task doc limitada a 40 entradas.
+   - ADITIVO: nenhum endpoint/contrato existente muda; DORMENTE sem
+     AUTH_SESSION_SECRET => 401; sem consumidor até a Desktop 1.0.217 (flag OFF).
+   ============================================================================ */
+const ET_LEASE_DEFAULT_MS = 10 * 60000;                 // resposta+snooze cabem no lease
+const ET_LEASE_MIN_MS = 60000;
+const ET_LEASE_MAX_MS = 30 * 60000;
+const ET_OBS_MAX = 2000;                                 // observação (texto integral só em Detalhes)
+const ET_TIMELINE_MAX = 40;                              // projeção limitada no task doc
+const ET_RESPONSE_TYPES = ["sim", "nao_nao_iniciei", "nao_bloqueado", "nao_aguardando_material", "nao_conclui_minha_parte", "nao_outro"];
+const ET_TASK_CLOSED_STATUSES = ["concluido", "entregue"];   // espelho de etEligibility (concluida_entregue)
+
+function etKey(taskId, designerId, deadlineVersion, checkpointIndex) {
+  return String(taskId || "") + "|" + String(designerId || "") + "|dl" + String(deadlineVersion || 0) + "|cp" + String(checkpointIndex);
+}
+
+function etClaimDecision(existing, serverNow, deviceId, leaseMs, ctx) {
+  leaseMs = leaseMs > 0 ? leaseMs : 3 * 60000;
+  if (ctx) {
+    if (ctx.eligible === false) return { decision: "deny", reason: "task_not_eligible" };
+    if (ctx.inSlaZone === true) return { decision: "deny", reason: "sla_zone" };
+    if (ctx.deadlineVersionCurrent !== undefined && ctx.expectedDeadlineVersion !== undefined &&
+        ctx.deadlineVersionCurrent !== ctx.expectedDeadlineVersion) return { decision: "deny", reason: "deadline_changed" };
+    if (ctx.designerIdCurrent !== undefined && ctx.expectedDesignerId !== undefined &&
+        String(ctx.designerIdCurrent) !== String(ctx.expectedDesignerId)) return { decision: "deny", reason: "designer_changed" };
+  }
+  if (!existing) return { decision: "claim", state: "CLAIMED", leaseUntil: serverNow + leaseMs };
+  var st = String(existing.state || "");
+  if (st === "RESPONDED" || st === "MISSED" || st === "CANCELLED" || st === "SUPERSEDED" || st === "SUPPRESSED")
+    return { decision: "closed", state: st };
+  if (st === "CLAIMED" || st === "DISPLAYED") {
+    if (String(existing.claimDeviceId || "") === String(deviceId || "")) return { decision: "own", state: st };
+    if (existing.leaseExpiresAt > serverNow) return { decision: "leased", state: st, reason: "LEASED_BY_OTHER", leaseExpiresAt: existing.leaseExpiresAt };
+    return { decision: "takeover_expired", state: "CLAIMED", leaseUntil: serverNow + leaseMs }; // lease venceu (no relógio do SERVIDOR)
+  }
+  return { decision: "claim", state: "CLAIMED", leaseUntil: serverNow + leaseMs }; // PLANNED/DUE
+}
+
+function etRespondDecision(existing, serverNow, deviceId, ctx) {
+  if (!existing) return { decision: "deny", reason: "checkpoint_not_found" };
+  if (ctx && ctx.deadlineVersionCurrent !== undefined && ctx.expectedDeadlineVersion !== undefined &&
+      ctx.deadlineVersionCurrent !== ctx.expectedDeadlineVersion) return { decision: "deny", reason: "deadline_changed" };
+  if (ctx && ctx.designerIdCurrent !== undefined && ctx.expectedDesignerId !== undefined &&
+      String(ctx.designerIdCurrent) !== String(ctx.expectedDesignerId)) return { decision: "deny", reason: "designer_changed" };
+  var st = String(existing.state || "");
+  if (st === "RESPONDED") return { decision: "already_responded" };
+  if (st === "CANCELLED" || st === "SUPERSEDED" || st === "SUPPRESSED" || st === "MISSED")
+    return { decision: "deny", reason: "checkpoint_closed_" + st.toLowerCase() };
+  if (!(st === "CLAIMED" || st === "DISPLAYED")) return { decision: "deny", reason: "invalid_transition_from_" + st.toLowerCase() };
+  if (String(existing.claimDeviceId || "") !== String(deviceId || "") && existing.leaseExpiresAt > serverNow)
+    return { decision: "deny", reason: "claim_held_by_other" };
+  return { decision: "respond", state: "RESPONDED" }; // respondedAt = server time (na transação)
+}
+
+/* Hash de sessão p/ auditoria de claim: sha256 do token Bearer (determinístico por
+   sessão; irreversível; o token em si NUNCA é persistido/logado). */
+function etSessionHash(authHeader) {
+  const m = /^Bearer\s+(.+)$/.exec(String(authHeader || "").trim());
+  return crypto.createHash("sha256").update(m ? m[1] : "").digest("hex").slice(0, 32);
+}
+
+/* Validação comum do corpo (claim e respond). Retorna {err} ou campos normalizados. */
+function etParseCommon(body, authUid) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return { err: "body_not_object" };
+  const taskId = (typeof body.taskId === "string") ? body.taskId.trim() : "";
+  if (!taskId || taskId.length > 120 || taskId.indexOf("/") >= 0) return { err: "bad_task_id" };
+  const dlv = Number(body.deadlineVersion);
+  if (!Number.isInteger(dlv) || dlv < 0 || dlv > 100000) return { err: "bad_deadline_version" };
+  const cpi = Number(body.checkpointIndex);
+  if (!Number.isInteger(cpi) || cpi < 0 || cpi > 11) return { err: "bad_checkpoint_index" };
+  const deviceHash = (typeof body.deviceHash === "string") ? body.deviceHash.trim().toLowerCase() : "";
+  if (!/^[a-f0-9]{16,64}$/.test(deviceHash)) return { err: "bad_device_hash" };
+  const key = etKey(taskId, authUid, dlv, cpi);
+  if (typeof body.checkinId === "string" && body.checkinId && body.checkinId !== key) return { err: "checkin_id_mismatch" };
+  return { taskId, dlv, cpi, deviceHash, key };
+}
+
+/* ctx do domínio a partir do doc REAL de tasks lido NA transação (nunca do cliente). */
+function etTaskCtx(taskSnap, authUid, body, dlv, serverNow) {
+  if (!taskSnap || !taskSnap.exists) return { eligible: false };
+  const t = taskSnap.data() || {};
+  const st = String(t.status || "");
+  const closed = ET_TASK_CLOSED_STATUSES.indexOf(st) >= 0 || t.removed === true || t.cancelled === true;
+  // Zona SLA conservadora (ver cabeçalho): o cliente só consegue APERTAR, nunca afrouxar.
+  let inSlaZone = body && body.slaZone === true;
+  const dueAtMs = body ? Number(body.dueAtMs) : 0;
+  if (!inSlaZone && dueAtMs > 0) {
+    const warnMin = Math.max(30, Number(body.sectorWarnMinutes) || 0);
+    if ((dueAtMs - serverNow) <= (warnMin + 10) * 60000) inSlaZone = true;
+  }
+  return {
+    eligible: !closed,
+    inSlaZone: inSlaZone,
+    deadlineVersionCurrent: Number(t.deadlineVersion || 0),
+    expectedDeadlineVersion: dlv,
+    designerIdCurrent: String(t.assigneeId || ""),
+    expectedDesignerId: String(authUid),
+  };
+}
+
+/* Orquestra o CLAIM transacional. ctx = {method, authHeader, body, ip, now, db}. */
+async function handleClaimExecutionCheckpoint(ctx) {
+  ctx = ctx || {};
+  const now = (typeof ctx.now === "number" ? ctx.now : Date.now());
+  const method = String(ctx.method || "").toUpperCase();
+  if (method && method !== "POST") return { status: 405, json: { ok: false, error: "method_not_allowed" } };
+  const auth = authVerifySessionToken(ctx.authHeader, authSessionSecret(), now);
+  if (!auth.ok) return { status: 401, json: { ok: false, error: "invalid_session" } };
+  const ip = (typeof ctx.ip === "string") ? ctx.ip : "";
+  const rlKeys = ["etc:" + auth.uid].concat(ip ? ["etci:" + ip] : []);
+  if (rlKeys.some((k) => notifRlBlocked(k, now))) return { status: 429, json: { ok: false, error: "rate_limited" } };
+  const p = etParseCommon(ctx.body, auth.uid);
+  if (p.err) { rlKeys.forEach((k) => notifRlFail(k, now)); return { status: 400, json: { ok: false, error: p.err } }; }
+  let leaseMs = Number(ctx.body.leaseMs) || ET_LEASE_DEFAULT_MS;
+  leaseMs = Math.max(ET_LEASE_MIN_MS, Math.min(ET_LEASE_MAX_MS, leaseMs));
+  const sessionHash = etSessionHash(ctx.authHeader);
+  const db = ctx.db || notifDb();
+  let out;
+  try {
+    out = await db.runTransaction(async (tx) => {
+      const serverNow = (typeof ctx.now === "number" ? ctx.now : Date.now()); // relógio do SERVIDOR (única autoridade)
+      const taskRef = db.collection("tasks").doc(p.taskId);
+      const cpRef = db.collection("executionCheckins").doc(p.key);
+      const taskSnap = await tx.get(taskRef);
+      const cpSnap = await tx.get(cpRef);
+      const existing = (cpSnap && cpSnap.exists) ? (cpSnap.data() || {}) : null;
+      const dctx = etTaskCtx(taskSnap, auth.uid, ctx.body, p.dlv, serverNow);
+      const d = etClaimDecision(existing, serverNow, p.deviceHash, leaseMs, dctx);
+      if (d.decision === "claim" || d.decision === "takeover_expired" || d.decision === "own") {
+        const claimVersion = (existing && Number(existing.claimVersion) > 0 ? Number(existing.claimVersion) : 0) + (d.decision === "own" ? 0 : 1);
+        const doc = {
+          taskId: p.taskId, designerId: auth.uid, deadlineVersion: p.dlv, checkpointIndex: p.cpi, key: p.key,
+          state: "CLAIMED",
+          claimDeviceId: p.deviceHash,
+          claimedBySessionHash: sessionHash,
+          claimedByDeviceHash: p.deviceHash,
+          claimedAt: serverNow,                      // servidor
+          leaseExpiresAt: serverNow + leaseMs,       // servidor + duração
+          claimVersion: claimVersion,
+          updatedAt: serverNow,                      // servidor
+        };
+        if (!existing) doc.createdAt = serverNow;
+        if (existing && existing.state === "DISPLAYED" && d.decision === "own") doc.state = "DISPLAYED"; // retomada não regride exibição
+        tx.set(cpRef, doc, { merge: true });
+        return {
+          status: 200,
+          json: {
+            ok: true,
+            decision: (d.decision === "own" ? "resumed" : (d.decision === "takeover_expired" ? "takeover" : "claimed")),
+            state: doc.state, claimedAt: doc.claimedAt, leaseExpiresAt: doc.leaseExpiresAt, claimVersion: claimVersion, key: p.key,
+          },
+        };
+      }
+      if (d.decision === "leased") {
+        return { status: 200, json: { ok: true, decision: "deny", reason: "LEASED_BY_OTHER", state: d.state, leaseExpiresAt: d.leaseExpiresAt, key: p.key } };
+      }
+      if (d.decision === "closed") {
+        return { status: 200, json: { ok: true, decision: "closed", state: d.state, key: p.key } };
+      }
+      return { status: 200, json: { ok: true, decision: "deny", reason: String(d.reason || "denied"), key: p.key } };
+    });
+  } catch (e) {
+    try { logger.error("[claimExecutionCheckpoint] tx falhou", { uid: notifMaskUid(auth.uid), task: notifMaskUid(p.taskId), err: e && e.message }); } catch (_) {}
+    return { status: 500, json: { ok: false, error: "tx_failed" } };
+  }
+  rlKeys.forEach((k) => notifRlClear(k));
+  try { logger.info("[claimExecutionCheckpoint] ok", { uid: notifMaskUid(auth.uid), task: notifMaskUid(p.taskId), cp: p.cpi, dlv: p.dlv, decision: out.json.decision, reason: out.json.reason || "" }); } catch (_) {}
+  return out;
+}
+
+/* Orquestra a RESPOSTA/MISSED transacional. ctx = {method, authHeader, body, ip, now, db}. */
+async function handleRespondExecutionCheckpoint(ctx) {
+  ctx = ctx || {};
+  const now = (typeof ctx.now === "number" ? ctx.now : Date.now());
+  const method = String(ctx.method || "").toUpperCase();
+  if (method && method !== "POST") return { status: 405, json: { ok: false, error: "method_not_allowed" } };
+  const auth = authVerifySessionToken(ctx.authHeader, authSessionSecret(), now);
+  if (!auth.ok) return { status: 401, json: { ok: false, error: "invalid_session" } };
+  const ip = (typeof ctx.ip === "string") ? ctx.ip : "";
+  const rlKeys = ["etr:" + auth.uid].concat(ip ? ["etri:" + ip] : []);
+  if (rlKeys.some((k) => notifRlBlocked(k, now))) return { status: 429, json: { ok: false, error: "rate_limited" } };
+  const p = etParseCommon(ctx.body, auth.uid);
+  if (p.err) { rlKeys.forEach((k) => notifRlFail(k, now)); return { status: 400, json: { ok: false, error: p.err } }; }
+  const body = ctx.body;
+  const kind = (body.kind === "missed") ? "missed" : "respond";
+  let responseType = "";
+  if (kind === "missed") {
+    responseType = "missed";
+  } else {
+    responseType = (typeof body.responseType === "string") ? body.responseType : "";
+    if (ET_RESPONSE_TYPES.indexOf(responseType) < 0) { rlKeys.forEach((k) => notifRlFail(k, now)); return { status: 400, json: { ok: false, error: "bad_response_type" } }; }
+  }
+  let observation = (typeof body.observation === "string") ? body.observation : "";
+  if (observation.length > ET_OBS_MAX) observation = observation.slice(0, ET_OBS_MAX);
+  let progressPct = Number(body.progressPct);
+  progressPct = (Number.isInteger(progressPct) && progressPct >= 0 && progressPct <= 100) ? progressPct : null;
+  let waitingOrigin = (typeof body.waitingOrigin === "string") ? body.waitingOrigin.slice(0, 200) : "";
+  let pauseUntilMs = Number(body.pauseUntilMs) || 0;
+  if (!(pauseUntilMs > now && pauseUntilMs <= now + 7 * 86400000)) pauseUntilMs = 0;
+  let displayedAtHint = Number(body.displayedAtMs) || 0;   // telemetria do cliente (NUNCA autoridade)
+  const db = ctx.db || notifDb();
+  let out;
+  try {
+    out = await db.runTransaction(async (tx) => {
+      const serverNow = (typeof ctx.now === "number" ? ctx.now : Date.now()); // relógio do SERVIDOR (única autoridade)
+      const taskRef = db.collection("tasks").doc(p.taskId);
+      const cpRef = db.collection("executionCheckins").doc(p.key);
+      const taskSnap = await tx.get(taskRef);
+      const cpSnap = await tx.get(cpRef);
+      const existing = (cpSnap && cpSnap.exists) ? (cpSnap.data() || {}) : null;
+      const dctx = etTaskCtx(taskSnap, auth.uid, body, p.dlv, serverNow);
+      delete dctx.inSlaZone;      // resposta de checkpoint já exibido NUNCA é bloqueada pela zona SLA
+      delete dctx.eligible;       // nem por elegibilidade posterior — histórico aberto pode fechar
+      const d = etRespondDecision(existing, serverNow, p.deviceHash, dctx);
+      if (d.decision === "already_responded") {
+        return { status: 200, json: { ok: true, decision: "already_responded", state: "RESPONDED", key: p.key } };
+      }
+      if (d.decision !== "respond") {
+        return { status: 200, json: { ok: true, decision: "deny", reason: String(d.reason || "denied"), key: p.key } };
+      }
+      const finalState = (kind === "missed") ? "MISSED" : "RESPONDED";
+      const upd = {
+        state: finalState,
+        respondedAt: serverNow,                    // servidor
+        respondedByDeviceHash: p.deviceHash,
+        responseType: responseType,
+        observation: observation,
+        updatedAt: serverNow,                      // servidor
+      };
+      if (kind === "missed") { upd.missedAt = serverNow; }
+      if (progressPct !== null) upd.progressPct = progressPct;
+      if (waitingOrigin) upd.waitingOrigin = waitingOrigin;
+      if (pauseUntilMs) upd.pauseUntilMs = pauseUntilMs;
+      if (displayedAtHint > 0 && !existing.displayedAtHint) upd.displayedAtHint = displayedAtHint;
+      tx.set(cpRef, upd, { merge: true });
+      // Projeção no task doc (MESMA transação): resumo + timeline limitada — é por aqui
+      // que os OUTROS devices fecham a superfície (snapshot realtime de tasks).
+      const t = (taskSnap && taskSnap.exists) ? (taskSnap.data() || {}) : {};
+      const prev = (t.executionTracking && typeof t.executionTracking === "object") ? t.executionTracking : {};
+      const prevTimeline = Array.isArray(prev.timeline) ? prev.timeline : [];
+      const entry = {
+        at: serverNow, checkpointIndex: p.cpi, deadlineVersion: p.dlv, kind: kind,
+        responseType: responseType, observation: observation,
+      };
+      if (progressPct !== null) entry.progressPct = progressPct;
+      if (waitingOrigin) entry.waitingOrigin = waitingOrigin;
+      if (pauseUntilMs) entry.pauseUntilMs = pauseUntilMs;
+      const timeline = prevTimeline.concat([entry]).slice(-ET_TIMELINE_MAX);
+      const tracking = Object.assign({}, prev, {
+        v: 1,
+        lastCheckin: { key: p.key, checkpointIndex: p.cpi, deadlineVersion: p.dlv, state: finalState, at: serverNow, responseType: responseType },
+        timeline: timeline,
+        updatedAt: serverNow,
+      });
+      if (taskSnap && taskSnap.exists) tx.set(taskRef, { executionTracking: tracking }, { merge: true });
+      return { status: 200, json: { ok: true, decision: (kind === "missed" ? "missed" : "responded"), state: finalState, respondedAt: serverNow, key: p.key } };
+    });
+  } catch (e) {
+    try { logger.error("[respondExecutionCheckpoint] tx falhou", { uid: notifMaskUid(auth.uid), task: notifMaskUid(p.taskId), err: e && e.message }); } catch (_) {}
+    return { status: 500, json: { ok: false, error: "tx_failed" } };
+  }
+  rlKeys.forEach((k) => notifRlClear(k));
+  try { logger.info("[respondExecutionCheckpoint] ok", { uid: notifMaskUid(auth.uid), task: notifMaskUid(p.taskId), cp: p.cpi, dlv: p.dlv, decision: out.json.decision, reason: out.json.reason || "" }); } catch (_) {}
+  return out;
+}
+
+// Wrappers HTTPS (onRequest => NAO usa request.auth.uid; uid SÓ da sessão verificada).
+// DORMENTE sem AUTH_SESSION_SECRET => 401. Cache-Control no-store; OPTIONS 204.
+exports.claimExecutionCheckpoint = onRequest({ secrets: [AUTH_SESSION_SECRET], region: "us-central1", maxInstances: 10, cors: NOTIF_CORS_ORIGINS }, async (req, res) => {
+  if (req.method === "OPTIONS") { res.status(204).send(""); return; }   // preflight: sem auth, sem segredo, sem Firestore
+  try {
+    res.set("Cache-Control", "no-store");
+    const ipHdr = (req.headers && (req.headers["x-forwarded-for"] || req.headers["X-Forwarded-For"])) || "";
+    const clientIp = String(ipHdr).split(",")[0].trim() || (req.ip ? String(req.ip) : "");
+    const out = await handleClaimExecutionCheckpoint({ method: req.method, authHeader: (req.get && req.get("authorization")) || "", body: req.body, ip: clientIp, now: Date.now() });
+    res.status(out.status).json(out.json);
+  } catch (e) {
+    try { logger.error("[claimExecutionCheckpoint] erro", { err: e && e.message }); } catch (_) {}
+    res.status(500).json({ ok: false, error: "internal" });
+  }
+});
+
+exports.respondExecutionCheckpoint = onRequest({ secrets: [AUTH_SESSION_SECRET], region: "us-central1", maxInstances: 10, cors: NOTIF_CORS_ORIGINS }, async (req, res) => {
+  if (req.method === "OPTIONS") { res.status(204).send(""); return; }   // preflight: sem auth, sem segredo, sem Firestore
+  try {
+    res.set("Cache-Control", "no-store");
+    const ipHdr = (req.headers && (req.headers["x-forwarded-for"] || req.headers["X-Forwarded-For"])) || "";
+    const clientIp = String(ipHdr).split(",")[0].trim() || (req.ip ? String(req.ip) : "");
+    const out = await handleRespondExecutionCheckpoint({ method: req.method, authHeader: (req.get && req.get("authorization")) || "", body: req.body, ip: clientIp, now: Date.now() });
+    res.status(out.status).json(out.json);
+  } catch (e) {
+    try { logger.error("[respondExecutionCheckpoint] erro", { err: e && e.message }); } catch (_) {}
+    res.status(500).json({ ok: false, error: "internal" });
+  }
+});
+
+// Exporta logica pura p/ o harness (NAO afeta runtime; NAO e CloudFunction; sem deploy).
+exports._handleClaimExecutionCheckpoint = handleClaimExecutionCheckpoint;
+exports._handleRespondExecutionCheckpoint = handleRespondExecutionCheckpoint;
+exports._etClaimDecision = etClaimDecision;
+exports._etRespondDecision = etRespondDecision;
+exports._etKey = etKey;
