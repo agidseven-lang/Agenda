@@ -1,0 +1,326 @@
+# =====================================================================
+# [push/manual] F3.5.4W-H1 — Desktop Build (1.0.215 — DETALHES · STATUS · APROVAÇÃO · OBSERVAÇÕES)
+# ---------------------------------------------------------------------
+# Base de código / rollback imediato: Desktop 1.0.214 (@8ede593 = tag v1.0.214, baseline FÍSICA aprovada).
+# Rollback adicional: 1.0.213 (@e626d36).
+# TRÊS entregas inseparáveis (E2/E3/E5) — renderer index.html + IPC MÍNIMO de clipboard:
+#   E2 — CENTRAL DE DETALHES premium: tipografia (.det-acc-k/-t/-l) + botões "Copiar tema"/"Copiar legenda"
+#        no cabeçalho dos acordeões (IPC simétrico clipboard-write-text/clipboardWriteText; detClipWrite;
+#        feedback discreto; observabilidade SANITIZADA — nunca tema/legenda/texto em log).
+#   E3 — STATUS Social/Designer (fonte única de aprovação/fluxo): awaiting_designer.social.col='afazer';
+#        designer atribuído e NÃO iniciado fica em "A Fazer" (paridade Social/Setores/Meu quadro);
+#        só vira "Em andamento" quando o designer realmente inicia.
+#   E5 — OBSERVAÇÕES INTERNAS por tema (aditivo): designerItemNotes (chave i<idx>), input dz-notes no
+#        fluxo do designer, render .det-acc-note na Central; histórico só com notesCount (nunca o texto).
+# Delta autorizado vs 1.0.214 em desktop/src: SOMENTE renderer/index.html + main.ts (APENAS o handler
+# clipboard-write-text) + preload.ts (APENAS clipboardWriteText). auth-core.ts/renderers comuns/
+# priorityEngine + stack de notificação/SLA/persistência: INTOCADOS (byte vs 1.0.214).
+# `--publish never` (nada publicado aqui; a publicação ocorre no desktop-release-f354wh1.yml, mesmos bytes).
+# =====================================================================
+name: "[push/manual] F3.5.4W-H1 — Desktop 1.0.215 (Detalhes/Status/Aprovação/Observações) — Desktop Build"
+"on":
+  push:
+    branches:
+      - "desktop/f354w-h1-details-workflow-approval-1.0.215"
+    paths-ignore:
+      - ".github/workflows/desktop-release-f354wh1.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  BASE_213_SHA: "e626d36921e269e28b74494ff51afb9c77f8d94d" # 1.0.213 (rollback adicional)
+  BASE_214_SHA: "8ede593bfab27cb212b0502bbbcdaed3f9c81f74" # 1.0.214 OFICIAL (base de código/rollback imediato = tag v1.0.214)
+  BRANCH_POINT_SHA: "8ede593bfab27cb212b0502bbbcdaed3f9c81f74" # ponto de fork da branch (= 1.0.214)
+  TEST_BRANCH: "desktop/f354w-h1-details-workflow-approval-1.0.215"
+  APP_DIR: "desktop"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults: { run: { shell: bash } }
+    steps:
+      - name: Checkout (SHA do push; history completo)
+        uses: actions/checkout@v4
+        with: { ref: "${{ github.sha }}", fetch-depth: 0 }
+
+      - name: Gate REF + ANCESTRIA — branch correta e descendente de 1.0.214 e 1.0.213
+        working-directory: desktop
+        run: |
+          set -e
+          [ "$GITHUB_REF_NAME" = "$TEST_BRANCH" ] || { echo "::error:: ref $GITHUB_REF_NAME != $TEST_BRANCH"; exit 1; }
+          git merge-base --is-ancestor "$BASE_214_SHA" HEAD || { echo "::error:: HEAD nao descende de 1.0.214"; exit 1; }
+          git merge-base --is-ancestor "$BASE_213_SHA" HEAD || { echo "::error:: HEAD nao descende de 1.0.213"; exit 1; }
+          echo "REF/ANCESTRIA OK"
+
+      - name: Derivar versao — exige 1.0.215 exato (package + lock x2)
+        working-directory: desktop
+        run: |
+          set -e
+          node -e 'const fs=require("fs");const p=JSON.parse(fs.readFileSync("package.json","utf8"));const l=JSON.parse(fs.readFileSync("package-lock.json","utf8"));if(p.version!=="1.0.215"){console.error("package.json version "+p.version+" != 1.0.215");process.exit(1);}if(l.version!=="1.0.215"||(l.packages&&l.packages[""]&&l.packages[""].version!=="1.0.215")){console.error("package-lock version != 1.0.215");process.exit(1);}console.log("versao 1.0.215 OK (3 campos)");'
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - name: npm ci
+        working-directory: desktop
+        run: npm ci
+      - name: TypeScript build (main + preload + renderer + modulos .js)
+        working-directory: desktop
+        run: npm run build
+      - name: Lint (tsc --noEmit)
+        working-directory: desktop
+        run: npx tsc --noEmit -p tsconfig.json
+
+      - name: Gate SINTAXE DOS RENDERERS — <script> inline de index/bgnotify/slareminder DEVEM parsear
+        working-directory: desktop
+        run: |
+          set -e
+          node -e '
+            const fs=require("fs");
+            function chk(file){ const s=fs.readFileSync(file,"utf8").replace(/\r\n/g,"\n");
+              const re=/<script(\b[^>]*)>([\s\S]*?)<\/script>/gi; let m,n=0;
+              while((m=re.exec(s))){ if(/\bsrc\s*=/.test(m[1]||"")) continue; n++;
+                try{ new Function(m[2]); }catch(e){ console.error("::error:: SyntaxError "+file+" #"+n+": "+(e&&e.message||e)); process.exit(1);} }
+              if(!n){ console.error("::error:: sem <script> inline "+file); process.exit(1);} }
+            chk("src/renderer/index.html"); chk("src/renderer/bgnotify.html"); chk("src/renderer/slareminder.html");
+            console.log("SINTAXE dos <script> inline OK.");'
+
+      - name: Gate F3.5.4W-H1 — contrato das 3 entregas E2/E3/E5 (74 asserts)
+        working-directory: desktop
+        run: |
+          set -e
+          node scripts/f354wh1-details-status-notes.test.mjs || { echo "::error:: f354wh1 vermelho"; exit 1; }
+
+      - name: Gate REGRESSAO 1.0.214 — F3.5.4W (53) + persistência da sessão (40) + qty vídeos (72) + contrato de vídeos f3377a (79)
+        working-directory: desktop
+        run: |
+          set -e
+          node scripts/f354w-compact-cards-details.test.mjs || { echo "::error:: f354w (cards compactos/central/avatares/social) regrediu"; exit 1; }
+          node scripts/f354vh1-session-persistence.test.mjs || { echo "::error:: f354vh1 (persistência) regrediu"; exit 1; }
+          node scripts/f354v-custom-video-quantity.test.mjs || { echo "::error:: f354v (quantidade de vídeos) regrediu"; exit 1; }
+          node scripts/f3377a-media-editing.test.mjs || { echo "::error:: f3377a (contrato de vídeos) regrediu"; exit 1; }
+
+      - name: Gate AUTH/CONTA — auth-core hermético (16) + account-anchor (server-side, splash-first)
+        working-directory: desktop
+        run: |
+          set -e
+          node scripts/f3356-auth-core.test.mjs || { echo "::error:: auth-core hermético regrediu"; exit 1; }
+          node scripts/f33L-account-anchor.test.mjs || { echo "::error:: account-anchor regrediu"; exit 1; }
+
+      - name: Gate REGRESSAO — notificações/SLA/decisão/idle/lembrete/agrupamento/prioridades/renderer (verdes)
+        working-directory: desktop
+        run: |
+          set -e
+          for t in \
+            f354u-h1-notification-hotfix f354u-premium-common-notifications f354r-priority-assistant \
+            f354q-task-idle-detection f354o-common-notification-grouping f354n-watchdog f354n-startup \
+            f354k-notification-all-window-states f354l-sla-central-persistent-reminders f354h-red-notification-boundary \
+            f354i-cronograma-save-send-client f354-notifications-reliability f354f-task-edit-update-notification \
+            f354f-sla-designer-live-timer f353-durable-notifications f353a-actor-photo f347-immediate-visual-delivery \
+            f352-cards-notify f33A-notif-central f33F-bg-notify f33B-form-typing f33C-assignment-toast \
+            f3377a-r4b-http-date-clock ; do
+            node "scripts/$t.test.mjs" || { echo "::error:: regressao vermelha: $t"; exit 1; }
+          done
+          echo "REGRESSAO verde."
+
+      - name: Gate ISOLAMENTO — delta vs 1.0.214 SÓ nos arquivos autorizados; src só index.html + IPC de clipboard
+        working-directory: desktop
+        run: |
+          set -e
+          # (a) delta vs o PONTO DE FORK (=1.0.214) = exatamente os arquivos desta fase
+          git -C "$GITHUB_WORKSPACE" diff --name-only "$BRANCH_POINT_SHA" HEAD > /tmp/diff.txt
+          echo "== arquivos alterados vs 1.0.214 =="; cat /tmp/diff.txt
+          ALLOW='^(desktop/src/renderer/index\.html|desktop/src/main/main\.ts|desktop/src/preload/preload\.ts|desktop/package\.json|desktop/package-lock\.json|desktop/scripts/f354wh1-details-status-notes\.test\.mjs|desktop/scripts/f354wh1-electron-proof\.mjs|desktop/scripts/f354wh1-electron-proof-main\.js|desktop/scripts/f354wh1-proof-preload\.js|desktop/scripts/f354vh1-session-persistence\.test\.mjs|docs/f354wh1-qa/.*|\.gitignore|\.github/workflows/desktop-build-f354wh1\.yml|\.github/workflows/desktop-release-f354wh1\.yml)$'
+          if grep -vE "$ALLOW" /tmp/diff.txt | grep -q .; then echo "::error:: arquivo fora da allowlist F3.5.4W-H1:"; grep -vE "$ALLOW" /tmp/diff.txt; exit 1; fi
+          # (b) em desktop/src, os ÚNICOS arquivos alterados vs 1.0.214 são index.html + main.ts + preload.ts
+          SRC=$(git -C "$GITHUB_WORKSPACE" diff --name-only "$BASE_214_SHA" HEAD -- desktop/src | grep -vE '^desktop/src/(renderer/index\.html|main/main\.ts|preload/preload\.ts)$' || true)
+          [ -z "$SRC" ] || { echo "::error:: alteração em desktop/src além do trio autorizado vs 1.0.214:"; echo "$SRC"; exit 1; }
+          # (c) congelados byte-idênticos vs 1.0.214 (todo main/ e preload/ EXCETO main.ts/preload.ts; renderers comuns; priorityEngine)
+          git -C "$GITHUB_WORKSPACE" diff --quiet "$BASE_214_SHA" HEAD -- desktop/src/main desktop/src/preload desktop/src/renderer/bgnotify.html desktop/src/renderer/slareminder.html desktop/src/renderer/priorityEngine.js ':(exclude)desktop/src/main/main.ts' ':(exclude)desktop/src/preload/preload.ts' || { echo "::error:: arquivo congelado alterado vs 1.0.214"; exit 1; }
+          echo "ISOLAMENTO OK."
+
+      - name: Gate IPC MÍNIMO — main.ts (+4/-0 só clipboard-write-text) e preload.ts (+2/-0 só clipboardWriteText) vs 1.0.214
+        working-directory: desktop
+        run: |
+          set -e
+          # main.ts: delta vs 1.0.214 = EXATAMENTE 4 linhas adicionadas (3 de comentário F3.5.4W-H1 + o handler) e 0 removidas
+          git -C "$GITHUB_WORKSPACE" diff "$BASE_214_SHA" HEAD -- desktop/src/main/main.ts > /tmp/main.diff
+          ADD=$(grep -E '^\+' /tmp/main.diff | grep -vE '^\+\+\+' || true); DEL=$(grep -E '^-' /tmp/main.diff | grep -vE '^---' || true)
+          [ -z "$DEL" ] || { echo "::error:: main.ts REMOVE linhas vs 1.0.214:"; echo "$DEL"; exit 1; }
+          N=$(printf '%s\n' "$ADD" | grep -c .); [ "$N" = "4" ] || { echo "::error:: main.ts: esperadas EXATAMENTE 4 linhas adicionadas, obtidas $N:"; printf '%s\n' "$ADD"; exit 1; }
+          printf '%s\n' "$ADD" | grep -qF 'ipcMain.handle("clipboard-write-text", (_e, s: string) => { try { clipboard.writeText(String(s ?? "")); return true; } catch { return false; } });' || { echo "::error:: handler clipboard-write-text ausente/alterado no delta de main.ts"; exit 1; }
+          printf '%s\n' "$ADD" | grep -qF '// F3.5.4W-H1 (E2)' || { echo "::error:: comentário F3.5.4W-H1 ausente no delta de main.ts"; exit 1; }
+          BAD=$(printf '%s\n' "$ADD" | grep -vE '^\+  //' | grep -vF 'ipcMain.handle("clipboard-write-text"' || true)
+          [ -z "$BAD" ] || { echo "::error:: linha adicionada fora do bloco clipboard-write-text em main.ts:"; echo "$BAD"; exit 1; }
+          # preload.ts: delta vs 1.0.214 = EXATAMENTE 2 linhas adicionadas (1 comentário + clipboardWriteText) e 0 removidas
+          git -C "$GITHUB_WORKSPACE" diff "$BASE_214_SHA" HEAD -- desktop/src/preload/preload.ts > /tmp/preload.diff
+          ADD=$(grep -E '^\+' /tmp/preload.diff | grep -vE '^\+\+\+' || true); DEL=$(grep -E '^-' /tmp/preload.diff | grep -vE '^---' || true)
+          [ -z "$DEL" ] || { echo "::error:: preload.ts REMOVE linhas vs 1.0.214:"; echo "$DEL"; exit 1; }
+          N=$(printf '%s\n' "$ADD" | grep -c .); [ "$N" = "2" ] || { echo "::error:: preload.ts: esperadas EXATAMENTE 2 linhas adicionadas, obtidas $N:"; printf '%s\n' "$ADD"; exit 1; }
+          printf '%s\n' "$ADD" | grep -qF 'clipboardWriteText: (s: string): Promise<boolean> => ipcRenderer.invoke("clipboard-write-text", s),' || { echo "::error:: clipboardWriteText ausente/alterado no delta de preload.ts"; exit 1; }
+          printf '%s\n' "$ADD" | grep -qF '// F3.5.4W-H1 (E2)' || { echo "::error:: comentário F3.5.4W-H1 ausente no delta de preload.ts"; exit 1; }
+          BAD=$(printf '%s\n' "$ADD" | grep -vE '^\+  //' | grep -vF 'clipboardWriteText:' || true)
+          [ -z "$BAD" ] || { echo "::error:: linha adicionada fora do bloco clipboardWriteText em preload.ts:"; echo "$BAD"; exit 1; }
+          echo "IPC MÍNIMO OK (main.ts +4/-0; preload.ts +2/-0; só o bloco clipboard-write-text)."
+
+      - name: Gate ANDROID/BACKEND intactos — diff nao toca android/functions/worker/Rules
+        working-directory: desktop
+        run: |
+          set -e
+          A=$(git -C "$GITHUB_WORKSPACE" diff --name-only "$BASE_214_SHA" HEAD | grep -cE '^(android/|functions/|worker/|.*\.rules$|firestore\.rules)' || true)
+          [ "$A" = "0" ] || { echo "::error:: diff toca android/backend ($A)"; exit 1; }
+          echo "ANDROID/BACKEND intactos."
+
+  build:
+    needs: verify
+    runs-on: windows-latest
+    defaults: { run: { shell: bash } }
+    steps:
+      - name: Forcar LF no checkout
+        run: git config --global core.autocrlf false
+      - name: Checkout (mesmo SHA do run)
+        uses: actions/checkout@v4
+        with: { ref: "${{ github.sha }}", fetch-depth: 0 }
+
+      - name: Gate REF + ANCESTRIA (windows)
+        working-directory: desktop
+        run: |
+          set -e
+          [ "$GITHUB_REF_NAME" = "$TEST_BRANCH" ] || { echo "::error:: ref != branch"; exit 1; }
+          git merge-base --is-ancestor "$BASE_214_SHA" HEAD || { echo "::error:: nao descende de 1.0.214"; exit 1; }
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - name: npm ci
+        working-directory: desktop
+        run: npm ci
+      - name: TypeScript build
+        working-directory: desktop
+        run: npm run build
+      - name: electron-builder (NSIS + MSI; --publish never)
+        working-directory: desktop
+        run: npx electron-builder --win nsis msi --publish never
+
+      - name: Gate prova-de-versao (asar == 1.0.215) + renderers EMPACOTADOS == fonte (EOL-normalizado)
+        working-directory: desktop
+        run: |
+          set -e
+          ASAR="dist-installer/win-unpacked/resources/app.asar"; test -f "$ASAR" || { echo "::error:: app.asar ausente"; exit 1; }
+          EXDIR="$RUNNER_TEMP/asarx"; rm -rf "$EXDIR"; mkdir -p "$EXDIR"; npx --yes @electron/asar extract "$ASAR" "$EXDIR"
+          PKGV=$(P="$EXDIR/package.json" node -e 'console.log(JSON.parse(require("fs").readFileSync(process.env.P,"utf8")).version||"")')
+          [ "$PKGV" = "1.0.215" ] || { echo "::error:: asar version=$PKGV != 1.0.215"; exit 1; }
+          cmp_norm() { EX="$1" SRC="$2" node -e 'const fs=require("fs");const n=s=>String(s).replace(/\r\n/g,"\n");if(n(fs.readFileSync(process.env.EX,"utf8"))!==n(fs.readFileSync(process.env.SRC,"utf8"))){console.error(process.env.SRC+" EMPACOTADO != fonte");process.exit(1);}'; }
+          cmp_norm "$EXDIR/src/renderer/index.html" "src/renderer/index.html"
+          cmp_norm "$EXDIR/src/renderer/bgnotify.html" "src/renderer/bgnotify.html"
+          cmp_norm "$EXDIR/src/renderer/slareminder.html" "src/renderer/slareminder.html"
+          echo "GATE prova-de-versao 1.0.215 + renderers==fonte OK."
+
+      - name: Gate F3.5.4W-H1 EMPACOTADO — E2/E3/E5 no asar + contratos (74 + 53) + 1.0.214 preservada + stack congelada
+        working-directory: desktop
+        run: |
+          set -e
+          EXDIR="$RUNNER_TEMP/asarx"; RR="$EXDIR/src/renderer"; DM="$EXDIR/dist/main"; IDX="$RR/index.html"; MJS="$DM/main.js"; PJS="$EXDIR/dist/preload/preload.js"
+          # ── contrato completo das 3 entregas F3.5.4W-H1 rodado contra o index.html EMPACOTADO ──
+          SRC="$IDX" node scripts/f354wh1-details-status-notes.test.mjs || { echo "::error:: contrato F3.5.4W-H1 vermelho no asar"; exit 1; }
+          # ── contrato F3.5.4W (4 entregas da 1.0.214) rodado contra o index.html EMPACOTADO ──
+          SRC="$IDX" node scripts/f354w-compact-cards-details.test.mjs || { echo "::error:: contrato F3.5.4W vermelho no asar"; exit 1; }
+          # ── E2 EMPACOTADO: IPC de escrita no main/preload COMPILADOS + botões de cópia no renderer ──
+          grep -qF 'clipboard-write-text' "$MJS" || { echo "::error:: clipboard-write-text ausente no dist/main/main.js do asar"; exit 1; }
+          grep -qF 'clipboardWriteText' "$PJS" || { echo "::error:: clipboardWriteText ausente no dist/preload/preload.js do asar"; exit 1; }
+          for m in 'data-detcopytheme' 'data-detcopycaption' 'detClipWrite'; do
+            grep -qF "$m" "$IDX" || { echo "::error:: marcador E2 '$m' ausente no asar"; exit 1; }
+          done
+          # ── E3 EMPACOTADO: fonte única de status — awaiting_designer na Social cai em 'afazer' ──
+          grep -qF "awaiting_designer:{social:{col:'afazer'" "$IDX" || { echo "::error:: marcador E3 (awaiting_designer→afazer) ausente no asar"; exit 1; }
+          # ── E5 EMPACOTADO: observações internas por tema ──
+          for m in 'designerItemNotes' 'dz-notes' 'det-acc-note'; do
+            grep -qF "$m" "$IDX" || { echo "::error:: marcador E5 '$m' ausente no asar"; exit 1; }
+          done
+          # ── D1 cards compactos (1.0.214): resumo presente; card NÃO emite nós de tema no DOM ──
+          grep -qF 'function kbv2ContentSlot(t, cron, s, clientView, isCron){' "$IDX" || { echo "::error:: kbv2ContentSlot ausente no asar"; exit 1; }
+          grep -qF 'h+=kbv2ContentSlot(t, cron, s, clientView, isCron);' "$IDX" || { echo "::error:: card não usa o resumo no asar"; exit 1; }
+          grep -qF '.kbv2-card-summary{' "$IDX" || { echo "::error:: CSS do resumo ausente no asar"; exit 1; }
+          node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");if(/class="kbv2-theme"/.test(s)||/class="kbv2-themes-list"/.test(s)){console.error("::error:: card ainda emite nós de tema no DOM (asar)");process.exit(1)}' "$IDX"
+          # ── D2 central de detalhes (1.0.214): sheet grande + acordeões + Esc/foco + edicao_cards labels ──
+          grep -qF '.det-sheet{width:min(1240px,92vw);max-width:92vw;text-align:left;height:88vh;max-height:90vh' "$IDX" || { echo "::error:: .det-sheet não foi ampliada no asar"; exit 1; }
+          for m in 'function detItemWord(t){' '<details class="det-acc"' 'data-detexpand="1"' 'data-detcollapse="1"' 'data-detmodal="1"' 'function detSetupModalFocus(){' 'CARD · LEGENDA' 'role="dialog" aria-modal="true"'; do
+            grep -qF "$m" "$IDX" || { echo "::error:: marcador D2 '$m' ausente no asar"; exit 1; }
+          done
+          # ── D3 avatares (1.0.214): correção pelo container (não encolhe o avatar) ──
+          grep -qF 'min-height:58px' "$IDX" || { echo "::error:: .f354-dstrip min-height ausente no asar"; exit 1; }
+          grep -qF 'avatar(d.u,22)' "$IDX" || { echo "::error:: avatar dos chips foi alterado no asar"; exit 1; }
+          # ── D4 social (1.0.214): auto-render por estado (sem .click()) + rótulo correto ──
+          for m in "var SOCIAL_SEL_KEY='idseven.socialSel.v1';" 'function f354SocialAutoPick(){' 'function f354SocialStrip(activeId){' "state.socialBoard=f354SocialAutoPick();" "l:'Social Medias'"; do
+            grep -qF "$m" "$IDX" || { echo "::error:: marcador D4 '$m' ausente no asar"; exit 1; }
+          done
+          node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const i=s.indexOf("function f354SocialAutoPick");if(i<0){process.exit(1)}if(/\.click\(\)/.test(s.slice(i,i+400))){console.error("::error:: auto-pick social usa .click() (asar)");process.exit(1)}' "$IDX"
+          # ── 1.0.213 (persistência/máquina de estados de auth + quantidade de vídeos) PRESERVADA no asar ──
+          for m in AUTH_INITIALIZING AUTH_RESTORING AUTHENTICATED AUTH_OFFLINE_CACHED authManualLogin 'id="authSplash"'; do
+            grep -qF "$m" "$IDX" || { echo "::error:: 1.0.213 (auth '$m') ausente no asar"; exit 1; }
+          done
+          grep -q 'data-vqminus' "$IDX" && grep -q 'var VIDEO_QTY_MAX=500;' "$IDX" || { echo "::error:: quantidade personalizada de vídeos (1.0.212) ausente no asar"; exit 1; }
+          # ── stack de notificação/SLA/persistência do main PRESERVADA no asar ──
+          grep -q "function deliverNotification" "$MJS" && grep -q "showBgNotify" "$MJS" || { echo "::error:: HUB de entrega alterado no asar"; exit 1; }
+          grep -q "createSlaReminderController" "$DM/slaReminder.js" && grep -q "onDecide" "$DM/slaReminder.js" || { echo "::error:: decisão SLA ausente no asar"; exit 1; }
+          grep -qF 'error: "network"' "$DM/auth-core.js" || { echo "::error:: auth-core (offline≠logout) alterado no asar"; exit 1; }
+          grep -qF 'requestSingleInstanceLock' "$MJS" || { echo "::error:: single-instance lock ausente no asar"; exit 1; }
+          # ── CONGELADOS byte-idênticos vs 1.0.214 (fonte): main/ e preload/ EXCETO main.ts/preload.ts; renderers comuns; priorityEngine ──
+          git -C "$GITHUB_WORKSPACE" diff --quiet "$BASE_214_SHA" HEAD -- desktop/src/main desktop/src/preload desktop/src/renderer/bgnotify.html desktop/src/renderer/slareminder.html desktop/src/renderer/priorityEngine.js ':(exclude)desktop/src/main/main.ts' ':(exclude)desktop/src/preload/preload.ts' || { echo "::error:: congelado alterado vs 1.0.214"; exit 1; }
+          SRC=$(git -C "$GITHUB_WORKSPACE" diff --name-only "$BASE_214_SHA" HEAD -- desktop/src | grep -vE '^desktop/src/(renderer/index\.html|main/main\.ts|preload/preload\.ts)$' || true)
+          [ -z "$SRC" ] || { echo "::error:: src além do trio autorizado vs 1.0.214: $SRC"; exit 1; }
+          echo "GATE F3.5.4W-H1 EMPACOTADO: VERIFIED."
+
+      - name: Empacotar bundle (EXE/MSI/latest.yml/blockmap/SBOM/SHA256SUMS/VERSAO-DESKTOP)
+        working-directory: ${{ env.APP_DIR }}
+        env: { APP_VERSION: "1.0.215" }
+        run: |
+          set -e
+          npx --yes @cyclonedx/cyclonedx-npm --omit dev --output-format JSON --output-file "$RUNNER_TEMP/sbom.json" || echo '{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}' > "$RUNNER_TEMP/sbom.json"
+          OUT="$GITHUB_WORKSPACE/dist-pkg"; mkdir -p "$OUT"
+          EXE=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe | head -1)
+          MSI=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.msi 2>/dev/null | head -1)
+          BM=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap | head -1)
+          cp "$EXE" "$OUT/"; [ -n "$MSI" ] && cp "$MSI" "$OUT/"; cp dist-installer/latest.yml "$OUT/"; cp "$BM" "$OUT/"; cp "$RUNNER_TEMP/sbom.json" "$OUT/SBOM-cyclonedx.json"
+          EXE_NAME=$(basename "$EXE"); MSI_NAME=$([ -n "$MSI" ] && basename "$MSI" || echo ""); BM_NAME=$(basename "$BM")
+          ( cd "$OUT" && sha256sum "$EXE_NAME" ${MSI_NAME:+$MSI_NAME} latest.yml "$BM_NAME" SBOM-cyclonedx.json > SHA256SUMS )
+          {
+            echo "productName : Agenda ID Seven Desktop"
+            echo "versionName : $APP_VERSION"
+            echo "rotulo      : 1.0.215-details-workflow-approval (CANDIDATA — Central de Detalhes premium, status Social/Designer, observações internas)"
+            echo "channel     : latest (estrutura do updater; NADA publicado neste build)"
+            echo "appId       : br.com.idseven.agenda.desktop"
+            echo "instalador  : $EXE_NAME"
+            echo "SHA-256 exe : $(sha256sum "$OUT/$EXE_NAME" | awk '{print $1}')"
+            [ -n "$MSI_NAME" ] && echo "instalador2 : $MSI_NAME" && echo "SHA-256 msi : $(sha256sum "$OUT/$MSI_NAME" | awk '{print $1}')"
+            echo "commit      : $GITHUB_SHA (branch $GITHUB_REF_NAME)"
+            echo "base-codigo : Desktop 1.0.214 (commit 8ede593 = tag v1.0.214; baseline FÍSICA aprovada; rollback imediato)"
+            echo "rollback2   : Desktop 1.0.213 OFICIAL (commit e626d36)"
+            echo "origem      : F3.5.4W-H1 — Central de Detalhes premium (tipografia + Copiar tema/legenda via IPC clipboard-write-text/clipboardWriteText) + status Social/Designer com fonte única (awaiting_designer→'A Fazer'; paridade Social/Setores/Meu quadro; 'Em andamento' só quando o designer inicia) + observações internas por tema (designerItemNotes; histórico só com notesCount). Em desktop/src, vs 1.0.214: SÓ renderer/index.html + main.ts/preload.ts (APENAS o IPC de clipboard). Notificações/SLA/Card Premium/Cronograma/updater/persistência(main)/auth/quantidade de vídeos/Android: INTOCADOS (byte vs 1.0.214)."
+            echo "distribuicao: CANDIDATA — build gated; publicacao no Latest ocorre no workflow desktop-release-f354wh1.yml (mesmos bytes deste run)"
+          } > "$OUT/VERSAO-DESKTOP.txt"
+          echo "== SHA256SUMS =="; cat "$OUT/SHA256SUMS"
+
+      - name: Upload artifact — installer (EXE + MSI) PRIVADO
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-1.0.215-installer
+          path: |
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.msi
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload artifact — updatemeta PRIVADO
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-1.0.215-updatemeta
+          path: |
+            dist-pkg/latest.yml
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap
+            dist-pkg/SHA256SUMS
+            dist-pkg/SBOM-cyclonedx.json
+            dist-pkg/VERSAO-DESKTOP.txt
+          if-no-files-found: error
+          retention-days: 30
