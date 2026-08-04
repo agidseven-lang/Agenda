@@ -22,6 +22,14 @@ function _setAuthUser(u: any): void {
 /** Papel autenticado do usuário logado (server-verified), ou null. Usado pelo slaScheduler. */
 export function getAuthUser(): { id: string; role: string; admin: boolean } | null { return _authUser; }
 
+// F3.5.5A — ponte de POST autenticado (claim/resposta de check-ins de execução). O core (e o
+// token) seguem confinados a este módulo; o main só recebe {ok,status,json}.
+let _coreRef: ReturnType<typeof createAuthCore> | null = null;
+export function authedBackendPost(url: string, body: unknown): Promise<{ ok: boolean; status: number; json?: any; error?: string }> {
+  if (!_coreRef) return Promise.resolve({ ok: false, status: 0, error: "no_core" });
+  return _coreRef.postAuthed(url, body);
+}
+
 export function registerAuthIpc(): void {
   const core = createAuthCore({
     storeDir: app.getPath("userData"),
@@ -33,6 +41,7 @@ export function registerAuthIpc(): void {
     // F3.3.73I6C11 — diagnostico behavior-preserving do auth-core (nunca loga token).
     log: (tag: string, data?: unknown) => diag("authcore." + tag, data),
   });
+  _coreRef = core;   // F3.5.5A — habilita authedBackendPost (token segue confinado ao core)
   ipcMain.handle("auth-login", async (_e, identifier: string, password: string) => { const r = await core.login(identifier, password); if (r && r.ok && r.user) _setAuthUser(r.user); return r; });
   ipcMain.handle("auth-self", async () => { const r = await core.self(); if (r && r.ok && r.self) _setAuthUser(r.self); diag("ipc.auth-self", { ok: r.ok, error: r.error, hasSelf: !!r.self }); return r; });
   ipcMain.handle("auth-change-password", (_e, oldPw: string, newPw: string) => core.changePassword(oldPw, newPw));

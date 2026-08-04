@@ -49,6 +49,14 @@ export type TaskIdleSchedulerOpts = {
     getResponse: (k: string) => any;
     markShown: (rec: { idleCheckKey: string; taskId: string; recipientUid: string; shownAt: number }) => void;
   };
+  // F3.5.5A — orquestrador de EXECUÇÃO acoplado (evolução DESTE mecanismo; sem 2º listener/timer/fila).
+  // Todos opcionais e no-op por default ⇒ ausentes/OFF, o comportamento é o de 1.0.216.
+  execution?: {
+    legacyGate?: (task: any) => boolean;                  // false ⇒ produtor legado SUPRIMIDO p/ a tarefa (ACTIVE+elegível: autoridade única adaptativa)
+    onTasks?: (tasks: Map<string, any>) => void;          // espelho do MESMO mapa (mesmo listener)
+    onEvaluate?: () => void;                              // avaliação adaptativa no MESMO tick do timer único
+    extraBoundary?: () => number;                         // próximo checkpoint planejado integra o MESMO arm()
+  };
 };
 
 function humanSince(mins: number): string {
@@ -104,6 +112,7 @@ export function startTaskIdleScheduler(getUid: () => string | null, emit: Emit, 
   const isEnabled = (opts && opts.isEnabled) || (() => true);
   const isCentralBusy = (opts && opts.isCentralBusy) || (() => false);
   const store = opts.store;
+  const exec = (opts && opts.execution) || null;          // F3.5.5A — hooks opcionais (no-op ausentes)
 
   const tasks = new Map<string, any>();
   let timer: any = null;
@@ -113,6 +122,9 @@ export function startTaskIdleScheduler(getUid: () => string | null, emit: Emit, 
 
   function evalDue(): void {
     if (stopped) return;
+    // F3.5.5A — avaliação adaptativa no MESMO tick (antes do gate legado: o modo de execução tem
+    // flag própria e o próprio orquestrador decide claim/supressão/SHADOW; no-op quando ausente/OFF).
+    try { if (exec && exec.onEvaluate) exec.onEvaluate(); } catch { /* nunca derruba o legado */ }
     if (!isEnabled()) { log("task.idle.feature_disabled", {}); return; }
     const uid = (getUid && getUid()) || "";
     if (!uid) return;
@@ -126,6 +138,9 @@ export function startTaskIdleScheduler(getUid: () => string | null, emit: Emit, 
       log("task.idle.evaluation_started", { taskId: task && task.id, reason: elig.reason });
       if (!elig.eligible) { log("task.idle.not_eligible", { taskId: task && task.id, reason: elig.reason }); return; }
       if (String(elig.recipientUid || "") !== uid) return;              // só as tarefas DESTE usuário
+      // F3.5.5A — autoridade ÚNICA por tarefa: ACTIVE+elegível ⇒ o adaptativo é o único produtor
+      // (NUNCA dois check-ins p/ a mesma tarefa). OFF/SHADOW/inelegível ⇒ legado segue normal.
+      try { if (exec && exec.legacyGate && exec.legacyGate(task) === false) { log("task.idle.suppressed_by_execution_authority", { taskId: task && task.id }); return; } } catch { /* */ }
       const key = String(elig.idleCheckKey || "");
       if (!key) return;
       if (store.getResponse(key)) return;                                // já respondido (pending_sync/synced/superseded) ⇒ não reemitir (o controlador deduplica o não respondido)
@@ -154,6 +169,8 @@ export function startTaskIdleScheduler(getUid: () => string | null, emit: Emit, 
       try { b = Number(TI.idleNextBoundaryMs(task, t0)) || 0; } catch { b = 0; }
       if (b > t0 && (!best || b < best)) best = b;
     });
+    // F3.5.5A — próximo checkpoint de execução integra o MESMO timer (sem 2º scheduler).
+    try { const eb = (exec && exec.extraBoundary && Number(exec.extraBoundary())) || 0; if (eb > t0 && (!best || eb < best)) best = eb; } catch { /* */ }
     return best;
   }
 
@@ -184,10 +201,12 @@ export function startTaskIdleScheduler(getUid: () => string | null, emit: Emit, 
         if (ch.type === "removed") tasks.delete(id);
         else tasks.set(id, Object.assign({ id }, (ch.doc.data && ch.doc.data()) || {}));
       }
+      try { if (exec && exec.onTasks) exec.onTasks(tasks); } catch { /* */ }   // F3.5.5A — MESMO mapa/listener
       reconcile("snapshot");
     } catch (e) { log("task.idle.snapshot.error", { err: String((e as any) && (e as any).message || e) }); }
   });
 
+  try { if (exec && exec.onTasks) exec.onTasks(tasks); } catch { /* */ }     // F3.5.5A — referência do MESMO mapa
   reconcile("boot");
 
   return {

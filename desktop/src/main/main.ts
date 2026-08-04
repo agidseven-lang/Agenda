@@ -9,6 +9,7 @@ import { app, BrowserWindow, ipcMain, Notification, shell, clipboard, nativeImag
 import path from "path";
 import fs from "fs";
 import os from "os";
+import crypto from "crypto"; // F3.5.5A — deviceHash estável (sha256 do userData; nunca caminho em claro)
 import { ensureTray, recreateTray, getTrayState, destroyTray } from "./tray";
 import { isAutoStart, setAutoStart } from "./autostart";
 import { startNotifier } from "./notifier";
@@ -30,6 +31,8 @@ import { createSlaReminderController, classifyReminderLevel } from "./slaReminde
 import { createSlaReminderSurface, loadReminderSounds } from "./slaReminderWindow"; // F3.5.4L — superfície Electron (janela central, som local)
 import { createTaskIdleStore } from "./taskIdleStore"; // F3.5.4Q — store durável do check-in (recibo de ciclo + fila offline, isolado)
 import { startTaskIdleScheduler } from "./taskIdleScheduler"; // F3.5.4Q — produtor ISOLADO do check-in de tarefa parada
+import { createExecutionOrchestrator } from "./executionOrchestrator"; // F3.5.5A — orquestrador de execução (acoplado ao taskIdleScheduler)
+import { authedBackendPost } from "./auth"; // F3.5.5A — claim/resposta server-side (token confinado ao auth-core)
 import { createSlaReminderStore } from "./slaReminderStore"; // F3.5.4L — recibo de reconhecimento (OK) + pendentes persistentes
 // UPDATER:BEGIN (F3.4.1A — atualizador nativo, processo main)
 import { createUpdaterService } from "./updaterService";
@@ -89,6 +92,22 @@ let taskIdleScheduler: ReturnType<typeof startTaskIdleScheduler> | null = null;
 let taskIdleStore: ReturnType<typeof createTaskIdleStore> | null = null;
 let taskIdleDetectionEnabled = true;
 const taskIdleTele = { shown: 0, working: 0, blocked: 0, help: 0, returned: 0, lastAt: 0, lastType: "" };
+// F3.5.5A — ACOMPANHAMENTO INTELIGENTE DE EXECUÇÃO: orquestrador acoplado + config OFF/SHADOW/ACTIVE
+// (default OFF pós-update) + endpoints server-side de claim/resposta (transação atômica, relógio do servidor).
+let executionOrch: ReturnType<typeof createExecutionOrchestrator> | null = null;
+const ET_CLAIM_URL = process.env.IDS_ET_CLAIM_URL || "https://claimexecutioncheckpoint-de36pi7vza-uc.a.run.app";
+const ET_RESPOND_URL = process.env.IDS_ET_RESPOND_URL || "https://respondexecutioncheckpoint-de36pi7vza-uc.a.run.app";
+let _etDeviceHash = "";
+function executionDeviceHash(): string {
+  if (!_etDeviceHash) { try { _etDeviceHash = crypto.createHash("sha256").update(app.getPath("userData")).digest("hex").slice(0, 32); } catch { _etDeviceHash = "0".repeat(32); } }
+  return _etDeviceHash;
+}
+let _etSound = "";
+function executionCheckinSound(): string {
+  if (_etSound) return _etSound;
+  try { const p = path.join(app.getAppPath(), "src", "renderer", "sounds", "execution-checkin.wav"); _etSound = "data:audio/wav;base64," + fs.readFileSync(p).toString("base64"); } catch { _etSound = ""; }
+  return _etSound;
+}
 // F3.3.70D3R10U — opts do tray centralizados (usados por startup, session-login,
 // heartbeat e IPC tray-recreate; a recriacao usa SEMPRE o mesmo menu/quit).
 const trayWin = () => mainWin;
@@ -589,6 +608,23 @@ function saveSlaDecisionFlag(v: boolean): void { try { const s = jsonStore("f354
 // check-in; não apaga histórico; não altera SLA/backend/agrupamento/watchdog. Constante local; NÃO remota.
 function loadTaskIdleFlag(): boolean { try { return (jsonStore("f354q-notify.json").read() || {}).taskIdleDetectionEnabled !== false; } catch { return true; } }
 function saveTaskIdleFlag(v: boolean): void { try { const s = jsonStore("f354q-notify.json"); const raw = s.read() || {}; raw.taskIdleDetectionEnabled = !!v; s.write(raw); } catch { /* */ } }
+// F3.5.5A — config do Acompanhamento de Execução (f355a-execution.json). DEFAULT OFF pós-update;
+// ACTIVE só é aceito com a JORNADA completa (etActiveAllowed) — sem horários inventados.
+const ET_CFG_DEFAULTS = {
+  mode: "off", sectors: [] as string[], designers: [] as string[],
+  schedule: { configured: false, days: [] as number[], startMin: 0, endMin: 0, tzOffsetMin: 0 },
+  maxPerDay: 3, maxPerTask: 6, minGapMin: 20, minIntervalMs: 20 * 60000, slaMarginMin: 10, responseMin: 10,
+  snoozeAllowed: true, requireObservationOnNegative: false, autoPauseOnBlock: true,
+  escalationResponsibles: [] as string[],
+};
+function loadExecutionCfg(): any {
+  try {
+    const raw = jsonStore("f355a-execution.json").read() || {};
+    const sch = Object.assign({}, ET_CFG_DEFAULTS.schedule, (raw.schedule && typeof raw.schedule === "object") ? raw.schedule : {});
+    return Object.assign({}, ET_CFG_DEFAULTS, raw, { schedule: sch });
+  } catch { return Object.assign({}, ET_CFG_DEFAULTS); }
+}
+function saveExecutionCfg(v: any): void { try { jsonStore("f355a-execution.json").write(v || {}); } catch { /* */ } }
 // F3.5.4Q — texto humano (LOCAL, sino) da resposta de check-in (enum; NUNCA texto livre — mesma sanitização).
 function taskIdleSinoText(info: any): string {
   const nm = String((info && info.actorName) || "").trim(); const who = nm ? nm + " " : "";
@@ -693,7 +729,7 @@ function startUserListeners(uid: string): void {
   // stopNotifier COMPÕE os teardowns aprovados. _notifSeen.clear()/toastAck.clear() são POR SESSÃO DE
   // USUÁRIO (troca de usuário); num restart do MESMO usuário isso é inofensivo — a dedup REAL está nos
   // recibos persistentes (notifierA), no seen persistente (slaScheduler) e no gate sinceMs (eventos).
-  stopNotifier = () => { try { _stopEventNew(); } catch { /* */ } try { _notifierA.stop(); } catch { /* */ } notifierAHandle = null; try { toastAck.clear(); } catch { /* */ } try { _notifSeen.clear(); } catch { /* */ } try { if (taskIdleScheduler) { taskIdleScheduler.stop(); taskIdleScheduler = null; } } catch { /* */ } };
+  stopNotifier = () => { try { _stopEventNew(); } catch { /* */ } try { _notifierA.stop(); } catch { /* */ } notifierAHandle = null; try { toastAck.clear(); } catch { /* */ } try { _notifSeen.clear(); } catch { /* */ } try { if (taskIdleScheduler) { taskIdleScheduler.stop(); taskIdleScheduler = null; } } catch { /* */ } try { if (executionOrch) { executionOrch.stop(); executionOrch = null; } } catch { /* F3.5.5A */ } };
   // F3.4.3/R4B — PRODUTOR AUTORITATIVO de SLA no MAIN (amarelo/vermelho/crítico), MESMO "agora" canônico
   // do renderer (slaNow → offset do clockSync), entrega pelo MESMO HUB (deliverNotification). authUser =
   // papel AUTENTICADO (só p/ o gate canSeeAll do operational_block). F3.5.4-C3 — seen POR USUÁRIO (opts.seen)
@@ -706,6 +742,31 @@ function startUserListeners(uid: string): void {
   // tarefas DO usuário logado; gated por flag + sem amarelo/vermelho ativo (isCentralBusy). Reinicia com esta
   // geração (restartAll do watchdog para stopNotifier→startUserListeners). Sem 2º watchdog/fila.
   try { if (taskIdleScheduler) { taskIdleScheduler.stop(); taskIdleScheduler = null; } } catch { /* */ }
+  // F3.5.5A — orquestrador de EXECUÇÃO (evolução do mecanismo): mesmo listener/timer/fila do
+  // taskIdleScheduler via hooks; autoridade única por tarefa (etAuthority); claim/resposta
+  // SERVER-SIDE (transação atômica; relógio do servidor); OFF ⇒ inerte (comportamento 1.0.216).
+  try { if (executionOrch) { executionOrch.stop(); executionOrch = null; } } catch { /* */ }
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const _slaRulesEt: any = require("./slaRules");
+  executionOrch = createExecutionOrchestrator({
+    now: slaNow,
+    getConfig: () => loadExecutionCfg(),
+    getUid: () => uid,
+    emit: (p) => { const r: any = slaReminderCtl ? slaReminderCtl.enqueueCheckin(p) : { ok: false, channel: "no-ctl" }; return r; },
+    claim: async (req: any) => {
+      const r = await authedBackendPost(ET_CLAIM_URL, Object.assign({}, req, { deviceHash: executionDeviceHash() }));
+      if (!r.ok || !r.json) throw new Error(String(r.error || ("http_" + r.status)));
+      return r.json;
+    },
+    isOnline: () => { try { return require("electron").net.isOnline(); } catch { return true; } },
+    isCentralBusySla: () => { try { return !!(slaReminderCtl && slaReminderCtl.hasPendingSla()); } catch { return false; } },
+    sectorWarn: (task: any) => { try { return Number(_slaRulesEt.slaCfgOf(task).warningMinutes) || 30; } catch { return 30; } },
+    soundDataUri: () => executionCheckinSound(),
+    appVersion: app.getVersion(),
+    store: jsonStore("f355a-execution-state.json"),
+    onRemoteClose: (key: string) => { try { slaReminderCtl && slaReminderCtl.dismissCheckin(key); } catch { /* */ } },
+    onLog: (t, d) => { try { diag(t, d as any); } catch { /* */ } },
+  });
   if (taskIdleStore) {
     taskIdleScheduler = startTaskIdleScheduler(
       () => uid,
@@ -716,6 +777,13 @@ function startUserListeners(uid: string): void {
         isCentralBusy: () => { try { return !!(slaReminderCtl && slaReminderCtl.hasPendingSla()); } catch { return false; } },
         store: taskIdleStore,
         onLog: (t, d) => { try { diag(t, d as any); } catch { /* */ } },
+        // F3.5.5A — acoplamento (no-op com modo OFF): mesmo mapa/tick/timer; autoridade única por tarefa.
+        execution: {
+          legacyGate: (task: any) => { try { return executionOrch ? executionOrch.authorityFor(task) !== "adaptive" : true; } catch { return true; } },
+          onTasks: (m: Map<string, any>) => { try { executionOrch && executionOrch.onTasks(m); } catch { /* */ } },
+          onEvaluate: () => { try { executionOrch && executionOrch.evaluate(); } catch { /* */ } },
+          extraBoundary: () => { try { return executionOrch ? executionOrch.nextBoundary() : 0; } catch { return 0; } },
+        },
       },
     );
   }
@@ -1063,6 +1131,37 @@ app.whenReady().then(() => {
   // F3.5.4Q — flag da DETECÇÃO DE TAREFA PARADA (Configurações → Notificações). OFF ⇒ nenhum novo check-in.
   ipcMain.handle("task-idle-get", () => ({ enabled: taskIdleDetectionEnabled }));
   ipcMain.handle("task-idle-set", (_e, v: boolean) => { taskIdleDetectionEnabled = !!v; saveTaskIdleFlag(taskIdleDetectionEnabled); diag("task.idle.flag", { enabled: taskIdleDetectionEnabled }); return { enabled: taskIdleDetectionEnabled }; });
+  // F3.5.5A — Configurações → Acompanhamento de execução. Leitura: qualquer usuário logado
+  // (a UI mostra o estado); ESCRITA global: SOMENTE Admin autenticado (papel server-verified).
+  // ACTIVE com jornada incompleta é RECUSADO com a mensagem literal do mandato (sem defaults inventados).
+  ipcMain.handle("execution-tracking-get", () => {
+    const cfg = loadExecutionCfg();
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const ETm: any = require("./executionTracking");
+    let gate: any = { allowed: false, missing: [] };
+    try { gate = ETm.etActiveAllowed(cfg); } catch { /* */ }
+    return { cfg, activeAllowed: !!gate.allowed, missing: gate.missing || [], message: gate.allowed ? "" : String(gate.message || "") };
+  });
+  ipcMain.handle("execution-tracking-set", (_e, next: any) => {
+    const au = getAuthUser();
+    if (!au || au.admin !== true) { diag("execution.cfg.denied_not_admin", {}); return { ok: false, error: "not_admin" }; }
+    const cur = loadExecutionCfg();
+    const cand = Object.assign({}, cur, (next && typeof next === "object") ? next : {});
+    cand.schedule = Object.assign({}, cur.schedule, (next && next.schedule && typeof next.schedule === "object") ? next.schedule : {});
+    const m = String(cand.mode || "off");
+    cand.mode = (m === "shadow" || m === "active") ? m : "off";
+    if (cand.mode === "active") {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const ETm: any = require("./executionTracking");
+      let gate: any = { allowed: false };
+      try { gate = ETm.etActiveAllowed(cand); } catch { /* */ }
+      if (!gate.allowed) { diag("execution.cfg.active_blocked_incomplete", { missing: gate.missing || [] }); return { ok: false, error: "schedule_incomplete", missing: gate.missing || [], message: String(gate.message || "Conclua a configuração da jornada antes de ativar os check-ins.") }; }
+    }
+    cand.minIntervalMs = Math.max(60000, (Number(cand.minGapMin) || 20) * 60000);
+    saveExecutionCfg(cand);
+    diag("execution.cfg.saved", { mode: cand.mode, sectors: (cand.sectors || []).length, designers: (cand.designers || []).length, scheduleConfigured: !!(cand.schedule && cand.schedule.configured) });
+    return { ok: true, cfg: cand };
+  });
   // F3.5.3 — leitura de texto da área de transferência p/ o pipeline explícito de COLAGEM do
   // formulário (Legenda/Tema/Observações). SOMENTE texto simples; nunca HTML executável.
   ipcMain.handle("clipboard-read-text", () => { try { return String(clipboard.readText() || ""); } catch { return ""; } });

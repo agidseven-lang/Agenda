@@ -175,6 +175,17 @@ export function createAuthCore(opts: { storeDir: string; urls?: Partial<Urls>; l
     },
     /** Logout seguro: limpa memória e o arquivo de sessão. */
     logout(): AuthResult { wipe(); return { ok: true }; },
+    /** F3.5.5A — POST autenticado a endpoint ADITIVO do backend oficial (claim/resposta de
+     *  check-ins de execução). O token NUNCA sai daqui; 401 aqui NÃO derruba a sessão
+     *  (a autoridade de expiração continua sendo o self()). */
+    async postAuthed(url: string, body: unknown): Promise<{ ok: boolean; status: number; json?: any; error?: string }> {
+      if (!valid()) return { ok: false, status: 0, error: "no_session" };
+      let r;
+      try { r = await post(String(url || ""), body, mem!.token); }
+      catch { return { ok: false, status: 0, error: "network" }; }
+      if (r.status === 401) return { ok: false, status: 401, error: "invalid_session", json: r.json };
+      return { ok: true, status: r.status, json: r.json };
+    },
     /** Status sem expor o token (só booleano + expiresAt). */
     status(): AuthResult { return { ok: true, active: valid(), expiresAt: mem ? mem.expiresAt : 0 }; },
     /** SOMENTE para testes herméticos (nunca chamado pelo app). */
