@@ -130,7 +130,7 @@ const PREMIUM_TYPES = {
 // (nunca token/dado de cliente). Distingue inequivocamente ESTE worker no host que o
 // serviu — a string de VERSÃO é idêntica entre QA e produção, então versão sozinha não
 // prova qual runtime respondeu. Presença de build=j3c => é a candidata J3C.
-const WORKER_BUILD = "f350-client-progress-tracking";
+const WORKER_BUILD = "f354wh1-approve-all";
 function premiumTypeOf(task) {
   const sec = (task && typeof task.sector === "string") ? task.sector.trim().toLowerCase() : "";
   return sec === "roteiro" ? PREMIUM_TYPES.roteiro : PREMIUM_TYPES.cronograma;
@@ -525,7 +525,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.59-c20-failopen-f350-client-progress", build: WORKER_BUILD }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.59-c20-failopen-f354wh1-approve-all", build: WORKER_BUILD }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -1626,6 +1626,7 @@ async function handleClientCronogramaAction(token, request, env) {
   // Globais + GRANULARES por conteúdo (V64.7). Back-compat: approve/revision/edit_request.
   const ALLOWED = [
     "approve", "approveAll", "revision", "edit_request",        // globais
+    "approveAllPending",                                        // F3.5.4W-H1 (E4) — lote ADITIVO da fase atual
     "approveItem", "reviseItem", "editTheme", "editLegenda", "noteItem", "comment", // por item
   ];
   if (ALLOWED.indexOf(type) < 0) {
@@ -1645,6 +1646,35 @@ async function handleClientCronogramaAction(token, request, env) {
   if (!task) return json({ ok: false, error: "token inválido" }, 404, env);
 
   const now = Date.now();
+  // F3.5.4W-H1 (E4) — "Aprovar tudo" (approveAllPending): lote ADITIVO da fase ATUAL, num único
+  // commit atômico. Ação NOVA — approve/approveAll/approveItem canônicos permanecem intocados.
+  // Segurança idêntica: mesma rota, mesmo token-capability, mesma escrita server-side por service
+  // account; fase SEMPRE recomputada no servidor. 1 notificação agrupada SÓ quando a fase fecha.
+  if (type === "approveAllPending") {
+    const bodyPhase = (payload && typeof payload.phase === "string") ? payload.phase.trim() : "";
+    const b = await writeClientBatchApprove(env, accessToken, task, { at: now, bodyPhase });
+    if (!b.ok) {
+      console.log(`[CLIENT-ACTION] task=${task.id} type=${type} REJECT ${b.error} phase=${b.phase} idem=${idemKey ? "yes" : "no"}`);
+      return json({ ok: false, error: b.error, phase: b.phase }, 200, env);   // sem escrita: página recarrega/segue o fluxo de feedback
+    }
+    try {
+      if (b.client === "concluido") await notifyWorkflowEvent(env, task, "final_approved_by_client", { token });
+      else if (b.client === "aprovado") await notifyWorkflowEvent(env, task, "themes_approved_by_client", { token });
+    } catch (_) { /* best-effort */ }
+    console.log(`[CLIENT-ACTION] task=${task.id} type=${type} phase=${b.phase} approved=${b.approved} pending=${b.pending} finalized=${b.finalized} idem=${idemKey ? "yes" : "no"}`);
+    const outB = { ok: true, type, at: now, phase: b.phase, approved: b.approved, pending: b.pending, approvedIndexes: b.approvedIndexes || [], finalized: b.finalized, final: b.client === "concluido", col: b.col || null, clientFlowStatus: b.client || null };
+    const respB = json(outB, 200, env);
+    if (idemUrl) {
+      try {
+        const cacheableB = new Response(JSON.stringify(outB), {
+          status: 200,
+          headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=300" },
+        });
+        await caches.default.put(new Request(idemUrl), cacheableB);
+      } catch (_) { /* cache write falhou -> ignorar */ }
+    }
+    return respB;
+  }
   const phaseIn = clientPhase(task);                                              // V64.13 — fase ANTES da escrita
   const g = await writeClientGranular(env, accessToken, task, { type, contentIndex: ci, note, value, at: now });
   // FINAL gating: só é "aprovação final" se a fase de entrada for 'final' E o eixo do cliente concluiu.
@@ -2934,6 +2964,164 @@ async function writeClientGranular(env, accessToken, task, e) {
   return g;   // {cs, rev, htype, label, col, stage} — handler usa p/ saber se concluiu (col==='concluido')
 }
 
+/* ───── F3.5.4W-H1 (E4) — "Aprovar tudo" (approveAllPending): aprovação EM LOTE dos itens
+   PENDENTES da FASE ATUAL num ÚNICO documents:commit (atômico: ou grava tudo, ou nada).
+   Ação NOVA e ADITIVA — writeClientGranular/approve/approveAll/approveItem ficam intocados.
+   Contrato:
+   • a fase é SEMPRE recomputada aqui (clientPhase); body.phase divergente ⇒ {ok:false,error:"stale"}
+     SEM escrita (página desatualizada recarrega; NUNCA aprova revisão diferente da publicada).
+   • ajuste/edição pendente NA FASE ⇒ {ok:false,error:"revision_pending"} SEM escrita (nunca aprova
+     por cima de revisão do cliente; o portal mantém o fluxo de feedback canônico).
+   • elegível: fase de temas (themesOnly, espelho do render) ⇒ todo item visível; production/final e
+     roteiro ⇒ SÓ itens com legenda não-vazia (cadeia legRaw idêntica ao render; override do cliente
+     em clientItems.iN.legenda conta). Legenda vazia NUNCA é aprovada.
+   • itens já aprovados na fase são PRESERVADOS (contam p/ completude; não são reescritos; máscara
+     granular .cs/.phase/.at preserva note/theme/legenda overrides dos demais).
+   • FECHA a fase com EXATAMENTE os campos/labels do approveAll canônico (approveG + limpeza por
+     transição V64.42) SOMENTE quando todos os itens terminam aprovados; senão grava cs='aprovado'
+     nos elegíveis e retorna {finalized:false} SEM fechar (retornável: o cliente aprova o resto depois).
+   • idempotente: nada a aprovar e nada a fechar ⇒ no-op sem escrita e sem notificação (o handler só
+     notifica — UMA vez, agrupado — quando client='aprovado'/'concluido'). Falha do commit ⇒
+     {ok:false,error:"commit_failed"} sem nada parcialmente aplicado (commit único). */
+async function writeClientBatchApprove(env, accessToken, task, e) {
+  const taskId = task.id;
+  const at = e.at;
+  const phaseIn = clientPhase(task);
+  if (e.bodyPhase && e.bodyPhase !== phaseIn) return { ok: false, error: "stale", phase: phaseIn };
+
+  const _ci0 = (task.clientItems && typeof task.clientItems === "object") ? task.clientItems : {};
+  const _pendingRev = Object.keys(_ci0).some((k) => {
+    const it = _ci0[k]; if (!it) return false;
+    return (it.cs === "em_revisao" || it.cs === "editado") && it.phase === phaseIn;
+  });
+  if (_pendingRev) return { ok: false, error: "revision_pending", phase: phaseIn };
+
+  const arr = Array.isArray(task.cronWeeks) ? task.cronWeeks : (Array.isArray(task.cronContents) ? task.cronContents : []);
+  const total = arr.length;
+  const _pt = premiumTypeOf(task);
+  const themesOnly = _pt.key !== "roteiro" && phaseIn === "themes";   // espelho EXATO do render (roteiro exige legenda)
+  let already = 0, pendingLeg = 0;
+  const newlyIdx = [];
+  for (let i = 0; i < total; i++) {
+    const c = (arr[i] && typeof arr[i] === "object") ? arr[i] : {};
+    const ov = _ci0["i" + i] || {};
+    if (ov.cs === "aprovado" && ov.phase === phaseIn) { already++; continue; }
+    // cadeia legRaw idêntica ao renderClientHtml (override do cliente primeiro)
+    const legRaw = (typeof ov.legenda === "string") ? ov.legenda : (typeof c.legenda === "string" ? c.legenda : (typeof c.caption === "string" ? c.caption : (typeof c.lg === "string" ? c.lg : (typeof c.l === "string" ? c.l : ""))));
+    const eligible = themesOnly ? true : !!String(legRaw || "").trim();
+    if (!eligible) { pendingLeg++; continue; }
+    newlyIdx.push(i);
+  }
+  const approvedNow = newlyIdx.length;
+  const complete = total > 0 && (already + approvedNow) === total;
+  const alreadyClosed = (clientAckedPhase(task) === phaseIn) || (phaseIn === "final" && task.finalApprovalCompleted === true);
+  if (approvedNow === 0 && (!complete || alreadyClosed)) {
+    return { ok: true, phase: phaseIn, approved: 0, pending: pendingLeg, approvedIndexes: [], finalized: !!(alreadyClosed && complete), client: null, col: null, noop: true };
+  }
+
+  const aid = "a" + at;
+  const actFields = {
+    type: { stringValue: "approveAllPending" }, at: { integerValue: String(at) },
+    approved: { integerValue: String(approvedNow) }, pending: { integerValue: String(pendingLeg) },
+    finalized: { booleanValue: complete }, phase: { stringValue: phaseIn },
+  };
+  const fields = {
+    clientLastAction: { mapValue: { fields: { type: { stringValue: "approveAllPending" }, at: { integerValue: String(at) }, note: { stringValue: "" } } } },
+    clientActions: { mapValue: { fields: { [aid]: { mapValue: { fields: actFields } } } } },
+    updatedAt: { integerValue: String(at) },
+  };
+  const mask = ["clientLastAction", "clientActions." + aid, "updatedAt"];
+
+  let g = null;
+  if (complete) {
+    // fecha a fase — MESMOS campos/labels do approveAll canônico (approveG) + limpeza V64.42
+    g = (phaseIn === "final")
+      ? { cs: "aprovado_cliente", rev: "aprovado", htype: "cliente_aprovou_final", label: "Cliente aprovou a entrega final", col: "concluido", stage: "concluido", client: "concluido" }
+      : { cs: "aprovado_cliente", rev: "aprovado", htype: "cliente_aprovou",       label: _pt.actApproveLabel, col: "andamento", stage: "producao", client: "aprovado" };
+    fields.cronStatus = { stringValue: g.cs };
+    fields.clientReview = { mapValue: { fields: {
+      status: { stringValue: g.rev }, note: { stringValue: "" },
+      at: { integerValue: String(at) }, byName: { stringValue: "Cliente" },
+    } } };
+    fields.clientReviewAt = { integerValue: String(at) };
+    fields.status = { stringValue: g.col };
+    fields.workflowStage = { stringValue: g.stage };
+    fields.clientFlowStatus = { stringValue: g.client };
+    fields.clientWorkflowStage = { stringValue: g.client };
+    mask.push("cronStatus", "clientReview", "clientReviewAt", "status", "workflowStage", "clientFlowStatus", "clientWorkflowStage");
+    if (g.client === "concluido") {
+      fields.clientFinalApprovedAt = { integerValue: String(at) };
+      fields.clientFinalApprovedBy = { stringValue: "Cliente" };
+      fields.finalApprovalCompleted = { booleanValue: true };
+      fields.operationalStatus = { stringValue: "concluido" };
+      fields.clientClosedMessageShown = { booleanValue: true };
+      mask.push("clientFinalApprovedAt", "clientFinalApprovedBy", "finalApprovalCompleted", "operationalStatus", "clientClosedMessageShown");
+    }
+    // limpeza por transição de fase (V64.42): zera cs dos itens desta fase (estado final idêntico
+    // ao fluxo canônico item-a-item + approveAll; itens recém-elegíveis sem entrada não precisam de nada)
+    for (const k of Object.keys(_ci0)) {
+      const it = _ci0[k]; if (!it || it.phase !== phaseIn) continue;
+      if (!fields.clientItems) fields.clientItems = { mapValue: { fields: {} } };
+      const slot = fields.clientItems.mapValue.fields[k] || { mapValue: { fields: {} } };
+      slot.mapValue.fields.cs = { nullValue: null };
+      fields.clientItems.mapValue.fields[k] = slot;
+      mask.push("clientItems." + k + ".cs");
+    }
+  } else {
+    // aprovação parcial: grava cs='aprovado' SÓ nos elegíveis pendentes, com máscara GRANULAR
+    // (.cs/.phase/.at) p/ preservar note/theme/legenda overrides já feitos pelo cliente no item
+    fields.clientItems = { mapValue: { fields: {} } };
+    for (const i of newlyIdx) {
+      const key = "i" + i;
+      fields.clientItems.mapValue.fields[key] = { mapValue: { fields: {
+        cs: { stringValue: "aprovado" }, phase: { stringValue: phaseIn }, at: { integerValue: String(at) },
+      } } };
+      mask.push("clientItems." + key + ".cs", "clientItems." + key + ".phase", "clientItems." + key + ".at");
+    }
+  }
+
+  // história: UMA entrada agrupada (labels canônicos quando fecha; contagem quando parcial)
+  const histFields = {
+    type: { stringValue: complete ? g.htype : "cliente_aprovou_item" },
+    label: { stringValue: complete ? g.label : ("Cliente aprovou em lote " + approvedNow + " conteúdo(s)" + (pendingLeg > 0 ? " (" + pendingLeg + " aguardando legenda)" : "")) },
+    at: { integerValue: String(at) },
+    by: { stringValue: "Cliente" },
+    channel: { stringValue: "client_public" },
+    client: { stringValue: (task.client || "") },
+    note: { stringValue: "" },
+  };
+  const statusFrom = (task.status || "afazer");
+  const clientFrom = (task.clientFlowStatus || "");
+  if (complete && g.col && g.col !== statusFrom) { histFields.statusFrom = { stringValue: statusFrom }; histFields.statusTo = { stringValue: g.col }; }
+  if (complete && g.client && g.client !== clientFrom) { histFields.clientFrom = { stringValue: clientFrom }; histFields.clientTo = { stringValue: g.client }; }
+
+  const docName = `projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/tasks/${taskId}`;
+  const body = {
+    writes: [{
+      update: { name: docName, fields },
+      updateMask: { fieldPaths: mask },
+      updateTransforms: [{ fieldPath: "history", appendMissingElements: { values: [{ mapValue: { fields: histFields } }] } }],
+    }],
+  };
+  const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents:commit`;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + accessToken, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      console.warn("[CLIENT-ACTION] batch commit falhou:", res.status, (await res.text()).slice(0, 240));
+      return { ok: false, error: "commit_failed", phase: phaseIn };   // atômico: nada foi aplicado
+    }
+    console.log(`[CLIENT-ACTION] batch commit ok task=${taskId} approved=${approvedNow} pending=${pendingLeg} finalized=${complete}`);
+  } catch (err) {
+    console.warn("[CLIENT-ACTION] erro no batch commit:", err && err.message);
+    return { ok: false, error: "commit_failed", phase: phaseIn };
+  }
+  return { ok: true, phase: phaseIn, approved: approvedNow, pending: pendingLeg, approvedIndexes: newlyIdx, finalized: complete, client: complete ? g.client : null, col: complete ? g.col : null };
+}
+
 /* Query Firestore pela task que corresponde ao token público do cliente.
    O token pode estar em DOIS campos, conforme a origem do link:
      - clientReviewToken  → Desktop (genReviewToken → ensureReviewToken)
@@ -3420,8 +3608,11 @@ function syncFooter(){
     inner.innerHTML='<button class="btn ghost" data-act="revision">'+CIC.revise+'Pedir revisão</button>'+
       '<button class="btn primary" data-act="approveAll" data-phase="'+PHASE+'">'+CIC.check+footerCta()+'</button>';
   }else{state='review';
-    gtxt='<span>Toque em <b>cada conteúdo</b> abaixo para revisar e aprovar ('+st.apr+' de '+st.total+'). O botão final aparece quando todos estiverem aprovados.</span>';
+    // F3.5.4W-H1 (E4) — CTA secundário "Aprovar tudo" (lote): só quando há pendentes SEM ajuste.
+    var bp=st.total-st.apr-st.rev;
+    gtxt='<span>Toque em <b>cada conteúdo</b> abaixo para revisar e aprovar ('+st.apr+' de '+st.total+')'+(bp>0?' — ou use <b>Aprovar tudo</b> para aprovar os pendentes de uma vez':'')+'.</span>';
     inner.innerHTML='<button class="btn ghost" data-act="revision">'+CIC.revise+'Pedir revisão</button>'+
+      (bp>0?'<button class="btn ghost" data-act="approveAllPending" data-phase="'+PHASE+'">'+CIC.check+'Aprovar tudo</button>':'')+
       '<button class="btn primary" data-act="reviewNext">'+CIC.check+'Revisar temas</button>';
   }
   if(guide)guide.innerHTML=CIC.note+gtxt;
@@ -3439,6 +3630,10 @@ function setLegenda(i,v){var c=card(i);if(!c)return;var el=c.querySelector('[dat
 function bumpProgress(){var cards=document.querySelectorAll('#contents [data-card]');var done=0;cards.forEach(function(c){var b=c.querySelector('[data-badge]');if(b&&b.textContent.indexOf('Aprovado')>=0)done++;});var t=document.querySelector('[data-progtxt]');if(t)t.textContent=done+' de '+TOTAL+' aprovados';var f=document.querySelector('[data-progfill]');if(f)f.style.width=Math.max(TOTAL?Math.round(done/TOTAL*100):0,4)+'%';}
 function addHist(kind,label){var sec=document.querySelector('[data-histsec]');if(sec)sec.classList.remove('hide');var h=document.getElementById('hist');var d=document.createElement('div');d.className='hitem';var ic=kind==='ok'?'hb-ok':kind==='rev'?'hb-rev':kind==='edit'?'hb-edit':'hb-note';var sv=kind==='ok'?CIC.check:kind==='rev'?CIC.revise:kind==='edit'?CIC.edit:CIC.note;d.innerHTML='<div class="hicon '+ic+'">'+sv+'</div><div class="hmain"><div class="ht"></div></div><div class="htime">agora</div>';d.querySelector('.ht').textContent=label;h.insertBefore(d,h.firstChild);}
 function post(payload,btn,cb){if(btn)btn.disabled=true;fetch(URLX,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(function(r){return r.json().then(function(j){return{ok:r.ok&&j&&j.ok,j:j};});}).then(function(res){if(btn)btn.disabled=false;if(res.ok){if(cb)cb(res.j);}else{toast((res.j&&res.j.error)||'Falha ao enviar.','err');}}).catch(function(){if(btn)btn.disabled=false;toast('Sem conexão. Tente novamente.','err');});}
+/* F3.5.4W-H1 (E4) — POST com Idempotency-Key (clique duplo/rede lenta NÃO duplica o lote: o Worker
+   replaya a resposta cacheada). Entrega o JSON ao cb TAMBÉM quando ok=false — stale/revision_pending/
+   commit_failed são tratados pela UI com mensagens próprias, não como erro genérico. */
+function postIdem(payload,btn,key,cb){if(btn)btn.disabled=true;fetch(URLX,{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':key},body:JSON.stringify(payload)}).then(function(r){return r.json();}).then(function(j){if(btn)btn.disabled=false;if(cb)cb(j||{});}).catch(function(){if(btn)btn.disabled=false;toast('Sem conexão. Tente novamente.','err');});}
 // V64.42 — apos aprovacao, tenta fechar a janela; navegadores normais bloqueiam window.close()
 // quando a aba nao foi aberta por script — nesse caso, deixa a tela final visivel com a frase
 // fallback ja presente no card (succ-foot/mid-foot "Voce pode fechar esta pagina."). Sem alarme.
@@ -3502,6 +3697,31 @@ document.addEventListener('click',function(e){
       if(t.indexOf('Aprovado')<0&&t.indexOf('Ajuste')<0)first=c;});
     if(first){first.classList.add('is-open');try{first.scrollIntoView({behavior:'smooth',block:'center'});}catch(_){first.scrollIntoView();}diagSet('expandedItem','i'+first.dataset.card);}
   }
+  else if(act==='approveAllPending'){var phB=a.getAttribute('data-phase')||PHASE||'themes';
+    // F3.5.4W-H1 (E4) — "Aprovar tudo": lote dos PENDENTES da fase atual. Defesas client-side
+    // espelham o servidor (que é a autoridade): com ajuste pendente vira feedback; sem pendência, nada.
+    var stB=badgeStats();var bpend=stB.total-stB.apr-stB.rev;
+    if(stB.rev>0){toast('Há ajuste pendente — use Enviar feedback.','err');syncFooter();return;}
+    if(bpend<=0){toast('Nada pendente para aprovar.','ok');syncFooter();return;}
+    var el0=(typeof BATCH_EMPTYLEG==='number')?BATCH_EMPTYLEG:0;
+    var mm='Aprovar todo '+PT.o+'?\n\n• '+bpend+' '+(PHASE==='themes'?PT.itens:'conteúdo(s)')+' pendente(s)'+
+      (el0>0?'\n• '+el0+' sem legenda continuarão pendentes':'')+
+      '\n\nTotal a aprovar agora: '+Math.max(bpend-el0,0)+'.';
+    if(!confirm(mm))return;
+    var ik='aap-'+Date.now()+'-'+Math.random().toString(36).slice(2,10);
+    postIdem({action:'approveAllPending',phase:phB},a,ik,function(j){
+      if(!j||j.ok!==true){
+        if(j&&j.error==='stale'){toast('O cronograma foi atualizado — recarregando a página…','err');setTimeout(function(){location.reload();},1200);return;}
+        if(j&&j.error==='revision_pending'){toast('Há ajuste pendente — use Enviar feedback.','err');syncFooter();return;}
+        toast('Não foi possível aprovar agora. Tente novamente.','err');return;}
+      (j.approvedIndexes||[]).forEach(function(ix){setBadge(ix,'aprovado');});bumpProgress();
+      if(j.finalized&&j.final===true){addHist('ok','Aprovou tudo');clientSuccess();return;}
+      if(j.finalized&&j.phase==='production'){addHist('ok','Aprovou tudo (legendas e artes)');clientProductionApproved();return;}
+      if(j.finalized){addHist('ok','Aprovou todos os '+PT.itens);clientThemesApproved();return;}
+      addHist('ok','Aprovou '+(j.approved||0)+' conteúdo(s) em lote');
+      toast((j.approved||0)+' aprovado(s)'+((j.pending||0)>0?' — '+j.pending+' aguardando legenda':''),'ok');
+      syncFooter();
+    });}
   else if(act==='approveAll'){var ph=a.getAttribute('data-phase')||'themes';
     // V64.51 — defesa extra: pendente SEM ajuste não finaliza; orienta a revisão item a item.
     var stG=badgeStats();
@@ -3766,6 +3986,20 @@ function renderClientHtml(task, token, env, origin) {
   let _allApprovedR = total > 0;
   for (let _i = 0; _i < total; _i++) { const _it = cItems["i" + _i]; if (!(_it && _it.cs === "aprovado" && _it.phase === phase)) { _allApprovedR = false; break; } }
   const pendingRevision = !_allApprovedR && (_itemPendingR || (task.clientReview && task.clientReview.status === "revisao"));
+  // F3.5.4W-H1 (E4) — contagem de PENDENTES p/ o CTA "Aprovar tudo" (lote). Espelho EXATO da
+  // elegibilidade de writeClientBatchApprove: pendente = sem aprovação e sem ajuste/edição na fase;
+  // elegível = themesOnly ? sempre : legenda não-vazia (cadeia legRaw idêntica; legenda vazia NUNCA
+  // é aprovada — fica em _batchEmptyLeg e o portal avisa que continuará pendente).
+  let _batchPend = 0, _batchEmptyLeg = 0;
+  for (let _bi = 0; _bi < total; _bi++) {
+    const _bit = cItems["i" + _bi] || {};
+    if (_bit.cs === "aprovado" && _bit.phase === phase) continue;
+    if ((_bit.cs === "em_revisao" || _bit.cs === "editado") && _bit.phase === phase) continue;
+    const _bc = (items[_bi] && typeof items[_bi] === "object") ? items[_bi] : {};
+    const _blr = (typeof _bit.legenda === "string") ? _bit.legenda : (typeof _bc.legenda === "string" ? _bc.legenda : (typeof _bc.caption === "string" ? _bc.caption : (typeof _bc.lg === "string" ? _bc.lg : (typeof _bc.l === "string" ? _bc.l : ""))));
+    if (!themesOnly && !String(_blr || "").trim()) { _batchEmptyLeg++; continue; }
+    _batchPend++;
+  }
 
   function firstUrl(v) {
     if (!v) return "";
@@ -3937,12 +4171,15 @@ ogClientMeta(origin, ogTitleRaw, ogDescRaw, "/cliente/cronograma/" + token, pt.i
   ? '<button class="btn ghost" data-act="revision">' + ICN.revise + 'Pedir revisão</button>' +
     '<button class="btn primary" data-act="approveAll" data-phase="' + phase + '">' + ICN.check + escapeHtml(phaseUi.cta) + '</button>'
   // V64.51 — itens pendentes SEM ajuste: NUNCA oferecer a finalização; orientar a revisão.
+  // F3.5.4W-H1 (E4) — CTA secundário "Aprovar tudo" (lote dos pendentes) ao lado, sem competir
+  // com a revisão item a item (ghost) e sem substituir a finalização canônica (approveAll).
   : '<button class="btn ghost" data-act="revision">' + ICN.revise + 'Pedir revisão</button>' +
+    (_batchPend > 0 ? '<button class="btn ghost" data-act="approveAllPending" data-phase="' + phase + '">' + ICN.check + 'Aprovar tudo</button>' : '') +
     '<button class="btn primary" data-act="reviewNext">' + ICN.check + 'Revisar temas</button>'
 )) + '</div></div>' +
 '<div class="scrim" id="scrim"><div class="sheet" id="sheet"></div></div>' +
 '<div class="toast" id="toast"></div>' +
-'<script>\nvar TOKEN=' + JSON.stringify(token) + ';var TOTAL=' + total + ';var PHASE=' + JSON.stringify(phase) + ';\n' +
+'<script>\nvar TOKEN=' + JSON.stringify(token) + ';var TOTAL=' + total + ';var PHASE=' + JSON.stringify(phase) + ';var BATCH_PEND=' + _batchPend + ';var BATCH_EMPTYLEG=' + _batchEmptyLeg + ';\n' +
 // F3.3.73I6C17 — vocabulário do TIPO p/ o JS do portal (cronograma×roteiro); CV_JS tem default seguro.
 'var PT=' + JSON.stringify({ o: pt.jsO, em: pt.jsEm, de: pt.jsDo, seu: pt.jsSeu, deste: pt.jsDeste, itens: pt.itensWord }) + ';\n' +
 // V64.42 — feature flag de PWA Web Push: o portal so mostra opt-in/subscribe quando ENABLE_PUSH=true.
