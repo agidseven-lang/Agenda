@@ -88,10 +88,10 @@ ok('B35 sem perda de dados: curSub() do roteiro é dirigido pelo N (pipeline id�
 
 console.log('— C) EDITOR RICO DE TEMA/LEGENDA (50 obrigatórios) —');
 ok('C1 texto simples: sem formatação NÃO grava campo rico (doc byte-equivalente ao legado)', has(rte, "o[field]=plain; if(hasFmt)o[field+'Rich']=rich; else delete o[field+'Rich'];"));
-ok('C2 negrito: b/strong→<strong> + botão + Ctrl+B', has(sanit, "if(tg==='B'||tg==='STRONG')return innerH?('<strong>'+innerH+'</strong>'):'';") && has(rte, "_rteBtn('bold','Negrito (Ctrl+B)'") && has(wire, "if(k==='b'){ev.preventDefault();ev.stopPropagation();_rteExec(ed,'bold');return;}"));
-ok('C3 itálico: i/em→<em> + botão + Ctrl+I', has(sanit, "if(tg==='I'||tg==='EM')return innerH?('<em>'+innerH+'</em>'):'';") && has(wire, "if(k==='i')"));
-ok('C4 sublinhado: u→<u> + Ctrl+U', has(sanit, "if(tg==='U')return innerH?('<u>'+innerH+'</u>'):'';") && has(wire, "if(k==='u')"));
-ok('C5 tachado: s/strike/del→<s>', has(sanit, "if(tg==='S'||tg==='STRIKE'||tg==='DEL')return innerH?('<s>'+innerH+'</s>'):'';"));
+ok('C2 negrito: b/strong→<strong> + botão + Ctrl+B', has(sanit, "if(tg==='B'||tg==='STRONG')return innerH?stWrap('<strong>'+innerH+'</strong>'):'';") && has(rte, "_rteBtn('bold','Negrito (Ctrl+B)'") && has(wire, "if(k==='b'){ev.preventDefault();ev.stopPropagation();_rteExec(ed,'bold');return;}"));
+ok('C3 itálico: i/em→<em> + botão + Ctrl+I', has(sanit, "if(tg==='I'||tg==='EM')return innerH?stWrap('<em>'+innerH+'</em>'):'';") && has(wire, "if(k==='i')"));
+ok('C4 sublinhado: u→<u> + Ctrl+U', has(sanit, "if(tg==='U')return innerH?stWrap('<u>'+innerH+'</u>'):'';") && has(wire, "if(k==='u')"));
+ok('C5 tachado: s/strike/del→<s>', has(sanit, "if(tg==='S'||tg==='STRIKE'||tg==='DEL')return innerH?stWrap('<s>'+innerH+'</s>'):'';"));
 ok('C6 subscrito: sub + botão', has(sanit, "if(tg==='SUB')") && has(rte, "_rteBtn('sub','Subscrito'"));
 ok('C7 sobrescrito: sup + botão', has(sanit, "if(tg==='SUP')") && has(rte, "_rteBtn('sup','Sobrescrito'"));
 ok('C8 cor: paleta FECHADA de 8 (data-cl 1..8; fora da paleta descarta mantendo texto)', has(rte, "var RTE_COLORS=['#F87171','#FB923C','#FACC15','#34D399','#22D3EE','#60A5FA','#A78BFA','#F472B6'];") && has(sanit, "(dcl&&/^[1-8]$/.test(dcl))?dcl:(_RTE_COLOR_BY_RGB[stC]||'')"));
