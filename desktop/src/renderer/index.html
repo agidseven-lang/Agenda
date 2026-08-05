@@ -244,6 +244,82 @@
   /* F3.5.5C — validação visível da quantidade de roteiros (nunca corrigir em silêncio) */
   .sq-err{margin:6px 0 12px;font-size:12.5px;color:#F87171;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.25);border-radius:9px;padding:8px 11px}
   .sq-err[hidden]{display:none}
+  /* ═══ F3.5.5C — EDITOR RICO (RTE) de Tema/Legenda ════════════════════════════════
+     Visual da CASA (tokens/superfícies/focus do app; NUNCA "Word dentro do app").
+     A barra aparece SÓ com foco no campo (leve com N editores na mesma tela). */
+  .rte{background:var(--surface);border:1px solid var(--line);border-radius:12px;margin-bottom:10px;transition:border-color .12s,box-shadow .12s}
+  .rte:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(91,108,255,.18)}
+  .rte-bar{display:none;position:relative;flex-wrap:wrap;align-items:center;gap:2px;padding:6px 8px;border-bottom:1px solid var(--line-soft)}
+  .rte:focus-within .rte-bar{display:flex}
+  .rte-b{flex:none;min-width:26px;height:26px;padding:0 5px;border:none;border-radius:7px;background:transparent;color:var(--soft);font-size:13px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:2px;cursor:pointer;user-select:none;transition:background .1s,color .1s}
+  .rte-b:hover{background:var(--surface2);color:var(--ink)}
+  .rte-b svg{width:16px;height:16px;display:block}
+  .rte-sep{flex:none;width:1px;height:18px;background:var(--line-soft);margin:0 4px}
+  .rte-car{font-size:8px;opacity:.7}
+  .rte-a{font-weight:800;line-height:1}
+  .rte-swb{display:block;width:14px;height:3px;border-radius:2px;background:#F87171;margin-top:1px}
+  .rte-dd[data-rtemenu="cl"]{flex-direction:column;gap:0}
+  .rte-hlico{font-weight:800;line-height:1.2;background:#FEF08A;color:#14161D;border-radius:4px;padding:0 4px}
+  .rte-menu{position:absolute;top:calc(100% - 2px);left:8px;z-index:60;display:flex;flex-direction:column;gap:2px;min-width:150px;background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:6px;box-shadow:0 14px 30px rgba(0,0,0,.35)}
+  .rte-menu[hidden]{display:none}
+  .rte-mi{text-align:left;border:none;border-radius:7px;background:transparent;color:var(--ink);font-size:13px;padding:7px 10px;cursor:pointer}
+  .rte-mi:hover{background:var(--surface)}
+  .rte-mi-go{background:var(--accent);color:#fff;font-weight:700}
+  .rte-mi-go:hover{background:var(--accent)}
+  .rte-pal{flex-direction:row;flex-wrap:wrap;min-width:0;width:172px}
+  .rte-sw{flex:none;width:26px;height:26px;border-radius:7px;border:1px solid var(--line);cursor:pointer;padding:0}
+  .rte-sw:hover{transform:scale(1.08)}
+  .rte-sw-x{background:transparent;color:var(--soft);border-style:dashed;font-size:13px;font-weight:800}
+  .rte-lnk{min-width:270px;gap:6px}
+  .rte-lnk-in{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:8px;color:var(--ink);font-size:13px;padding:8px 10px;outline:none}
+  .rte-lnk-in:focus{border-color:var(--accent)}
+  .rte-lnk-err{color:#F87171;font-size:12px;padding:0 2px}
+  .rte-lnk-acts{display:flex;gap:6px;justify-content:flex-end}
+  .rte-ed{position:relative;min-height:64px;max-height:280px;overflow-y:auto;padding:11px 13px;color:var(--ink);font-size:14px;line-height:1.5;outline:none;overflow-wrap:anywhere;user-select:text;cursor:text;border-radius:0 0 12px 12px}
+  .rte[data-rte$="|tema"] .rte-ed{min-height:44px}
+  .rte-ed:empty::before,.rte-ed.rte-mt::before{content:attr(data-ph);position:absolute;top:11px;left:13px;color:var(--faint);pointer-events:none}
+  /* Render do CANÔNICO (mesmas regras no editor e na exibição .rte-view) */
+  .rte-view{overflow-wrap:anywhere}
+  .rte-ed p,.rte-view p{margin:0 0 6px}
+  .rte-ed p:last-child,.rte-view p:last-child{margin-bottom:0}
+  .rte-ed h3,.rte-view h3{margin:10px 0 6px;font-size:17px;font-weight:800;line-height:1.3}
+  .rte-ed h4,.rte-view h4{margin:8px 0 5px;font-size:15px;font-weight:700;line-height:1.3}
+  .rte-ed h3:first-child,.rte-ed h4:first-child,.rte-view h3:first-child,.rte-view h4:first-child{margin-top:0}
+  .rte-ed ul,.rte-ed ol,.rte-view ul,.rte-view ol{margin:0 0 6px;padding-left:22px}
+  .rte-ed li,.rte-view li{margin:2px 0}
+  .rte-ed hr,.rte-view hr{border:none;border-top:1px solid var(--line);margin:10px 0}
+  .rte-ed a,.rte-view a{color:var(--accent);text-decoration:underline}
+  .rte-ed blockquote{margin:0 0 6px;padding-left:12px;border-left:3px solid var(--line)}
+  .rte-ed [data-al="c"],.rte-view [data-al="c"]{text-align:center}
+  .rte-ed [data-al="r"],.rte-view [data-al="r"]{text-align:right}
+  .rte-ed [data-al="j"],.rte-view [data-al="j"]{text-align:justify}
+  /* recuo: no EDITOR a escala é a do gesto nativo (40px, margem inline via rteEditableHtml;
+     o CSS abaixo é só fallback do mesmo valor); na EXIBIÇÃO, escala compacta 22px. */
+  .rte-ed [data-ind="1"]{margin-left:40px}.rte-ed [data-ind="2"]{margin-left:80px}.rte-ed [data-ind="3"]{margin-left:120px}
+  .rte-ed [data-ind="4"]{margin-left:160px}.rte-ed [data-ind="5"]{margin-left:200px}.rte-ed [data-ind="6"]{margin-left:240px}
+  .rte-view [data-ind="1"]{margin-left:22px}.rte-view [data-ind="2"]{margin-left:44px}.rte-view [data-ind="3"]{margin-left:66px}
+  .rte-view [data-ind="4"]{margin-left:88px}.rte-view [data-ind="5"]{margin-left:110px}.rte-view [data-ind="6"]{margin-left:132px}
+  .rte-ed span[data-fs="s"],.rte-view span[data-fs="s"]{font-size:12px}
+  .rte-ed span[data-fs="l"],.rte-view span[data-fs="l"]{font-size:17px}
+  .rte-ed span[data-fs="xl"],.rte-view span[data-fs="xl"]{font-size:21px}
+  /* pré-visualização VIVA do tamanho durante a edição (token de família do gesto) */
+  .rte-ed span[style*="rte-fs-s"]{font-size:12px}
+  .rte-ed span[style*="rte-fs-l"]{font-size:17px}
+  .rte-ed span[style*="rte-fs-xl"]{font-size:21px}
+  .rte-ed span[data-cl="1"],.rte-view span[data-cl="1"]{color:#F87171}
+  .rte-ed span[data-cl="2"],.rte-view span[data-cl="2"]{color:#FB923C}
+  .rte-ed span[data-cl="3"],.rte-view span[data-cl="3"]{color:#FACC15}
+  .rte-ed span[data-cl="4"],.rte-view span[data-cl="4"]{color:#34D399}
+  .rte-ed span[data-cl="5"],.rte-view span[data-cl="5"]{color:#22D3EE}
+  .rte-ed span[data-cl="6"],.rte-view span[data-cl="6"]{color:#60A5FA}
+  .rte-ed span[data-cl="7"],.rte-view span[data-cl="7"]{color:#A78BFA}
+  .rte-ed span[data-cl="8"],.rte-view span[data-cl="8"]{color:#F472B6}
+  .rte-ed span[data-hl="1"],.rte-view span[data-hl="1"]{background:#FEF08A;color:#14161D;border-radius:3px;padding:0 2px}
+  .rte-ed span[data-hl="2"],.rte-view span[data-hl="2"]{background:#BBF7D0;color:#14161D;border-radius:3px;padding:0 2px}
+  .rte-ed span[data-hl="3"],.rte-view span[data-hl="3"]{background:#BAE6FD;color:#14161D;border-radius:3px;padding:0 2px}
+  .rte-ed span[data-hl="4"],.rte-view span[data-hl="4"]{background:#FBCFE8;color:#14161D;border-radius:3px;padding:0 2px}
+  .rte-ed span[data-hl="5"],.rte-view span[data-hl="5"]{background:#FDBA74;color:#14161D;border-radius:3px;padding:0 2px}
+  .rte-ed span[data-hl="6"],.rte-view span[data-hl="6"]{background:#E9D5FF;color:#14161D;border-radius:3px;padding:0 2px}
   /* F3.4.6 — GRADE DIÁRIA da Agenda/Mês: restaura as MOLDURAS individuais de cada dia (visual
      aprovado da linhagem PWA .cell): cada data na sua própria célula com superfície+borda (linhas
      e colunas delimitadas), fora-do-mês discreto porém VISÍVEL, hoje contornado, seleção em accent.
@@ -7566,10 +7642,12 @@ function openDetails(taskId){
         '<details class="det-acc"'+(_openAll?' open':'')+'>'+
           '<summary class="det-acc-sum"><span class="det-content-n">'+(c._i+1)+'</span>'+
             '<span class="det-acc-h"><span class="det-acc-k">'+_word+' '+num+'</span>'+
-            '<span class="det-acc-t">'+esc(c.tema||'(sem tema)')+'</span></span>'+
+            /* F3.5.5C — tema/legenda com formatação do editor rico (paridade; senão texto).
+               O espelho oculto .det-plain-src preserva a CÓPIA como projeção text/plain exata. */
+            '<span class="det-acc-t">'+(hasTema?(rteInlineDisplay(c.temaRich,String(c.tema))||esc(c.tema)):'(sem tema)')+'</span></span>'+
             cp+
             '<span class="det-acc-chev">'+svg('arr')+'</span></summary>'+
-          '<div class="det-acc-body">'+(leg?'<div class="det-acc-l">'+esc(leg)+'</div>':'<div class="det-acc-empty">Sem legenda para este item.</div>')+_dnote+'</div>'+
+          '<div class="det-acc-body">'+(leg?(function(){var _rv=rteDisplayHtml(c.legendaRich,leg);return '<div class="det-acc-l">'+(_rv||esc(leg))+(_rv?'<span class="det-plain-src" hidden>'+esc(leg)+'</span>':'')+'</div>';})():'<div class="det-acc-empty">Sem legenda para este item.</div>')+_dnote+'</div>'+
         '</details>'+
         (_canEdit?'<div class="det-note-ed" data-detnotebox="'+c._i+'" hidden></div>':'')+
         '</div>';
@@ -7958,23 +8036,28 @@ function openItemFix(taskId,idx,field){
   const arr=Array.isArray(t.cronContents)?t.cronContents:[];const c=arr[idx]||{};
   const ci=(t.clientItems&&t.clientItems['i'+idx])||{};
   const cur=field==='tema'?(c.tema||''):(c.legenda||'');
+  /* F3.5.5C — correção pontual usa o editor rico; o rico atual entra com paridade
+     (edição em texto puro no portal invalida e cai no texto). */
+  const curRich=field==='tema'?(c.temaRich||''):(c.legendaRich||'');
+  window._fixModel={plain:cur,rich:(curRich&&rteParity(curRich,cur))?curRich:''};
   const isLeg=field==='legenda';const lbl=isLeg?'Legenda':'Tema';
+  const beforeHtml=cur?(rteDisplayHtml(curRich,cur)||esc(cur)):'(vazio)';
   document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1"><div class="sheet sp-sheet">'+
     '<button class="iconbtn sp-x" data-modalclose="1">'+svg('close')+'</button>'+
     '<div class="sp-ic">'+svg('editnote')+'</div>'+
     '<div class="sp-title">Corrigir '+lbl.toLowerCase()+' — Conteúdo '+(idx+1)+'</div>'+
     (ci.note?'<div class="sp-sub">Pedido do cliente: <b>"'+esc(ci.note)+'"</b></div>':'<div class="sp-sub">Ajuste apenas este conteúdo. Os demais não são alterados.</div>')+
-    '<div class="if-ba"><div class="if-lbl">Antes</div><div class="if-before">'+esc(cur||'(vazio)')+'</div></div>'+
+    '<div class="if-ba"><div class="if-lbl">Antes</div><div class="if-before">'+beforeHtml+'</div></div>'+
     '<div class="sp-lbl">'+lbl+' corrigido</div>'+
-    (isLeg?'<textarea id="ifIn" class="if-in" rows="5" autofocus>'+esc(cur)+'</textarea>':'<input id="ifIn" class="if-in" autofocus value="'+esc(cur).replace(/"/g,'&quot;')+'">')+
+    rteField('fix|'+idx+'|'+field,cur,window._fixModel.rich,lbl+' corrigido')+
     '<div class="sp-actions"><button class="btn ghost" data-modalclose="1">Cancelar</button>'+
       '<button class="btn ce-edit" data-itemfixsave="'+taskId+'|'+idx+'|'+field+'|save">'+svg('check')+'Salvar correção</button>'+
       '<button class="btn send-go" data-itemfixsave="'+taskId+'|'+idx+'|'+field+'|resend">'+svg('send')+'Salvar e reenviar ao cliente</button></div>'+
   '</div></div>';
   // 1.0.105 — foco GARANTIDO no PRIMEIRO clique (Problema do teste real: input "não
   // respondia de primeira"). autofocus + dupla tentativa via rAF e timeout, posicionando
-  // o cursor no fim do texto. Idempotente e null-safe.
-  var _focusIf=function(){var i=document.getElementById('ifIn');if(!i)return;try{i.focus();var n=(i.value||'').length;if(i.setSelectionRange)i.setSelectionRange(n,n);}catch(e){}};
+  // o cursor no fim do texto. Idempotente e null-safe. (F3.5.5C: alvo = editor rico.)
+  var _focusIf=function(){var i=document.querySelector('[data-rteed^="fix|"]');if(!i)return;try{i.focus();var r=document.createRange();r.selectNodeContents(i);r.collapse(false);var s=window.getSelection();s.removeAllRanges();s.addRange(r);}catch(e){}};
   requestAnimationFrame(function(){_focusIf();requestAnimationFrame(_focusIf);});
   setTimeout(_focusIf,60);
 }
@@ -7983,7 +8066,12 @@ async function saveItemFix(taskId,idx,field,val,resend){
   const arr=Array.isArray(t.cronContents)?t.cronContents.slice():[];
   while(arr.length<=idx)arr.push({});
   const c=Object.assign({},arr[idx]||{});const old=field==='tema'?(c.tema||''):(c.legenda||'');
-  if(field==='tema')c.tema=val;else c.legenda=val;arr[idx]=c;
+  if(field==='tema')c.tema=val;else c.legenda=val;
+  /* F3.5.5C — carrega o canônico rico junto (só quando há formatação; senão remove o
+     campo rico antigo para o documento não divergir da projeção). */
+  {const _rk=field+'Rich';const _r=(window._fixModel&&window._fixModel.rich)||'';
+   if(_r)c[_rk]=_r;else delete c[_rk];}
+  arr[idx]=c;
   const now=Date.now();const u=state.user||{};
   const patch={cronContents:arr,
     history:firebase.firestore.FieldValue.arrayUnion({type:'social_corrigiu',label:'Social corrigiu '+(field==='tema'?'o tema':'a legenda')+' do Conteúdo '+(idx+1),
@@ -8152,12 +8240,15 @@ function addDaysStr(s,n){const p=String(s).split('-');const dt=new Date(+p[0],+p
 function openContentEditor(taskId){
   const t=state.tasks.find(x=>x.id===taskId);if(!t)return;
   const conts=(Array.isArray(t.cronContents)?t.cronContents:[]).map(c=>c||{});
-  const list=(conts.length?conts:[{}]).map((c,i)=>
+  /* F3.5.5C — modelo de trabalho do editor rico (rteSync src "ce" grava aqui; o save lê daqui).
+     Carrega plano + rico; feed/story ficam no orig e são re-mesclados no save. */
+  window._ceModel=(conts.length?conts:[{}]).map(c=>({tema:c.tema||'',legenda:c.legenda||'',temaRich:c.temaRich||'',legendaRich:c.legendaRich||''}));
+  const list=window._ceModel.map((c,i)=>
     '<div class="ce-card"><div class="ce-n">'+(i+1)+'</div><div class="ce-f">'+
       '<label>Tema do conteúdo '+(i+1)+'</label>'+
-      '<input class="ce-in" data-cetema="'+i+'" type="text" value="'+esc(c.tema||'')+'" placeholder="Tema do conteúdo">'+
+      rteField('ce|'+i+'|tema',c.tema,c.temaRich,'Tema do conteúdo')+
       '<label style="margin-top:10px">Legenda</label>'+
-      '<textarea class="ce-ta" data-celeg="'+i+'" placeholder="Legenda para este conteúdo…">'+esc(c.legenda||'')+'</textarea>'+
+      rteField('ce|'+i+'|legenda',c.legenda,c.legendaRich,'Legenda para este conteúdo…')+
     '</div></div>').join('');
   document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1"><div class="sheet ce-sheet">'+
     '<button class="iconbtn sp-x" data-modalclose="1">'+svg('close')+'</button>'+
@@ -8173,13 +8264,19 @@ function openContentEditor(taskId){
 async function saveContentEdits(taskId){
   const t=state.tasks.find(x=>x.id===taskId);if(!t)return;
   const orig=(Array.isArray(t.cronContents)?t.cronContents:[]).map(c=>c||{});
-  const n=Math.max(orig.length,document.querySelectorAll('[data-cetema]').length);
+  /* F3.5.5C — lê o MODELO do editor rico (rteSync mantém plano+rico em _ceModel); feed/story
+     preservados do original 1:1. Campo rico só persiste quando há formatação de fato. */
+  const model=Array.isArray(window._ceModel)?window._ceModel:[];
+  const n=Math.max(orig.length,model.length);
   const contents=[];
   for(let i=0;i<n;i++){
-    const tm=document.querySelector('[data-cetema="'+i+'"]');const lg=document.querySelector('[data-celeg="'+i+'"]');
-    if(!tm&&!lg)continue;
+    const m=model[i];
     const o=orig[i]||{};
-    contents.push({tema:tm?tm.value.trim():(o.tema||''),legenda:lg?lg.value.trim():(o.legenda||''),feedImageUrl:o.feedImageUrl||'',storyImageUrl:o.storyImageUrl||''});
+    if(!m){contents.push(Object.assign({},o));continue;}
+    const it={tema:(m.tema||''),legenda:(m.legenda||''),feedImageUrl:o.feedImageUrl||'',storyImageUrl:o.storyImageUrl||''};
+    if(m.temaRich)it.temaRich=m.temaRich;
+    if(m.legendaRich)it.legendaRich=m.legendaRich;
+    contents.push(it);
   }
   const obsEl=document.getElementById('ceObs');const desc=obsEl?obsEl.value:t.desc||'';
   const now=Date.now();const u=state.user||{};
@@ -8212,7 +8309,7 @@ async function ikUpload(file,folder){
 }
 function openProductionModal(taskId){
   const t=state.tasks.find(x=>x.id===taskId);if(!t)return;
-  state._prod={taskId:taskId,items:(Array.isArray(t.cronContents)?t.cronContents:[]).map(c=>({tema:(c&&c.tema)||'',legenda:(c&&c.legenda)||'',feedImageUrl:(c&&c.feedImageUrl)||'',storyImageUrl:(c&&c.storyImageUrl)||''}))};
+  state._prod={taskId:taskId,items:(Array.isArray(t.cronContents)?t.cronContents:[]).map(c=>({tema:(c&&c.tema)||'',legenda:(c&&c.legenda)||'',temaRich:(c&&c.temaRich)||'',legendaRich:(c&&c.legendaRich)||'',feedImageUrl:(c&&c.feedImageUrl)||'',storyImageUrl:(c&&c.storyImageUrl)||''}))};
   renderProductionModal();
 }
 function artBox(i,kind){
@@ -8229,8 +8326,8 @@ function artBox(i,kind){
 function renderProductionModal(){
   const p=state._prod;const t=state.tasks.find(x=>x.id===p.taskId)||{};
   const cards=p.items.length?p.items.map((it,i)=>
-    '<div class="pr-card"><div class="pr-card-h"><div class="pr-n">'+(i+1)+'</div><div class="pr-tema">'+esc(it.tema||'(sem tema)')+'</div></div>'+
-    '<label class="pr-leg-l">Legenda</label><textarea class="pr-leg" data-prodleg="'+i+'" placeholder="Escreva a legenda deste conteúdo…">'+esc(it.legenda||'')+'</textarea>'+
+    '<div class="pr-card"><div class="pr-card-h"><div class="pr-n">'+(i+1)+'</div><div class="pr-tema">'+(it.tema?(rteInlineDisplay(it.temaRich,it.tema)||esc(it.tema)):'(sem tema)')+'</div></div>'+
+    '<label class="pr-leg-l">Legenda</label>'+rteField('prod|'+i+'|legenda',it.legenda||'',it.legendaRich||'','Escreva a legenda deste conteúdo…')+
     '<div class="pr-arts">'+artBox(i,'feed')+artBox(i,'story')+'</div>'+
     '</div>').join(''):'<div class="cvw-soft">Nenhum conteúdo neste cronograma.</div>';
   document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1"><div class="sheet pr-sheet">'+
@@ -8257,7 +8354,7 @@ function renderProductionModal(){
 }
 // guarda o scrollTop da lista de produção antes de um re-render disparado por upload/URL.
 function _prodKeepScroll(){const l=document.querySelector('.pr-list');state._prodScroll=l?l.scrollTop:0;}
-function prodCollect(){return (state._prod&&state._prod.items||[]).map(it=>({tema:it.tema||'',legenda:it.legenda||'',feedImageUrl:it.feedImageUrl||'',storyImageUrl:it.storyImageUrl||''}));}
+function prodCollect(){return (state._prod&&state._prod.items||[]).map(it=>{const o={tema:it.tema||'',legenda:it.legenda||'',feedImageUrl:it.feedImageUrl||'',storyImageUrl:it.storyImageUrl||''};if(it.temaRich)o.temaRich=it.temaRich;if(it.legendaRich)o.legendaRich=it.legendaRich;return o;});}
 async function saveProduction(taskId,resend){
   const t=state.tasks.find(x=>x.id===taskId);if(!t)return;
   const contents=prodCollect();const now=Date.now();const u=state.user||{};
@@ -9500,6 +9597,484 @@ function openSheet(which){
 }
 
 /* ---- TASK FORM (wizard) ---- */
+/* ════════════════ F3.5.5C — EDITOR RICO DE TEMAS E LEGENDAS (RTE) ════════════════
+ * Arquitetura auditada: SEM biblioteca externa (zero dependência nova; SBOM intacto; sem CDN;
+ * compatível com o renderer single-file). contenteditable + document.execCommand APENAS como
+ * mecânica de GESTO (engine único e fixado do Electron/Chromium; todos os comandos usados são
+ * integrados ao undo/redo nativo). O execCommand NUNCA é a fonte da verdade: o formato CANÔNICO
+ * é a saída determinística de rteSanitize() — allowlist estrita:
+ *   tags  p, br, strong, em, u, s, sub, sup, ul, ol, li, a, hr, h3, h4, span
+ *   attrs data-al(c|r|j) alinhamento · data-ind(1..6) recuo · span[data-fs(s|l|xl)] tamanho ·
+ *         span[data-cl(1..8)] cor da paleta · span[data-hl(1..6)] marca-texto ·
+ *         a[href http/https] com rel="noopener noreferrer" target="_blank" FORÇADOS
+ * PROIBIDO no canônico: style, class, atributos on..., script, iframe, object, embed,
+ *   form, svg, img e URLs javascript:.
+ * PROJEÇÃO TEXTO (richToPlain) grava SEMPRE nos campos legados tema/legenda (compat integral:
+ * busca/cópia/notificações/portal antigo). REGRA ANTI-DIVERGÊNCIA: o rico só é exibido quando
+ * richToPlain(rich)===plain — edição em texto puro (cliente no portal, versões antigas)
+ * invalida o rico automaticamente (fallback texto). Conteúdo SEM formatação não grava campo
+ * rico (documento byte-equivalente ao legado). */
+var RTE_COLORS=['#F87171','#FB923C','#FACC15','#34D399','#22D3EE','#60A5FA','#A78BFA','#F472B6'];
+var RTE_HL=['#FEF08A','#BBF7D0','#BAE6FD','#FBCFE8','#FDBA74','#E9D5FF'];
+var RTE_FS={s:'12px',l:'17px',xl:'21px'};
+function _rteRgb(hex){var n=parseInt(hex.slice(1),16);return 'rgb('+((n>>16)&255)+', '+((n>>8)&255)+', '+(n&255)+')';}
+var _RTE_COLOR_BY_RGB={},_RTE_HL_BY_RGB={};
+RTE_COLORS.forEach(function(h,i){_RTE_COLOR_BY_RGB[_rteRgb(h)]=String(i+1);_RTE_COLOR_BY_RGB[h.toLowerCase()]=String(i+1);});
+RTE_HL.forEach(function(h,i){_RTE_HL_BY_RGB[_rteRgb(h)]=String(i+1);_RTE_HL_BY_RGB[h.toLowerCase()]=String(i+1);});
+function _rteIndentOf(el){
+  /* margem inline VIVA (gesto de recuo do editor / colagem Word "36pt") tem precedência;
+   * data-ind é o valor canônico re-parseado (sem estilo). */
+  try{
+    var ml=(el.style&&el.style.marginLeft)||(el.style&&el.style.paddingLeft)||'';
+    if(ml){var px=parseFloat(ml);if(isFinite(px))return Math.max(0,Math.min(6,Math.round(px/40)));}
+    var di=el.getAttribute&&el.getAttribute('data-ind'); if(di&&/^[1-6]$/.test(di))return Number(di);
+  }catch(_){ }
+  return 0;
+}
+function _rteAlignOf(el){
+  /* o style VIVO (último gesto justify*) tem precedência sobre data-al canônico; um
+   * text-align:left explícito LIMPA data-al antigo. */
+  try{
+    var s=((el.style&&el.style.textAlign)||'').toLowerCase();
+    if(s==='center')return 'c'; if(s==='right')return 'r'; if(s==='justify')return 'j';
+    if(s==='left'||s==='start')return '';
+    var a=el.getAttribute&&el.getAttribute('data-al'); if(a==='c'||a==='r'||a==='j')return a;
+    var al=((el.getAttribute&&el.getAttribute('align'))||'').toLowerCase();
+    if(al==='center')return 'c'; if(al==='right')return 'r'; if(al==='justify')return 'j';
+  }catch(_){ }
+  return '';
+}
+/* Núcleo do canônico: percorre um DOM (de DOMParser) e emite SOMENTE a allowlist normalizada.
+ * b→strong, i/em→em, strike/del→s, div→p, h1/h2/h3→h3, h4..h6→h4, blockquote→recuo(+1),
+ * font/span com cor/fundo/família-token → span[data-*] (só valores EXATOS da paleta; o resto
+ * é descartado mantendo o texto), estilos mso, class, id e atributos on... SEMPRE descartados. Texto é
+ * re-escapado (esc). Elementos perigosos somem COM o conteúdo (script/style/iframe/object/
+ * embed/form/svg/img/video/audio/template/link/meta). */
+function rteSanitize(html){
+  var out='';
+  try{
+    var doc=new DOMParser().parseFromString('<div id="__rteroot">'+String(html==null?'':html)+'</div>','text/html');
+    var root=doc.getElementById('__rteroot'); if(!root)return '';
+    var DROP={SCRIPT:1,STYLE:1,IFRAME:1,OBJECT:1,EMBED:1,FORM:1,INPUT:1,BUTTON:1,SELECT:1,TEXTAREA:1,SVG:1,IMG:1,VIDEO:1,AUDIO:1,TEMPLATE:1,LINK:1,META:1,CANVAS:1,MAP:1,BASE:1,DIALOG:1};
+    var BLK={P:1,DIV:1,H1:1,H2:1,H3:1,H4:1,H5:1,H6:1,UL:1,OL:1,LI:1,TABLE:1,TBODY:1,THEAD:1,TFOOT:1,TR:1,TD:1,TH:1,BLOCKQUOTE:1,HR:1};
+    function hasBlockChild(el){
+      for(var i=0;i<el.children.length;i++){if(BLK[el.children[i].tagName])return true;}
+      return false;
+    }
+    function inline(node,ctx){
+      var r='';
+      node.childNodes.forEach(function(ch){
+        if(ch.nodeType===3){r+=esc(ch.nodeValue);return;}
+        if(ch.nodeType!==1)return;
+        r+=inlineEl(ch,ctx);
+      });
+      return r;
+    }
+    function inlineEl(ch,ctx){
+      var tg=ch.tagName;
+      if(DROP[tg])return '';
+      if(tg==='BR')return '<br>';
+      /* bloco em contexto inline (colagem malformada) → emitido como bloco ATÔMICO */
+      if(BLK[tg])return blockEl(ch,ctx);
+      var innerH=inline(ch,ctx);
+      if(tg==='B'||tg==='STRONG')return innerH?('<strong>'+innerH+'</strong>'):'';
+      if(tg==='I'||tg==='EM')return innerH?('<em>'+innerH+'</em>'):'';
+      if(tg==='U')return innerH?('<u>'+innerH+'</u>'):'';
+      if(tg==='S'||tg==='STRIKE'||tg==='DEL')return innerH?('<s>'+innerH+'</s>'):'';
+      if(tg==='SUB')return innerH?('<sub>'+innerH+'</sub>'):'';
+      if(tg==='SUP')return innerH?('<sup>'+innerH+'</sup>'):'';
+      if(tg==='A'){
+        var href=String(ch.getAttribute('href')||'').trim();
+        if(/^https?:\/\//i.test(href)&&innerH)return '<a href="'+esc(href)+'" rel="noopener noreferrer" target="_blank">'+innerH+'</a>';
+        return innerH;
+      }
+      if(tg==='SPAN'||tg==='FONT'){
+        var attrs='';
+        var dcl=ch.getAttribute('data-cl'),dhl=ch.getAttribute('data-hl'),dfs=ch.getAttribute('data-fs');
+        var stC=((ch.style&&ch.style.color)||ch.getAttribute('color')||'').toLowerCase();
+        var stB=((ch.style&&(ch.style.backgroundColor||ch.style.background))||'').toLowerCase();
+        var fam=((ch.style&&ch.style.fontFamily)||ch.getAttribute('face')||'');
+        var mF=/rte-fs-(s|m|l|xl)/.exec(fam||'');
+        var cl=(dcl&&/^[1-8]$/.test(dcl))?dcl:(_RTE_COLOR_BY_RGB[stC]||'');
+        var hl=(dhl&&/^[1-6]$/.test(dhl))?dhl:(_RTE_HL_BY_RGB[stB]||'');
+        var fsv=(dfs&&/^(s|l|xl)$/.test(dfs))?dfs:((mF&&mF[1]!=='m')?mF[1]:'');
+        if(cl)attrs+=' data-cl="'+cl+'"'; if(hl)attrs+=' data-hl="'+hl+'"'; if(fsv)attrs+=' data-fs="'+fsv+'"';
+        return (attrs&&innerH)?('<span'+attrs+'>'+innerH+'</span>'):innerH;
+      }
+      /* elemento inline desconhecido (code/mark/abbr/o:p…) → texto preservado, casca fora */
+      return innerH;
+    }
+    function blockAttrs(el,extraInd){
+      var a=_rteAlignOf(el);var ind=Math.max(0,Math.min(6,_rteIndentOf(el)+(extraInd||0)));
+      return (a?' data-al="'+a+'"':'')+(ind?' data-ind="'+ind+'"':'');
+    }
+    /* conteúdo inline de um LI; listas aninhadas DIRETAS são coletadas como itens irmãos
+     * (skipLists=true no topo) e as profundas (dentro de div etc.) achatam com <br>. */
+    function liInline(node,ctx,skipLists){
+      var r='';
+      node.childNodes.forEach(function(ch){
+        if(ch.nodeType===3){r+=esc(ch.nodeValue);return;}
+        if(ch.nodeType!==1)return;
+        var tg=ch.tagName;
+        if(DROP[tg])return;
+        if(tg==='BR'){r+='<br>';return;}
+        if(tg==='UL'||tg==='OL'){
+          if(skipLists)return;
+          Array.prototype.forEach.call(ch.children,function(li2){
+            if(li2.tagName!=='LI')return;
+            var t2=liInline(li2,ctx,false);
+            if(t2)r+=(r?'<br>':'')+t2;
+          });
+          return;
+        }
+        if(BLK[tg]){var b=liInline(ch,ctx,false);if(b)r+=(r?'<br>':'')+b;return;}
+        r+=inlineEl(ch,ctx);
+      });
+      return r;
+    }
+    function blockEl(ch,ctx){
+      var tg=ch.tagName;
+      if(DROP[tg])return '';
+      if(tg==='P'||tg==='DIV'){
+        if(hasBlockChild(ch)){
+          var ind2=Math.min(6,((ctx&&ctx.ind)||0)+_rteIndentOf(ch));
+          return blocks(ch,ind2?{ind:ind2}:null);
+        }
+        var ih=inline(ch,ctx);
+        return '<p'+blockAttrs(ch,ctx&&ctx.ind)+'>'+(ih||'<br>')+'</p>';
+      }
+      if(tg==='H1'||tg==='H2'||tg==='H3'){var i3=inline(ch,ctx);return '<h3'+blockAttrs(ch,ctx&&ctx.ind)+'>'+(i3||'<br>')+'</h3>';}
+      if(tg==='H4'||tg==='H5'||tg==='H6'){var i4=inline(ch,ctx);return '<h4'+blockAttrs(ch,ctx&&ctx.ind)+'>'+(i4||'<br>')+'</h4>';}
+      if(tg==='HR')return '<hr>';
+      if(tg==='BLOCKQUOTE')return blocks(ch,{ind:Math.min(6,((ctx&&ctx.ind)||0)+1)});
+      if(tg==='UL'||tg==='OL'){
+        var items='';
+        (function coll(listEl){
+          Array.prototype.forEach.call(listEl.children,function(li){
+            if(li.tagName==='UL'||li.tagName==='OL'){coll(li);return;}
+            if(li.tagName!=='LI')return;
+            var il=liInline(li,ctx,true);
+            items+='<li'+blockAttrs(li,0)+'>'+(il||'<br>')+'</li>';
+            Array.prototype.forEach.call(li.children,function(sub){if(sub.tagName==='UL'||sub.tagName==='OL')coll(sub);});
+          });
+        })(ch);
+        return items?('<'+tg.toLowerCase()+'>'+items+'</'+tg.toLowerCase()+'>'):'';
+      }
+      if(tg==='LI'){var il2=liInline(ch,ctx,false);return '<p'+blockAttrs(ch,ctx&&ctx.ind)+'>'+(il2||'<br>')+'</p>';}
+      if(tg==='TABLE'||tg==='TBODY'||tg==='THEAD'||tg==='TFOOT'||tg==='TR')return blocks(ch,ctx);
+      if(tg==='TD'||tg==='TH'){var it=inline(ch,ctx);return it.trim()?('<p'+((ctx&&ctx.ind)?' data-ind="'+ctx.ind+'"':'')+'>'+it+'</p>'):'';}
+      return '';
+    }
+    function blocks(node,ctx){
+      /* runs inline consecutivos no nível de bloco fundem em UM parágrafo ("hello <b>x</b> world");
+       * BR de topo fecha o parágrafo corrente e BRs consecutivos viram linha vazia. */
+      var r='',run='';
+      var pAttr=(ctx&&ctx.ind)?' data-ind="'+ctx.ind+'"':'';
+      function flush(){if(run.trim())r+='<p'+pAttr+'>'+run+'</p>';run='';}
+      Array.prototype.forEach.call(node.childNodes,function(ch){
+        if(ch.nodeType===3){run+=esc(ch.nodeValue);return;}
+        if(ch.nodeType!==1)return;
+        var tg=ch.tagName;
+        if(DROP[tg])return;
+        if(tg==='BR'){if(run.trim())flush();else{run='';r+='<p'+pAttr+'><br></p>';}return;}
+        if(BLK[tg]){flush();r+=blockEl(ch,ctx);return;}
+        run+=inlineEl(ch,ctx);
+      });
+      flush();
+      return r;
+    }
+    out=blocks(root,null);
+  }catch(_e){out='';}
+  return out;
+}
+/* Projeção DETERMINÍSTICA em texto simples (a MESMA regra existe no Worker): blocos→\n;
+ * <br>→\n; itens de lista com prefixo "• " (ul) ou "N. " (ol); <hr>→"---". */
+function richToPlain(html){
+  try{
+    var doc=new DOMParser().parseFromString('<div id="__rteroot">'+String(html==null?'':html)+'</div>','text/html');
+    var root=doc.getElementById('__rteroot'); if(!root)return '';
+    var lines=[];
+    function text(node){
+      var r='';
+      node.childNodes.forEach(function(ch){
+        if(ch.nodeType===3){r+=ch.nodeValue;return;}
+        if(ch.nodeType!==1)return;
+        if(ch.tagName==='BR'){r+='\n';return;}
+        r+=text(ch);
+      });
+      return r;
+    }
+    function walk(node){
+      Array.prototype.forEach.call(node.children,function(ch){
+        var tg=ch.tagName;
+        if(tg==='UL'||tg==='OL'){
+          var n=0;
+          Array.prototype.forEach.call(ch.children,function(li){if(li.tagName!=='LI')return;n++;lines.push((tg==='UL'?'• ':(n+'. '))+text(li).replace(/\n+$/,''));});
+          return;
+        }
+        if(tg==='HR'){lines.push('---');return;}
+        /* <br> terminal é placeholder do editor (parágrafo vazio → linha VAZIA, não '\n') */
+        if(tg==='P'||tg==='H3'||tg==='H4'){lines.push(text(ch).replace(/\n+$/,''));return;}
+        walk(ch);
+      });
+    }
+    walk(root);
+    return lines.join('\n').replace(/\u00A0/g,' ').replace(/[ \t]+\n/g,'\n').replace(/\n+$/,'').replace(/^\n+/,'');
+  }catch(_e){return '';}
+}
+function plainToRich(text){
+  var t=String(text==null?'':text).replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  if(!t)return '';
+  return t.split('\n').map(function(l){return '<p>'+(l?esc(l):'<br>')+'</p>';}).join('');
+}
+function rteParity(rich,plain){ if(!rich)return false; return richToPlain(rich)===String(plain==null?'':plain); }
+/* HTML de EXIBIÇÃO (Revisão/Central/etc.): re-sanitiza o canônico (defesa em profundidade) e SÓ
+ * exibe rico com paridade; senão null → o chamador usa o fallback esc(texto) de sempre. */
+function rteDisplayHtml(rich,plain){
+  if(!rich)return null;
+  var clean=rteSanitize(rich);
+  if(!clean||richToPlain(clean)!==String(plain==null?'':plain))return null;
+  return '<div class="rte-view">'+clean+'</div>';
+}
+/* Variante INLINE para linhas compactas (título do tema em listas/summaries): só quando o
+ * canônico é UM parágrafo puramente inline; senão null → chamador usa esc(texto) de sempre. */
+function rteInlineDisplay(rich,plain){
+  var v=rteDisplayHtml(rich,plain); if(!v)return null;
+  var m=/^<div class="rte-view"><p>([\s\S]*)<\/p><\/div>$/.exec(v);
+  if(!m||/<(p|ul|ol|hr|h3|h4)[\s>]/.test(m[1]))return null;
+  return '<span class="rte-view">'+m[1]+'</span>';
+}
+/* rico "de fato"? conteúdo sem NENHUMA formatação vira só parágrafos do texto → NÃO grava campo
+ * rico (o documento fica idêntico ao legado). */
+function rteHasFormatting(rich,plain){
+  if(!rich)return false;
+  return rich!==plainToRich(String(plain==null?'':plain));
+}
+var _RTE_ICO={
+  undo:'<path d="M6.5 3.5 3 7l3.5 3.5" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.4 7H10a3.6 3.6 0 0 1 0 7.2H7" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/>',
+  redo:'<path d="M9.5 3.5 13 7l-3.5 3.5" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M12.6 7H6a3.6 3.6 0 0 0 0 7.2h3" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/>',
+  ul:'<circle cx="3" cy="4" r="1.1" fill="currentColor"/><circle cx="3" cy="8" r="1.1" fill="currentColor"/><circle cx="3" cy="12" r="1.1" fill="currentColor"/><path d="M6.4 4h7M6.4 8h7M6.4 12h7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+  ol:'<path d="M2.2 3h1.4v3M2.1 6h3M6.9 4h6.5M6.9 8h6.5M6.9 12h6.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M2.1 9.6h2.6l-2.4 2.7h2.6" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
+  al:'<path d="M2 3.5h12M2 6.7h8M2 9.9h12M2 13.1h8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+  ac:'<path d="M2 3.5h12M4 6.7h8M2 9.9h12M4 13.1h8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+  ar:'<path d="M2 3.5h12M6 6.7h8M2 9.9h12M6 13.1h8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+  aj:'<path d="M2 3.5h12M2 6.7h12M2 9.9h12M2 13.1h12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+  indent:'<path d="M7 3.5h7M7 8h7M2 12.5h12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M2 4.6 5 7 2 9.4z" fill="currentColor"/>',
+  outdent:'<path d="M7 3.5h7M7 8h7M2 12.5h12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M5 4.6 2 7l3 2.4z" fill="currentColor"/>',
+  link:'<path d="M6.5 9.5l3-3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M7.5 5.2 8.6 4a2.6 2.6 0 0 1 3.7 3.7L11 9M8.5 10.8 7.4 12a2.6 2.6 0 0 1-3.7-3.7L5 7" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
+  hr:'<path d="M2 8h12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M4 4h8M4 12h8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity=".45"/>',
+  clear:'<path d="M3 3.5h8M7 3.5 5 12.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M9.5 9.5 14 14M14 9.5 9.5 14" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>'
+};
+function _rteIco(n){return '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true">'+(_RTE_ICO[n]||'')+'</svg>';}
+function _rteBtn(cmd,title,inner,extra){return '<button type="button" class="rte-b'+(extra||'')+'" data-rtecmd="'+cmd+'" title="'+esc(title)+'" aria-label="'+esc(title)+'" tabindex="-1">'+inner+'</button>';}
+/* Campo do editor: barra + área contenteditable. key = "fonte|índice|campo" roteando o sync ao
+ * modelo certo. Barra visível só com foco no campo (:focus-within) — leve com N editores. */
+/* Canônico → HTML EDITÁVEL: infla data-ind em margem inline real para que os gestos nativos
+ * de recuo (indent/outdent do engine) enxerguem e ajustem o valor. O canônico em si nunca
+ * carrega style; só a cópia de trabalho do editor. */
+function rteEditableHtml(canon){
+  return String(canon||'').replace(/ data-ind="([1-6])"/g,function(_m,d){return ' data-ind="'+d+'" style="margin-left:'+(Number(d)*40)+'px"';});
+}
+function rteField(key,plain,rich,placeholder){
+  var initial=rteEditableHtml((rich&&rteParity(rich,plain))?rteSanitize(rich):plainToRich(plain));
+  var bar='<div class="rte-bar" role="toolbar" aria-label="Formatação">'+
+    _rteBtn('undo','Desfazer (Ctrl+Z)',_rteIco('undo'))+_rteBtn('redo','Refazer (Ctrl+Y)',_rteIco('redo'))+
+    '<span class="rte-sep"></span>'+
+    '<button type="button" class="rte-b rte-dd" data-rtemenu="para" title="Estilo de parágrafo" aria-label="Estilo de parágrafo" tabindex="-1">¶<span class="rte-car">▾</span></button>'+
+    '<button type="button" class="rte-b rte-dd" data-rtemenu="fs" title="Tamanho do texto" aria-label="Tamanho do texto" tabindex="-1">A<span class="rte-car">▾</span></button>'+
+    '<span class="rte-sep"></span>'+
+    _rteBtn('bold','Negrito (Ctrl+B)','<b>N</b>')+_rteBtn('italic','Itálico (Ctrl+I)','<i>I</i>')+
+    _rteBtn('underline','Sublinhado (Ctrl+U)','<u>S</u>')+_rteBtn('strike','Tachado','<s>S</s>')+
+    _rteBtn('sub','Subscrito','X<sub>2</sub>')+_rteBtn('sup','Sobrescrito','X<sup>2</sup>')+
+    '<span class="rte-sep"></span>'+
+    '<button type="button" class="rte-b rte-dd" data-rtemenu="cl" title="Cor do texto" aria-label="Cor do texto" tabindex="-1"><span class="rte-a">A</span><span class="rte-swb" data-rteswcl="1"></span></button>'+
+    '<button type="button" class="rte-b rte-dd" data-rtemenu="hl" title="Marca-texto" aria-label="Marca-texto" tabindex="-1"><span class="rte-hlico">A</span></button>'+
+    '<span class="rte-sep"></span>'+
+    _rteBtn('ul','Lista com marcadores',_rteIco('ul'))+_rteBtn('ol','Lista numerada',_rteIco('ol'))+
+    '<span class="rte-sep"></span>'+
+    _rteBtn('al','Alinhar à esquerda',_rteIco('al'))+_rteBtn('ac','Centralizar',_rteIco('ac'))+
+    _rteBtn('ar','Alinhar à direita',_rteIco('ar'))+_rteBtn('aj','Justificar',_rteIco('aj'))+
+    _rteBtn('outdent','Diminuir recuo',_rteIco('outdent'))+_rteBtn('indent','Aumentar recuo',_rteIco('indent'))+
+    '<span class="rte-sep"></span>'+
+    _rteBtn('link','Inserir link (Ctrl+K)',_rteIco('link'))+_rteBtn('hr','Linha separadora',_rteIco('hr'))+
+    _rteBtn('clear','Limpar formatação',_rteIco('clear'))+
+    '<div class="rte-menu" data-rtepanel="para" hidden><button type="button" class="rte-mi" data-rtepara="p" tabindex="-1">Normal</button><button type="button" class="rte-mi" data-rtepara="h3" tabindex="-1" style="font-size:16px;font-weight:800">Título</button><button type="button" class="rte-mi" data-rtepara="h4" tabindex="-1" style="font-size:14px;font-weight:700">Subtítulo</button></div>'+
+    '<div class="rte-menu" data-rtepanel="fs" hidden><button type="button" class="rte-mi" data-rtefs="s" tabindex="-1" style="font-size:11px">Pequeno</button><button type="button" class="rte-mi" data-rtefs="m" tabindex="-1">Normal</button><button type="button" class="rte-mi" data-rtefs="l" tabindex="-1" style="font-size:16px">Grande</button><button type="button" class="rte-mi" data-rtefs="xl" tabindex="-1" style="font-size:19px">Extra</button></div>'+
+    '<div class="rte-menu rte-pal" data-rtepanel="cl" hidden><button type="button" class="rte-sw rte-sw-x" data-rtecolor="0" title="Cor padrão" tabindex="-1">×</button>'+RTE_COLORS.map(function(h,i){return '<button type="button" class="rte-sw" data-rtecolor="'+(i+1)+'" style="background:'+h+'" title="Cor '+(i+1)+'" tabindex="-1"></button>';}).join('')+'</div>'+
+    '<div class="rte-menu rte-pal" data-rtepanel="hl" hidden><button type="button" class="rte-sw rte-sw-x" data-rtehl="0" title="Sem destaque" tabindex="-1">×</button>'+RTE_HL.map(function(h,i){return '<button type="button" class="rte-sw" data-rtehl="'+(i+1)+'" style="background:'+h+'" title="Destaque '+(i+1)+'" tabindex="-1"></button>';}).join('')+'</div>'+
+    '<div class="rte-menu rte-lnk" data-rtepanel="link" hidden><input class="rte-lnk-in" data-rtelinkin="1" type="text" placeholder="https://…" spellcheck="false"><div class="rte-lnk-err" data-rtelinkerr="1" hidden>Informe um link http:// ou https:// válido.</div><div class="rte-lnk-acts"><button type="button" class="rte-mi" data-rtelinkrm="1" tabindex="-1">Remover</button><button type="button" class="rte-mi rte-mi-go" data-rtelinkok="1" tabindex="-1">Aplicar</button></div></div>'+
+  '</div>';
+  return '<div class="rte" data-rte="'+esc(key)+'">'+bar+
+    '<div class="rte-ed" contenteditable="true" spellcheck="true" data-rteed="'+esc(key)+'" data-ph="'+esc(placeholder||'')+'" role="textbox" aria-multiline="true" aria-label="'+esc(placeholder||'Editor de texto')+'">'+initial+'</div></div>';
+}
+/* Sincroniza o editor → modelo (canônico + projeção). Fontes: form (wizard), ce (Editar
+ * conteúdos), fix (correção pontual), prod (Legendas e artes). Nunca grava no banco aqui. */
+function rteSync(key,el){
+  try{
+    var parts=String(key||'').split('|');var src=parts[0],idx=Number(parts[1]),field=parts[2];
+    var rich=rteSanitize(el.innerHTML);
+    var plain=richToPlain(rich);
+    var hasFmt=rteHasFormatting(rich,plain);
+    try{el.classList.toggle('rte-mt',!plain&&!hasFmt);}catch(_e0){}
+    function apply(o){ if(!o)return; o[field]=plain; if(hasFmt)o[field+'Rich']=rich; else delete o[field+'Rich']; }
+    if(src==='form'&&state.form){state.form.contents[idx]=state.form.contents[idx]||{};apply(state.form.contents[idx]);}
+    else if(src==='ce'&&window._ceModel){window._ceModel[idx]=window._ceModel[idx]||{};apply(window._ceModel[idx]);}
+    else if(src==='fix'&&window._fixModel){window._fixModel.plain=plain;window._fixModel.rich=hasFmt?rich:'';}
+    else if(src==='prod'&&state._prod&&state._prod.items&&state._prod.items[idx]){apply(state._prod.items[idx]);}
+  }catch(_e){}
+}
+var _rteRange=null;
+function _rteEdOf(node){var w=node&&node.closest?node.closest('.rte'):null;return w?w.querySelector('.rte-ed'):null;}
+function _rteSaveRange(ed){
+  try{var s=window.getSelection();if(s&&s.rangeCount&&ed.contains(s.getRangeAt(0).startContainer))_rteRange=s.getRangeAt(0).cloneRange();}catch(_e){}
+}
+function _rteRestoreRange(ed){
+  /* NUNCA restaura seleção de OUTRO editor (comando aplicaria no campo errado);
+   * sem seleção válida aqui → caret no fim deste editor. */
+  try{
+    if(_rteRange&&ed.contains(_rteRange.startContainer)){
+      var s=window.getSelection();s.removeAllRanges();s.addRange(_rteRange);return;
+    }
+    var r=document.createRange();r.selectNodeContents(ed);r.collapse(false);
+    var s2=window.getSelection();s2.removeAllRanges();s2.addRange(r);
+  }catch(_e){}
+}
+var _rteMenuOpen=false;
+function _rteCloseMenus(scope){
+  _rteMenuOpen=false;
+  (scope||document).querySelectorAll('.rte-menu:not([hidden])').forEach(function(m){m.hidden=true;});
+}
+/* Painéis em position:fixed calculado na ABERTURA: escapam de overflow:hidden/auto dos
+ * containers (content-card, ce-list, pr-list, sheet) sem mexer em nenhum CSS legado. */
+function _rtePlacePanel(panel,anchor){
+  try{
+    _rteMenuOpen=true;
+    var rb=anchor.getBoundingClientRect();
+    panel.style.position='fixed';
+    panel.style.top=Math.round(rb.bottom+4)+'px';
+    var w=panel.offsetWidth||170;
+    panel.style.left=Math.max(8,Math.min(Math.round(rb.left),window.innerWidth-w-8))+'px';
+  }catch(_e){}
+}
+function _rteExec(ed,cmd){
+  ed.focus();_rteRestoreRange(ed);
+  try{document.execCommand('styleWithCSS',false,true);}catch(_e){}
+  var M={bold:'bold',italic:'italic',underline:'underline',strike:'strikeThrough',sub:'subscript',sup:'superscript',
+    ul:'insertUnorderedList',ol:'insertOrderedList',undo:'undo',redo:'redo',
+    al:'justifyLeft',ac:'justifyCenter',ar:'justifyRight',aj:'justifyFull',
+    indent:'indent',outdent:'outdent',hr:'insertHorizontalRule'};
+  if(M[cmd]){try{document.execCommand(M[cmd]);}catch(_e){}}
+  else if(cmd==='clear'){
+    try{document.execCommand('removeFormat');document.execCommand('unlink');}catch(_e){}
+    /* remove também os spans de paleta/tamanho que intersectam a seleção */
+    try{
+      var s=window.getSelection();if(s&&s.rangeCount){var r=s.getRangeAt(0);
+        ed.querySelectorAll('span[data-cl],span[data-hl],span[data-fs]').forEach(function(sp){
+          if(r.intersectsNode(sp)){var p=sp.parentNode;while(sp.firstChild)p.insertBefore(sp.firstChild,sp);p.removeChild(sp);}});}
+    }catch(_e2){}
+  }
+  rteSync(ed.getAttribute('data-rteed'),ed);
+}
+function _rteWireGlobal(){
+  if(window.__rteWired)return;window.__rteWired=true;
+  /* mousedown na barra NÃO rouba a seleção do editor (padrão de toolbars) */
+  document.addEventListener('mousedown',function(ev){
+    var b=ev.target&&ev.target.closest?ev.target.closest('.rte-bar'):null;
+    if(b&&!(ev.target.closest('input'))){var ed=_rteEdOf(b);if(ed)_rteSaveRange(ed);ev.preventDefault();}
+  },true);
+  /* scroll em qualquer container fecha os menus (são fixed; não podem "flutuar" deslocados) */
+  document.addEventListener('scroll',function(){if(_rteMenuOpen)_rteCloseMenus();},true);
+  document.addEventListener('click',function(ev){
+    var t=ev.target;if(!t||!t.closest)return;
+    var openPanel=t.closest('.rte-menu');
+    var dd=t.closest('[data-rtemenu]');
+    if(!openPanel&&!dd)_rteCloseMenus();
+    var wrap=t.closest('.rte');
+    if(dd&&wrap){
+      var name=dd.getAttribute('data-rtemenu');var panel=wrap.querySelector('.rte-menu[data-rtepanel="'+name+'"]');
+      var wasHidden=panel?panel.hidden:true;_rteCloseMenus(wrap);
+      if(panel){panel.hidden=!wasHidden;
+        if(!panel.hidden)_rtePlacePanel(panel,dd);
+        if(name==='link'&&!panel.hidden){var inp=panel.querySelector('[data-rtelinkin]');var err=panel.querySelector('[data-rtelinkerr]');if(err)err.hidden=true;
+          try{var s=window.getSelection();var a=s&&s.anchorNode?(s.anchorNode.nodeType===1?s.anchorNode:s.anchorNode.parentElement):null;var link=a&&a.closest?a.closest('a'):null;if(inp){inp.value=link?(link.getAttribute('href')||''):'';setTimeout(function(){inp.focus();},0);}}catch(_e){}
+        }
+      }
+      return;
+    }
+    var cb=t.closest('[data-rtecmd]');
+    if(cb&&wrap){var ed=_rteEdOf(cb);if(!ed)return;
+      var cmd=cb.getAttribute('data-rtecmd');
+      if(cmd==='link'){var lp=wrap.querySelector('.rte-menu[data-rtepanel="link"]');_rteCloseMenus(wrap);if(lp){lp.hidden=false;_rtePlacePanel(lp,cb);var li2=lp.querySelector('[data-rtelinkin]');if(li2)setTimeout(function(){li2.focus();},0);}return;}
+      _rteExec(ed,cmd);return;
+    }
+    var pa=t.closest('[data-rtepara]');
+    if(pa&&wrap){var ed2=_rteEdOf(pa);if(ed2){ed2.focus();_rteRestoreRange(ed2);try{document.execCommand('formatBlock',false,pa.getAttribute('data-rtepara').toUpperCase());}catch(_e){}rteSync(ed2.getAttribute('data-rteed'),ed2);}_rteCloseMenus(wrap);return;}
+    var fsb=t.closest('[data-rtefs]');
+    if(fsb&&wrap){var ed3=_rteEdOf(fsb);if(ed3){ed3.focus();_rteRestoreRange(ed3);try{document.execCommand('styleWithCSS',false,true);document.execCommand('fontName',false,'rte-fs-'+fsb.getAttribute('data-rtefs'));}catch(_e){}rteSync(ed3.getAttribute('data-rteed'),ed3);}_rteCloseMenus(wrap);return;}
+    var clb=t.closest('[data-rtecolor]');
+    if(clb&&wrap){var ed4=_rteEdOf(clb);if(ed4){ed4.focus();_rteRestoreRange(ed4);var id=clb.getAttribute('data-rtecolor');
+      try{document.execCommand('styleWithCSS',false,true);if(id==='0'){document.execCommand('foreColor',false,'inherit');}else{document.execCommand('foreColor',false,RTE_COLORS[Number(id)-1]);}}catch(_e){}
+      rteSync(ed4.getAttribute('data-rteed'),ed4);}_rteCloseMenus(wrap);return;}
+    var hlb=t.closest('[data-rtehl]');
+    if(hlb&&wrap){var ed5=_rteEdOf(hlb);if(ed5){ed5.focus();_rteRestoreRange(ed5);var hid=hlb.getAttribute('data-rtehl');
+      try{document.execCommand('styleWithCSS',false,true);document.execCommand('hiliteColor',false,hid==='0'?'transparent':RTE_HL[Number(hid)-1]);}catch(_e){}
+      rteSync(ed5.getAttribute('data-rteed'),ed5);}_rteCloseMenus(wrap);return;}
+    if(t.closest('[data-rtelinkok]')&&wrap){
+      var lpn=wrap.querySelector('.rte-menu[data-rtepanel="link"]');var inp2=lpn?lpn.querySelector('[data-rtelinkin]'):null;var err2=lpn?lpn.querySelector('[data-rtelinkerr]'):null;
+      var url=(inp2?inp2.value:'').trim();
+      if(!/^https?:\/\/[^\s]+$/i.test(url)){if(err2)err2.hidden=false;return;}
+      var ed6=_rteEdOf(t);if(ed6){ed6.focus();_rteRestoreRange(ed6);try{document.execCommand('createLink',false,url);}catch(_e){}rteSync(ed6.getAttribute('data-rteed'),ed6);}
+      _rteCloseMenus(wrap);return;
+    }
+    if(t.closest('[data-rtelinkrm]')&&wrap){var ed7=_rteEdOf(t);if(ed7){ed7.focus();_rteRestoreRange(ed7);try{document.execCommand('unlink');}catch(_e){}rteSync(ed7.getAttribute('data-rteed'),ed7);}_rteCloseMenus(wrap);return;}
+  },true);
+  /* input → sync do modelo (nunca re-render; nunca write no banco) */
+  document.addEventListener('input',function(ev){
+    var ed=ev.target&&ev.target.closest?ev.target.closest('.rte-ed'):null;
+    if(ed)rteSync(ed.getAttribute('data-rteed'),ed);
+  },true);
+  /* teclado: atalhos escopados ao editor (NUNCA vazam para atalhos globais do app) */
+  document.addEventListener('keydown',function(ev){
+    /* campo de link do painel: Enter aplica, Esc fecha e devolve o foco ao editor */
+    var lin=ev.target&&ev.target.closest?ev.target.closest('.rte-lnk-in'):null;
+    if(lin){
+      var kk=(ev.key||'').toLowerCase();
+      if(kk==='enter'){ev.preventDefault();ev.stopPropagation();var okb=lin.closest('.rte-menu');okb=okb?okb.querySelector('[data-rtelinkok]'):null;if(okb)okb.click();return;}
+      if(kk==='escape'){ev.preventDefault();ev.stopPropagation();var wl=lin.closest('.rte');if(wl){_rteCloseMenus(wl);var edl=wl.querySelector('.rte-ed');if(edl)edl.focus();}return;}
+      return;
+    }
+    var ed=ev.target&&ev.target.closest?ev.target.closest('.rte-ed'):null;
+    if(!ed)return;
+    var k=(ev.key||'').toLowerCase();
+    if((ev.ctrlKey||ev.metaKey)&&!ev.altKey){
+      if(k==='b'){ev.preventDefault();ev.stopPropagation();_rteExec(ed,'bold');return;}
+      if(k==='i'){ev.preventDefault();ev.stopPropagation();_rteExec(ed,'italic');return;}
+      if(k==='u'){ev.preventDefault();ev.stopPropagation();_rteExec(ed,'underline');return;}
+      if(k==='k'){ev.preventDefault();ev.stopPropagation();_rteSaveRange(ed);var w=ed.closest('.rte');var lp3=w?w.querySelector('.rte-menu[data-rtepanel="link"]'):null;_rteCloseMenus(w);if(lp3){lp3.hidden=false;var _ka=(w&&w.querySelector('[data-rtecmd="link"]'))||ed;_rtePlacePanel(lp3,_ka);var li3=lp3.querySelector('[data-rtelinkin]');if(li3)setTimeout(function(){li3.focus();},0);}return;}
+      if(k==='z'||k==='y'){ev.stopPropagation();return;/* undo/redo nativos do CE */}
+    }
+    if(k==='tab'){
+      var inLi=false;try{var s2=window.getSelection();var n2=s2&&s2.anchorNode?(s2.anchorNode.nodeType===1?s2.anchorNode:s2.anchorNode.parentElement):null;inLi=!!(n2&&n2.closest&&n2.closest('li')&&ed.contains(n2));}catch(_e){}
+      if(inLi){ev.preventDefault();ev.stopPropagation();_rteExec(ed,ev.shiftKey?'outdent':'indent');return;}
+    }
+    if(k==='escape'){var w2=ed.closest('.rte');if(w2&&w2.querySelector('.rte-menu:not([hidden])')){ev.preventDefault();ev.stopPropagation();_rteCloseMenus(w2);ed.focus();}}
+  },true);
+  /* colagem: Word/Docs/HTML → SANITIZADA (allowlist); texto puro → parágrafos/quebras. Fallback
+   * determinístico via clipboard do Electron (IPC, texto) quando o evento vier vazio. */
+  document.addEventListener('paste',function(ev){
+    var ed=ev.target&&ev.target.closest?ev.target.closest('.rte-ed'):null;
+    if(!ed)return;
+    ev.preventDefault();ev.stopPropagation();
+    var htmlD='',txt='';
+    try{htmlD=(ev.clipboardData&&ev.clipboardData.getData('text/html'))||'';}catch(_e){}
+    try{txt=(ev.clipboardData&&ev.clipboardData.getData('text/plain'))||'';}catch(_e){}
+    function ins(html){try{document.execCommand('insertHTML',false,html);}catch(_e){}rteSync(ed.getAttribute('data-rteed'),ed);}
+    if(htmlD){var cl=rteSanitize(htmlD);if(cl){ins(cl);return;}}
+    if(txt){ins(esc(txt).replace(/\r\n/g,'\n').replace(/\r/g,'\n').replace(/\n/g,'<br>'));return;}
+    try{if(window.desktopAPI&&typeof window.desktopAPI.clipboardReadText==='function'){window.desktopAPI.clipboardReadText().then(function(t2){if(t2)ins(esc(String(t2)).replace(/\r\n/g,'\n').replace(/\r/g,'\n').replace(/\n/g,'<br>'));});}}catch(_e){}
+  },true);
+}
+try{_rteWireGlobal();}catch(_e){}
 function newForm(sector){return {id:null,step:0,sector:sector||null,title:'',client:'',assigneeId:null,assignee:'',status:'afazer',startDate:'',startTime:'',endDate:'',endTime:'',dueDate:'',dueTime:'',priority:false,subtype:null,videoQty:null,scriptQty:null,fields:{},contents:[],items:[],videos:[],checklist:[],link:'',obs:'',_openContent:null,_sendAfterSave:false,_sending:false,_draftId:null,/* F3.5.4I — estado de envio + id idempotente do draft *//* F3.5.2 — Edição de Cards (aditivo): N cards avulsos + quantidade. F3.5.2A: cada card com INTERVALO
    completo {tema,legenda,obs,startDate,startTime,endDate,endTime} (início + término; término=prazo) */cards:[],cardsQty:1};}
 /* F3.5.2 — quem pode CRIAR tarefas de Edição de Cards: Social Media / Administrador (contrato atual
@@ -9786,8 +10361,10 @@ function stepBriefing(){const f=state.form;const t=tpl();const s=secOf(f.sector)
     if(sub){
       h+='<div style="background:'+withAlpha('#5B6CFF',.12)+';color:var(--accent);font-size:13px;font-weight:700;padding:8px 12px;border-radius:10px;margin-bottom:12px">'+esc(sub.formTitle)+'</div>'+fieldsHtml(sub.fields);
       if(sub.contentCount){h+='<div class="lbl" style="margin-top:6px">'+(secOf(f.sector).key==='roteiro'?'Roteiros':'Conteúdos do cronograma')+' ('+sub.contentCount+')</div>';
+        /* F3.5.5C — Tema/Legenda agora usam o EDITOR RICO (rteField): canônico sanitizado +
+           projeção texto nos campos legados (rteSync grava tema/legenda + temaRich/legendaRich). */
         for(let i=0;i<sub.contentCount;i++){const c=f.contents[i]||{tema:'',legenda:''};const filled=(c.tema||c.legenda);const open=f._openContent===i;
-          h+='<div class="content-card '+(open?'open':'')+'"><button class="ch" data-content="'+i+'"><span class="cd '+(filled?'fill':'')+'"></span><span class="ct">'+(secOf(f.sector).key==='roteiro'?'Roteiro ':'Conteúdo ')+(i+1)+'</span><span style="color:var(--soft)">'+(open?'▲':'▼')+'</span></button><div class="cb"><div class="lbl">Tema</div><input class="inp" data-ctema="'+i+'" placeholder="Tema do conteúdo '+(i+1)+'" value="'+esc(c.tema||'')+'"><div style="height:8px"></div><div class="lbl">Legenda</div><textarea class="inp" data-cleg="'+i+'" placeholder="Legenda do conteúdo '+(i+1)+'">'+esc(c.legenda||'')+'</textarea></div></div>';}}
+          h+='<div class="content-card '+(open?'open':'')+'"><button class="ch" data-content="'+i+'"><span class="cd '+(filled?'fill':'')+'"></span><span class="ct">'+(secOf(f.sector).key==='roteiro'?'Roteiro ':'Conteúdo ')+(i+1)+'</span><span style="color:var(--soft)">'+(open?'▲':'▼')+'</span></button><div class="cb"><div class="lbl">Tema</div>'+rteField('form|'+i+'|tema',c.tema||'',c.temaRich||'','Tema do conteúdo '+(i+1))+'<div class="lbl">Legenda</div>'+rteField('form|'+i+'|legenda',c.legenda||'',c.legendaRich||'','Legenda do conteúdo '+(i+1))+'</div></div>';}}
       if(sub.items){
         if(sub.videoTema){
           // F3.3.77A — Edição de mídia: N vídeos, cada um com seu TEMA (fonte própria f.videos → data.videos;
@@ -9880,7 +10457,8 @@ function stepReview(){const f=state.form;const s=secOf(f.sector);const sub=curSu
   if(sub&&sub.contentCount){
     const filled=f.contents.map((c,i)=>({c,i})).filter(o=>o.c&&(o.c.tema||o.c.legenda));
     h+='<div class="rev-sec-h"><span>'+(secOf(f.sector).key==='roteiro'?'Roteiros':'Conteúdos do cronograma')+'</span><span class="rev-count">'+filled.length+' / '+sub.contentCount+'</span></div>';
-    if(filled.length)h+='<div class="rev-contents">'+filled.map(o=>'<div class="rev-content"><div class="rev-content-n">'+(o.i+1)+'</div><div class="rev-content-m"><div class="rev-content-t">'+esc(o.c.tema||'(sem tema)')+'</div>'+(o.c.legenda?'<div class="rev-content-l">'+esc(o.c.legenda)+'</div>':'')+'</div></div>').join('')+'</div>';
+    /* F3.5.5C — revisão mostra a formatação do editor rico (com PARIDADE; senão texto de sempre) */
+    if(filled.length)h+='<div class="rev-contents">'+filled.map(o=>'<div class="rev-content"><div class="rev-content-n">'+(o.i+1)+'</div><div class="rev-content-m"><div class="rev-content-t">'+(o.c.tema?(rteInlineDisplay(o.c.temaRich,o.c.tema)||esc(o.c.tema)):'(sem tema)')+'</div>'+(o.c.legenda?'<div class="rev-content-l">'+(rteDisplayHtml(o.c.legendaRich,String(o.c.legenda))||esc(o.c.legenda))+'</div>':'')+'</div></div>').join('')+'</div>';
     else h+='<div class="emptyline">Nenhum conteúdo preenchido ainda.</div>';
   }
   // F3.3.77A — Edição de mídia: prévia dos TEMAS dos vídeos na revisão (todos os N)
@@ -10559,7 +11137,10 @@ document.addEventListener('click',async e=>{
     e.preventDefault(); e.stopPropagation();
     var _cap=el.hasAttribute('data-detcopycaption'); var _acc=el.closest('.det-acc');
     var _node=_cap?(_acc&&_acc.querySelector('.det-acc-body .det-acc-l')):(_acc&&_acc.querySelector('.det-acc-t'));
-    var _txt=_node?(_node.textContent||''):'';
+    /* F3.5.5C — com legenda RICA no corpo, a cópia lê o espelho .det-plain-src (projeção
+       text/plain EXATA — marcadores/linhas preservados); sem espelho, comportamento de sempre. */
+    var _ps=(_node&&_node.querySelector)?_node.querySelector('.det-plain-src'):null;
+    var _txt=_ps?(_ps.textContent||''):(_node?(_node.textContent||''):'');
     detCopyFromButton(el, _cap?'caption':'theme', _txt);
     return;
   }
@@ -10661,7 +11242,7 @@ document.addEventListener('click',async e=>{
     return;
   }
   if(el=g('[data-itemfix]')){const p=el.dataset.itemfix.split('|');openItemFix(p[0],+p[1],p[2]);return;}
-  if(el=g('[data-itemfixsave]')){const p=el.dataset.itemfixsave.split('|');const ta=document.getElementById('ifIn');const val=ta?ta.value:'';saveItemFix(p[0],+p[1],p[2],val,p[3]==='resend');return;}
+  if(el=g('[data-itemfixsave]')){const p=el.dataset.itemfixsave.split('|');const val=(window._fixModel&&window._fixModel.plain)||'';saveItemFix(p[0],+p[1],p[2],val,p[3]==='resend');return;}
   if(el=g('[data-ceopen]')){openContentEditor(el.dataset.ceopen);return;}
   if(el=g('[data-cesave]')){saveContentEdits(el.dataset.cesave);return;}
   if(el=g('[data-prodopen]')){openProductionModal(el.dataset.prodopen);return;}
