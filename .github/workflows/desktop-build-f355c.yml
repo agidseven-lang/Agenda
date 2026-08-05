@@ -1,0 +1,208 @@
+# F3.5.5C — Desktop 1.0.220 (Roteiros Personalizados e Editor Profissional) — build GATED, --publish never.
+# Publicação SÓ no desktop-release-f355c.yml (mesmos bytes). Base de código 1.0.219 @ 7e54cdf
+# (branch F3.5.5B publicada); baseline FÍSICA 1.0.218 @ 1a94515 (ROLLBACK IMEDIATO); adicional
+# 1.0.216 @ e509f43. Delta: renderer index.html (quantidade personalizada de roteiros +
+# editor rico canônico) + cloudflare-worker.js (render rico VALIDADO server-side, aditivo
+# fail-closed, V64.60) + suítes/provas/docs/workflows + pins herdados (precedente b12fde2).
+# main/preload/bgnotify/slareminder/sons/priorityEngine/functions/android CONGELADOS byte a
+# byte vs 1.0.219 — regra máxima do owner: ZERO regressão na baseline.
+name: "[push/manual] F3.5.5C — Desktop 1.0.220 (Roteiros Personalizados + Editor Rico) — Desktop Build"
+"on":
+  push:
+    branches: ["desktop/f355c-custom-script-quantity-rich-editor-1.0.220"]
+    paths-ignore: [".github/workflows/desktop-release-f355c.yml"]
+  workflow_dispatch: {}
+permissions: { contents: read }
+env:
+  TEST_BRANCH: "desktop/f355c-custom-script-quantity-rich-editor-1.0.220"
+  BASE_219_SHA: "7e54cdf48f10f7b968c844f5fa4eb284cbc93a87"
+  BASE_218_SHA: "1a945159dd563eba5c80657427519d0f22b4b673"
+  BASE_216_SHA: "e509f43ae8f3130a9922791f89db0ba29aa7a410"
+  APP_DIR: desktop
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: "Gate REF + ANCESTRIA (descende da 1.0.219, 1.0.218 e 1.0.216)"
+        run: |
+          set -euo pipefail
+          [ "${GITHUB_REF_NAME}" = "$TEST_BRANCH" ] || { echo "::error::branch errada"; exit 1; }
+          git merge-base --is-ancestor "$BASE_219_SHA" HEAD || { echo "::error::não descende da 1.0.219"; exit 1; }
+          git merge-base --is-ancestor "$BASE_218_SHA" HEAD || { echo "::error::não descende da 1.0.218"; exit 1; }
+          git merge-base --is-ancestor "$BASE_216_SHA" HEAD || { echo "::error::não descende da 1.0.216"; exit 1; }
+      - name: "Gate VERSAO 1.0.220 (package + lock x2 + description)"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node -e "const p=require('./package.json'); if(p.version!=='1.0.220') process.exit(1); if(!/custom-script-quantity-rich-editor/.test(p.description||'')) process.exit(1);"
+          [ "$(grep -c '"version": "1.0.220"' package-lock.json)" -ge 2 ]
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: npm ci + TypeScript + sintaxe dos renderers (index/bgnotify/slareminder) + worker
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          ./node_modules/.bin/tsc --noEmit -p tsconfig.json
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/renderer/bgnotify.html','utf8');const m=s.match(/<script>([\s\S]*?)<\/script>/);new Function(m[1]);"
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/renderer/slareminder.html','utf8');const m=s.match(/<script>([\s\S]*?)<\/script>/);new Function(m[1]);"
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/renderer/index.html','utf8');const b=[...s.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(x=>x[1]);b.sort((a,c)=>c.length-a.length);new Function(b[0]);"
+          node --check ../cloudflare-worker.js
+      - name: "Gate F3.5.5C — quantidade + editor rico 128 (35 qtd + 50 editor + segurança + Worker + congelados)"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f355c-script-quantity-rich-editor.test.mjs
+      - name: "Gate F3.5.5C — validador RTE do PORTAL 97 (gramática fail-closed + projeção idêntica)"
+        run: |
+          set -euo pipefail
+          node scripts/worker-ops/f355c-rte-worker-validator.test.mjs
+      - name: "Gate F3.5.5B herdado — Agenda Premium 84"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f355b-agenda-premium.test.mjs
+      - name: "Gate F3.5.5A-H1 herdado — observações internas 72"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f355ah1-internal-notes.test.mjs
+      - name: "Gate F3.5.5A herdado — planner 98 + orquestrador 38 + central 33 + integração 25 (dist)"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          npm run build
+          node scripts/f355a-execution-planner.test.mjs
+          node scripts/f355a-orchestrator.test.mjs
+          node scripts/f355a-execution-central.test.mjs
+          node scripts/f355a-integration.test.mjs
+      - name: "Gate REGRESSÃO canônica — som 37 + detalhes 74 + cards 53 + sessão 40"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f354wh2-immediate-notification-sound.test.mjs
+          node scripts/f354wh1-details-status-notes.test.mjs
+          node scripts/f354w-compact-cards-details.test.mjs
+          node scripts/f354vh1-session-persistence.test.mjs
+      - name: "Gate SMOKE RTE — 91 comportamentais no Chromium REAL (sanitizador/projeção/paridade/fixpoint)"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y >/dev/null 2>&1 || true
+          sudo apt-get install -y xvfb >/dev/null 2>&1 || true
+          timeout -k 15 300 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f355c-rte-behavior-main.js
+      - name: "Gate PROVAS REAIS Electron — F3.5.5C (32, asar do index REAL, PNGs) — xvfb"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          timeout -k 15 600 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f355c-proof-main.js
+      - name: "Gate PARIDADE CRUZADA — canônicos do app EMPACOTADO validados pelo Worker (fixtures E16)"
+        run: |
+          set -euo pipefail
+          node scripts/worker-ops/f355c-canon-crossparity.mjs
+      - name: "Gate PROVAS herdadas — F3.5.5B (20) + F3.5.5A-H1 (15) + F3.5.5A (25) — xvfb"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          timeout -k 15 600 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f355b-proof-main.js
+          timeout -k 15 600 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f355ah1-proof-main.js
+          timeout -k 15 600 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f355a-execution-proof-main.js
+      - uses: actions/upload-artifact@v4
+        with: { name: f355c-provas-qa, path: "docs/f355c-qa/**", if-no-files-found: error, retention-days: 30 }
+      - name: "Gate ISOLAMENTO — delta vs 1.0.219 SÓ nos arquivos autorizados; congelados diff-vazio"
+        run: |
+          set -euo pipefail
+          git diff --name-only "$BASE_219_SHA"..HEAD > /tmp/delta.txt; cat /tmp/delta.txt
+          # allowlist F3.5.5C: renderer index.html + WORKER (render rico validado, aditivo) + versão
+          # + suítes/provas/docs/workflows da fase + pins herdados (precedente b12fde2: f355b/f355ah1/
+          # wh2/vh1/f355a-integration/orchestrator + preload de prova herdado com a versão injetada).
+          BAD=$(grep -vE '^(\.github/workflows/desktop-(build|release)-f355c\.yml$|desktop/src/renderer/index\.html$|desktop/package(-lock)?\.json$|desktop/scripts/f355c-|desktop/scripts/f355b-agenda-premium\.test\.mjs$|desktop/scripts/f355b-proof-preload\.js$|desktop/scripts/f355ah1-internal-notes\.test\.mjs$|desktop/scripts/f355a-integration\.test\.mjs$|desktop/scripts/f355a-orchestrator\.test\.mjs$|desktop/scripts/f354wh2-immediate-notification-sound\.test\.mjs$|desktop/scripts/f354vh1-session-persistence\.test\.mjs$|cloudflare-worker\.js$|scripts/worker-ops/f355c-|docs/f355c(-qa)?/)' /tmp/delta.txt || true)
+          [ -z "$BAD" ] || { echo "::error::fora da allowlist: $BAD"; exit 1; }
+          # CONGELADOS byte-idênticos vs 1.0.219: TODO o main + preload + janelas premium/central +
+          # sons + priorityEngine + build config + Functions + Android. (O worker MUDOU nesta fase —
+          # coberto pelos gates 97 + paridade cruzada + marcadores V64.60; NÃO está nos congelados.)
+          git diff --quiet "$BASE_219_SHA"..HEAD -- desktop/src/main desktop/src/preload desktop/src/renderer/bgnotify.html desktop/src/renderer/slareminder.html desktop/src/renderer/sounds desktop/src/renderer/priorityEngine.js desktop/scripts/copy-renderer.js desktop/tsconfig.json functions android-native android-native-beta || { echo "::error::módulo congelado alterado"; exit 1; }
+      - name: "Gate MARCADORES F3.5.5C — stepper + editor canônico + espelho de cópia + Worker V64.60 (fonte)"
+        run: |
+          set -euo pipefail
+          grep -q 'id="fScriptQty"' desktop/src/renderer/index.html
+          grep -q 'data-sqplus' desktop/src/renderer/index.html
+          grep -q 'Informe uma quantidade inteira igual ou superior a 1.' desktop/src/renderer/index.html
+          grep -q 'function normScriptQty' desktop/src/renderer/index.html
+          grep -q 'function synthScriptSub' desktop/src/renderer/index.html
+          grep -q 'function rteSanitize' desktop/src/renderer/index.html
+          grep -q 'function richToPlain' desktop/src/renderer/index.html
+          grep -q 'data-rteed' desktop/src/renderer/index.html
+          grep -q 'rte-bar' desktop/src/renderer/index.html
+          grep -q 'det-plain-src' desktop/src/renderer/index.html
+          grep -q 'function rteWkValid' cloudflare-worker.js
+          grep -q 'V64.60-f355c-rich-render' cloudflare-worker.js
+          grep -q 'class="rtev"' cloudflare-worker.js
+          echo "MARCADORES F3.5.5C: VERIFIED."
+  build:
+    needs: verify
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: npm ci + build + electron-builder (--publish never)
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm run build
+          npx electron-builder --win nsis msi --publish never
+      - name: "Gate EMPACOTADO — versão + quantidade + editor rico no app.asar (suites completas contra o pacote)"
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          ASAR="dist-installer/win-unpacked/resources/app.asar"; test -f "$ASAR"
+          npx --yes @electron/asar extract "$ASAR" asar-x
+          node -e "const p=require('./asar-x/package.json'); if(p.version!=='1.0.220') process.exit(1);"
+          grep -q 'id="fScriptQty"' asar-x/src/renderer/index.html
+          grep -q 'data-sqplus' asar-x/src/renderer/index.html
+          grep -q 'function rteSanitize' asar-x/src/renderer/index.html
+          grep -q 'data-rteed' asar-x/src/renderer/index.html
+          grep -q 'rte-bar' asar-x/src/renderer/index.html
+          grep -q 'det-plain-src' asar-x/src/renderer/index.html
+          # herdados intactos no pacote (Agenda Premium 1.0.219 + observações internas + acompanhamento + sons)
+          grep -q 'evc2-date' asar-x/src/renderer/index.html
+          grep -q 'data-evdmodal' asar-x/src/renderer/index.html
+          grep -q 'data-detnoteedit' asar-x/src/renderer/index.html
+          grep -q "CHECK-IN DE EXECUÇÃO" asar-x/src/renderer/slareminder.html
+          test -f asar-x/dist/main/executionOrchestrator.js
+          test -f asar-x/dist/main/reminder.js
+          test -f asar-x/src/renderer/sounds/execution-checkin.wav
+          grep -q 'mode: "off"' asar-x/dist/main/main.js
+          # MESMAS suítes rodando contra os BYTES do pacote (worker do checkout p/ a seção E):
+          SRC=asar-x/src/renderer/index.html WSRC=../cloudflare-worker.js node scripts/f355c-script-quantity-rich-editor.test.mjs
+          SRC=asar-x/src/renderer/index.html node scripts/f355b-agenda-premium.test.mjs
+          SRC=asar-x/src/renderer/index.html node scripts/f355ah1-internal-notes.test.mjs
+          SRC=asar-x/src/renderer/index.html BG_SRC=asar-x/src/renderer/bgnotify.html MAIN_SRC=src/main/main.ts BGM_SRC=src/main/bgNotify.ts node scripts/f354wh2-immediate-notification-sound.test.mjs
+          SRC=asar-x/src/renderer/index.html node scripts/f354wh1-details-status-notes.test.mjs
+          echo "GATE F3.5.5C EMPACOTADO: VERIFIED."
+      - name: Empacotar bundle + SHA256SUMS + VERSAO-DESKTOP
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes @cyclonedx/cyclonedx-npm --omit dev --output-format JSON --output-file "$RUNNER_TEMP/sbom.json" || echo '{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}' > "$RUNNER_TEMP/sbom.json"
+          OUT="$GITHUB_WORKSPACE/dist-pkg"; mkdir -p "$OUT"
+          EXE=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe | head -1); MSI=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.msi | head -1); BM=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap | head -1)
+          cp "$EXE" "$MSI" "$BM" dist-installer/latest.yml "$OUT/"; cp "$RUNNER_TEMP/sbom.json" "$OUT/SBOM-cyclonedx.json"
+          EXE_NAME=$(basename "$EXE"); MSI_NAME=$(basename "$MSI"); BM_NAME=$(basename "$BM")
+          ( cd "$OUT" && sha256sum "$EXE_NAME" "$MSI_NAME" latest.yml "$BM_NAME" SBOM-cyclonedx.json > SHA256SUMS )
+          { echo "productName : Agenda ID Seven Desktop"; echo "versionName : 1.0.220"; echo "rotulo      : 1.0.220-custom-script-quantity-rich-editor (CANDIDATA — Roteiros Personalizados e Editor Profissional)"; echo "channel     : latest (NADA publicado neste build)"; echo "appId       : br.com.idseven.agenda.desktop"; echo "instalador  : $EXE_NAME"; echo "SHA-256 exe : $(sha256sum "$OUT/$EXE_NAME" | awk '{print $1}')"; echo "instalador2 : $MSI_NAME"; echo "SHA-256 msi : $(sha256sum "$OUT/$MSI_NAME" | awk '{print $1}')"; echo "commit      : $GITHUB_SHA (branch $GITHUB_REF_NAME)"; echo "base-codigo : Desktop 1.0.219 (commit 7e54cdf)"; echo "rollback    : Desktop 1.0.218 (imediato, commit 1a94515); adicional 1.0.216 (e509f43)"; echo "origem      : F3.5.5C — Roteiro com QUANTIDADE PERSONALIZADA ([−][N][+] no lugar dos chips 4/6/8/12; inteiro ≥1; crescer preserva, reduzir com conteúdo pede confirmação; tarefas antigas abrem pelo tamanho real, sem migração) e EDITOR RICO de Tema/Legenda (barra da casa com desfazer/refazer, parágrafo/tamanho, negrito/itálico/sublinhado/tachado/sub/sobrescrito, cor 8 e marca-texto 6 de paleta fechada, listas, alinhamentos, recuo, link http(s), limpar; colagem Word/Docs SANITIZADA; canônico allowlist com projeção em texto nos campos legados; paridade obrigatória na exibição; cópia continua text/plain; card kanban segue compacto). Portal (Worker V64.60) renderiza o rico com validação SERVER-SIDE fail-closed e paridade — aprovação e edição do cliente preservadas."; echo "distribuicao: CANDIDATA — publicação no Latest ocorre no workflow desktop-release-f355c.yml (mesmos bytes)"; } > "$OUT/VERSAO-DESKTOP.txt"
+          echo "== SHA256SUMS =="; cat "$OUT/SHA256SUMS"
+      - uses: actions/upload-artifact@v4
+        with: { name: agenda-id-seven-desktop-1.0.220-installer, path: "dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe\ndist-pkg/Agenda-ID-Seven-Desktop-*-x64.msi", if-no-files-found: error, retention-days: 30 }
+      - uses: actions/upload-artifact@v4
+        with: { name: agenda-id-seven-desktop-1.0.220-updatemeta, path: "dist-pkg/latest.yml\ndist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap\ndist-pkg/SHA256SUMS\ndist-pkg/SBOM-cyclonedx.json\ndist-pkg/VERSAO-DESKTOP.txt", if-no-files-found: error, retention-days: 30 }
