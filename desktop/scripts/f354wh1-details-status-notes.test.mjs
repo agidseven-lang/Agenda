@@ -67,7 +67,7 @@ ok('E2.12 handler intercepta [data-detcopytheme],[data-detcopycaption]', /if\(el
 ok('E2.13 handler chama preventDefault() (não navega/afeta o form)', /if\(el=g\('\[data-detcopytheme\],\[data-detcopycaption\]'\)\)\{\s*e\.preventDefault\(\);/.test(H));
 ok('E2.14 handler chama stopPropagation() (o <summary> NÃO expande/recolhe)', /if\(el=g\('\[data-detcopytheme\],\[data-detcopycaption\]'\)\)\{\s*e\.preventDefault\(\); ?e\.stopPropagation\(\);/.test(H));
 ok('E2.15 handler: legenda lê .det-acc-body .det-acc-l (conteúdo real), tema lê .det-acc-t', /_cap\?\(_acc&&_acc\.querySelector\('\.det-acc-body \.det-acc-l'\)\):\(_acc&&_acc\.querySelector\('\.det-acc-t'\)\)/.test(H));
-ok('E2.16 handler lê o texto via \.textContent (nunca innerHTML)', /var _txt=_node\?\(_node\.textContent\|\|''\):'';/.test(H) && /detCopyFromButton\(el, ?_cap\?'caption':'theme', ?_txt\)/.test(H));
+ok('E2.16 handler lê o texto via \.textContent (nunca innerHTML) — F3.5.5C: prefere o espelho text/plain .det-plain-src quando a legenda renderiza rica', /var _txt=_ps\?\(_ps\.textContent\|\|''\):\(_node\?\(_node\.textContent\|\|''\):''\);/.test(H) && /detCopyFromButton\(el, ?_cap\?'caption':'theme', ?_txt\)/.test(H) && !/_txt=[^;\n]*innerHTML/.test(H));
 // Helpers
 ok('E2.17 helper detClipWrite(text) definido', /async function detClipWrite\(text\)\{/.test(H));
 ok('E2.18 detClipWrite: IPC-first (clipboardWriteText) → navigator.clipboard → execCommand', /detClipWrite\(text\)\{[\s\S]{0,700}window\.desktopAPI\.clipboardWriteText[\s\S]{0,200}navigator\.clipboard\.writeText[\s\S]{0,260}execCommand&&document\.execCommand\('copy'\)/.test(H));
@@ -137,7 +137,7 @@ ok('E5.11 render: lookup da nota keyed \'i\'+c._i (ÍNDICE), lido de t.designerI
 ok('E5.12 render: .det-acc-note só quando a nota NÃO é vazia (_dn?...:\'\')', /var _dnote=_dn\?'<div class="det-acc-note">[\s\S]*?<\/div>':'';/.test(H));
 ok('E5.13 render: rótulo .det-acc-note-k "Observação interna da Social Media" + corpo .det-acc-note-b', /<span class="det-acc-note-k">Observação interna da Social Media<\/span><div class="det-acc-note-b">'\+esc\(_dn\)/.test(H));
 ok('E5.14 render: o corpo da nota é ESCAPADO (esc(_dn)) — sem HTML cru', /det-acc-note-b">'\+esc\(_dn\)\+'/.test(H));
-ok('E5.15 render: _dnote é anexado ao corpo do acordeão (após legenda)', /'<div class="det-acc-body">'\+\(leg\?[\s\S]{0,180}\)\+_dnote\+'<\/div>'/.test(H));
+ok('E5.15 render: _dnote é anexado ao corpo do acordeão (após legenda) — F3.5.5C: o corpo pode carregar o render RICO gateado + espelho .det-plain-src (janela ampliada; estrutura idêntica)', /'<div class="det-acc-body">'\+\(leg\?[\s\S]{0,420}\)\+_dnote\+'<\/div>'/.test(H));
 ok('E5.16 (PROVA índice≠tema) a nota é indexada por c._i; NUNCA por c.tema no lookup', /\(t\.designerItemNotes\|\|\{\}\)\['i'\+c\._i\]/.test(H) && !/\(t\.designerItemNotes\|\|\{\}\)\[[^\]]*c\.tema/.test(H));
 // Histórico enviado_designer — só notesCount, sem texto
 const HIST = (H.match(/type:'enviado_designer'[\s\S]{0,400}?\}\)/) || [''])[0];

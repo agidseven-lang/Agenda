@@ -53,8 +53,8 @@ ok('D2.4  rótulo numerado det-acc-k com PALAVRA + NN (zero à esquerda)', /num=
 ok('D2.5  barra "Expandir todos" / "Recolher todos" (data-detexpand/collapse)', /data-detexpand="1">Expandir todos<\/button>/.test(H) && /data-detcollapse="1">Recolher todos<\/button>/.test(H));
 ok('D2.6  handler Expandir/Recolher aplica open a TODOS os .det-acc', /\[data-detexpand\]'\)\)\{[^}]*\.det-acc'\)\.forEach\(function\(d\)\{d\.open=true;\}\)/.test(H) && /\[data-detcollapse\]'\)\)\{[^}]*\.det-acc'\)\.forEach\(function\(d\)\{d\.open=false;\}\)/.test(H));
 ok('D2.7  corpo do bloco preserva parágrafos/quebras (.det-acc-l white-space:pre-wrap)', /\.det-acc-l\{[^}]*white-space:pre-wrap/.test(H));
-ok('D2.8  legenda do bloco escapada (esc(leg)) — sem innerHTML cru', /det-acc-l">'\+esc\(leg\)/.test(H));
-ok('D2.9  tema do bloco escapado (esc(c.tema||...))', /<span class="det-acc-t">'\+esc\(c\.tema\|\|'\(sem tema\)'\)/.test(H));
+ok('D2.8  legenda do bloco escapada — F3.5.5C: rico GATEADO (rteDisplayHtml re-sanitiza + exige paridade) com fallback esc(leg); nunca HTML cru', /rteDisplayHtml\(c\.legendaRich,leg\)/.test(H) && /det-acc-l">'\+\(_rv\|\|esc\(leg\)\)/.test(H));
+ok('D2.9  tema do bloco escapado — F3.5.5C: inline rico GATEADO (rteInlineDisplay) com fallback esc(c.tema); vazio segue \'(sem tema)\'', /<span class="det-acc-t">'\+\(hasTema\?\(rteInlineDisplay\(c\.temaRich,String\(c\.tema\)\)\|\|esc\(c\.tema\)\):'\(sem tema\)'\)/.test(H));
 ok('D2.10 modal-back marcado com data-detmodal (escopo do Esc/trap)', /class="modal-back" data-modalbg="1" data-detmodal="1"/.test(H));
 ok('D2.11 acessibilidade: role="dialog" aria-modal="true" no sheet', /class="sheet det-sheet" role="dialog" aria-modal="true"/.test(H));
 ok('D2.12 detSetupModalFocus definido e chamado ao abrir', /function detSetupModalFocus\(\)\{/.test(H) && /detSetupModalFocus\(\);\s*\/\/ F3\.5\.4W/.test(H));
