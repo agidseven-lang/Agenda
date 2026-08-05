@@ -97,7 +97,7 @@ ok('J3 coleta da atribuição preservada (mapa completo; persiste limpezas)', id
 ok('J4 sendToDesigner NÃO foi alterado nesta fase (grava mapa completo como na W-H1)', idx.includes("notesCount:(dl.itemNotesPresent?Object.keys(dl.itemNotes||{}).length:0)"));
 
 console.log('— K) estabilidade dos índices (reordenar/excluir/inserir NÃO existem; editar texto preserva) —');
-ok('K1 cronOf: _i = índice REAL do array (map ANTES do filter)', idx.includes('const list=arr.map((c,i)=>({tema:c&&c.tema,legenda:c&&c.legenda,_i:i})).filter(c=>c.tema||c.legenda);'));
+ok('K1 cronOf: _i = índice REAL do array (map ANTES do filter) — F3.5.5C: map carrega também temaRich/legendaRich (aditivo; filtro idêntico)', idx.includes('const list=arr.map((c,i)=>({tema:c&&c.tema,legenda:c&&c.legenda,temaRich:(c&&c.temaRich)||\'\',legendaRich:(c&&c.legendaRich)||\'\',_i:i})).filter(c=>c.tema||c.legenda);'));
 ok('K2 saveContentEdits reescreve 1:1 pelo índice (mesmo n; preserva feed/story de orig[i]) — F3.5.5C: fonte é o modelo do editor rico', idx.includes('const n=Math.max(orig.length,model.length);') && idx.includes("feedImageUrl:o.feedImageUrl||'',storyImageUrl:o.storyImageUrl||''") && idx.includes('contents.push(it);'));
 ok('K3 saveItemFix edita SÓ arr[idx] (pad {}; nunca desloca)', idx.includes('while(arr.length<=idx)arr.push({});'));
 ok('K4 NENHUM sort/reverse/splice sobre cronContents em todo o renderer', !/cronContents[^\n]*\.(sort|reverse|splice)\(/.test(idx) && !/\.(sort|reverse|splice)\([^)]*cronContents/.test(idx));
