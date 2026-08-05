@@ -305,7 +305,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.59-legacy-risk" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.60-f355c-rich-render" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
