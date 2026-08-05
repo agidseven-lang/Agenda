@@ -1,0 +1,301 @@
+# =====================================================================
+# F3.5.5C — Publicacao da Desktop 1.0.220 no CANAL DO ATUALIZADOR INTERNO (Latest)
+# ---------------------------------------------------------------------
+# Publica a 1.0.220 (F3.5.5C — Roteiros Personalizados e Editor Profissional:
+# quantidade personalizada de roteiros via stepper [−][N][+] no lugar dos chips
+# fixos 4/6/8/12, e editor rico de Tema/Legenda com sanitizacao canonica,
+# projecao em texto e paridade obrigatoria; portal/Worker V64.60 com validacao
+# SERVER-SIDE fail-closed). USA EXCLUSIVAMENTE os BYTES do run de build F3.5.5C
+# 30968443751 (gated, verde nos 2 jobs; --publish never): NAO RECOMPILA — baixa os
+# 2 artifacts e publica os MESMOS bytes. TUDO PINADO: run id, digests dos artifacts,
+# 5 hashes SHA-256, tag v1.0.220 no head EXATO da branch.
+# 6 assets: EXE, MSI, latest.yml, blockmap, SHA256SUMS, VERSAO-DESKTOP.txt.
+# ESCRITAS (tag + release + Latest) SO via token temporario do GitHub App "Agenda ID Seven Release
+# Bot" (expira sozinho); GITHUB_TOKEN permanece somente leitura; sem RELEASE_PAT.
+# Roda NA PROPRIA branch de teste (main INTOCAVEL): dispara no push DESTE arquivo + workflow_dispatch.
+# Rollback imediato: v1.0.218 (baseline FISICAMENTE aprovada). Rollback adicional: v1.0.216.
+# A publicacao NAO significa aprovacao fisica — o teste fisico do owner vem depois, pelo atualizador.
+# =====================================================================
+name: "F3.5.5C Desktop Release — 1.0.220 no canal do updater (Roteiros Personalizados + Editor Rico; sem build novo)"
+"on":
+  push:
+    branches:
+      - "desktop/f355c-custom-script-quantity-rich-editor-1.0.220"
+    paths:
+      - ".github/workflows/desktop-release-f355c.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: agidseven-lang/Agenda
+      # ── PINAGEM COMPLETA (F3.5.5C; run de build 30968443751 verde nos 2 jobs) ──
+      RUN_ID: "30968443751"
+      STABLE_SHA: "2d003adaeeec00499e95a9eac5fe01f48859e4ed"
+      TEST_BRANCH: "desktop/f355c-custom-script-quantity-rich-editor-1.0.220"
+      BASE_219_SHA: "7e54cdf48f10f7b968c844f5fa4eb284cbc93a87"
+      BASE_218_SHA: "1a945159dd563eba5c80657427519d0f22b4b673"
+      BASE_216_SHA: "e509f43ae8f3130a9922791f89db0ba29aa7a410"
+      TAG: "v1.0.220"
+      TITLE: "Agenda ID Seven Desktop 1.0.220 — Roteiros Personalizados e Editor Profissional"
+      ART_INST: "agenda-id-seven-desktop-1.0.220-installer"
+      ART_INST_DIGEST: "sha256:76aac559301fdd735523fe57f8632956f0be3573183e1d1751d7a8114c5f1fa2"
+      ART_META: "agenda-id-seven-desktop-1.0.220-updatemeta"
+      ART_META_DIGEST: "sha256:b91b1fe09e15e91d2c3d1846516050744a42b73f5991a6dd5572569fe8b75939"
+      EXE_NAME: "Agenda-ID-Seven-Desktop-1.0.220-x64.exe"
+      MSI_NAME: "Agenda-ID-Seven-Desktop-1.0.220-x64.msi"
+      BM_NAME: "Agenda-ID-Seven-Desktop-1.0.220-x64.exe.blockmap"
+      LY_NAME: "latest.yml"
+      EXP_EXE: "c0c9ab2fe88153e21e0f51888fecfdc7c2f6631bab5937a9ddef8a6adce93da4"
+      EXP_MSI: "dc3f417ccad77588e31d65a8be4184bcef73e9eaa4ab9cb8a3e5a9c5cb8f8008"
+      EXP_LY: "f44afabae1e8cdd1997bac2d714429d174b268409ee87e37ffdb8a0cd811c2c8"
+      EXP_BM: "70c22f3fea39fee9cdfed91dda9b95bcc2c2a7d7dbbd85b7d6fbd9777a549931"
+      EXP_SBOM: "274590bd7a2de3dbe2ff5120abb833978eed460cbdea0debc1ed66783d538310"
+      PREV_LATEST_TAG: "v1.0.219"
+      PROD_ROLLBACK_TAG: "v1.0.218"
+      PROD_ROLLBACK2_TAG: "v1.0.216"
+    steps:
+      - name: "Gate 0 — contexto: branch de teste correta (publicacao autorizada F3.5.5C)"
+        run: |
+          set -euo pipefail
+          [ "${{ github.ref_name }}" = "$TEST_BRANCH" ] || { echo "::error::ref '${{ github.ref_name }}' != $TEST_BRANCH — nada publicado"; exit 1; }
+          echo "OK: rodando na branch de teste autorizada"
+
+      - name: "Gate 0a — token temporario do Release Bot (GitHub App; expira sozinho)"
+        id: release_bot
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: Agenda
+          permission-contents: write
+          permission-workflows: write
+
+      - name: "Gate 0b — token do Release Bot ATIVO + escopo SO Agenda"
+        env:
+          BOT_TOKEN: ${{ steps.release_bot.outputs.token }}
+        run: |
+          set -euo pipefail
+          [ -n "$BOT_TOKEN" ] || { echo "::error::token do Release Bot vazio — NADA publicado."; exit 1; }
+          FN="$(GH_TOKEN="$BOT_TOKEN" gh api "repos/$REPO" --jq '.full_name' 2>/dev/null || true)"
+          [ "$FN" = "$REPO" ] || { echo "::error::Release Bot sem acesso a $REPO."; exit 1; }
+          J="$(GH_TOKEN="$BOT_TOKEN" gh api /installation/repositories)"
+          N="$(echo "$J" | jq -r '.total_count')"; R="$(echo "$J" | jq -r '.repositories[0].full_name')"
+          { [ "$N" = "1" ] && [ "$R" = "$REPO" ]; } || { echo "::error::escopo do Release Bot != {1 repo, $REPO} ($N,$R)."; exit 1; }
+          echo "OK: Release Bot ativo, escopo restrito a $REPO"
+
+      - name: "Gate 1 — run de build F3.5.5C completed/success e head EXATO"
+        run: |
+          set -euo pipefail
+          J="$(gh api "repos/$REPO/actions/runs/$RUN_ID")"
+          ST="$(echo "$J" | jq -r '.status + "|" + .conclusion')"
+          HS="$(echo "$J" | jq -r '.head_sha')"
+          BR="$(echo "$J" | jq -r '.head_branch')"
+          echo "run $RUN_ID: $ST head=$HS branch=$BR"
+          [ "$ST" = "completed|success" ] || { echo "::error::run de build invalido"; exit 1; }
+          [ "$HS" = "$STABLE_SHA" ] || { echo "::error::head do run != STABLE_SHA"; exit 1; }
+          [ "$BR" = "$TEST_BRANCH" ] || { echo "::error::branch do run != branch de teste"; exit 1; }
+
+      - name: "Gate 2 — STABLE_SHA na linhagem do tip; commits alem dele SO o workflow de release"
+        run: |
+          set -euo pipefail
+          H="$(gh api "repos/$REPO/git/ref/heads/$TEST_BRANCH" --jq '.object.sha')"
+          CMP="$(gh api "repos/$REPO/compare/$STABLE_SHA...$H" --jq '.status')"
+          echo "compare $STABLE_SHA...$H: $CMP"
+          { [ "$CMP" = "identical" ] || [ "$CMP" = "ahead" ]; } || { echo "::error::STABLE_SHA fora da linhagem do tip ($CMP)"; exit 1; }
+          gh api "repos/$REPO/compare/$STABLE_SHA...$H" --jq '.files[].filename' | tee /tmp/extra.txt || true
+          if grep -vE '^\.github/workflows/desktop-release-f355c\.yml$' /tmp/extra.txt | grep -q .; then
+            echo "::error::commits pos-candidato tocam arquivos alem do workflow de release"; exit 1; fi
+          if grep -qE '^(desktop/src/|desktop/scripts/copy-renderer\.js|desktop/package\.json|desktop/package-lock\.json|desktop/tsconfig\.json|desktop/electron-builder)' /tmp/extra.txt; then
+            echo "::error::insumo de build alterado apos STABLE_SHA — bytes publicados nao corresponderiam ao build"; exit 1; fi
+          CMP9="$(gh api "repos/$REPO/compare/$BASE_219_SHA...$STABLE_SHA" --jq '.status')"
+          { [ "$CMP9" = "ahead" ] || [ "$CMP9" = "identical" ]; } || { echo "::error::STABLE_SHA nao descende da base 1.0.219 ($CMP9)"; exit 1; }
+          CMP0="$(gh api "repos/$REPO/compare/$BASE_218_SHA...$STABLE_SHA" --jq '.status')"
+          { [ "$CMP0" = "ahead" ] || [ "$CMP0" = "identical" ]; } || { echo "::error::STABLE_SHA nao descende da baseline 1.0.218 ($CMP0)"; exit 1; }
+          CMP1="$(gh api "repos/$REPO/compare/$BASE_216_SHA...$STABLE_SHA" --jq '.status')"
+          { [ "$CMP1" = "ahead" ] || [ "$CMP1" = "identical" ]; } || { echo "::error::STABLE_SHA nao descende da 1.0.216 ($CMP1)"; exit 1; }
+          echo "OK: STABLE_SHA ancestral do tip; extras = so o workflow de release; bases 1.0.219/1.0.218/1.0.216 na linhagem"
+
+      - name: "Gate 3 — release v1.0.220 NAO existe; tag so pode preexistir apontando p/ STABLE_SHA"
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then echo "::error::release $TAG ja existe"; exit 1; fi
+          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            TS="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+            [ "$TS" = "$STABLE_SHA" ] || { echo "::error::tag $TAG aponta para outro sha ($TS)"; exit 1; }
+          fi
+          echo "OK: release/tag livres (ou tag ja em STABLE_SHA)"
+
+      - name: "Gate 4 — artifacts: ids+digests conferem (mesmos bytes do run verde)"
+        run: |
+          set -euo pipefail
+          json="$(gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts" --paginate)"
+          chk() { local d; d="$(echo "$json" | jq -r --arg n "$1" '.artifacts[]|select(.name==$n)|.digest')"; echo "$1: $d"; [ "$d" = "$2" ] || { echo "::error::digest $1 divergente"; exit 1; }; }
+          chk "$ART_INST" "$ART_INST_DIGEST"
+          chk "$ART_META" "$ART_META_DIGEST"
+
+      - name: "Baixar artifacts (installer + updatemeta) — SEM recompilar"
+        run: |
+          set -euo pipefail
+          gh run download "$RUN_ID" -R "$REPO" -n "$ART_INST" -D pacote
+          gh run download "$RUN_ID" -R "$REPO" -n "$ART_META" -D pacote
+          for f in "$EXE_NAME" "$MSI_NAME" "$LY_NAME" "$BM_NAME" SHA256SUMS SBOM-cyclonedx.json VERSAO-DESKTOP.txt; do
+            test -f "pacote/$f" || { echo "::error::arquivo ausente: $f"; exit 1; }
+          done
+          if [ -f pacote/canary.yml ]; then echo "::error::canary.yml presente — canal ambiguo"; exit 1; fi
+
+      - name: "Gate 5 — hashes SHA-256 + latest.yml (versao/EXE/sha512) + VERSAO-DESKTOP"
+        run: |
+          set -euo pipefail
+          declare -A EXP=( ["$EXE_NAME"]="$EXP_EXE" ["$MSI_NAME"]="$EXP_MSI" ["$LY_NAME"]="$EXP_LY" ["$BM_NAME"]="$EXP_BM" ["SBOM-cyclonedx.json"]="$EXP_SBOM" )
+          for f in "${!EXP[@]}"; do
+            H="$(sha256sum "pacote/$f" | awk '{print $1}')"; echo "$f=$H"
+            [ "$H" = "${EXP[$f]}" ] || { echo "::error::hash $f divergente"; exit 1; }
+          done
+          ( cd pacote && sha256sum -c SHA256SUMS ) || { echo "::error::SHA256SUMS nao confere"; exit 1; }
+          grep -q "version: 1.0.220" "pacote/$LY_NAME" || { echo "::error::latest.yml version != 1.0.220"; exit 1; }
+          grep -qE "^path: $EXE_NAME" "pacote/$LY_NAME" || { echo "::error::latest.yml path != EXE"; exit 1; }
+          META_SHA512=$(grep -E '^sha512:' "pacote/$LY_NAME" | head -1 | sed -E 's/^sha512:[[:space:]]*//' | tr -d '\r')
+          CALC_SHA512=$(openssl dgst -sha512 -binary "pacote/$EXE_NAME" | openssl base64 -A)
+          [ "$META_SHA512" = "$CALC_SHA512" ] || { echo "::error::sha512 do latest.yml != EXE (updater rejeitaria)"; exit 1; }
+          grep -q "versionName : 1.0.220" pacote/VERSAO-DESKTOP.txt || { echo "::error::VERSAO-DESKTOP sem 1.0.220"; exit 1; }
+          grep -q "1.0.220-custom-script-quantity-rich-editor" pacote/VERSAO-DESKTOP.txt || { echo "::error::rotulo da candidata ausente"; exit 1; }
+          echo "OK: 5 hashes + SHA256SUMS + latest.yml (1.0.220/EXE/sha512==EXE) + VERSAO-DESKTOP"
+
+      - name: "Release notes"
+        run: |
+          cat > notas.md <<'NOTAS'
+          Agenda ID Seven Desktop 1.0.220 — Roteiros Personalizados e Editor Profissional
+
+          Atualização disponibilizada pelo ATUALIZADOR INTERNO do app (Configurações ->
+          Atualizações -> Verificar atualizações -> Baixar -> Instalar e reiniciar).
+          NENHUM download manual é necessário.
+
+          O QUE MUDA vs 1.0.219 (F3.5.5C)
+
+          QUANTIDADE PERSONALIZADA DE ROTEIROS — na criação e edição de tarefas de
+          Roteiro, os chips fixos "4, 6, 8, 12" deram lugar a um seletor
+          personalizado [−] [N] [+]:
+          - qualquer quantidade INTEIRA a partir de 1 (digitada ou pelos botões);
+          - valor inválido mostra "Informe uma quantidade inteira igual ou
+            superior a 1." e bloqueia o avanço — sem travar a tela;
+          - AUMENTAR a quantidade preserva tudo o que já foi preenchido;
+          - DIMINUIR com conteúdo preenchido nos itens excedentes pede
+            CONFIRMAÇÃO explícita antes de remover (cancelar mantém como estava);
+          - tarefas antigas (q4/q6/q8/q12 ou sem marcação) abrem EXATAMENTE com
+            os roteiros que já têm — nenhuma migração, nenhum dado tocado;
+          - o portal do cliente mostra o rótulo correto ("7 roteiros", "1
+            roteiro"), com os textos antigos de 4/6/8/12 idênticos aos de sempre.
+
+          EDITOR PROFISSIONAL DE TEMA E LEGENDA — cada campo de Tema e Legenda dos
+          roteiros (Briefing, Revisão, editor de conteúdos, correção de item e
+          produção) agora tem formatação rica com a identidade visual da casa:
+          - barra completa: desfazer/refazer, parágrafo/títulos/tamanhos, negrito,
+            itálico, sublinhado, tachado, subscrito/sobrescrito, COR do texto
+            (paleta fechada de 8) e MARCA-TEXTO (6), listas com e sem número,
+            alinhamentos, aumentar/diminuir recuo, linha divisória, link http(s)
+            e LIMPAR FORMATAÇÃO; atalhos Ctrl+B/I/U/K funcionam;
+          - colar do Word/Google Docs LIMPA automaticamente o lixo invisível e
+            preserva só a formatação suportada; colar sempre disponível também
+            como texto puro;
+          - segurança em camadas: NADA executável entra (script, iframe, eventos,
+            estilos arbitrários, links javascript:, imagens externas etc. são
+            descartados na raiz); o formato salvo é um canônico fechado e o texto
+            PURO continua sendo gravado nos campos de sempre (compatibilidade
+            total com tarefas antigas e com tudo que consome texto);
+          - o texto formatado SÓ é exibido quando bate 100% com o texto puro
+            (paridade); qualquer divergência mostra o texto seguro de sempre;
+          - o card do Kanban permanece COMPACTO (sem render rico); os botões de
+            copiar continuam copiando TEXTO LIMPO; notificações seguem sem HTML.
+
+          PORTAL DO CLIENTE (Worker V64.60 — já no ar) — o link de aprovação
+          renderiza Tema/Legenda formatados com validação SERVER-SIDE fail-closed
+          (gramática canônica token a token + projeção idêntica + paridade) e cai
+          no texto escapado de sempre em qualquer dúvida. Edição do cliente,
+          aprovação por item, "Aprovar tudo", etapas do cronograma (ETAPA 1 só
+          Tema) e o card de compartilhamento seguem EXATAMENTE como estavam.
+
+          IMPORTANTE: NENHUMA regra de negócio mudou — mesmos fluxos de aprovação,
+          mesmas permissões, mesma persistência, mesmos alertas e notificações.
+
+          PRESERVAÇÃO (provado pelos gates do build e provas Electron reais)
+          - TODAS as entregas da 1.0.219: Agenda Premium (cards data-first e
+            detalhe premium), Observações Internas por Tema, Acompanhamento
+            Inteligente de Execução, alertas laranja/amarelo/vermelho, check-in,
+            fila central, sons, notificações imediatas com som, card compacto,
+            Central de Detalhes, Copiar tema/legenda, Aprovar tudo, status
+            Social/Designer, autenticação/sessão/autostart, quantidade
+            personalizada de vídeos, criação/edição de tarefas, drag-and-drop,
+            sino, histórico, Minhas Prioridades, Monitor SLA, watchdog, tray,
+            atualizador, portal, backend e Android — preservados (congelados
+            byte-idênticos fora do renderer; suítes herdadas todas verdes).
+          - Rollback imediato: 1.0.218 (baseline fisicamente aprovada).
+            Adicional: 1.0.216. A 1.0.219 também permanece preservada.
+
+          IMPORTANTE: esta versão DEPENDE DE VALIDAÇÃO FÍSICA do owner no Windows
+          (criar roteiro com quantidade personalizada; formatar Tema/Legenda;
+          colar do Word/Docs; conferir o portal do cliente com o texto formatado;
+          confirmar cópia em texto limpo e card compacto; testar 125%/150%).
+          A publicação não é aprovação física.
+
+          Procedência: run de build F3.5.5C 30968443751 (success; --publish never;
+          verify + Windows verdes, incluindo Gate EMPACOTADO no app.asar — suíte da
+          fase (128) + Agenda Premium (84) + observações internas (72) + som imediato
+          (37) + detalhes (74) contra os bytes do pacote; 32 provas reais Electron da
+          fase + 20 + 15 + 25 herdadas; 91 casos comportamentais do sanitizador no
+          Chromium real; paridade cruzada Desktop↔Worker com os canônicos do app
+          EMPACOTADO) @ commit 2d003adaeeec00499e95a9eac5fe01f48859e4ed (branch
+          desktop/f355c-custom-script-quantity-rich-editor-1.0.220). Mesmos bytes; sem
+          recompilar. Confira SHA-256 em SHA256SUMS.
+          NOTAS
+
+      - name: "Criar tag v1.0.220 pinada em STABLE_SHA — ESCRITA via Release Bot"
+        env:
+          GH_TOKEN: ${{ steps.release_bot.outputs.token }}
+        run: |
+          set -euo pipefail
+          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            TS="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+            [ "$TS" = "$STABLE_SHA" ] || { echo "::error::tag $TAG aponta para outro sha ($TS)"; exit 1; }
+          else
+            gh api -X POST "repos/$REPO/git/refs" -f ref="refs/tags/$TAG" -f sha="$STABLE_SHA" >/dev/null
+            echo "tag $TAG criada em $STABLE_SHA"
+          fi
+
+      - name: "Publicar release no canal do updater (latest=true, prerelease=false) — 6 assets — via Release Bot"
+        env:
+          GH_TOKEN: ${{ steps.release_bot.outputs.token }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" -R "$REPO" \
+            --target "$STABLE_SHA" --latest=true \
+            --title "$TITLE" --notes-file notas.md \
+            "pacote/$EXE_NAME" "pacote/$MSI_NAME" "pacote/$LY_NAME" "pacote/$BM_NAME" "pacote/SHA256SUMS" "pacote/VERSAO-DESKTOP.txt"
+          echo "publicado: $TAG (canal do electron-updater: release Latest com latest.yml)"
+
+      - name: "Pos-verificacao (Latest=1.0.220; 1.0.219 preservada; rollbacks 1.0.218/1.0.216 preservados)"
+        run: |
+          set -euo pipefail
+          FLAGS="$(gh release view "$TAG" -R "$REPO" --json isPrerelease,isDraft --jq '(.isPrerelease|tostring)+"|"+(.isDraft|tostring)')"
+          [ "$FLAGS" = "false|false" ] || { echo "::error::flags incorretas: $FLAGS"; exit 1; }
+          N="$(gh release view "$TAG" -R "$REPO" --json assets --jq '.assets|length')"
+          [ "$N" = "6" ] || { echo "::error::esperado 6 assets, encontrados $N"; exit 1; }
+          for a in "$EXE_NAME" "$MSI_NAME" "$LY_NAME" "$BM_NAME" SHA256SUMS VERSAO-DESKTOP.txt; do
+            gh release view "$TAG" -R "$REPO" --json assets --jq '.assets[].name' | grep -qx "$a" || { echo "::error::asset $a ausente"; exit 1; }
+          done
+          if gh release view "$TAG" -R "$REPO" --json assets --jq '.assets[].name' | grep -qx "app-update.yml"; then echo "::error::app-update.yml nao pode ser asset"; exit 1; fi
+          TAGSHA="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+          [ "$TAGSHA" = "$STABLE_SHA" ] || { echo "::error::tag != STABLE_SHA"; exit 1; }
+          LATEST_TAG="$(gh api "repos/$REPO/releases/latest" --jq '.tag_name')"
+          [ "$LATEST_TAG" = "$TAG" ] || { echo "::error::Latest do repo != $TAG (got $LATEST_TAG)"; exit 1; }
+          for t in "$PREV_LATEST_TAG" "$PROD_ROLLBACK_TAG" "$PROD_ROLLBACK2_TAG"; do
+            gh release view "$t" -R "$REPO" --json tagName --jq '.tagName' | grep -qx "$t" || { echo "::error::$t (preservada/rollback) sumiu"; exit 1; }
+          done
+          echo "===== GO: 1.0.220 no canal do updater (Latest); 1.0.219 preservada; 1.0.218 rollback imediato; 1.0.216 rollback adicional ====="
