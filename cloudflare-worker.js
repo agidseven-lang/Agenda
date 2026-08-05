@@ -2456,6 +2456,101 @@ function escapeHtml(s) {
     .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
+/* ═══ F3.5.5C — TEMA/LEGENDA RICOS NO PORTAL (validação SERVER-SIDE, fail-closed) ═══
+   O Desktop 1.0.220+ grava ADITIVAMENTE temaRich/legendaRich no formato CANÔNICO
+   (allowlist p/br/strong/em/u/s/sub/sup/ul/ol/li/a/hr/h3/h4/span; atributos
+   data-al|data-ind|data-cl|data-hl|data-fs; texto sempre escapado; links http/https
+   com rel/target FORÇADOS). O portal NUNCA confia no campo:
+     1) rteWkValid  — valida a GRAMÁTICA canônica token a token (qualquer tag,
+        atributo, aninhamento ou texto fora da gramática ⇒ rejeita tudo);
+     2) rteWkPlain  — projeta o rico em texto pela MESMA regra determinística
+        do Desktop (blocos→\n, '• '/'N. ', '---', <br> terminal = linha vazia);
+     3) paridade    — só renderiza rico quando a projeção BATE com o texto
+        exibido e NÃO há override do cliente (clientItems). Qualquer falha ⇒
+        renderização escapada de sempre (fail-closed). Nada disso altera /state,
+        gravações ou notificações (texto puro segue sendo o contrato). */
+const RTE_WK = {
+  block: /^<(p|h3|h4|li)( data-al="[crj]")?( data-ind="[1-6]")?>$/,
+  span: /^<span( data-cl="[1-8]")?( data-hl="[1-6]")?( data-fs="(?:s|l|xl)")?>$/,
+  a: /^<a href="https?:\/\/[^"]+" rel="noopener noreferrer" target="_blank">$/,
+};
+function rteWkValid(html) {
+  if (typeof html !== "string" || !html || html.length > 120000) return false;
+  const TAG = /<[^<>]*>/g; let last = 0, m; const st = [];
+  function inInline() { const t = st[st.length - 1]; return !!t && t !== "ul" && t !== "ol"; }
+  while ((m = TAG.exec(html))) {
+    const txt = html.slice(last, m.index);
+    if (txt) {
+      if (/[<>]/.test(txt)) return false;
+      if (!inInline() && txt.trim() !== "") return false;      // texto solto fora de bloco
+    }
+    last = m.index + m[0].length;
+    const t = m[0];
+    if (t === "<br>") { if (!inInline()) return false; continue; }
+    if (t === "<hr>") { if (st.length) return false; continue; }
+    if (t === "<ul>" || t === "<ol>") { if (st.length) return false; st.push(t.slice(1, 3)); continue; }
+    if (t === "</ul>" || t === "</ol>") { if (st.pop() !== t.slice(2, 4)) return false; continue; }
+    const blk = RTE_WK.block.exec(t);
+    if (blk) {
+      if (blk[1] === "li") { const top = st[st.length - 1]; if (top !== "ul" && top !== "ol") return false; }
+      else if (st.length) return false;                        // p/h3/h4 só no topo
+      st.push(blk[1]); continue;
+    }
+    if (t[1] === "/") {
+      const name = t.slice(2, -1);
+      if (/^(p|h3|h4|li|strong|em|u|s|sub|sup|span|a)$/.test(name)) { if (st.pop() !== name) return false; continue; }
+      return false;
+    }
+    const bare = /^<(strong|em|u|s|sub|sup)>$/.exec(t);
+    if (bare) { if (!inInline()) return false; st.push(bare[1]); continue; }
+    if (t !== "<span>" && RTE_WK.span.test(t)) { if (!inInline()) return false; st.push("span"); continue; }
+    if (RTE_WK.a.test(t)) { if (!inInline() || st.indexOf("a") >= 0) return false; st.push("a"); continue; }
+    return false;                                              // qualquer outra tag ⇒ rejeita
+  }
+  if (html.slice(last) !== "") return false;                   // canônico termina em tag
+  return st.length === 0;
+}
+function rteWkDecode(s) {
+  return String(s).replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&");
+}
+function rteWkPlain(html) {
+  const TAG = /<[^<>]*>/g; let last = 0, m;
+  const lines = []; let cur = null; let listT = null, n = 0;
+  while ((m = TAG.exec(html))) {
+    const txt = html.slice(last, m.index);
+    if (txt && cur !== null) cur += rteWkDecode(txt);
+    last = m.index + m[0].length;
+    const t = m[0];
+    if (t === "<br>") { if (cur !== null) cur += "\n"; continue; }
+    if (t === "<hr>") { lines.push("---"); continue; }
+    if (t === "<ul>" || t === "<ol>") { listT = t.slice(1, 3); n = 0; continue; }
+    if (t === "</ul>" || t === "</ol>") { listT = null; continue; }
+    if (t === "<li>" || /^<li /.test(t)) { cur = ""; continue; }
+    if (t === "</li>") { n++; lines.push((listT === "ul" ? "• " : (n + ". ")) + String(cur == null ? "" : cur).replace(/\n+$/, "")); cur = null; continue; }
+    if (/^<(p|h3|h4)[ >]/.test(t)) { cur = ""; continue; }
+    if (t === "</p>" || t === "</h3>" || t === "</h4>") { lines.push(String(cur == null ? "" : cur).replace(/\n+$/, "")); cur = null; continue; }
+    /* tags inline abrem/fecham de forma transparente para a projeção */
+  }
+  return lines.join("\n").replace(/\u00A0/g, " ").replace(/[ \t]+\n/g, "\n").replace(/\n+$/, "").replace(/^\n+/, "");
+}
+function rteWkDisplay(rich, plain) {
+  try {
+    if (!rich || typeof rich !== "string") return null;
+    if (!rteWkValid(rich)) return null;
+    if (rteWkPlain(rich) !== String(plain == null ? "" : plain)) return null;
+    return '<div class="rtev">' + rich + "</div>";
+  } catch (_) { return null; }
+}
+function rteWkInline(rich, plain) {
+  const v = rteWkDisplay(rich, plain); if (!v) return null;
+  const m = /^<div class="rtev"><p>([\s\S]*)<\/p><\/div>$/.exec(v);
+  if (!m || /<(p|ul|ol|hr|h3|h4)[\s>]/.test(m[1])) return null;
+  return '<span class="rtev">' + m[1] + "</span>";
+}
+function rteWkAttrPlain(plain) {   // projeção em atributo (preserva quebras como &#10;)
+  return escapeHtml(plain).replace(/\r/g, "").replace(/\n/g, "&#10;");
+}
+
 function frequencyLabel(t) {
   const f = (t.freq || t.frequencia || t.cronFrequency || "").toString().toLowerCase();
   const map = { semanal: "Semanal", quinzenal: "Quinzenal", mensal: "Mensal", unico: "Único" };
@@ -2661,6 +2756,30 @@ a{color:#b9a4ff;text-decoration:none}
 .flabel .cnt{font-size:11px;color:var(--mut)}
 .fval{background:var(--bg2);border:1px solid var(--line);border-radius:var(--radius-sm);padding:13px 14px;font-size:14px;color:var(--txt);line-height:1.6;white-space:pre-wrap;word-break:break-word}
 .fval.theme{font-weight:600;font-size:15px}.fval.note{border-color:rgba(251,113,133,.3)}
+/* F3.5.5C — render do canônico rico (validado no servidor); MESMA paleta do Desktop */
+.rtev{white-space:normal}
+span.rtev{display:inline}
+.rtev p{margin:0 0 6px}.rtev p:last-child{margin-bottom:0}
+.rtev h3{margin:10px 0 6px;font-size:16px;font-weight:800;line-height:1.3}
+.rtev h4{margin:8px 0 5px;font-size:14.5px;font-weight:700;line-height:1.3}
+.rtev h3:first-child,.rtev h4:first-child{margin-top:0}
+.rtev ul,.rtev ol{margin:0 0 6px;padding-left:22px}
+.rtev li{margin:2px 0}
+.rtev hr{border:none;border-top:1px solid var(--line);margin:10px 0}
+.rtev a{color:#7C8CFF;text-decoration:underline}
+.rtev [data-al="c"]{text-align:center}.rtev [data-al="r"]{text-align:right}.rtev [data-al="j"]{text-align:justify}
+.rtev [data-ind="1"]{margin-left:18px}.rtev [data-ind="2"]{margin-left:36px}.rtev [data-ind="3"]{margin-left:54px}
+.rtev [data-ind="4"]{margin-left:72px}.rtev [data-ind="5"]{margin-left:90px}.rtev [data-ind="6"]{margin-left:108px}
+.rtev span[data-fs="s"]{font-size:12px}.rtev span[data-fs="l"]{font-size:16.5px}.rtev span[data-fs="xl"]{font-size:20px}
+.rtev span[data-cl="1"]{color:#F87171}.rtev span[data-cl="2"]{color:#FB923C}.rtev span[data-cl="3"]{color:#FACC15}
+.rtev span[data-cl="4"]{color:#34D399}.rtev span[data-cl="5"]{color:#22D3EE}.rtev span[data-cl="6"]{color:#60A5FA}
+.rtev span[data-cl="7"]{color:#A78BFA}.rtev span[data-cl="8"]{color:#F472B6}
+.rtev span[data-hl="1"]{background:#FEF08A;color:#14161D;border-radius:3px;padding:0 2px}
+.rtev span[data-hl="2"]{background:#BBF7D0;color:#14161D;border-radius:3px;padding:0 2px}
+.rtev span[data-hl="3"]{background:#BAE6FD;color:#14161D;border-radius:3px;padding:0 2px}
+.rtev span[data-hl="4"]{background:#FBCFE8;color:#14161D;border-radius:3px;padding:0 2px}
+.rtev span[data-hl="5"]{background:#FDBA74;color:#14161D;border-radius:3px;padding:0 2px}
+.rtev span[data-hl="6"]{background:#E9D5FF;color:#14161D;border-radius:3px;padding:0 2px}
 .pend{display:flex;align-items:center;gap:11px;background:repeating-linear-gradient(45deg,rgba(255,255,255,.02),rgba(255,255,255,.02) 10px,transparent 10px,transparent 20px),var(--bg2);border:1px dashed var(--line2);border-radius:var(--radius-sm);padding:14px;color:var(--mut)}
 .pend .pi{width:34px;height:34px;border-radius:9px;background:rgba(255,255,255,.04);display:flex;align-items:center;justify-content:center;color:var(--faint);flex:0 0 34px}.pend .pi svg{width:16px;height:16px}
 .pend .pt{font-weight:600;color:var(--txt)}.pend .ps{font-size:12px;color:var(--faint)}
@@ -2833,7 +2952,7 @@ function clientFeedbackSent(){var ga=document.querySelector('.gactions');if(ga&&
   // V64.18 — entra em modo "aguardando ajuste": o poller detecta quando a equipe corrige e
   // recarrega o MESMO link automaticamente para o cliente revisar de novo (sem reabrir o WhatsApp).
   FEEDBACK_MODE=true;FEEDBACK_BASE=null;window.scrollTo(0,0);}
-function getText(i,field){var c=card(i);if(!c)return'';var el=c.querySelector('[data-field="'+field+'"]');if(!el||el.classList.contains('pend'))return'';return el.textContent||'';}
+function getText(i,field){var c=card(i);if(!c)return'';var el=c.querySelector('[data-field="'+field+'"]');if(!el||el.classList.contains('pend'))return'';var dp=el.getAttribute('data-plain');if(dp!=null)return dp;return el.textContent||'';}
 function sheetForm(title,desc,kind,val,multiline){var inp=multiline?'<textarea id="sIn" placeholder="Escreva aqui...">'+(val||'')+'</textarea>':'<input id="sIn" value="'+(val||'').replace(/"/g,'&quot;')+'"/>';return '<h3></h3><div class="sd"></div>'+inp+'<div class="srow"><button class="btn ghost" data-x="cancel">Cancelar</button><button class="btn '+(kind==='rev'?'warn':'primary')+'" data-x="send">'+(kind==='rev'?'Enviar':'Salvar')+'</button></div>';}
 function openInput(title,desc,kind,val,multiline,cb){openSheet(sheetForm(title,desc,kind,val,multiline));sheet.querySelector('h3').textContent=title;sheet.querySelector('.sd').textContent=desc;pending=cb;}
 diagSet('cardClickBound','1');
@@ -3167,9 +3286,16 @@ function renderClientHtml(task, token, env, origin) {
       const ov = cItems["i" + i] || {};
       const cs = ov.cs || c.cs || "";
       if (cs === "aprovado") doneCount++;
-      const tema = escapeHtml((typeof ov.theme === "string" && ov.theme) ? ov.theme : (c.t || c.tema || ("Conteúdo " + (i + 1))));
+      const temaPlainRaw = (typeof ov.theme === "string" && ov.theme) ? ov.theme : (c.t || c.tema || ("Conteúdo " + (i + 1)));
+      const tema = escapeHtml(temaPlainRaw);
       const legRaw = (typeof ov.legenda === "string") ? ov.legenda : (typeof c.legenda === "string" ? c.legenda : (typeof c.caption === "string" ? c.caption : (typeof c.lg === "string" ? c.lg : (typeof c.l === "string" ? c.l : ""))));
       const leg = (legRaw || "").trim();
+      /* F3.5.5C — rico validado no SERVIDOR + paridade com o texto exibido; NUNCA com
+         override do cliente (edição em texto invalida naturalmente). Falhou ⇒ escapado. */
+      const temaOv = (typeof ov.theme === "string" && ov.theme) ? true : false;
+      const temaRichHtml = temaOv ? null : rteWkDisplay(c.temaRich, temaPlainRaw);
+      const temaTitleHtml = temaOv ? tema : (rteWkInline(c.temaRich, temaPlainRaw) || tema);
+      const legRichHtml = (typeof ov.legenda === "string") ? null : rteWkDisplay(c.legendaRich, String(legRaw == null ? "" : legRaw));
       const itemNote = (ov.note || c.csFeedback || "").toString().trim();
       const feedUrl = firstUrl(c.feed) || (c.feedImageUrl || "");
       const storyUrl = firstUrl(c.story || c.stories) || (c.storyImageUrl || "");
@@ -3178,14 +3304,14 @@ function renderClientHtml(task, token, env, origin) {
       return '<div class="card' + open + '" data-card="' + i + '">' +
         '<div class="chead" data-toggle="' + i + '">' +
           '<div class="cidx">' + (i + 1) + '</div>' +
-          '<div class="ctitle"><div class="ck">Conteúdo ' + (i + 1) + '</div><h3>' + tema + '</h3></div>' +
+          '<div class="ctitle"><div class="ck">Conteúdo ' + (i + 1) + '</div><h3>' + temaTitleHtml + '</h3></div>' +
           '<div class="cstate"><span class="badge ' + b.cls + '" data-badge><span class="bd" style="background:' + b.dot + '"></span>' + b.label + '</span></div>' +
           '<div class="chev">' + ICN.chev + '</div>' +
         '</div>' +
         '<div class="cbody">' +
-          '<div class="field"><div class="flabel"><span class="fl">' + ICN.type + 'Tema</span></div><div class="fval theme" data-field="tema">' + tema + '</div></div>' +
+          '<div class="field"><div class="flabel"><span class="fl">' + ICN.type + 'Tema</span></div><div class="fval theme" data-field="tema"' + (temaRichHtml ? ' data-plain="' + rteWkAttrPlain(temaPlainRaw) + '"' : '') + '>' + (temaRichHtml || tema) + '</div></div>' +
           '<div class="field"><div class="flabel"><span class="fl">' + ICN.text + 'Legenda</span>' + (leg ? '<span class="cnt">' + leg.length + ' caracteres</span>' : '') + '</div>' +
-            (leg ? '<div class="fval" data-field="legenda">' + escapeHtml(leg) + '</div>'
+            (leg ? '<div class="fval" data-field="legenda"' + (legRichHtml ? ' data-plain="' + rteWkAttrPlain(String(legRaw)) + '"' : '') + '>' + (legRichHtml || escapeHtml(leg)) + '</div>'
                  : '<div class="pend" data-field="legenda"><div class="pi">' + ICN.text + '</div><div><div class="pt">Legenda pendente</div><div class="ps">Nossa equipe ainda está finalizando a legenda deste conteúdo.</div></div></div>') +
           '</div>' +
           '<div class="field"><div class="flabel"><span class="fl">' + ICN.img + 'Peças</span></div><div class="media-row">' + media("feed", feedUrl) + media("story", storyUrl) + '</div></div>' +
