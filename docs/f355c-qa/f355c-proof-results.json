@@ -1,0 +1,262 @@
+{
+  "at": "2026-08-05T01:09:43.705Z",
+  "asarSha256": "c0dcf8a3ae6da3bf0253b3194f94ac37221b0d0c8c0145e316804785bed22fe8",
+  "results": [
+    {
+      "name": "BOOT app.asar carregado + semente entregue (snapshot real; user informativo no container sem rede)",
+      "ok": false,
+      "info": {
+        "asarSha": "c0dcf8a3ae6da3bf",
+        "srcSha": "b4d57a664920253d",
+        "app": true,
+        "user": false,
+        "tasks": 0
+      }
+    },
+    {
+      "name": "Q1 Briefing do Roteiro: stepper [−][N][+] presente; SEM chips fixos; sem erro inicial; 0 blocos antes de definir",
+      "ok": false,
+      "info": {
+        "png": "skipped",
+        "stepper": false,
+        "minus": false,
+        "plus": false,
+        "chips": 0,
+        "msgOculta": false,
+        "blocos": 0
+      }
+    },
+    {
+      "name": "Q2 digitar 3 + change → scriptQty=3 e 3 blocos 'Roteiro N'",
+      "ok": false,
+      "info": {
+        "err": "Script failed to execute, this normally means an error was thrown. Check the renderer console for the error."
+      }
+    },
+    {
+      "name": "Q3 [+][+] 3→5 preserva o conteúdo do Roteiro 1 e cria vazios",
+      "ok": false,
+      "info": {
+        "png": "skipped",
+        "err": "Script failed to execute, this normally means an error was thrown. Check the renderer console for the error."
+      }
+    },
+    {
+      "name": "Q4 zero → mensagem literal visível + normaliza p/ 1 (nunca silencioso)",
+      "ok": false,
+      "info": {
+        "png": "skipped",
+        "err": "Script failed to execute, this normally means an error was thrown. Check the renderer console for the error."
+      }
+    },
+    {
+      "name": "Q5 decimal 2.5→msg+2; negativo -3→msg+1; letras: input nativo esvazia e a camada de commit acusa; vazio permitido",
+      "ok": false,
+      "info": {
+        "err": "Script failed to execute, this normally means an error was thrown. Check the renderer console for the error."
+      }
+    },
+    {
+      "name": "Q6 reduzir 5→2 com Roteiro 3 preenchido → CONFIRMAÇÃO (nada removido ainda)",
+      "ok": false,
+      "info": {
+        "png": "skipped",
+        "err": "Script failed to execute, this normally means an error was thrown. Check the renderer console for the error."
+      }
+    },
+    {
+      "name": "Q7 Cancelar mantém TODOS os dados (5 blocos; Roteiro 3 intacto)",
+      "ok": false,
+      "info": {
+        "err": "Script failed to execute, this normally means an error was thrown. Check the renderer console for the error."
+      }
+    },
+    {
+      "name": "Q8 Confirmar remove SÓ os excedentes (2 blocos; Roteiro 1 intacto)",
+      "ok": false,
+      "info": {
+        "png": "skipped",
+        "err": "Script failed to execute, this normally means an error was thrown. Check the renderer console for the error."
+      }
+    },
+    {
+      "name": "Q9 compat: q4/q6/q8/q12→4/6/8/12; edição usa tamanho REAL (7); criação livre (13); novo sem valor=null",
+      "ok": false,
+      "info": {
+        "err": "Script failed to execute, this normally means an error was thrown. Check the renderer console for the error."
+      }
+    },
+    {
+      "name": "E1 editor real no Briefing: contenteditable + barra visível com foco + botões completos",
+      "ok": false,
+      "info": {
+        "png": "skipped",
+        "err": "Script failed to execute, this normally means an error was thrown. Check the renderer console for the error."
+      }
+    },
+    {
+      "name": "E2 texto simples NÃO grava campo rico (byte-equivalente ao legado)",
+      "ok": false,
+      "info": {
+        "err": "Script failed to execute, this normally means an error was thrown. Check the renderer console for the error."
+      }
+    },
+    {
+      "name": "E3 negrito via barra → canônico <strong> + PARIDADE + visual no editor",
+      "ok": false,
+      "info": {
+        "png": "skipped",
+        "err": "Script failed to execute, this normally means an error was thrown. Check the renderer console for the error."
+      }
+    },
+    {
+      "name": "E4 cor da paleta (swatch REAL) → span[data-cl] no canônico + paridade",
+      "ok": false,
+      "info": {
+        "png": "skipped",
+        "err": "Script failed to execute, this normally means an error was thrown. Check the renderer console for the error."
+      }
+    },
+    {
+      "name": "E5 lista com marcadores → canônico <ul><li> e projeção '• '",
+      "ok": false,
+      "info": {
+        "png": "skipped",
+        "err": "Script failed to execute, this normally means an error was thrown. Check the renderer console for the error."
+      }
+    },
+    {
+      "name": "E6 colagem MALICIOSA inerte: nada executa; script/img/iframe/js: somem; texto seguro fica",
+      "ok": false,
+      "info": {
+        "png": "skipped",
+        "err": "Script failed to execute, this normally means an error was thrown. Check the renderer console for the error."
+      }
+    },
+    {
+      "name": "E7 colagem Word: mso/class caem; negrito/itálico/recuo ficam",
+      "ok": false,
+      "info": {
+        "err": "Script failed to execute, this normally means an error was thrown. Check the renderer console for the error."
+      }
+    },
+    {
+      "name": "E8 limpar formatação: texto preservado; campo rico REMOVIDO",
+      "ok": false,
+      "info": {
+        "err": "Script failed to execute, this normally means an error was thrown. Check the renderer console for the error."
+      }
+    },
+    {
+      "name": "E9 centralizar + recuo → data-al=\"c\" e data-ind=\"1\" canônicos",
+      "ok": false,
+      "info": {
+        "png": "skipped",
+        "err": "Script failed to execute, this normally means an error was thrown. Check the renderer console for the error."
+      }
+    },
+    {
+      "name": "E10 accordion abre/fecha com RE-RENDER e formatação sobrevive (modelo → editor)",
+      "ok": false,
+      "info": {
+        "err": "Script failed to execute, this normally means an error was thrown. Check the renderer console for the error."
+      }
+    },
+    {
+      "name": "E11 REVISÃO exibe a formatação (legenda rica obrigatória; tema com data-al cai p/ texto por regra inline)",
+      "ok": false,
+      "info": {
+        "png": "skipped",
+        "temaInline": false,
+        "corNoTema": false,
+        "legendaRica": false
+      }
+    },
+    {
+      "name": "E12 CENTRAL: legenda RICA renderizada (ul/li) + espelho text/plain + tema inline colorido",
+      "ok": false,
+      "info": {
+        "png": "skipped",
+        "err": "Script failed to execute, this normally means an error was thrown. Check the renderer console for the error."
+      }
+    },
+    {
+      "name": "E13 Copiar legenda com corpo RICO copia a projeção text/plain EXATA (• itens/linhas)",
+      "ok": false,
+      "info": {
+        "err": "Script failed to execute, this normally means an error was thrown. Check the renderer console for the error."
+      }
+    },
+    {
+      "name": "E14 tarefa ANTIGA (texto puro): renderização escapada de sempre + cópia com quebras",
+      "ok": false,
+      "info": {
+        "err": "Script failed to execute, this normally means an error was thrown. Check the renderer console for the error."
+      }
+    },
+    {
+      "name": "E15 paridade QUEBRADA (rico≠texto) → exibe o TEXTO (anti-divergência real)",
+      "ok": false,
+      "info": {
+        "err": "Script failed to execute, this normally means an error was thrown. Check the renderer console for the error."
+      }
+    },
+    {
+      "name": "E16 fixtures canônicos REAIS exportados p/ validação de paridade no Worker",
+      "ok": false,
+      "info": {
+        "n": -1
+      }
+    },
+    {
+      "name": "P1 50 roteiros: render em tempo aceitável + 100 editores no DOM + heap são",
+      "ok": false,
+      "info": {
+        "png": "skipped",
+        "err": "Script failed to execute, this normally means an error was thrown. Check the renderer console for the error."
+      }
+    },
+    {
+      "name": "P2 digitação com 50 roteiros: sync por tecla fluido (<50ms/gesto) e modelo atualizado",
+      "ok": false,
+      "info": {
+        "err": "Script failed to execute, this normally means an error was thrown. Check the renderer console for the error."
+      }
+    },
+    {
+      "name": "P3 1366×768: sem overflow horizontal no Briefing com editores",
+      "ok": true,
+      "info": {
+        "png": "skipped",
+        "overflowX": false,
+        "w": 1366
+      }
+    },
+    {
+      "name": "P4 escala 125%: sem overflow horizontal",
+      "ok": true,
+      "info": {
+        "png": "skipped",
+        "overflowX": false
+      }
+    },
+    {
+      "name": "P5 'Editar conteúdos' com 12 itens RICOS abre rápido (24 editores; modelo semeado)",
+      "ok": false,
+      "info": {
+        "png": "skipped",
+        "err": "Script failed to execute, this normally means an error was thrown. Check the renderer console for the error."
+      }
+    },
+    {
+      "name": "E17 modal Editar conteúdos: rico inicial renderizado; reescrever mantém PARIDADE (formatação herdada legítima, nunca divergente)",
+      "ok": false,
+      "info": {
+        "richInicial": false,
+        "plain": "",
+        "paridade": true
+      }
+    }
+  ],
+  "fatal": null
+}

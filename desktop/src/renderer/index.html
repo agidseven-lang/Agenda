@@ -6808,7 +6808,9 @@ function cronOf(t){
   }
   const arr=Array.isArray(t.cronContents)?t.cronContents:(Array.isArray(t.contents)?t.contents:null);
   if(!arr||!arr.length)return null;
-  const list=arr.map((c,i)=>({tema:c&&c.tema,legenda:c&&c.legenda,_i:i})).filter(c=>c.tema||c.legenda);
+  /* F3.5.5C — projeção carrega TAMBÉM o canônico rico (aditivo): a Central exibe com
+     paridade; card kanban/consumidores compactos seguem usando só tema/legenda esc(). */
+  const list=arr.map((c,i)=>({tema:c&&c.tema,legenda:c&&c.legenda,temaRich:(c&&c.temaRich)||'',legendaRich:(c&&c.legendaRich)||'',_i:i})).filter(c=>c.tema||c.legenda);
   const count=arr.length;
   const label=count>=12?'Mensal':count>=6?'Quinzenal':count>=3?'Semanal':'Cronograma';
   return {list,count,label};
@@ -9677,12 +9679,24 @@ function rteSanitize(html){
       /* bloco em contexto inline (colagem malformada) → emitido como bloco ATÔMICO */
       if(BLK[tg])return blockEl(ch,ctx);
       var innerH=inline(ch,ctx);
-      if(tg==='B'||tg==='STRONG')return innerH?('<strong>'+innerH+'</strong>'):'';
-      if(tg==='I'||tg==='EM')return innerH?('<em>'+innerH+'</em>'):'';
-      if(tg==='U')return innerH?('<u>'+innerH+'</u>'):'';
-      if(tg==='S'||tg==='STRIKE'||tg==='DEL')return innerH?('<s>'+innerH+'</s>'):'';
-      if(tg==='SUB')return innerH?('<sub>'+innerH+'</sub>'):'';
-      if(tg==='SUP')return innerH?('<sup>'+innerH+'</sup>'):'';
+      /* o engine pode ANEXAR cor/fundo ao próprio elemento formatador (ex.: <b style="color:…">
+       * ao colorir uma seleção já em negrito) — preserva via span da paleta em volta do wrapper */
+      function stWrap(h){
+        if(!h)return h;
+        try{
+          var sc=String((ch.style&&ch.style.color)||'').toLowerCase();
+          var sb=String((ch.style&&(ch.style.backgroundColor||ch.style.background))||'').toLowerCase();
+          var c2=_RTE_COLOR_BY_RGB[sc]||'';var h2=_RTE_HL_BY_RGB[sb]||'';
+          var at='';if(c2)at+=' data-cl="'+c2+'"';if(h2)at+=' data-hl="'+h2+'"';
+          return at?('<span'+at+'>'+h+'</span>'):h;
+        }catch(_e){return h;}
+      }
+      if(tg==='B'||tg==='STRONG')return innerH?stWrap('<strong>'+innerH+'</strong>'):'';
+      if(tg==='I'||tg==='EM')return innerH?stWrap('<em>'+innerH+'</em>'):'';
+      if(tg==='U')return innerH?stWrap('<u>'+innerH+'</u>'):'';
+      if(tg==='S'||tg==='STRIKE'||tg==='DEL')return innerH?stWrap('<s>'+innerH+'</s>'):'';
+      if(tg==='SUB')return innerH?stWrap('<sub>'+innerH+'</sub>'):'';
+      if(tg==='SUP')return innerH?stWrap('<sup>'+innerH+'</sup>'):'';
       if(tg==='A'){
         var href=String(ch.getAttribute('href')||'').trim();
         if(/^https?:\/\//i.test(href)&&innerH)return '<a href="'+esc(href)+'" rel="noopener noreferrer" target="_blank">'+innerH+'</a>';
@@ -9699,7 +9713,19 @@ function rteSanitize(html){
         var hl=(dhl&&/^[1-6]$/.test(dhl))?dhl:(_RTE_HL_BY_RGB[stB]||'');
         var fsv=(dfs&&/^(s|l|xl)$/.test(dfs))?dfs:((mF&&mF[1]!=='m')?mF[1]:'');
         if(cl)attrs+=' data-cl="'+cl+'"'; if(hl)attrs+=' data-hl="'+hl+'"'; if(fsv)attrs+=' data-fs="'+fsv+'"';
-        return (attrs&&innerH)?('<span'+attrs+'>'+innerH+'</span>'):innerH;
+        /* Google Docs/Word exprimem negrito/itálico/sublinhado/tachado como ESTILO de span —
+         * mapeia p/ os elementos canônicos (ordem determinística strong>em>u>s). */
+        var inner2=innerH;
+        if(inner2){
+          var fw=String((ch.style&&ch.style.fontWeight)||'').toLowerCase();
+          var fst=String((ch.style&&ch.style.fontStyle)||'').toLowerCase();
+          var td=String((ch.style&&(ch.style.textDecorationLine||ch.style.textDecoration))||'').toLowerCase();
+          if(td.indexOf('line-through')>=0)inner2='<s>'+inner2+'</s>';
+          if(td.indexOf('underline')>=0)inner2='<u>'+inner2+'</u>';
+          if(fst==='italic'||fst==='oblique')inner2='<em>'+inner2+'</em>';
+          if(fw==='bold'||fw==='bolder'||(parseInt(fw,10)||0)>=600)inner2='<strong>'+inner2+'</strong>';
+        }
+        return (attrs&&inner2)?('<span'+attrs+'>'+inner2+'</span>'):inner2;
       }
       /* elemento inline desconhecido (code/mark/abbr/o:p…) → texto preservado, casca fora */
       return innerH;
@@ -9958,7 +9984,10 @@ function _rtePlacePanel(panel,anchor){
 }
 function _rteExec(ed,cmd){
   ed.focus();_rteRestoreRange(ed);
-  try{document.execCommand('styleWithCSS',false,true);}catch(_e){}
+  /* Comandos ESTRUTURAIS com styleWithCSS=false: o engine emite b/i/u/strike/sub/sup/listas
+   * reais (que o canônico normaliza), NUNCA spans de estilo soltos. Cor/marca-texto/tamanho
+   * setam true no próprio branch (spans de estilo que o sanitizador MAPEIA p/ a paleta). */
+  try{document.execCommand('styleWithCSS',false,false);}catch(_e){}
   var M={bold:'bold',italic:'italic',underline:'underline',strike:'strikeThrough',sub:'subscript',sup:'superscript',
     ul:'insertUnorderedList',ol:'insertOrderedList',undo:'undo',redo:'redo',
     al:'justifyLeft',ac:'justifyCenter',ar:'justifyRight',aj:'justifyFull',

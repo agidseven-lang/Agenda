@@ -1,0 +1,42 @@
+[
+  {
+    "canon": "<p>simples</p>",
+    "plain": "simples"
+  },
+  {
+    "canon": "<p><strong>b</strong> e <em>i</em></p>",
+    "plain": "b e i"
+  },
+  {
+    "canon": "<ul><li>a</li><li>b<br>c</li></ul>",
+    "plain": "• a\n• b\nc"
+  },
+  {
+    "canon": "<h3>T</h3><p data-al=\"c\">c</p>",
+    "plain": "T\nc"
+  },
+  {
+    "canon": "<p data-ind=\"1\">q</p>",
+    "plain": "q"
+  },
+  {
+    "canon": "<p><span data-cl=\"1\">cor</span></p>",
+    "plain": "cor"
+  },
+  {
+    "canon": "<p><span data-hl=\"1\">hl</span></p>",
+    "plain": "hl"
+  },
+  {
+    "canon": "<p data-ind=\"2\">ind</p>",
+    "plain": "ind"
+  },
+  {
+    "canon": "<p>a &amp; b</p><p><br></p><p>fim</p>",
+    "plain": "a & b\n\nfim"
+  },
+  {
+    "canon": "<p><a href=\"https://ok.com\" rel=\"noopener noreferrer\" target=\"_blank\">go</a>mau</p>",
+    "plain": "gomau"
+  }
+]
