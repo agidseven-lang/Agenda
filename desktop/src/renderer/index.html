@@ -10097,7 +10097,26 @@ function _rteWireGlobal(){
     var htmlD='',txt='';
     try{htmlD=(ev.clipboardData&&ev.clipboardData.getData('text/html'))||'';}catch(_e){}
     try{txt=(ev.clipboardData&&ev.clipboardData.getData('text/plain'))||'';}catch(_e){}
-    function ins(html){try{document.execCommand('insertHTML',false,html);}catch(_e){}rteSync(ed.getAttribute('data-rteed'),ed);}
+    /* execCommand é só GESTO; quando o engine o recusa (contexto sem foco do SO/evento
+       sintético) insere o MESMO canônico já sanitizado via Range+template (inerte) —
+       o rteSync canonicaliza o resultado nas duas vias. */
+    function ins(html){
+      var okc=false;
+      try{okc=document.execCommand('insertHTML',false,html);}catch(_e){}
+      if(!okc){
+        try{
+          var s=getSelection();
+          if(s&&s.rangeCount&&ed.contains(s.getRangeAt(0).startContainer)){
+            var r=s.getRangeAt(0);r.deleteContents();
+            var tp=document.createElement('template');tp.innerHTML=html;
+            var last=tp.content.lastChild;
+            r.insertNode(tp.content);
+            if(last){var nr=document.createRange();nr.setStartAfter(last);nr.collapse(true);s.removeAllRanges();s.addRange(nr);}
+          }
+        }catch(_e2){}
+      }
+      rteSync(ed.getAttribute('data-rteed'),ed);
+    }
     if(htmlD){var cl=rteSanitize(htmlD);if(cl){ins(cl);return;}}
     if(txt){ins(esc(txt).replace(/\r\n/g,'\n').replace(/\r/g,'\n').replace(/\n/g,'<br>'));return;}
     try{if(window.desktopAPI&&typeof window.desktopAPI.clipboardReadText==='function'){window.desktopAPI.clipboardReadText().then(function(t2){if(t2)ins(esc(String(t2)).replace(/\r\n/g,'\n').replace(/\r/g,'\n').replace(/\n/g,'<br>'));});}}catch(_e){}
