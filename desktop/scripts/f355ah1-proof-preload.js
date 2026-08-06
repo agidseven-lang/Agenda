@@ -12,7 +12,7 @@
  *     mantendo o texto) — senão RESOLVE. Nada é aplicado pelo stub: o pós-sucesso otimista é
  *     exercitado no código REAL (detNoteSave).
  *   • FieldValue.delete() marcado como {__del:true} (prova do vazio ⇒ remoção da chave).
- *   • desktopAPI.version='1.0.220'; window.__DIAG registra cada diagLog (observabilidade). */
+ *   • desktopAPI.version='1.0.221'; window.__DIAG registra cada diagLog (observabilidade). */
 const noop = function () {};
 function fnProxy() { return new Proxy(noop, { get: () => fnProxy(), apply: () => undefined }); }
 
@@ -78,12 +78,12 @@ try {
     authSelf: authSelf,
     diagLog: diagLog,
     clipboardWriteText: function (s) { return Promise.resolve(true); },
-    version: '1.0.220',
+    version: '1.0.221',
     authLogout: function () { return Promise.resolve({ ok: true }); },
     sessionLogin: noop,
     sessionLogout: noop
   };
   window.desktopAPI = new Proxy(desktopAPI, { get: function (t, k) { return (k in t ? t[k] : fnProxy()); } });
   window.api = window.desktopAPI;
-  window.__APP_VERSION = '1.0.220';
+  window.__APP_VERSION = '1.0.221';
 } catch (_) {}
