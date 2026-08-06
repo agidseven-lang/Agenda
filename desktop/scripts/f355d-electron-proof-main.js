@@ -236,9 +236,14 @@ app.whenReady().then(async () => {
     const u16 = await J(`(function(){try{if(document.activeElement)document.activeElement.blur();}catch(_){ }var t=state.form.title;var o=state.form.obs;document.body.focus();var ev=new KeyboardEvent('keydown',{key:'v',keyCode:86,ctrlKey:true,bubbles:true,cancelable:true});document.body.dispatchEvent(ev);return new Promise(function(res){setTimeout(function(){res({tituloIgual:state.form.title===t, obsIgual:state.form.obs===o});},350);});})()`);
     rec("U16 Ctrl+V fora de campo editável: NADA muda (sem ação indevida)", u16 && u16.tituloIgual && u16.obsIgual, u16);
 
-    /* U8 — colagem POR SETOR (uma prova por formulário) */
-    clipboard.writeText("Roteiro colado por setor");
-    const s1 = await J(`(function(){__blur();state.form=null;closeModal();openTaskForm('roteiro');state.form.title='R';state.form.client='C';state.form.step=2;render();var el=document.getElementById('fScriptQty');el.focus();el.value='1';el.blur();el.dispatchEvent(new Event('change',{bubbles:true}));state.form._openContent=0;render();var ed=document.querySelector('[data-rteed="form|0|tema"]');ed.focus();var r=document.createRange();r.selectNodeContents(ed);var s=getSelection();s.removeAllRanges();s.addRange(r);var ev=new KeyboardEvent('keydown',{key:'v',keyCode:86,ctrlKey:true,bubbles:true,cancelable:true});ed.dispatchEvent(ev);return new Promise(function(res){setTimeout(function(){res({tema:(state.form.contents[0]||{}).tema||''});},500);});})()`);
+    /* U8 — colagem POR SETOR (uma prova por formulário)
+       [RE-PINADO F3.5.5E] Roteiro foi RETIRADO (mandato: fora de "Nova tarefa"; nenhum registro novo
+       possível). openTaskForm('roteiro') agora NEUTRALIZA o setor (guard descontinuado em produção) e
+       reabre a seleção de setor SÓ com módulos vivos — a perna s1 passa a provar exatamente isso
+       (form sem setor, etapa de seleção, sem campos do Roteiro). A colagem universal em editor rico
+       segue provada em U4/U5/U6 e U9 (Cronograma, setor vivo); as demais pernas s2–s5 continuam
+       provando a colagem em TODOS os formulários vivos. */
+    const s1 = await J(`(function(){__blur();state.form=null;closeModal();openTaskForm('roteiro');var f=state.form||{};var qty=document.getElementById('fScriptQty');var ed=document.querySelector('[data-rteed="form|0|tema"]');return {semSetor:!f.sector, etapaSelecao:(f.step===0), semCampoQty:!qty, semEditorRoteiro:!ed};})()`);
     clipboard.writeText("Período colado no cronograma");
     const s2 = await J(`(function(){__blur();state.form=null;closeModal();openTaskForm('cronograma');state.form.title='CR';state.form.client='C';state.form.step=2;render();var el=document.getElementById('fCronQty');el.focus();el.value='1';el.blur();el.dispatchEvent(new Event('change',{bubbles:true}));var f=document.querySelector('[data-ffield="periodo"]');f.focus();var ev=new KeyboardEvent('keydown',{key:'v',keyCode:86,ctrlKey:true,bubbles:true,cancelable:true});f.dispatchEvent(ev);return new Promise(function(res){setTimeout(function(){res({v:f.value, model:state.form.fields.periodo||''});},500);});})()`);
     clipboard.writeText("Tema de card colado");
@@ -247,8 +252,8 @@ app.whenReady().then(async () => {
     const s4 = await J(`(function(){__blur();state.form=null;closeModal();openTaskForm('edicao_midia');state.form.title='V';state.form.client='C';state.form.step=2;render();var el=document.getElementById('fVideoQty');el.focus();el.value='1';el.blur();el.dispatchEvent(new Event('change',{bubbles:true}));var f=document.querySelector('[data-vtema="0"]');if(!f)return {no:1};f.focus();var ev=new KeyboardEvent('keydown',{key:'v',keyCode:86,ctrlKey:true,bubbles:true,cancelable:true});f.dispatchEvent(ev);return new Promise(function(res){setTimeout(function(){res({v:f.value, model:((state.form.videos[0]||{}).tema)||''});},500);});})()`);
     clipboard.writeText("Reunião colada na Agenda");
     const s5 = await J(`(function(){__blur();state.form=null;closeModal();openEventForm();var f=document.getElementById('evTitle');if(!f)return {no:1};f.focus();var ev=new KeyboardEvent('keydown',{key:'v',keyCode:86,ctrlKey:true,bubbles:true,cancelable:true});f.dispatchEvent(ev);return new Promise(function(res){setTimeout(function(){res({v:f.value});},500);});})()`);
-    rec("U8 colagem por SETOR: Roteiro (tema rico), Cronograma (período), Programação de Posts/Cards (tema), Edição de Vídeos (tema) e Agenda (título) — todas recebem o clipboard REAL",
-      s1 && s1.tema === 'Roteiro colado por setor' && s2 && s2.v === 'Período colado no cronograma' && s2.model === s2.v && s3 && s3.v === 'Tema de card colado' && s3.model === s3.v && s4 && s4.v === 'Tema de vídeo colado' && s4.model === s4.v && s5 && s5.v === 'Reunião colada na Agenda',
+    rec("U8 colagem por SETOR [RE-PINADO F3.5.5E]: Roteiro RETIRADO não abre criação (setor neutralizado, sem campos); Cronograma (período), Programação de Posts/Cards (tema), Edição de Vídeos (tema) e Agenda (título) recebem o clipboard REAL",
+      s1 && s1.semSetor && s1.etapaSelecao && s1.semCampoQty && s1.semEditorRoteiro && s2 && s2.v === 'Período colado no cronograma' && s2.model === s2.v && s3 && s3.v === 'Tema de card colado' && s3.model === s3.v && s4 && s4.v === 'Tema de vídeo colado' && s4.model === s4.v && s5 && s5.v === 'Reunião colada na Agenda',
       Object.assign({ png: await shot("f355d-u8-setores") }, { s1, s2, s3, s4, s5 }));
 
     /* U9 — Revisão preserva o conteúdo colado */

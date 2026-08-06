@@ -92,11 +92,14 @@ app.whenReady().then(async () => {
   try {
     await win.loadFile(path.join(asarPath, "src", "renderer", "index.html"));
     let boot = null;
+    /* [RE-PINADO F3.5.5E] a semente tem 4 tarefas, mas nh1-rot2 é do módulo RETIRADO (roteiro):
+       o filtro canônico de ingestão a mantém fora do state (histórico preservado, oculto).
+       O boot passa a exigir as 3 VIVAS + a queda auditada de exatamente 1 retirada. */
     for (let i = 0; i < 60; i++) { await sleep(200);
-      boot = await J(`({authed:document.body.classList.contains('authed'),tasks:(typeof state!=='undefined'&&state.tasks||[]).length,users:(typeof state!=='undefined'&&state.users||[]).length})`);
-      if (boot && boot.authed && boot.tasks >= 4) break; }
+      boot = await J(`({authed:document.body.classList.contains('authed'),tasks:(typeof state!=='undefined'&&state.tasks||[]).length,users:(typeof state!=='undefined'&&state.users||[]).length,ret:(window.__retiredCutoff||{}).dropped||0})`);
+      if (boot && boot.authed && boot.tasks >= 3 && boot.ret >= 1) break; }
     line({ boot });
-    if (!boot || !boot.authed || boot.tasks < 4) fatal = "boot-failed: " + JSON.stringify(boot);
+    if (!boot || !boot.authed || boot.tasks < 3 || !boot.ret) fatal = "boot-failed: " + JSON.stringify(boot);
 
     if (!fatal) {
       await J(`window.__H1=(function(){
@@ -120,13 +123,16 @@ app.whenReady().then(async () => {
           aria:(H.pen(0)&&H.pen(0).getAttribute('aria-label'))||'', title:(H.pen(0)&&H.pen(0).getAttribute('title'))||''};
         var sum=H.q('.det-acc-sum'); var iC=sum?sum.innerHTML.indexOf('data-detcopytheme'):-1, iE=sum?sum.innerHTML.indexOf('data-detnoteedit'):-1, iV=sum?sum.innerHTML.indexOf('det-acc-chev'):-1;
         r.order = iC>=0 && iE>iC && iV>iE;
-        H.open('nh1-rot2'); r.rotPencils=H.qa('[data-detnoteedit]').length;
+        /* [RE-PINADO F3.5.5E] nh1-rot2 é do módulo RETIRADO: a superfície não abre (retiredModuleNotice
+           fecha o modal) — 0 lápis; observações internas de histórico retirado ficam fora do fluxo
+           operacional, exatamente como manda a fase. Vivos seguem com o contrato original. */
+        H.open('nh1-rot2'); r.rotPencils=H.qa('[data-detnoteedit]').length; r.rotModal=!!H.q('.modal-back[data-detmodal]');
         H.open('nh1-edm');  r.edmPencils=H.qa('[data-detnoteedit]').length;
         H.open('nh1-cards'); r.cardsPencils=H.qa('[data-detnoteedit]').length;
         H.open('nh1-cron3'); return r; })()`);
       await sleep(120); const p1png = await shot("f355ah1-P01-lapis");
-      rec("P1 lápis por tema: 3 no cron, 2 no roteiro, 0 em mídia/cards; ordem Copiar→Editar→Expandir; aria/título",
-        m && !m.err && m.pencils === 3 && m.rotPencils === 2 && m.edmPencils === 0 && m.cardsPencils === 0 && m.order === true && m.aria === "Editar observação interna" && m.title === "Editar observação interna" && m.notes === 0, Object.assign(m || {}, { png: p1png }));
+      rec("P1 lápis por tema: 3 no cron; roteiro RETIRADO bloqueado (0 lápis, sem modal) [RE-PINADO F3.5.5E]; 0 em mídia/cards; ordem Copiar→Editar→Expandir; aria/título",
+        m && !m.err && m.pencils === 3 && m.rotPencils === 0 && m.rotModal === false && m.edmPencils === 0 && m.cardsPencils === 0 && m.order === true && m.aria === "Editar observação interna" && m.title === "Editar observação interna" && m.notes === 0, Object.assign(m || {}, { png: p1png }));
 
       /* P2 — editor abre SEM expandir/recolher; label literal; 1 editor por vez; descarte em 2 cliques */
       m = await J(`(async function(){ var H=window.__H1;

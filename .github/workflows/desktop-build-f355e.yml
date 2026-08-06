@@ -163,11 +163,19 @@ jobs:
         run: |
           set -euo pipefail
           timeout -k 15 300 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f355c-rte-behavior-main.js
-      - name: "Gate PROVAS herdadas — F3.5.5C (32) — xvfb"
+      - name: "Gate PROVAS herdadas — F3.5.5C [RE-PINADO F3.5.5E: superfície do Roteiro retirada; verdade herdada] — xvfb"
         working-directory: desktop
         run: |
           set -euo pipefail
-          timeout -k 15 600 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f355c-proof-main.js
+          # [RE-PINADO F3.5.5E] O harness original (f355c-proof-main.js, 32 cenas) prova o stepper e o
+          # editor rico DENTRO do formulário de criação do ROTEIRO — superfície RETIRADA pelo mandato
+          # desta fase; as 29 cenas interativas deixam de ser executáveis POR DESENHO (guard
+          # descontinuado). O arquivo original permanece byte-idêntico à 1.0.223 (artefato histórico,
+          # fora do delta). O gate re-escopado prova no app empacotado: retirada da criação (canônico +
+          # aliases), histórico preservado e bloqueado, e os componentes compartilhados VIVOS no
+          # Cronograma (stepper, editor rico, sanitização) + responsividade. Cobertura remanescente:
+          # f355c suite 128 + validador RTE 97 + SMOKE RTE 91 + f355d C1–C9/U1–U16 + paridade cruzada.
+          timeout -k 15 600 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f355e-retired-legacy-inherited-proof.js
       - name: "Gate PARIDADE CRUZADA herdada — canônicos validados pelo Worker"
         run: |
           set -euo pipefail
@@ -182,7 +190,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with: { name: f355e-provas-qa, path: "docs/f355e-qa/**", if-no-files-found: error, retention-days: 30 }
       - uses: actions/upload-artifact@v4
-        with: { name: f355e-provas-herdadas-qa, path: "docs/f355d-qa/**\ndocs/f355ch2-qa/**\ndocs/f355ch1-qa/**\ndocs/f355c-qa/**", if-no-files-found: error, retention-days: 30 }
+        with: { name: f355e-provas-herdadas-qa, path: "docs/f355d-qa/**\ndocs/f355ch2-qa/**\ndocs/f355ch1-qa/**", if-no-files-found: error, retention-days: 30 }
       - name: "Gate ISOLAMENTO — delta vs 1.0.223 SÓ nos arquivos autorizados; congelados diff-vazio"
         run: |
           set -euo pipefail
@@ -195,7 +203,11 @@ jobs:
           # [RE-PINADO F3.5.5E] f354l entra na allowlist: o teste 53 (DIFF CONTROLADO do notifEvents.js
           # vs 1.0.201) foi re-pinado para permitir SOMENTE as 2 reescritas mandatadas (clientName real
           # + exports estendido), com garantia real verificada no arquivo atual.
-          BAD=$(grep -vE '^(\.github/workflows/desktop-(build|release)-f355e\.yml$|desktop/src/renderer/index\.html$|desktop/src/renderer/bgnotify\.html$|desktop/src/main/main\.ts$|desktop/src/main/notifEvents\.js$|desktop/src/main/taskIdleScheduler\.ts$|desktop/src/main/executionTracking\.js$|desktop/package(-lock)?\.json$|desktop/scripts/f355e-|desktop/scripts/f355d-cron-quantity-universal-paste\.test\.mjs$|desktop/scripts/f354l-sla-central-persistent-reminders\.test\.mjs$|desktop/scripts/f354p-sla-decision-actions\.test\.mjs$|desktop/scripts/f354u-premium-common-notifications\.test\.mjs$|desktop/scripts/f354u-h1-notification-hotfix\.test\.mjs$|desktop/scripts/f354vh1-session-persistence\.test\.mjs$|desktop/scripts/f354wh2-immediate-notification-sound\.test\.mjs$|desktop/scripts/f355a-integration\.test\.mjs$|desktop/scripts/f355ah1-internal-notes\.test\.mjs$|desktop/scripts/f355b-agenda-premium\.test\.mjs$|desktop/scripts/f355c-script-quantity-rich-editor\.test\.mjs$|docs/f355e(-qa)?/)' /tmp/delta.txt || true)
+          # [RE-PINADO F3.5.5E] f355d-electron-proof-main.js entra na allowlist: a cena U8/s1 colava no
+          # formulário de criação do ROTEIRO (superfície retirada pelo mandato) — re-pinada para provar
+          # a neutralização; pernas vivas s2–s5 intactas. O gate herdado da F3.5.5C foi re-escopado para
+          # scripts/f355e-retired-legacy-inherited-proof.js (f355c-proof-main.js segue byte-idêntico).
+          BAD=$(grep -vE '^(\.github/workflows/desktop-(build|release)-f355e\.yml$|desktop/src/renderer/index\.html$|desktop/src/renderer/bgnotify\.html$|desktop/src/main/main\.ts$|desktop/src/main/notifEvents\.js$|desktop/src/main/taskIdleScheduler\.ts$|desktop/src/main/executionTracking\.js$|desktop/package(-lock)?\.json$|desktop/scripts/f355e-|desktop/scripts/f355d-cron-quantity-universal-paste\.test\.mjs$|desktop/scripts/f355d-electron-proof-main\.js$|desktop/scripts/f354l-sla-central-persistent-reminders\.test\.mjs$|desktop/scripts/f354p-sla-decision-actions\.test\.mjs$|desktop/scripts/f354u-premium-common-notifications\.test\.mjs$|desktop/scripts/f354u-h1-notification-hotfix\.test\.mjs$|desktop/scripts/f354vh1-session-persistence\.test\.mjs$|desktop/scripts/f354wh2-immediate-notification-sound\.test\.mjs$|desktop/scripts/f355a-integration\.test\.mjs$|desktop/scripts/f355ah1-internal-notes\.test\.mjs$|desktop/scripts/f355ah1-proof-main\.js$|desktop/scripts/f355b-agenda-premium\.test\.mjs$|desktop/scripts/f355c-script-quantity-rich-editor\.test\.mjs$|docs/f355e(-qa)?/)' /tmp/delta.txt || true)
           [ -z "$BAD" ] || { echo "::error::fora da allowlist: $BAD"; exit 1; }
           # No MAIN, as ÚNICAS mudanças permitidas são os 4 arquivos dos gates de retirada/enriquecimento:
           MAINDELTA=$(git diff --name-only "$BASE_223_SHA"..HEAD -- desktop/src/main | sort | tr '\n' ' ')
