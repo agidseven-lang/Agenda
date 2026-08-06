@@ -222,6 +222,12 @@ export type SlaReminderControllerOpts = {
     markResponseSuperseded: (idleCheckKey: string) => void;
     listResponsesPendingSync: () => any[];
   };
+  // F3.5.5C-H2 — BARREIRAS 2/3: gate CANÔNICO de exibição (documento atual da tarefa é a autoridade).
+  // 'unknown' = 1º snapshot ainda não chegou (boot/offline) ⇒ NUNCA exibir bloqueante só do cache;
+  // 'terminal'/'missing'/'assignee_changed' ⇒ invalidar o resíduo (recibo-lápide + motivo) sem exibir.
+  // AUSENTE ⇒ comportamento aprovado byte-igual (suítes herdadas intactas).
+  taskGate?: (taskId: string, recipientUid: string) => "valid" | "terminal" | "missing" | "assignee_changed" | "unknown";
+  autoCloseMs?: number;   // F3.5.5C-H2 — fechamento automático do aviso "Esta tarefa já foi encerrada." (default 7000)
 };
 
 const LEVEL_RANK: Record<ReminderLevel, number> = { critical: 0, warning: 1 };
@@ -249,6 +255,25 @@ export function createSlaReminderController(opts: SlaReminderControllerOpts) {
   const completedTasks = new Set<string>();   // tarefas concluídas com modal aberto ⇒ suprime vermelho futuro
   let active: QueueItem | null = null;   // item atualmente exibido (ou em nativa quando locked)
   let stopped = false;
+  // F3.5.5C-H2 — gate canônico (Barreiras 2/3) + auto-close do aviso "já encerrada" (Barreira 1)
+  const taskGate = opts.taskGate || null;
+  const autoCloseMs = Math.max(500, Number(opts.autoCloseMs) || 7000);
+  let closeTimer: any = null;
+  function clearCloseTimer(): void { if (closeTimer) { try { clearTimeout(closeTimer); } catch { /* */ } closeTimer = null; } }
+  function gateOf(taskId: string, uid: string): "valid" | "terminal" | "missing" | "assignee_changed" | "unknown" {
+    if (!taskGate) return "valid";
+    try {
+      const g = taskGate(String(taskId || ""), String(uid || ""));
+      return (g === "terminal" || g === "missing" || g === "assignee_changed" || g === "unknown") ? g : "valid";
+    } catch { return "valid"; }   // incerteza NUNCA derruba alerta legítimo
+  }
+  /** Recibo-LÁPIDE do resíduo: nunca reexibir + motivo técnico registrado + histórico preservado (idempotente). */
+  function dropStale(key: string, taskId: string, uid: string, level: ReminderLevel, reason: string): void {
+    try { store.markAck(key, { recipientUid: uid, taskId, eventId: key, level, appVersion, windowState: "stale:" + reason }); } catch { /* */ }
+    store.removePending(key);
+    log("sla.reminder.stale_dropped", { key: mask(key), reason });
+    centralObs("central_alert.stale_dropped", { taskId, dedupKey: key }, level, { reason });
+  }
   // F3.5.4P — decisão do responsável
   const inFlight = new Set<string>();         // idempotência: decisionKeys em processamento (bloqueia duplo-clique/reentrância)
   const persistDecision = opts.persistDecision || (async () => ({ status: "offline" as DecisionPersistStatus }));
@@ -336,6 +361,21 @@ export function createSlaReminderController(opts: SlaReminderControllerOpts) {
     const idx = pickNextIndex();
     // F3.5.4Q — nenhum SLA pendente ⇒ tenta o check-in (prioridade mais baixa) ou fecha a janela.
     if (idx < 0) { showNextCheckin(); return; }
+    // F3.5.5C-H2 (Barreiras 2/3) — REVALIDAÇÃO CANÔNICA antes de exibir: o documento ATUAL da tarefa
+    // é a autoridade. 'unknown' (1º snapshot ainda não chegou — boot/offline) ⇒ DIFERE: nenhum modal
+    // bloqueante sai só do cache local; nada é apagado. Terminal/inexistente/responsável trocado ⇒
+    // invalida o resíduo (recibo-lápide + motivo) e segue para o próximo.
+    if (taskGate) {
+      const cand = queue[idx];
+      const uidc = cand.base.split(":")[1] || "";
+      const g = gateOf(cand.taskId || cand.view.deep.replace(/^detail\//, ""), uidc);
+      if (g === "unknown") { log("sla.reminder.deferred_awaiting_snapshot", { key: mask(cand.key), pending: pendingCount() }); return; }
+      if (g !== "valid") {
+        queue.splice(idx, 1);
+        dropStale(cand.key, cand.taskId, uidc, cand.level, g === "terminal" ? "stale_terminal_task" : (g === "missing" ? "stale_missing_task" : "stale_assignee_changed"));
+        return showNext();
+      }
+    }
     const it = queue.splice(idx, 1)[0];
     // valida antes de exibir (tarefa concluída/removida/destinatário inválido ⇒ pula, sem emitir)
     if (!taskValid(String(it.view.deep.replace(/^detail\//, "") || it.key), recipientOf({ dedupKey: it.key, targetUserId: it.base.split(":")[1] }))) {
@@ -529,6 +569,13 @@ export function createSlaReminderController(opts: SlaReminderControllerOpts) {
     }
     if (!checkinQueue.length) { centralObs("central_alert.queue_empty", {}, "", { queueDepth: 0 }); if (surface.isOpen()) { try { surface.close(); } catch { /* */ } } return; }
     const it = checkinQueue.shift()!;
+    // F3.5.5C-H2 (Barreira 2) — o check-in (azul/laranja) também revalida no estado canônico:
+    // 'unknown' difere (recoloca na fila; nada bloqueante só do cache); terminal/inexistente descarta.
+    if (taskGate) {
+      const g = gateOf(it.taskId, it.recipientUid);
+      if (g === "unknown") { checkinQueue.unshift(it); log("task.idle.deferred_awaiting_snapshot", { key: mask(it.key) }); if (surface.isOpen()) { try { surface.close(); } catch { /* */ } } return; }
+      if (g !== "valid") { log("task.idle.stale_dropped", { key: mask(it.key), reason: g === "terminal" ? "stale_terminal_task" : (g === "missing" ? "stale_missing_task" : "stale_assignee_changed") }); return showNextCheckin(); }
+    }
     if (!taskValid(it.taskId, it.recipientUid)) { log("task.idle.cancelled_gone", { key: mask(it.key) }); return showNextCheckin(); }
     activeCheckin = it;
     if (isLocked()) { try { const ok = surface.native(it.view); log("task.idle.locked", { key: mask(it.key), nativeOk: ok }); } catch (e) { log("task.idle.native.failed", { key: mask(it.key), err: errMsg(e) }); } return; }
@@ -564,6 +611,16 @@ export function createSlaReminderController(opts: SlaReminderControllerOpts) {
         log("sla.reminder.dedup.skipped", { key: mask(key), reason: "logical" }); return { ok: true, channel: "sla-logical-dup" };
       }
       const taskId = String((p && p.taskId) || "");
+      // F3.5.5C-H2 (Barreira 2 na ENTRADA) — alerta de tarefa já terminal/inexistente NÃO entra na
+      // fila (nem grava pendente). 'unknown'/'assignee' seguem: o gate de exibição decide depois.
+      if (taskGate && taskId) {
+        const gIn = gateOf(taskId, recipientOf(p));
+        if (gIn === "terminal" || gIn === "missing") {
+          store.removePending(key);
+          log("sla.reminder.stale_dropped", { key: mask(key), reason: gIn === "terminal" ? "stale_terminal_task" : "stale_missing_task", at: "enqueue" });
+          return { ok: true, channel: "sla-stale" };
+        }
+      }
       // tarefa concluída com modal aberto ⇒ não gerar o alerta vermelho futuro (mandato)
       if (level === "critical" && taskId && completedTasks.has(taskId)) {
         store.removePending(key); log("sla.reminder.cancelled.completed", { key: mask(key), reason: "completed-while-open" });
@@ -640,6 +697,9 @@ export function createSlaReminderController(opts: SlaReminderControllerOpts) {
       const k = String((input && input.key) || "");
       if (!k || !active || active.key !== k) { log("sla.decision.stale.ignored", { key: mask(k) }); return { status: "ignored" }; }
       const cur = active;   // item ATIVO no momento da decisão (estável ao longo do await; active pode mudar)
+      // F3.5.5C-H2 — tarefa já ENCERRADA com o aviso em tela: NENHUMA resposta obsoleta é aceita
+      // (nem via IPC direto); o aviso fecha sozinho e o recibo já foi gravado.
+      if (cur.taskId && completedTasks.has(cur.taskId)) { log("sla.decision.stale.terminal_ignored", { key: mask(k) }); return { status: "ignored" }; }
       centralObs("central_alert.action_received", { taskId: cur.taskId, dedupKey: cur.key }, cur.level, { decisionType: String((input && (input as any).decisionType) || "") });
       const decisionType = String((input && input.decisionType) || "") as DecisionType;
       const recipientUid = cur.base.split(":")[1] || "";
@@ -791,16 +851,84 @@ export function createSlaReminderController(opts: SlaReminderControllerOpts) {
       }
     },
 
-    /** Tarefa concluída (por qualquer um): suprime vermelho futuro; se o modal ativo é dela, vira "concluída" mantendo OK. */
-    noteCompleted(taskId: string): void {
+    /**
+     * F3.5.5C-H2 (Barreira 1) — INVALIDAÇÃO COMPLETA na transição TERMINAL (concluída/cancelada/
+     * removida — por Admin/SM/Designer/portal/automação/outro dispositivo): remove fila + pendentes
+     * + check-ins locais do taskId (recibo-lápide com motivo; histórico preservado; idempotente).
+     * Modal ABERTO da tarefa: grava o recibo IMEDIATAMENTE, troca para o aviso informativo
+     * "Esta tarefa já foi encerrada." SEM os botões de decisão (nenhuma resposta obsoleta) e FECHA
+     * automaticamente (autoCloseMs). NUNCA altera a tarefa/status/responsável.
+     */
+    invalidateTerminal(taskId: string, reason?: string): void {
       const t = String(taskId || ""); if (!t) return;
+      const why = String(reason || "terminal");
       completedTasks.add(t);
-      for (let i = queue.length - 1; i >= 0; i--) { if (queue[i].taskId === t) { store.removePending(queue[i].key); queue.splice(i, 1); } }
+      for (let i = queue.length - 1; i >= 0; i--) {
+        if (queue[i].taskId === t) { const q = queue[i]; queue.splice(i, 1); dropStale(q.key, t, q.base.split(":")[1] || "", q.level, "stale_terminal_task"); }
+      }
+      // check-ins locais (azul/laranja) da tarefa: fila e ativo (o ciclo dela morreu com a tarefa)
+      for (let i = checkinQueue.length - 1; i >= 0; i--) if (checkinQueue[i].taskId === t) { log("task.idle.stale_dropped", { key: mask(checkinQueue[i].key), reason: "stale_terminal_task" }); checkinQueue.splice(i, 1); }
+      if (activeCheckin && activeCheckin.taskId === t) {
+        const ck = activeCheckin.key;
+        if (execIsExecution(activeCheckin)) execClearTimer();
+        activeCheckin = null;
+        try { surface.close(); } catch { /* */ }
+        log("task.idle.cancelled_completed", { key: mask(ck), reason: why });
+        showNext();
+      }
       if (active && active.taskId === t) {
-        active.view = Object.assign({}, active.view, { body: "Esta tarefa foi concluída enquanto o alerta estava aberto.", context: "" });
-        try { surface.show(active.view); } catch { /* */ }
-        log("sla.reminder.cancelled.completed", { key: mask(active.key), active: true });
+        const cur = active;
+        try { store.markAck(cur.key, { recipientUid: cur.base.split(":")[1] || "", taskId: t, eventId: cur.key, level: cur.level, appVersion, windowState: "terminal_autoclose:" + why }); } catch { /* */ }
+        store.removePending(cur.key);
+        cur.view = Object.assign({}, cur.view, { body: "Esta tarefa já foi encerrada.", context: "", decisionsEnabled: false, queueLen: pendingCount() });
+        try { surface.show(cur.view); } catch { /* */ }
+        log("sla.reminder.cancelled.completed", { key: mask(cur.key), active: true, reason: why, autoCloseMs });
+        centralObs("central_alert.terminal_autoclose", { taskId: t, dedupKey: cur.key }, cur.level, { reason: why });
+        clearCloseTimer();
+        closeTimer = setTimeout(() => {
+          closeTimer = null;
+          if (active === cur) { active = null; try { surface.close(); } catch { /* */ } log("sla.reminder.closed", { key: mask(cur.key), auto: true }); showNext(); }
+        }, autoCloseMs);
       } else { refreshCounter(); }
+    },
+
+    /** Tarefa concluída (API aprovada F3.5.4L — compat): delega à invalidação terminal completa. */
+    noteCompleted(taskId: string): void { this.invalidateTerminal(String(taskId || ""), "completed"); },
+
+    /** F3.5.5C-H2 (Barreira 3) — 1º snapshot canônico chegou: revalida o replay do boot e apresenta
+     *  SOMENTE o que continuar legítimo (nada foi exibido antes disto quando há taskGate). */
+    onTaskGateReady(): void {
+      if (stopped) return;
+      log("sla.reminder.gate_ready", { pending: pendingCount() });
+      if (!active) showNext(); else refreshCounter();
+    },
+
+    /**
+     * F3.5.5C-H2 — LIMPEZA REPARADORA local (auditável, idempotente, por taskId): conta PRIMEIRO
+     * (modo read-only: sla.stale.cleanup.scan) e remove SÓ os pendentes comprovadamente residuais
+     * (tarefa terminal ou inexistente no snapshot canônico completo), com recibo-lápide + motivo
+     * por chave. 'unknown'/'assignee' NUNCA são removidos aqui. NÃO altera a tarefa; NÃO toca
+     * notificações comuns nem alertas legítimos.
+     */
+    cleanupStale(): { scanned: number; terminal: number; missing: number } {
+      const out = { scanned: 0, terminal: 0, missing: 0 };
+      if (stopped || !taskGate) return out;
+      const pend = store.listPending() || [];
+      const marks: Array<{ rec: any; reason: string }> = [];
+      for (const rec of pend) {
+        if (!rec || !rec.key) continue;
+        out.scanned++;
+        const g = gateOf(String(rec.taskId || ""), String(rec.recipientUid || ""));
+        if (g === "terminal") { out.terminal++; marks.push({ rec, reason: "stale_terminal_task" }); }
+        else if (g === "missing") { out.missing++; marks.push({ rec, reason: "stale_missing_task" }); }
+      }
+      log("sla.stale.cleanup.scan", out);   // contagem ANTES de aplicar (modo read-only)
+      for (const m of marks) {
+        dropStale(String(m.rec.key), String(m.rec.taskId || ""), String(m.rec.recipientUid || ""), (m.rec.level === "critical" ? "critical" : "warning"), m.reason);
+        for (let i = queue.length - 1; i >= 0; i--) if (queue[i].key === m.rec.key) queue.splice(i, 1);
+      }
+      log("sla.stale.cleanup.applied", { removed: marks.length });
+      return out;
     },
     // ═══════════════ F3.5.4Q — CHECK-IN DE TAREFA PARADA: API pública ═══════════════
     /** Produtor idle: há amarelo/vermelho ativo ou na fila? (o produtor não emite check-in enquanto sim) */
@@ -924,8 +1052,8 @@ export function createSlaReminderController(opts: SlaReminderControllerOpts) {
     /** Logout / troca de usuário: fecha a janela e limpa a memória (store PRESERVADO; o próximo login reexibe os pendentes do novo uid). */
     /** F3.5.5A — ACK de render do check-in de EXECUÇÃO ⇒ inicia a janela de resposta (nunca antes). */
     onExecutionRendered(key: string): void { onExecutionRendered(key); },
-    clearActive() { try { surface.close(); } catch { /* */ } active = null; queue.length = 0; completedTasks.clear(); activeCheckin = null; checkinQueue.length = 0; execClearTimer(); },
-    stop() { stopped = true; try { surface.close(); } catch { /* */ } queue.length = 0; active = null; checkinQueue.length = 0; activeCheckin = null; execClearTimer(); },
+    clearActive() { try { surface.close(); } catch { /* */ } active = null; queue.length = 0; completedTasks.clear(); activeCheckin = null; checkinQueue.length = 0; execClearTimer(); clearCloseTimer(); },
+    stop() { stopped = true; try { surface.close(); } catch { /* */ } queue.length = 0; active = null; checkinQueue.length = 0; activeCheckin = null; execClearTimer(); clearCloseTimer(); },
   };
 }
 

@@ -55,6 +55,11 @@ const notifTele = { lastAt: 0, lastChannel: "", lastEventType: "", lastFailAt: 0
 // persistência/lock) + superfície Electron (janela central). Uma instância; o uid logado filtra a
 // reexibição de pendentes. Sons locais lidos UMA vez do pacote (data URI).
 let slaReminderCtl: ReturnType<typeof createSlaReminderController> | null = null;
+// F3.5.5C-H2 — SNAPSHOT CANÔNICO VIVO de tasks (Barreiras 2/3): alimentado pela MESMA escuta
+// fbListen("tasks") da sessão; 'ready' só após o 1º snapshot — antes disso o gate responde
+// 'unknown' e NENHUM modal bloqueante sai do cache local.
+const slaTaskMap = new Map<string, any>();
+let slaTaskMapReady = false;
 let currentUid = "";
 let slaReminderSounds: { warning: string; critical: string } = { warning: "", critical: "" };
 let stopSlaWatch: (() => void) | null = null; // escuta read-only de conclusão (tarefa concluída c/ modal aberto)
@@ -793,15 +798,30 @@ function startUserListeners(uid: string): void {
     if (stopSlaWatch) { try { stopSlaWatch(); } catch { /* */ } stopSlaWatch = null; }
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const _slaRulesRt: any = require("./slaRules");
+    slaTaskMap.clear(); slaTaskMapReady = false;   // F3.5.5C-H2 — mapa canônico por sessão (gate volta a 'unknown')
     stopSlaWatch = fbListen("tasks", (snap: any) => {
       try {
+        // F3.5.5C-H2 — MAPA CANÔNICO completo (Barreiras 2/3): o documento ATUAL da tarefa é a
+        // autoridade do gate de exibição; refresh integral a cada snapshot (barato e correto).
+        try {
+          const docs = (snap && snap.docs) || [];
+          slaTaskMap.clear();
+          for (const dd of docs) { try { const did = dd && dd.id; if (did) slaTaskMap.set(String(did), (dd.data && dd.data()) || {}); } catch { /* */ } }
+        } catch { /* o mapa nunca derruba a escuta */ }
         const changes = (snap && snap.docChanges && snap.docChanges()) || [];
         for (const ch of changes) {
           const id = ch && ch.doc && ch.doc.id; if (!id) continue;
-          if (ch.type === "removed") { if (slaReminderCtl) slaReminderCtl.noteCompleted(String(id)); continue; }
+          if (ch.type === "removed") { if (slaReminderCtl) slaReminderCtl.invalidateTerminal(String(id), "removed"); continue; }
           const d: any = (ch.doc.data && ch.doc.data()) || {};
-          try { if (_slaRulesRt.slaPanelDelivered(Object.assign({ id }, d)) && slaReminderCtl) slaReminderCtl.noteCompleted(String(id)); } catch { /* */ }
+          try { if (_slaRulesRt.slaPanelDelivered(Object.assign({ id }, d)) && slaReminderCtl) slaReminderCtl.invalidateTerminal(String(id), "delivered"); } catch { /* */ }
           try { deriveExecutionSmEvent(String(id), d); } catch { /* F3.5.5A — derivação nunca derruba a escuta */ }
+        }
+        // F3.5.5C-H2 — 1º snapshot da sessão: gate pronto ⇒ LIMPEZA REPARADORA (contagem primeiro,
+        // remoção só dos comprovadamente residuais) e revalidação do replay do boot (Barreira 3).
+        if (!slaTaskMapReady) {
+          slaTaskMapReady = true;
+          try { if (slaReminderCtl) slaReminderCtl.cleanupStale(); } catch { /* */ }
+          try { if (slaReminderCtl) slaReminderCtl.onTaskGateReady(); } catch { /* */ }
         }
       } catch { /* escuta de conclusão nunca derruba nada */ }
     });
@@ -953,6 +973,23 @@ app.whenReady().then(() => {
       surface: slaSurface, store: slaReminderStore, now: () => Date.now(),
       appVersion: (() => { try { return app.getVersion(); } catch { return "dev"; } })(),
       isLocked: () => sessionLocked, getUid: () => currentUid,
+      // F3.5.5C-H2 — Barreiras 2/3: gate CANÔNICO de exibição sobre o snapshot vivo da sessão.
+      // 'unknown' até o 1º snapshot (boot/offline) ⇒ difere; terminal = slaPanelDelivered (enums
+      // REAIS: finishedAt/doneAt/entregue/concluido/cancelado/removido); responsável = resolvedor
+      // canônico (designerAssignment.designerId || assigneeId). Incerteza NUNCA derruba alerta.
+      taskGate: (taskId: string, recipientUid: string): "valid" | "terminal" | "missing" | "assignee_changed" | "unknown" => {
+        try {
+          if (!slaTaskMapReady) return "unknown";
+          const t = slaTaskMap.get(String(taskId || ""));
+          if (!t) return "missing";
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const _sr: any = require("./slaRules");
+          if (_sr.slaPanelDelivered(t)) return "terminal";
+          const resp = String((t.designerAssignment && t.designerAssignment.designerId) || t.assigneeId || "");
+          if (resp && recipientUid && resp !== String(recipientUid)) return "assignee_changed";
+          return "valid";
+        } catch { return "valid"; }
+      },
       soundFor: (lvl) => (lvl === "critical" ? slaReminderSounds.critical : slaReminderSounds.warning),
       // F3.5.4P — persistência OFICIAL por TRANSAÇÃO no renderer; flag; sino/observabilidade pós-commit.
       persistDecision: (req) => persistSlaDecisionViaRenderer(req),
@@ -1321,6 +1358,7 @@ app.whenReady().then(() => {
       currentUid = uid; // F3.5.4N — ANTES de iniciar os listeners (restartAll/isAuthValid dependem do uid)
       try { if (listenerWatchdog) listenerWatchdog.resetForLogin(); } catch { /* */ } // F3.5.4N — novo episódio de supervisão
       try { if (notificationGrouping) notificationGrouping.reset(); } catch { /* */ } // F3.5.4O — grupos são POR SESSÃO de usuário (troca de usuário zera a memória de grupos)
+    slaTaskMap.clear(); slaTaskMapReady = false; // F3.5.5C-H2 — gate volta a 'unknown' fora de sessão (nada bloqueante sem snapshot)
       // F3.5.3/F3.5.4N — INÍCIO dos listeners Firestore (notifier de eventos + Categoria A DURÁVEL p/
       // TODOS os usuários ativos + produtor AUTORITATIVO de SLA + escuta de conclusão). Extraído p/
       // startUserListeners: é o MESMO caminho reusado pelo ÚLTIMO RECURSO do watchdog (para a geração
