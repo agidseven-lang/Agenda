@@ -52,7 +52,11 @@ export function createAuthCore(opts: { storeDir: string; urls?: Partial<Urls>; l
   function persist(): void {
     try {
       fs.mkdirSync(opts.storeDir, { recursive: true });
-      fs.writeFileSync(storeFile, JSON.stringify(mem || {}), { mode: 0o600 });
+      /* F3.5.5C-H1 — escrita ATÔMICA (tmp + rename): encerramento abrupto do Windows durante
+         a gravação não pode deixar session.json truncado/corrompido (sessão perdida no boot). */
+      const tmp = storeFile + ".tmp";
+      fs.writeFileSync(tmp, JSON.stringify(mem || {}), { mode: 0o600 });
+      fs.renameSync(tmp, storeFile);
     } catch { /* best-effort: sessão só em memória se o disco falhar */ }
   }
   function wipe(): void {
@@ -119,16 +123,57 @@ export function createAuthCore(opts: { storeDir: string; urls?: Partial<Urls>; l
       }
       return { ok: false, error: (j && j.error) || ("http_" + r.status) };
     },
-    /** Restore/perfil via getUserSelf. 401 => sessão expirada (limpa). Rede fora NÃO derruba a sessão. */
+    /** Restore/perfil via getUserSelf.
+     *  F3.5.5C-H1 (P0 boot do Windows): o SERVIDOR é a ÚNICA autoridade de expiração/revogação.
+     *  Antes, self() decidia expiração LOCALMENTE (valid(): relógio adiantado pré-NTP no boot,
+     *  ou TTL local vencido) e fazia wipe() SEM consultar o servidor; e QUALQUER HTTP 401
+     *  (inclusive transitório de proxy/borda, sem corpo JSON) apagava a sessão em disco —
+     *  o usuário via a tela de login sem nunca ter deslogado. Agora:
+     *  1) sem sessão em memória ⇒ RELEITURA do disco (falha transitória de leitura no boot
+     *     não pode virar no_session);
+     *  2) NADA local apaga sessão — o token vai ao servidor mesmo com a janela local vencida;
+     *  3) 401 só derruba com o contrato JSON explícito (ok:false + error string, ex.:
+     *     invalid_session) CONFIRMADO em DUAS leituras espaçadas — 401 isolado/opaco NÃO apaga;
+     *  4) sucesso renova a DICA local de expiração (sliding; usada só pelos demais métodos).
+     *  Rede fora NÃO derruba a sessão (comportamento preservado). */
     async self(): Promise<AuthResult> {
       log("self.enter", { valid: valid(), hasMem: !!mem }); // F3.3.73I6C11-DIAG: estado da sessao no boot
-      if (!valid()) { if (mem) wipe(); return { ok: false, error: "no_session" }; }
+      if (!mem || !mem.token) {
+        load(); // F3.5.5C-H1: segunda chance de leitura (antivírus/disco ocupado no boot)
+        log("self.reload", { hasMem: !!mem });
+        if (!mem || !mem.token) return { ok: false, error: "no_session" };
+      }
       let r;
       try { r = await post(urls.self, {}, (mem as Session).token); }
       catch { return { ok: false, error: "network" }; }
       const j = r.json || {};
-      if (r.status === 200 && j.ok === true && j.self && j.self.id) return { ok: true, self: j.self };
-      if (r.status === 401) { wipe(); return { ok: false, error: "expired" }; }
+      if (r.status === 200 && j.ok === true && j.self && j.self.id) {
+        const hint = Date.now() + FALLBACK_TTL_MS;
+        if ((mem as Session).expiresAt < hint) { (mem as Session).expiresAt = hint; persist(); }
+        return { ok: true, self: j.self };
+      }
+      if (r.status === 401 && j && typeof j.error === "string" && j.error) {
+        // Candidata a revogação REAL. Wipe é destrutivo e irreversível: exigir CONFIRMAÇÃO
+        // (segunda leitura) para que um 401 isolado de infraestrutura não apague a sessão.
+        await new Promise((res) => setTimeout(res, 1200));
+        let r2;
+        try { r2 = await post(urls.self, {}, (mem as Session).token); }
+        catch { log("self.revoke_unconfirmed", { why: "network" }); return { ok: false, error: "http_401_unconfirmed" }; }
+        const j2 = r2.json || {};
+        if (r2.status === 200 && j2.ok === true && j2.self && j2.self.id) {
+          const hint2 = Date.now() + FALLBACK_TTL_MS;
+          if ((mem as Session).expiresAt < hint2) { (mem as Session).expiresAt = hint2; persist(); }
+          return { ok: true, self: j2.self };
+        }
+        if (r2.status === 401 && j2 && typeof j2.error === "string" && j2.error) {
+          log("wipe.reason", { reason: "server_unauthorized_confirmed" });
+          wipe();
+          return { ok: false, error: "expired" };
+        }
+        log("self.revoke_unconfirmed", { why: "status_" + r2.status });
+        return { ok: false, error: "http_401_unconfirmed" };
+      }
+      if (r.status === 401) { log("self.401_opaque", {}); return { ok: false, error: "http_401_opaque" }; }
       return { ok: false, error: (j && j.error) || ("http_" + r.status) };
     },
     /** Troca de senha via endpoint (valida a senha atual NO SERVIDOR). */

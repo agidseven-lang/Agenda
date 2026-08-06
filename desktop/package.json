@@ -1,7 +1,7 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.220",
-  "description": "Agenda ID Seven Desktop 1.0.220-custom-script-quantity-rich-editor (Roteiros Personalizados e Editor Profissional de Temas e Legendas)",
+  "version": "1.0.221",
+  "description": "Agenda ID Seven Desktop 1.0.221-f355ch1-session-restore-boot-hotfix (Hotfix P0 da Restauração Automática de Sessão no Boot do Windows; base 1.0.220-custom-script-quantity-rich-editor)",
   "main": "dist/main/main.js",
   "private": true,
   "scripts": {

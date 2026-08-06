@@ -2713,6 +2713,23 @@ body.desktop .kbv2-name{ white-space:normal; display:-webkit-box; -webkit-box-or
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="priorityEngine.js"></script>
 <script>
+/* F3.5.5C-H1 — GUARDA DE BOOT OFFLINE (bloco PRÓPRIO: sobrevive se o script principal morrer).
+   No autostart do Windows sem rede/cache, os SDKs do gstatic não carregam, `firebase` fica
+   undefined e o script principal morreria no initializeApp — deixando o splash "Restaurando
+   sessão…" congelado PARA SEMPRE, sem retry. Este guarda mantém o splash com mensagem honesta
+   e RECARREGA a página com backoff (e imediatamente quando o SO sinalizar rede), refazendo o
+   boot completo — a sessão em disco fica INTACTA (nada aqui toca dados/armazenamento). */
+(function(){
+  if(typeof firebase!=='undefined'&&firebase&&firebase.initializeApp)return;
+  try{var m=document.getElementById('authSplashMsg');if(m)m.textContent='Aguardando conexão…';
+      var h=document.getElementById('authSplashHint');if(h){h.classList.remove('hidden');h.textContent='Sem conexão com o servidor — reconectando automaticamente. Sua sessão está preservada.';}}catch(_){}
+  var d=4000;
+  function again(){try{location.reload();}catch(_){}}
+  try{window.addEventListener('online',again);}catch(_){}
+  (function loop(){setTimeout(function(){if(navigator.onLine!==false){again();return;}d=Math.min(d*2,60000);loop();},d);})();
+})();
+</script>
+<script>
 /* WEB PREVIEW 1.0.65 — Paridade com o APK nativo.
    Espelha o app Android (Compose) e usa o MESMO Firestore.
    Login custom s2:/SHA-256 (sem Firebase Auth), igual ao nativo/PWA.
@@ -11521,11 +11538,18 @@ function _revealLogin(reason){_hideAuthSplash();try{var l=document.getElementByI
   /* F3.5.4-C4 (preservado) — RETRY do bootstrap com backoff capado (3s→60s); PARA em sucesso, em
      negativa REAL (expired/no_session) ou quando o usuário logar manualmente. F3.5.4V-H1: durante
      o retry por erro de rede, o SPLASH permanece (nunca login). */
-  var _bootDelay=3000,_tries=0;
+  var _bootDelay=3000,_tries=0,_nb=0;
   for(;;){
     try{
       const api=window.desktopAPI;
-      if(!(api&&typeof api.authSelf==='function')){_revealLogin('no_bridge');return;}
+      if(!(api&&typeof api.authSelf==='function')){
+        /* F3.5.5C-H1 — corrida do preload no autostart: a ponte pode chegar ms depois do
+           script; antes isso revelava o LOGIN imediatamente com sessão válida em disco.
+           Agora o splash espera a ponte por até ~12s antes de admitir no_bridge real. */
+        _nb++;
+        if(_nb<40){await new Promise(function(res){setTimeout(res,300);});continue;}
+        _revealLogin('no_bridge');return;
+      }
       const r=await api.authSelf();
       try{api.diagLog&&api.diagLog('boot.authSelf',{ok:!!(r&&r.ok),error:r&&r.error,hasSelf:!!(r&&r.self),retryInMs:(r&&r.ok)||((r&&(r.error==='expired'||r.error==='no_session')))?0:_bootDelay})}catch(_){}
       if(state.user)return;                                    // login manual venceu a corrida
@@ -11535,9 +11559,11 @@ function _revealLogin(reason){_hideAuthSplash();try{var l=document.getElementByI
       /* network/http_* ⇒ EXISTE sessão local válida no main, mas a rede ainda não respondeu:
          manter o SPLASH (jamais login) e reintentar. Não apagar sessão (offline != logout). */
       authPhase='AUTH_OFFLINE_CACHED';_tries++;_authObs('auth.startup.offline_cached',{hasCachedUser:true,retryInMs:_bootDelay,tries:_tries});
-      if(_tries===3){try{var _msg=document.getElementById('authSplashMsg');if(_msg)_msg.textContent='Aguardando conexão…';var _h=document.getElementById('authSplashHint');if(_h){_h.classList.remove('hidden');_h.innerHTML='Sem conexão — tentando reconectar automaticamente. <span class="lnk" id="authManualLogin">Entrar manualmente</span>';var _ml=document.getElementById('authManualLogin');if(_ml)_ml.onclick=function(){_revealLogin('manual_escape');};}}catch(_hh){}}
+      if(_tries===3){try{var _msg=document.getElementById('authSplashMsg');if(_msg)_msg.textContent='Aguardando conexão…';var _h=document.getElementById('authSplashHint');if(_h){_h.classList.remove('hidden');_h.innerHTML='Sem conexão — tentando reconectar automaticamente. <span class="lnk" id="authRetryNow">Tentar novamente</span> · <span class="lnk" id="authManualLogin">Entrar manualmente</span>';var _rn=document.getElementById('authRetryNow');if(_rn)_rn.onclick=function(){_bootDelay=3000;try{if(window.__authWake)window.__authWake();}catch(_w){}};var _ml=document.getElementById('authManualLogin');if(_ml)_ml.onclick=function(){_revealLogin('manual_escape');};}}catch(_hh){}}
     }catch(_){}
-    await new Promise(function(res){setTimeout(res,_bootDelay);});
+    /* F3.5.5C-H1 — "Tentar novamente" acorda a espera na hora (sem esperar o backoff). */
+    await new Promise(function(res){window.__authWake=res;setTimeout(res,_bootDelay);});
+    window.__authWake=null;
     if(state.user)return;
     _bootDelay=Math.min(_bootDelay*2,60000);
   }
