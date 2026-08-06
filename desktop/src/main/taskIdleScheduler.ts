@@ -199,7 +199,14 @@ export function startTaskIdleScheduler(getUid: () => string | null, emit: Emit, 
         const id = ch && ch.doc && ch.doc.id;
         if (!id) continue;
         if (ch.type === "removed") tasks.delete(id);
-        else tasks.set(id, Object.assign({ id }, (ch.doc.data && ch.doc.data()) || {}));
+        else {
+          const d = Object.assign({ id }, (ch.doc.data && ch.doc.data()) || {});
+          // F3.5.5E — módulo retirado NUNCA entra no mapa do check-in NEM do Acompanhamento
+          // (exec.onTasks recebe ESTE MESMO mapa). Chave canônica de setor; nada é apagado no banco.
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          let retired = false; try { retired = !!require("./notifEvents").isRetiredSector(String((d as any).sector || "")); } catch { retired = false; }
+          if (retired) tasks.delete(id); else tasks.set(id, d);
+        }
       }
       try { if (exec && exec.onTasks) exec.onTasks(tasks); } catch { /* */ }   // F3.5.5A — MESMO mapa/listener
       reconcile("snapshot");

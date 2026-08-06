@@ -23,7 +23,7 @@ for (const [name, s] of [["bgnotify", bg], ["index", ix]]) {
   ok(/\.ntfp-hd\{display:grid;grid-template-columns:1fr auto auto/.test(s), `H1-01 ${name}: cabeçalho premium em GRID de colunas reservadas`);
   ok(/\.ntfp-eyebrow \.esev\{/.test(s), `H1-02 ${name}: glifo de severidade PEQUENO (esev) no eyebrow`);
   ok(/\.ntf-card\.ntfp \.ntfp-hd \.ntf-x\{position:static/.test(s), `H1-03 ${name}: X em coluna própria (position:static), sem absoluto sobreposto`);
-  ok(/\.ntf-card\.ntfp\{gap:14px;padding:14px 16px 15px 17px\}/.test(s), `H1-04 ${name}: padding-direito reduzido (16px) — sem reserva p/ 3 absolutos`);
+  ok(/\.ntf-card\.ntfp\{gap:0;padding:0\}/.test(s) && /\.ntfp-wrap\{[^}]*padding:15px 16px 15px 14px/.test(s), `H1-04 ${name}: padding no wrap 16px à direita — sem reserva p/ 3 absolutos (RE-PINADO F3.5.5E)`);
   // builder premium: eyebrow(esev+tipo) → tm → X, dentro de ntfp-hd; SEM ntfp-sev grande sobreposto
   ok(/<div class="ntfp-hd"><span class="ntfp-eyebrow"><span class="esev"[^]*?<\/span><span class="ntfp-tm">[^]*?<button class="ntf-x"/.test(s), `H1-05 ${name}: ordem reservada eyebrow→horário→fechar`);
   ok(!/<span class="ntfp-sev"/.test(s), `H1-06 ${name}: ícone grande ntfp-sev sobreposto REMOVIDO do markup`);

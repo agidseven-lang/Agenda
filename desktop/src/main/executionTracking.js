@@ -28,6 +28,10 @@ function etEligibility(t, cfg) {
   if (t.waitingClientFormal) return no("aguardando_cliente");
   if (t.blockedPaused) return no("bloqueada_pausada");
   if (t.adminOnly) return no("administrativa");
+  /* F3.5.5E — módulos retirados pelo owner (chaves canônicas + aliases legados; espelho de
+     notifEvents.RETIRED_SECTORS — módulo puro, sem require): nunca elegível ao Acompanhamento. */
+  var RETIRED_ET = { copywriting: 1, roteiro: 1, programacao_posts: 1, copy: 1, postagem: 1 };
+  if (RETIRED_ET[String(t.sector || "")]) return no("modulo_descontinuado");
   var sectors = cfg.sectors || null;
   if (sectors && sectors.length && sectors.indexOf(String(t.sector || "")) < 0) return no("setor_desabilitado");
   var designers = cfg.designers || null;

@@ -33,6 +33,35 @@ function columnLabel(k) { return COLUMN_LABEL[String(k || '')] || String(k || ''
 function num(v) { var n = Number(v); return isFinite(n) && n > 0 ? n : 0; }
 function str(v) { return (v == null) ? '' : String(v); }
 
+/* F3.5.5E — MÓDULOS RETIRADOS (Copywriting, Roteiro, Programação de Posts — ordem do owner).
+   Identificação SOMENTE por chave canônica de setor + aliases legados oficiais (copy/postagem).
+   NUNCA por título, cliente, descrição ou texto escrito pelo usuário. */
+var RETIRED_SECTORS = { copywriting: 1, roteiro: 1, programacao_posts: 1, copy: 1, postagem: 1 };
+function isRetiredSector(raw) { return !!RETIRED_SECTORS[str(raw)]; }
+/* F3.5.5E — rótulo OFICIAL do setor p/ a superfície da notificação (a chave crua 'edicao_midia'/
+   'cronograma' nunca mais aparece ao usuário). Espelha SECTORS/SECTOR_ALIAS do renderer. */
+var SECTOR_LABELS = {
+  edicao_midia: 'Edição de vídeos', design: 'Edição de vídeos',
+  cronograma: 'Cronograma', edicao_cards: 'Edição de Cards',
+  copywriting: 'Copywriting', copy: 'Copywriting',
+  roteiro: 'Roteiro', programacao_posts: 'Programação de posts', postagem: 'Programação de posts'
+};
+function sectorLabelOf(raw) { return SECTOR_LABELS[str(raw)] || ''; }
+/* F3.5.5E — contexto do Cronograma na notificação. REGRA DO OWNER: NUNCA inferir periodicidade
+   pela contagem (3≠semanal, 6≠quinzenal, 12≠mensal). Legado = subtipo REAL gravado no doc
+   (subtype/cronSub ∈ semanal|quinzenal|mensal) ⇒ 'Cronograma <sub> • N temas'. Personalizado
+   (sem subtipo) ⇒ 'Cronograma • N temas' (N = comprimento REAL de cronContents → cronQty).
+   Sem contagem conhecida ⇒ 'Cronograma' (fallback profissional; nunca vazio/undefined). */
+function cronNotifContext(sector, subtype, cronQty, cronLen) {
+  if (str(sector) !== 'cronograma') return '';
+  var subMap = { semanal: 'semanal', quinzenal: 'quinzenal', mensal: 'mensal' };
+  var sub = subMap[str(subtype)] || '';
+  var n = num(cronLen) || num(cronQty) || 0;
+  if (!n && sub) { var lm = { semanal: 3, quinzenal: 6, mensal: 12 }; n = lm[str(subtype)] || 0; }
+  var base = 'Cronograma' + (sub ? (' ' + sub) : '');
+  return n >= 1 ? (base + ' • ' + n + ' tema' + (n === 1 ? '' : 's')) : base;
+}
+
 /** Classifica UMA entrada de history[] {kind,from,to,at,byId} no tipo Categoria A. */
 function classifyMove(from, to) {
   var f = str(from), t = str(to);
@@ -59,6 +88,14 @@ function deriveTaskEvents(t, o) {
   var retMs = num(o.retentionMs) || RETENTION_MS_DEFAULT;
   var minAt = nowMs ? (nowMs - retMs) : 0;
   var taskId = str(t.id), title = str(t.title) || 'Tarefa', sector = str(t.sector);
+  // F3.5.5E — tarefa de módulo retirado NUNCA gera evento novo (backlog pós-desligamento incluso).
+  // Nada é apagado: o doc permanece intacto; apenas nenhuma notificação nasce dele.
+  if (isRetiredSector(sector)) return out;
+  // F3.5.5E — contexto canônico p/ a notificação premium (fonte: o PRÓPRIO doc; nunca o título):
+  var evClient = str(t.client);
+  var evSubtype = str(t.subtype || t.cronSub);
+  var evCronQty = num(t.cronQty);
+  var evCronLen = Array.isArray(t.cronContents) ? t.cronContents.length : 0;
 
   // 1) MOVIMENTAÇÕES/CONCLUSÃO/REABERTURA — history[] gravado pelo PRÓPRIO escritor da ação.
   var hs = Array.isArray(t.history) ? t.history : [];
@@ -232,6 +269,11 @@ function deriveTaskEvents(t, o) {
     });
   }
 
+  // F3.5.5E — contexto uniforme em TODOS os eventos derivados (dados do doc; aditivo; sem rede).
+  for (var _x = 0; _x < out.length; _x++) {
+    out[_x].client = evClient; out[_x].subtype = evSubtype;
+    out[_x].cronQty = evCronQty; out[_x].cronLen = evCronLen;
+  }
   out.sort(function (a, b) { return (a.at - b.at) || (a.eventId < b.eventId ? -1 : a.eventId > b.eventId ? 1 : 0); });
   return out;
 }
@@ -317,7 +359,7 @@ function buildCategoryAPayload(ev, uid, resolveProfile) {
   return {
     eventId: ev.eventId, dedupKey: ev.eventId,
     eventType: ev.type, notificationType: (ev.recipientMode === 'assigned_designer' ? 'assigned_designer' : 'all_active_users'),
-    taskId: ev.taskId, taskTitle: ev.taskTitle, clientName: '',
+    taskId: ev.taskId, taskTitle: ev.taskTitle, clientName: str(ev.client || ''),   /* F3.5.5E — cliente CANÔNICO do doc (antes: sempre vazio — causa provada do card sem cliente) */
     actorId: ev.actorId || '', actorName: ator, actorAvatar: atorP.photo,
     responsibleId: ev.assignedDesignerId || '', responsibleName: designer, responsibleAvatar: respP.photo,
     targetUserId: uid, createdAt: ev.at,
@@ -330,6 +372,10 @@ function buildCategoryAPayload(ev, uid, resolveProfile) {
     // sino/histórico e p/ o fallback retrocompatível (flag OFF / payloads antigos). Chaves cruas de status
     // (afazer/andamento/revisao/concluido/entregue) — a superfície traduz via columnLabel e escolhe a cor.
     fromStatus: ev.fromStatus || '', toStatus: ev.toStatus || '', sector: ev.sector || '',
+    // F3.5.5E — campos ADITIVOS da notificação premium: rótulo oficial do setor (chave crua nunca
+    // aparece) + contexto do Cronograma (subtipo legado REAL ou 'Cronograma • N temas' — sem
+    // periodicidade inventada). Payloads antigos continuam válidos (campos opcionais).
+    sectorLabel: sectorLabelOf(ev.sector), cronContext: cronNotifContext(ev.sector, ev.subtype, ev.cronQty, ev.cronLen),
     severity: evSeverity(ev.type), sound: true,
     action: { type: 'detail', deep: 'detail/' + ev.taskId },
     source: 'notifierA', providerCalled: false
@@ -341,5 +387,7 @@ module.exports = {
   COLUMN_LABEL: COLUMN_LABEL, columnLabel: columnLabel,
   classifyMove: classifyMove, deriveTaskEvents: deriveTaskEvents,
   evTitle: evTitle, evBody: evBody, evSeverity: evSeverity, fmtBRDT: fmtBRDT,
-  buildCategoryAPayload: buildCategoryAPayload
+  buildCategoryAPayload: buildCategoryAPayload,
+  /* F3.5.5E — módulos retirados + contexto premium */
+  isRetiredSector: isRetiredSector, sectorLabelOf: sectorLabelOf, cronNotifContext: cronNotifContext
 };

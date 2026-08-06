@@ -45,7 +45,7 @@ function buildApi(block) {
 const bgBlock = extractBlock(BG), idxBlock = extractBlock(IDX);
 const api = buildApi(bgBlock);
 
-const move = { _premiumCommon: true, eventType: "task_moved", title: "Tarefa movimentada", actorName: "Miercohévisk Niheb Ferreira", actorAvatar: "https://x/p.jpg", taskTitle: "Edição do Reels Institucional", fromStatus: "afazer", toStatus: "andamento", sector: "Vídeo", clientName: "", context: "A Fazer → Em andamento", body: "Miercohévisk moveu ‘Edição do Reels Institucional’ de A Fazer para Em andamento.", severity: "info" };
+const move = { _premiumCommon: true, eventType: "task_moved", title: "Tarefa movimentada", actorName: "Miercohévisk Niheb Ferreira", actorAvatar: "https://x/p.jpg", taskTitle: "Edição do Reels Institucional", fromStatus: "afazer", toStatus: "andamento", sector: "Vídeo", sectorLabel: "Edição de vídeos", clientName: "", context: "A Fazer → Em andamento", body: "Miercohévisk moveu ‘Edição do Reels Institucional’ de A Fazer para Em andamento.", severity: "info" };
 const assign = { _premiumCommon: true, eventType: "task_assigned", title: "Tarefa atribuída", actorName: "Ana Souza", actorAvatar: "", taskTitle: "Card Institucional", responsibleName: "Bruno Lima", fromStatus: "", toStatus: "", sector: "Design", clientName: "", context: "Tarefas", severity: "info" };
 const upd = { _premiumCommon: true, eventType: "task_updated", title: "Tarefa atualizada", actorName: "Ana", taskTitle: "X", fromStatus: "", toStatus: "", context: "Prazo: 01/08 12:00 → 02/08 18:00", severity: "info" };
 const done = { _premiumCommon: true, eventType: "task_completed", title: "Tarefa concluída", actorName: "João", actorAvatar: "", taskTitle: "Y", fromStatus: "andamento", toStatus: "concluido", severity: "success" };
@@ -75,17 +75,17 @@ ok(typeof NEmod.columnLabel === "function" && NEmod.columnLabel("andamento") ===
 // ══════════════════════ B) CARD PREMIUM — CARTÃO ÚNICO ══════════════════════
 ok(api.premiumUse(move) === true, "B01 premiumUse=true p/ task_moved com _premiumCommon:true");
 ok(/ntfp-eyebrow[^>]*>[\s\S]*?Tarefa movimentada/.test(hMove), "B02 TIPO como eyebrow discreto");
-ok(/ntfp-actor">Miercoh/.test(hMove), "B03 ATOR em linha dedicada");
+ok(/ntfp-by">[\s\S]*?Movimentada por Miercoh/.test(hMove), "B03 ATOR como METADADO da ação (RE-PINADO F3.5.5E — hierarquia do owner)");
 ok(/ntfp-task">Edição do Reels Institucional/.test(hMove), "B04 TÍTULO da tarefa (elemento dominante)");
 ok(/ntfp-chip cs-afazer[^>]*>[\s\S]*?A Fazer/.test(hMove), "B05 chip origem [A Fazer] cor do estado");
 ok(/ntfp-chip cs-andamento[^>]*>[\s\S]*?Em andamento/.test(hMove), "B06 chip destino [Em andamento] cor do estado");
 ok(/ntfp-arrow/.test(hMove), "B07 seta entre os chips");
 ok(!/moveu\s+‘/.test(hMove), "B08 NÃO usa o body genérico (sem 'moveu ‘tarefa’')");
 ok((hMove.match(/Ferreira/g) || []).length === 1, "B09 ATOR não repetido (nome aparece 1x)");
-ok(/ntfp-meta">Vídeo/.test(hMove), "B10 COMPLEMENTARES: setor no rodapé");
+ok(/ntfp-ctx">Edição de vídeos/.test(hMove) && /ntfp-client">Sem cliente vinculado/.test(hMove), "B10 setor com rótulo oficial + cliente com fallback (RE-PINADO F3.5.5E)");
 ok(/ntfp-cta[^>]*>Abrir tarefa/.test(hMove), "B11 CTA discreta 'Abrir tarefa'");
 ok(/class="ntf-x"/.test(hMove), "B12 botão fechar (X)");
-ok(/ntfp-eyebrow"><span class="esev"/.test(hMove), "B13 indicador de severidade discreto INTEGRADO ao eyebrow (H1 Defeito 1)");
+ok(/ntfp-eyebrow"><span class="ntfp-ic"/.test(hMove), "B13 indicador de categoria discreto INTEGRADO ao eyebrow (RE-PINADO F3.5.5E)");
 ok(/ntfp-hd/.test(hMove) && !/ntfp-sev/.test(hMove), "B13b cabeçalho em GRID reservado (ntfp-hd) SEM ntfp-sev grande sobreposto (H1 Defeito 1)");
 ok(/role="group" aria-label="Movimento de/.test(hMove), "B14 acessibilidade: aria-label nos chips");
 ok(/ntfp-av" style="background-image:url\('https/.test(hMove), "B15 avatar por foto real quando há URL");
@@ -106,14 +106,14 @@ ok(/\.ntfp-task\{[^}]*font-size:18px/.test(BG) && /\.ntfp-task\{[^}]*font-size:1
 ok(/\.ntfp-actor\{[^}]*font-size:15px/.test(BG), "C02 ator 15px");
 ok(/\.ntfp-eyebrow\{[^}]*font-size:11\.5px/.test(BG), "C03 eyebrow 11.5px (não domina)");
 ok(/\.ntfp-chip\{[^}]*font-size:12\.5px/.test(BG), "C04 chips 12.5px");
-ok(/\.ntfp-av\{[^}]*width:54px/.test(BG), "C05 avatar 54px");
+ok(/\.ntfp-av\{[^}]*width:38px/.test(BG), "C05 avatar 38px SECUNDÁRIO (RE-PINADO F3.5.5E — mandato 36-44px)");
 ok(/\.ntfp-task\{[^}]*-webkit-line-clamp:2/.test(BG), "C06 título máx 2 linhas (clamp)");
 ok(/\.ntfp-actor\{[^}]*-webkit-line-clamp:2/.test(BG), "C07 ator máx 2 linhas (clamp)");
 ok(/\.ntfp-task\{[^}]*overflow:hidden/.test(BG), "C08 título ellipsis/overflow hidden");
 ok(/cs-afazer\{--cfg:/.test(BG) && /cs-andamento\{--cfg:/.test(BG) && /cs-revisao\{--cfg:/.test(BG) && /cs-concluido\{--cfg:/.test(BG), "C09 chips têm cor por estado real (4 estados)");
 ok(/prefers-reduced-motion: reduce/.test(BG) && /prefers-reduced-motion: reduce/.test(IDX), "C10 acessibilidade: prefers-reduced-motion");
 ok(/\.ntf\.ntfp-w\{width:100%/.test(BG), "C11 janela premium: card ocupa largura responsiva (100%)");
-ok(/\.ntf\.ntfp-w\{width:500px;max-width:calc\(100vw - 36px\)/.test(IDX), "C12 toast: largura ~500 responsiva (calc/margens)");
+ok(/\.ntf\.ntfp-w\{width:480px;max-width:calc\(100vw - 36px\)/.test(IDX), "C12 toast: largura 480 responsiva (RE-PINADO F3.5.5E — mandato 420-500)");
 
 // ══════════════════════ D) CARD PREMIUM — GRUPO ══════════════════════
 const view = { _premiumCommon: true, groupKey: "g1", taskTitle: "Edição do Reels Institucional", count: 4, items: [{ actorName: "Miercohévisk", title: "Tarefa movimentada", body: "..." }, { actorName: "Ana", title: "Tarefa atualizada", body: "..." }], extraCount: 2, primaryName: "Miercohévisk", primaryAvatar: "", severity: "info", deep: "detail/t1" };
@@ -148,7 +148,7 @@ ok(/\(p as any\)\._premiumCommon = \(typeof premiumCommonEnabled !== "undefined"
 ok(/premiumObserve\(p, "toast"\)/.test(MAIN) && /premiumObserve\(p, bgOk \? "premium_window"/.test(MAIN), "F08 premiumObserve nas superfícies toast + premium_window");
 ok(/premiumObserveGroup\(p,/.test(MAIN), "F09 premiumObserveGroup no caminho de atualização de grupo");
 ok(/\n      premiumCommonEnabled,\n/.test(MAIN.replace(/\r/g, "")) || /premiumCommonEnabled,/.test(MAIN), "F10 notif-diag inclui premiumCommonEnabled (sanitizado)");
-ok(/, screen \} from "electron"/.test(MAIN), "F11 screen importado (scaleFactor)");
+ok(/, screen, Menu \} from "electron"/.test(MAIN), "F11 screen importado (scaleFactor; RE-PINADO F3.5.5D/E — Menu aditivo)");
 ok(/const PREMIUM_COMMON_TYPES: Record<string, true> = \{/.test(MAIN), "F12 allowlist premium no main");
 
 // ══════════════════════ G) OBSERVABILIDADE — 8 NOMES EXATOS + SANITIZAÇÃO ══════════════════════

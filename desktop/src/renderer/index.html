@@ -2767,8 +2767,12 @@ const SECTORS=[
      A definição permanece para tarefas HISTÓRICAS: secOf/alias/labels/cores/Board
      continuam resolvendo 'copywriting' e 'copy' normalmente. */
   {key:'copywriting',label:'Copywriting',color:'#22D3EE',desc:'Textos, legendas e anúncios',icon:'editnote',descontinuado:true},
-  {key:'roteiro',label:'Roteiro',color:'#F59E0B',desc:'Roteiros de gravação de vídeos',icon:'description'},
-  {key:'programacao_posts',label:'Programação de posts',color:'#A78BFA',desc:'Agendamento e publicação',icon:'grid'},
+  /* F3.5.5E — RETIRADA DEFINITIVA (ordem do owner): Roteiro e Programação de posts saem de TODAS as
+     superfícies operacionais (mesmo padrão F3.3.71C7 do Copywriting). As DEFINIÇÕES permanecem para
+     tarefas HISTÓRICAS (labels/cores/aliases) — removê-las faria secOf() cair no fallback SECTORS[0]
+     e tratar tarefa antiga como Edição de vídeos. NENHUM dado é apagado. */
+  {key:'roteiro',label:'Roteiro',color:'#F59E0B',desc:'Roteiros de gravação de vídeos',icon:'description',descontinuado:true},
+  {key:'programacao_posts',label:'Programação de posts',color:'#A78BFA',desc:'Agendamento e publicação',icon:'grid',descontinuado:true},
   /* F3.5.2 — NOVO 5º setor INTERNO (não-cliente): cards avulsos individuais. ADITIVO.
      NÃO entra em isClientSector (sem Card Premium/link/portal/Worker), SECTOR_ALIAS nem SECTOR_SLA
      (perfil de notificação próprio T-30/T-10). key estável 'edicao_cards' — nunca reusa outro setor. */
@@ -3018,7 +3022,7 @@ function subscribeData(){
      de ler a coleção users; nenhum pass/salt/PII chega à memória do app. */
   unsub.users=db.collection('usersPublic').onSnapshot(s=>{state.users=s.docs.map(d=>Object.assign({id:d.id},d.data()));if(state.user){const me=state.users.find(x=>x.id===state.user.id);if(me)state.user=me;}renderFromSnapshot();});
   unsub.events=db.collection('events').onSnapshot(s=>{state.events=s.docs.map(d=>Object.assign({id:d.id},d.data()));renderFromSnapshot();});
-  unsub.tasks=db.collection('tasks').onSnapshot(s=>{state.tasks=pwaCutoffFilter(dedupById(s.docs.map(d=>Object.assign({id:d.id},d.data())).filter(t=>!isTestTask(t))));renderFromSnapshot();});
+  unsub.tasks=db.collection('tasks').onSnapshot(s=>{state.tasks=retiredCutoffFilter(pwaCutoffFilter(dedupById(s.docs.map(d=>Object.assign({id:d.id},d.data())).filter(t=>!isTestTask(t)))));renderFromSnapshot();});   /* F3.5.5E — módulos retirados fora do fluxo operacional (read-only; nada apagado) */
 }
 // 1.0.121 — BLINDAGEM: nunca renderizar dados de teste/QA no quadro operacional, mesmo que
 // algum escape para o Firestore. Marcadores inequívocos de teste (jamais cliente real):
@@ -3071,6 +3075,51 @@ function pwaCutoffFilter(list){
     try{console.info('[pwa-cutoff] '+dropped+' tarefa(s) legadas PWA ocultada(s)'+(ambiguous?(' + '+ambiguous+' ambígua(s) bloqueada(s)'):'')+' — nenhum dado apagado.');}catch(_){}
   }
   return keep;
+}
+
+/* F3.5.5E — MÓDULOS RETIRADOS (Copywriting, Roteiro, Programação de Posts — ordem do owner).
+   Espelho EXATO do padrão aprovado do pwaCutoffFilter: tarefa de módulo retirado NÃO entra no
+   state (some de TODAS as superfícies operacionais: quadros, contadores, filtros, busca,
+   prioridades, hoje, relatórios, executivo, alertas, check-ins, notificações) e NADA é apagado
+   no Firestore. Identificação SOMENTE por chave canônica de setor + alias oficial — NUNCA por
+   título, cliente, descrição ou texto do usuário (a palavra "roteiro" em conteúdo escrito não
+   tem efeito). __retiredIndex guarda APENAS id→setor (sem conteúdo) p/ o deep-link antigo
+   responder com a mensagem de descontinuado em vez de tela branca/silêncio. Idempotente. */
+const RETIRED_SECTOR_KEYS={copywriting:1,roteiro:1,programacao_posts:1};
+function isRetiredSectorKey(k){const kk=SECTOR_ALIAS[String(k||'')]||String(k||'');return !!RETIRED_SECTOR_KEYS[kk];}
+function isRetiredTask(t){return !!(t&&isRetiredSectorKey(t.sector));}
+var __retiredIndex={};
+function retiredCutoffFilter(list){
+  const keep=[];const cnt={copywriting:0,roteiro:0,programacao_posts:0};let dropped=0;
+  for(const t of (Array.isArray(list)?list:[])){
+    if(isRetiredTask(t)){
+      dropped++;const kk=SECTOR_ALIAS[String(t.sector||'')]||String(t.sector||'');
+      if(cnt[kk]!==undefined)cnt[kk]++;
+      try{if(t.id!=null)__retiredIndex[t.id]={s:kk};}catch(_){}
+      continue;
+    }
+    keep.push(t);
+  }
+  if(dropped){
+    try{window.__retiredCutoff={dropped:dropped,porModulo:cnt,at:Date.now()};}catch(_){}
+    try{console.info('[retired-modules] '+dropped+' tarefa(s) de módulos descontinuados ocultada(s) das superfícies operacionais — nenhum dado apagado.');}catch(_){}
+  }
+  return keep;
+}
+/* F3.5.5E — deep-link/rota antiga de módulo retirado: NUNCA tela branca, NUNCA erro, NUNCA
+   ressuscitar tarefa/quadro. Mensagem clara + volta para Tarefas + registro APENAS de
+   taskId/setor + motivo técnico (sem título, sem cliente, sem conteúdo). */
+var RETIRED_MODULE_MSG='Este módulo foi descontinuado e não está mais disponível no Agenda ID Seven.';
+function retiredModuleNotice(taskId,sectorKey){
+  var kk=String(sectorKey||((__retiredIndex[taskId]||{}).s)||'desconhecido');
+  try{if(typeof ncDiag==='function')ncDiag('retired.deeplink.blocked',{taskId:String(taskId||''),motivo:'retired_module_'+kk});}catch(_){}
+  try{if(typeof closeModal==='function')closeModal();}catch(_){}
+  try{
+    state.tab='tarefas';state.boardSector=null;state.personBoard=null;state.roleBoards=false;
+    state.flowView=null;state.designerBoard=null;state.socialBoard=null;
+    render();
+  }catch(_){}
+  try{if(typeof flashToast==='function')flashToast(RETIRED_MODULE_MSG,5200);}catch(_){}
 }
 
 /* ---- LOGIN UI ---- */
@@ -4346,7 +4395,7 @@ function notifSound(sev){
 /* TOAST in-app premium (fila/stack, severidade, clique→abrir, X, auto-dismiss) */
 function notifEnsureStack(){
   var s=document.getElementById('notif-stack'); if(s) return s;
-  s=document.createElement('div'); s.id='notif-stack'; s.className='notif-stack'; document.body.appendChild(s);
+  s=document.createElement('div'); s.id='notif-stack'; s.className='notif-stack'; s.setAttribute('role','status'); s.setAttribute('aria-live','polite'); document.body.appendChild(s);   /* F3.5.5E — leitura única por leitor de tela (sem duplicar) */
   if(!document.getElementById('notif-style')){
     var st=document.createElement('style'); st.id='notif-style';
     st.textContent=
@@ -4372,9 +4421,9 @@ function notifEnsureStack(){
      +'.ntf-x{position:absolute;top:8px;right:9px;width:20px;height:20px;border:0;border-radius:6px;background:transparent;color:#7f8aa0;font-size:15px;line-height:1;cursor:pointer}.ntf-x:hover{background:rgba(255,255,255,.08);color:#cdd6e6}'
      +'.ntf-glist{margin-top:7px;display:flex;flex-direction:column;gap:3px}.ntf-gi{color:#9fb0c8;font-size:12px;line-height:1.35;white-space:normal;overflow-wrap:anywhere;word-break:break-word}.ntf-gi b{color:#eef2f8;font-weight:700}.ntf-more{color:#7f8aa0;font-size:11px;margin-top:3px;font-weight:600}'
      /* F3.5.4U — LAYOUT PREMIUM das notificações COMUNS (paridade visual/estrutural com a janela premium de fundo). */
-     +'.ntf-card.ntfp{gap:14px;padding:14px 16px 15px 17px}'
-     +'.ntfp-av{flex:0 0 auto;width:54px;height:54px;border-radius:50%;background-size:cover;background-position:center;box-shadow:0 0 0 2px rgba(109,91,255,.5),0 6px 16px -6px rgba(0,0,0,.7)}'
-     +'.ntfp-av.gen{display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#6D5BFF,#22D3EE);color:#fff;font-weight:800;font-size:20px;letter-spacing:.5px}'
+     +'.ntf-card.ntfp{gap:0;padding:0}'   /* F3.5.5E — o wrap interno assume padding + linha lateral por categoria */
+     +'.ntfp-av{flex:0 0 auto;width:38px;height:38px;border-radius:50%;background-size:cover;background-position:center;box-shadow:0 0 0 2px rgba(109,91,255,.4),0 4px 10px -5px rgba(0,0,0,.7)}'   /* F3.5.5E — avatar SECUNDÁRIO (36-44px), nunca dominante */
+     +'.ntfp-av.gen{display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#6D5BFF,#22D3EE);color:#fff;font-weight:800;font-size:14px;letter-spacing:.5px}'
      +'.ntfp-bd{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}'
      +'.ntfp-top{display:flex;align-items:center;justify-content:space-between;gap:8px}'
      +'.ntfp-hd{display:grid;grid-template-columns:1fr auto auto;align-items:center;column-gap:9px;min-width:0}'
@@ -4397,12 +4446,26 @@ function notifEnsureStack(){
      +'.ntfp-glist{margin-top:8px;display:flex;flex-direction:column;gap:4px}'
      +'.ntfp-gi{color:#aeb8ca;font-size:12.5px;line-height:1.4;white-space:normal;overflow-wrap:anywhere;word-break:break-word}'
      +'.ntfp-gi b{color:#e7ecf6;font-weight:700}'
+     /* F3.5.5E — NOTIFICAÇÃO PREMIUM reorganizada (hierarquia do owner): evento+hora → título →
+        CLIENTE → setor/contexto → status → autor (metadado, avatar 36px) → responsável → ação.
+        Linha lateral por CATEGORIA do evento (cor discreta; nunca só cor — texto+ícone sempre). */
+     +'.ntfp-wrap{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px;padding:15px 16px 15px 14px;border-left:3px solid var(--catc,#5B6CFF);border-radius:inherit}'
+     +'.cat-blue{--catc:#60A5FA}.cat-violet{--catc:#A78BFA}.cat-green{--catc:#34D399}.cat-amber{--catc:#F59E0B}.cat-red{--catc:#F87171}.cat-orange{--catc:#FB923C}.cat-teal{--catc:#22D3B8}.cat-neutral{--catc:#8792a6}'
+     +'.ntfp-ic{flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:var(--catc,#5B6CFF)}'
+     +'.ntfp-client{color:#dbe2f0;font-size:13.5px;font-weight:700;line-height:1.3;margin-top:3px;white-space:normal;overflow-wrap:anywhere;word-break:break-word;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}'
+     +'.ntfp-ctx{color:#9aa6bd;font-size:12px;font-weight:600;margin-top:2px;line-height:1.3;white-space:normal;overflow-wrap:anywhere;word-break:break-word}'
+     +'.ntfp-by{display:flex;align-items:center;gap:8px;margin-top:9px;color:#8792a6;font-size:12px;line-height:1.3;min-width:0}'
+     +'.ntfp-by .ntfp-av{width:36px;height:36px}.ntfp-by .ntfp-av.gen{font-size:13px}'
+     +'.ntfp-by span{white-space:normal;overflow-wrap:anywhere;word-break:break-word;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}'
+     +'.ntfp-respline{color:#8792a6;font-size:12px;margin-top:3px;line-height:1.3;white-space:normal;overflow-wrap:anywhere;word-break:break-word}'
+     +'.ntfp-cta:focus-visible{outline:2px solid #8FA2FF;outline-offset:2px}'
+     +'.ntf-x:focus-visible{outline:2px solid #8FA2FF;outline-offset:1px}'
      +'.ntfp-more{color:#8792a6;font-size:11.5px;margin-top:3px;font-weight:600}'
      +'.cs-afazer{--cfg:#c3ccdb;--cbg:rgba(148,163,184,.14);--cbd:rgba(148,163,184,.34)}'
      +'.cs-andamento{--cfg:#8FA2FF;--cbg:rgba(91,108,255,.16);--cbd:rgba(91,108,255,.44)}'
      +'.cs-revisao{--cfg:#F2C46B;--cbg:rgba(242,169,59,.15);--cbd:rgba(242,169,59,.44)}'
      +'.cs-concluido{--cfg:#4FD9A0;--cbg:rgba(47,207,143,.15);--cbd:rgba(47,207,143,.44)}'
-     +'.ntf.ntfp-w{width:500px;max-width:calc(100vw - 36px)}'
+     +'.ntf.ntfp-w{width:480px;max-width:calc(100vw - 36px)}'   /* F3.5.5E — 420–500px (mandato); compacto e profissional */
      +'@media (prefers-reduced-motion: reduce){.ntf{transition:none}}';
     document.head.appendChild(st);
   }
@@ -4413,9 +4476,24 @@ function notifRoute(deep){
     if(!deep||!state.user) return;
     if(deep.indexOf('detail/')===0){ var id=deep.slice(7); if(typeof openDetails==='function'){ try{ openDetails(id); return; }catch(_){} } deep='board/'; }
     if(deep.indexOf('client/')===0){ if(typeof openClientView==='function') openClientView(deep.slice(7)); return; }
-    if(deep.indexOf('board/')===0){ state.tab='tarefas'; state.boardSector=deep.slice(6)||null; render(); return; }
+    if(deep.indexOf('board/')===0){ var _bs=deep.slice(6)||null; if(_bs&&typeof isRetiredSectorKey==='function'&&isRetiredSectorKey(_bs)){retiredModuleNotice('',SECTOR_ALIAS[_bs]||_bs);return;} state.tab='tarefas'; state.boardSector=_bs; render(); return; }   /* F3.5.5E — rota de quadro retirado tratada com segurança */
     if(deep==='agenda'){ state.tab='agenda'; state.boardSector=null; render(); return; }
   }catch(_){}
+}
+/* F3.5.5E — contexto do Cronograma p/ a notificação (gêmeo do resolvedor puro do main em
+   notifEvents.js — MESMAS regras). NUNCA infere periodicidade pela contagem: subtipo só quando o
+   campo legado REAL existe (subtype/cronSub); personalizado ⇒ 'Cronograma • N temas'. */
+function cronNotifContextR(t){
+  try{
+    if(!t||secOf(t.sector).key!=='cronograma')return '';
+    var subMap={semanal:'semanal',quinzenal:'quinzenal',mensal:'mensal'};
+    var subRaw=String(t.subtype||t.cronSub||''); var sub=subMap[subRaw]||'';
+    var n=Array.isArray(t.cronContents)?t.cronContents.length:0;
+    if(!n&&t.cronQty){ var q=Number(t.cronQty); if(isFinite(q)&&q>0)n=q; }
+    if(!n&&sub){ var lm={semanal:3,quinzenal:6,mensal:12}; n=lm[subRaw]||0; }
+    var base='Cronograma'+(sub?(' '+sub):'');
+    return n>=1?(base+' • '+n+' tema'+(n===1?'':'s')):base;
+  }catch(_){ return ''; }
 }
 /* NORMALIZA a identidade visual do toast — cobre toasts do RENDERER e os vindos do HUB/main
    (atribuição). Resolve ATOR (quem fez) e RESPONSÁVEL (designer) p/ FOTO+NOME reais a partir do
@@ -4432,13 +4510,30 @@ function notifNormalize(p){
     p.actorId=actor.userId||p.actorId||''; if(actor.name)p.actorName=actor.name; if(actor.avatarUrl)p.actorAvatar=actor.avatarUrl;
     p.responsibleId=resp.userId||p.responsibleId||''; if(resp.name)p.responsibleName=resp.name; if(resp.avatarUrl)p.responsibleAvatar=resp.avatarUrl;
     p._actorIni=actor.initials; p._respIni=resp.initials;
+    /* F3.5.5E — ENRIQUECIMENTO CANÔNICO p/ o card premium. Fonte: o DOC da tarefa no state (nunca o
+       título; nunca texto do usuário). O main já envia estes campos nos eventos task_*; aqui cobrimos
+       payloads do renderer e reforçamos quando o doc está disponível. Idempotente e aditivo. */
+    if(task){
+      try{ if(!p.clientName&&task.client)p.clientName=String(task.client); }catch(_){}
+      try{ if(!p.sectorLabel){ var _sd=secOf(task.sector); var _rk=SECTOR_ALIAS[String(task.sector||'')]||String(task.sector||''); if(_sd&&_sd.key===_rk){ p.sectorKey=_sd.key; p.sectorLabel=_sd.label; } } }catch(_){}
+      try{ if(p.cronContext==null||p.cronContext===''){ p.cronContext=cronNotifContextR(task); } }catch(_){}
+    }
     // ATRIBUIÇÃO: título com o ATOR; subtítulo = tarefa·cliente; responsável vai no respRow (mini-foto);
     // etapa fica no contexto. Compacto, sem repetir o responsável nem o autor.
     if(p.eventType==='designer_assigned'||p.eventType==='task_assigned'){
-      if(actor.name) p.title=actor.name+' atribuiu uma tarefa';
-      else if(!p.title||/^Novo cronograma atribu/i.test(p.title)) p.title='Nova tarefa atribuída a você';
-      p.subtitle=(p.clientName?((p.taskTitle||'Tarefa')+' — '+p.clientName):(p.taskTitle||'Tarefa'));
-      p.body='';
+      /* F3.5.5E — no CARD PREMIUM o título do cabeçalho é o TIPO DO EVENTO (hierarquia do owner);
+         o autor vira metadado ('Atribuída por …') e o responsável tem linha própria. A mutação
+         legada do título ('Fulano atribuiu uma tarefa') permanece SÓ para o layout antigo
+         (flag OFF / atribuição fora do premium) — comportamento retrocompatível intacto. */
+      var _prem=false; try{ _prem=(typeof premiumUse==='function')&&premiumUse(p); }catch(_){ _prem=false; }
+      if(_prem){
+        if(!p.title) p.title='Tarefa atribuída';
+      } else {
+        if(actor.name) p.title=actor.name+' atribuiu uma tarefa';
+        else if(!p.title||/^Novo cronograma atribu/i.test(p.title)) p.title='Nova tarefa atribuída a você';
+        p.subtitle=(p.clientName?((p.taskTitle||'Tarefa')+' — '+p.clientName):(p.taskTitle||'Tarefa'));
+        p.body='';
+      }
       p.context='Etapa: '+(p.etapa||'Aguardando produção');
     }
   }catch(_){}
@@ -4454,18 +4549,45 @@ function notifNormalize(p){
   function premiumHM(){ try{ var d=new Date(); var z=function(n){return(n<10?'0':'')+n;}; return z(d.getHours())+':'+z(d.getMinutes()); }catch(_){ return ''; } }
   function premiumChip(k){ var s=String(k||''); var m={afazer:['A Fazer','cs-afazer'],andamento:['Em andamento','cs-andamento'],revisao:['Revisão','cs-revisao'],concluido:['Concluído','cs-concluido'],entregue:['Concluído','cs-concluido']}; var e=m[s]; return e?{label:e[0],cls:e[1]}:{label:s,cls:'cs-afazer'}; }
   function premiumAvatar(name,photo,sev){ var ini=''; try{ ini=(initials(name)||'').toUpperCase(); }catch(_){} return photo?('<div class="ntfp-av" style="background-image:url(\''+esc(photo)+'\')" aria-hidden="true"></div>'):(name?('<div class="ntfp-av gen" aria-hidden="true">'+esc(ini||'?')+'</div>'):('<div class="ntfp-av gen" aria-hidden="true">'+esc(premiumSevIcon(sev))+'</div>')); }
+  /* F3.5.5E — categoria visual por EVENTO (cores discretas do mandato; texto+ícone sempre — a cor
+     nunca é o único sinal). */
+  function premiumEvtCat(et){ var m={task_assigned:'cat-blue',task_reassigned:'cat-blue',designer_assigned:'cat-blue',task_moved:'cat-violet',task_updated:'cat-violet',task_completed:'cat-green',task_reopened:'cat-amber',task_canceled:'cat-red',flow_client_changes:'cat-orange',flow_completed:'cat-green'}; return m[String(et||'')]||'cat-neutral'; }
+  /* F3.5.5E — verbo do AUTOR (metadado da ação; o autor nunca é o título do card). */
+  function premiumByVerb(et){ var m={task_moved:'Movimentada por',task_completed:'Concluída por',task_reopened:'Reaberta por',task_updated:'Atualizada por',task_assigned:'Atribuída por',task_reassigned:'Reatribuída por',designer_assigned:'Atribuída por'}; return m[String(et||'')]||'Por'; }
+  /* F3.5.5E — HORÁRIO DO EVENTO (createdAt do payload; 24h). Fallback: agora. */
+  function premiumHMOf(p){ try{ var t=Number(p&&p.createdAt)||0; var d=t?new Date(t):new Date(); var z=function(n){return(n<10?'0':'')+n;}; return z(d.getHours())+':'+z(d.getMinutes()); }catch(_){ return premiumHM(); } }
+  /* F3.5.5E — CARD PREMIUM reorganizado (hierarquia obrigatória do owner):
+     1 evento · 2 hora · 3 título · 4 CLIENTE (canônico; fallback 'Sem cliente vinculado') ·
+     5 setor/tipo · 6 contexto do Cronograma (subtipo REAL ou 'Cronograma • N temas' — sem
+     periodicidade inventada) · 7 status compacto · 8 autor (metadado + avatar 36px) ·
+     9 responsável (quando distinto) · 10 Abrir tarefa. Fallbacks profissionais; nunca
+     undefined/null/IDs/hífens; nada de conteúdo privado (tema/legenda/observações). */
   function premiumCommonInner(p){
-    p=p||{}; var sev=p.severity||'info'; var sic=premiumSevIcon(sev);
-    var type=String(p.title||'Atualização'); var actor=String(p.actorName||p.responsibleName||''); var task=String(p.taskTitle||'');
-    var av=premiumAvatar(actor,String(p.actorAvatar||''),sev);
-    var from=String(p.fromStatus||''), to=String(p.toStatus||''), et=String(p.eventType||''); var mid='';
+    p=p||{}; var et=String(p.eventType||''); var cat=premiumEvtCat(et);
+    var type=String(p.title||'Atualização'); var task=String(p.taskTitle||'Tarefa');
+    var cli=String(p.clientName||'').trim()||'Sem cliente vinculado';
+    var cc=String(p.cronContext||'').trim(), sl=String(p.sectorLabel||'').trim();
+    var ctxLine=cc||sl;   /* cronContext JÁ inclui 'Cronograma …' — nunca duplicar o setor */
+    var from=String(p.fromStatus||''), to=String(p.toStatus||''); var mid='';
     if(from&&to){ var cf=premiumChip(from), ct=premiumChip(to);
       mid='<div class="ntfp-chips" role="group" aria-label="Movimento de '+esc(cf.label)+' para '+esc(ct.label)+'"><span class="ntfp-chip '+cf.cls+'"><span class="cdot"></span>'+esc(cf.label)+'</span><span class="ntfp-arrow" aria-hidden="true">→</span><span class="ntfp-chip '+ct.cls+'"><span class="cdot"></span>'+esc(ct.label)+'</span></div>';
-    } else if(et==='task_assigned'||et==='task_reassigned'||et==='designer_assigned'){ var resp=String(p.responsibleName||''); mid='<div class="ntfp-action">'+(resp?('Atribuída a '+esc(resp)):'Nova atribuição')+'</div>';
-    } else { var ctx=String(p.context||''); if(ctx&&ctx!=='Tarefas') mid='<div class="ntfp-action">'+esc(ctx)+'</div>'; }
-    var comp=[]; if(p.sector) comp.push(esc(String(p.sector))); if(p.clientName) comp.push(esc(String(p.clientName)));
-    var meta=comp.length?('<div class="ntfp-meta">'+comp.join(' · ')+'</div>'):'';
-    return av+'<div class="ntfp-bd"><div class="ntfp-hd"><span class="ntfp-eyebrow"><span class="esev" aria-hidden="true">'+esc(sic)+'</span>'+esc(type)+'</span><span class="ntfp-tm">'+esc(premiumHM())+'</span><button class="ntf-x" title="Fechar" aria-label="Fechar">×</button></div>'+(actor?('<div class="ntfp-actor">'+esc(actor)+'</div>'):'')+(task?('<div class="ntfp-task">'+esc(task)+'</div>'):'')+mid+meta+'<div class="ntfp-cta" data-cta="1">Abrir tarefa</div></div>';
+    } else if(et==='task_assigned'||et==='task_reassigned'||et==='designer_assigned'){ var respA=String(p.responsibleName||'').trim(); mid='<div class="ntfp-action">'+(respA?('Atribuída a '+esc(respA)):'Nova atribuição')+'</div>';
+    } else { var ctxg=String(p.context||''); if(ctxg&&ctxg!=='Tarefas') mid='<div class="ntfp-action">'+esc(ctxg)+'</div>'; }
+    var actorName=String(p.actorName||'').trim();
+    var byTxt=actorName?(premiumByVerb(et)+' '+actorName):'Usuário não identificado';
+    var av=premiumAvatar(actorName,String(p.actorAvatar||''),p.severity||'info');
+    var resp=String(p.responsibleName||'').trim();
+    var respRow=(resp&&resp!==actorName)?('<div class="ntfp-respline">Responsável: '+esc(resp)+'</div>'):'';
+    return '<div class="ntfp-wrap '+cat+'">'
+      +'<div class="ntfp-hd"><span class="ntfp-eyebrow"><span class="ntfp-ic" aria-hidden="true"></span>'+esc(type)+'</span><span class="ntfp-tm">'+esc(premiumHMOf(p))+'</span><button class="ntf-x" title="Fechar" aria-label="Fechar notificação">×</button></div>'
+      +'<div class="ntfp-task">'+esc(task)+'</div>'
+      +'<div class="ntfp-client">'+esc(cli)+'</div>'
+      +(ctxLine?('<div class="ntfp-ctx">'+esc(ctxLine)+'</div>'):'')
+      +mid
+      +'<div class="ntfp-by">'+av+'<span>'+esc(byTxt)+'</span></div>'
+      +respRow
+      +'<div class="ntfp-cta" role="button" tabindex="0" data-cta="1">Abrir tarefa</div>'
+      +'</div>';
   }
   function premiumGroupAction(t){ var s=String(t||''); var m={'Tarefa movimentada':'movimentou a tarefa','Tarefa concluída':'concluiu a tarefa','Tarefa reaberta':'reabriu a tarefa','Tarefa atribuída':'atribuiu a tarefa','Tarefa atualizada':'atualizou a tarefa'}; return m[s]||s; }
   function premiumGroupInner(view){
@@ -4538,6 +4660,7 @@ function notifShowToast(p){
     var dismiss=function(){ try{ if(premiumUse(p)&&typeof ncDiag==='function') ncDiag('notification.premium.closed',{eventType:p.eventType,deliverySurface:'toast'}); }catch(_){} try{ el.classList.remove('in'); setTimeout(function(){ if(el&&el.parentNode) el.parentNode.removeChild(el); },200); }catch(_){} }; // F3.5.4U — observabilidade sanitizada (só premium)
     var xb=el.querySelector('.ntf-x'); if(xb) xb.addEventListener('click',function(ev){ ev.stopPropagation(); dismiss(); });
     var cd=el.querySelector('.ntf-card'); if(cd) cd.addEventListener('click',function(){ try{ if(premiumUse(p)&&typeof ncDiag==='function') ncDiag('notification.premium.opened',{eventType:p.eventType,deliverySurface:'toast'}); }catch(_){} notifRoute(p.action&&p.action.deep); dismiss(); }); // F3.5.4U — clique abre a tarefa (deep-link atual); não movimenta/conclui a tarefa
+    el.addEventListener('keydown',function(ev){ try{ var k=ev.key; if(k!=='Enter'&&k!==' ')return; var tg=ev.target; if(tg&&tg.closest&&tg.closest('[data-cta]')){ ev.preventDefault(); notifRoute(p.action&&p.action.deep); dismiss(); } else if(tg&&tg.closest&&tg.closest('.ntf-x')){ ev.preventDefault(); dismiss(); } }catch(_){} });   /* F3.5.5E — teclado: Enter/Espaço no CTA e no fechar */
     if(p.sound!==false){ var _sr=notifSound(sev); try{ if(typeof ncDiag==='function') ncDiag('notification.sound.playback',{eventType:String(p.eventType||''),deliverySurface:'toast',severity:sev,grouped:false,firstInGroup:true,soundEnabled:true,playbackResult:String(_sr||''),appVersion:(window.desktopAPI&&window.desktopAPI.version)||'',timestamp:Date.now()}); }catch(_){} }
     else { try{ if(typeof ncDiag==='function') ncDiag('notification.sound.suppressed_by_payload',{eventType:String(p.eventType||''),deliverySurface:'toast',soundEnabled:false,appVersion:(window.desktopAPI&&window.desktopAPI.version)||'',timestamp:Date.now()}); }catch(_){} }  // F3.5.4W-H2 — observabilidade sanitizada; som identico
     var ttl=sev==='critical'?11000:(sev==='warning'?8000:6000);
@@ -4631,6 +4754,7 @@ function notifScanFlow(){
     var seeAll=(typeof canSeeAll==='function')&&canSeeAll(state.user);
     for(var i=0;i<tasks.length;i++){
       var t=tasks[i]; if(!t||!t.id) continue;
+      if(typeof isRetiredTask==='function'&&isRetiredTask(t)) continue;   /* F3.5.5E — módulo retirado nunca gera notificação nova (cinto; o state já filtra) */
       var cur=''; try{ cur=(deriveCanonicalTaskState(t)||{}).phase||''; }catch(_){ cur=''; }
       var prev=_notifPhase[t.id]; _notifPhase[t.id]=cur;
       if(firstRun||prev===undefined||prev===cur) continue;   // baseline/tarefa-nova/sem-mudança
@@ -4663,6 +4787,7 @@ function notifScanSla(){
     try{ vis=slaibVisible(state.user)||[]; }catch(_){ vis=[]; }
     for(var i=0;i<vis.length;i++){
       var t=vis[i]; if(!t) continue;
+      if(typeof isRetiredTask==='function'&&isRetiredTask(t)) continue;   /* F3.5.5E — módulo retirado nunca gera alerta SLA novo (cobre também copywriting/programacao, que caíam no default 30/10) */
       // TIPO 1 — SLA é PESSOAL: dispara SOMENTE p/ o designer responsável. Social/Cliente/Admin/gestor
       // (que "veem tudo" no painel) NÃO recebem laranja/vermelho de tarefa que não é deles. A porta é o
       // roteador puro (mesma regra de slaCriticalFor). A sub-severidade (warning/overdue/critical) divide
@@ -5905,7 +6030,9 @@ function renderHub(){
         (dzLate>0?'<span class="pill" style="background:'+withAlpha('#F87171',.16)+';color:#F87171">'+dzLate+' em atraso</span>':'')+'</div></div>'+
       '<div class="arr">'+svg('arr')+'</div></button>';
   }
-  const cards=SECTORS.map(s=>{const list=vis.filter(t=>secOf(t.sector).key===s.key);const total=list.length;const late=list.filter(t=>{const d=taskDeadline(t);return d&&d.late;}).length;
+  /* F3.5.5E — Quadros só com setores ATIVOS (Copywriting/Roteiro/Programação de posts retirados
+     pelo owner; mesmo filtro !descontinuado já aprovado na criação — 71C7). Ordem preservada. */
+  const cards=SECTORS.filter(s=>!s.descontinuado).map(s=>{const list=vis.filter(t=>secOf(t.sector).key===s.key);const total=list.length;const late=list.filter(t=>{const d=taskDeadline(t);return d&&d.late;}).length;
     return '<button class="bcard" data-sector="'+s.key+'"><div class="icb" style="background:'+withAlpha(s.color,.18)+';color:'+s.color+'">'+svg(s.icon)+'</div>'+
       '<div class="bm"><div class="bl">'+esc(s.label)+'</div><div class="bd">'+esc(s.desc)+'</div>'+
         '<div class="bp"><span class="pill" style="background:'+withAlpha(s.color,.16)+';color:'+s.color+'">'+total+' tarefas</span>'+
@@ -7582,7 +7709,8 @@ function execTrackingBlock(t){
     +'<div class="det-acc-body">'+rows+'</div></details>';
 }
 function openDetails(taskId){
-  const t=state.tasks.find(x=>x.id===taskId);if(!t)return;
+  const t=state.tasks.find(x=>x.id===taskId);
+  if(!t){ if(__retiredIndex[taskId]){retiredModuleNotice(taskId);} return; }   /* F3.5.5E — deep-link antigo de módulo retirado: mensagem + redirect (nunca tela branca) */
   // F3.5.4W — captura o foco de origem só quando a Central ainda não está aberta (reaberturas
   // internas, ex.: markItemsAdjusted, não sobrescrevem o elemento de retorno original).
   if(!document.querySelector('.modal-back[data-detmodal]')){_detReturnEl=(document.activeElement&&document.activeElement!==document.body)?document.activeElement:null;}
@@ -11403,7 +11531,7 @@ document.addEventListener('click',async e=>{
   }
   if(el=g('[data-tab]')){state.form=null;state.boardSector=null;state.personBoard=null;state.roleBoards=false;state.flowView=null;state.designerBoard=null;state.socialBoard=null;state.tab=el.dataset.tab;closeModal();render();return;}
   if(el=g('[data-fab]')){state.tab='tarefas';openNewTaskWizard();return;}   // F3.3.75A — sempre ETAPA 1 (Setor), sem reaproveitar estado
-  if(el=g('[data-sector]')){state.boardSector=el.dataset.sector;state.personBoard=null;state.roleBoards=false;state.flowView=null;state.designerBoard=null;state.socialBoard=null;boardCol=0;boardMine=false;boardQuery='';render();return;}
+  if(el=g('[data-sector]')){if(isRetiredSectorKey(el.dataset.sector)){retiredModuleNotice('',SECTOR_ALIAS[el.dataset.sector]||el.dataset.sector);return;}state.boardSector=el.dataset.sector;state.personBoard=null;state.roleBoards=false;state.flowView=null;state.designerBoard=null;state.socialBoard=null;boardCol=0;boardMine=false;boardQuery='';render();return;}   /* F3.5.5E — quadro retirado nunca abre */
   if(el=g('[data-myboard]')){state.personBoard=state.user&&state.user.id;state.roleBoards=false;state.flowView=null;state.designerBoard=null;state.socialBoard=null;state.boardSector=null;boardQuery='';render();return;}
   if(el=g('[data-roleboards]')){state.roleBoards=true;state.personBoard=null;state.flowView=null;state.designerBoard=null;state.socialBoard=null;state.boardSector=null;boardQuery='';render();return;}
   if(el=g('[data-personboard]')){state.personBoard=el.dataset.personboard;state.roleBoards=false;state.flowView=null;state.designerBoard=null;state.socialBoard=null;state.boardSector=null;boardQuery='';render();return;}
@@ -11645,7 +11773,7 @@ document.addEventListener('click',async e=>{
   if(el=g('[data-cfgfont]')){appearSet({font:(el.dataset.cfgfont==='lg'||el.dataset.cfgfont==='xl')?el.dataset.cfgfont:'std'});return;}
   if(el=g('[data-cfghc]')){appearSet({hc:el.dataset.cfghc==='on'});return;}
   if(el=g('[data-pickasg]')){if(state.form){const id=el.dataset.pickasg||null;state.form.assigneeId=id;const u=id?state.users.find(x=>x.id===id):null;state.form.assignee=u?(u.name||''):'';}closeModal();render();return;}
-  if(el=g('[data-form]')){const a=el.dataset.form;if(a==='close'){state.form=null;render();}else if(a==='back'){state.form.step=Math.max(0,state.form.step-1);render();}else if(a==='next')stepNext();else if(a==='save'){/* F3.5.2 — Edição de Cards salva em LOTE atômico (saveCardsBatch); demais setores usam saveTask (byte-idêntico à base). */if(state.form&&secOf(state.form.sector).key==='edicao_cards')await saveCardsBatch();else await saveTask();}return;}
+  if(el=g('[data-form]')){const a=el.dataset.form;if(a==='close'){state.form=null;render();}else if(a==='back'){state.form.step=Math.max(0,state.form.step-1);render();}else if(a==='next')stepNext();else if(a==='save'){/* F3.5.5E — gate DEFENSIVO: nenhum registro novo de módulo retirado pode nascer (a UI já não oferece; isto cobre rota residual). */if(state.form&&isRetiredSectorKey(state.form.sector)){retiredModuleNotice('',SECTOR_ALIAS[state.form.sector]||state.form.sector);state.form=null;render();return;}/* F3.5.2 — Edição de Cards salva em LOTE atômico (saveCardsBatch); demais setores usam saveTask (byte-idêntico à base). */if(state.form&&secOf(state.form.sector).key==='edicao_cards')await saveCardsBatch();else await saveTask();}return;}
   if(el=g('[data-fsector]')){state.form.sector=el.dataset.fsector;state.form.subtype=null;state.form.contents=[];state.form.checklist=[];state.form._sendAfterSave=false;render();return;}
   if(el=g('[data-fstatus]')){state.form.status=el.dataset.fstatus;render();return;}
   if(el=g('[data-ftoggle]')){state.form[el.dataset.ftoggle]=!state.form[el.dataset.ftoggle];render();return;}

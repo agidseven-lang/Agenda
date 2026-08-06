@@ -155,6 +155,8 @@ type NotifPayload = {
   title?: string; body?: string; context?: string; createdAt?: number;
   severity?: "info" | "success" | "warning" | "critical"; sound?: boolean;
   action?: { type?: string; deep?: string }; dedupKey?: string; source?: string; providerCalled?: boolean;
+  // F3.5.4U/F3.5.5E — campos ESTRUTURADOS do card premium (aditivos; produzidos em notifEvents.js):
+  fromStatus?: string; toStatus?: string; sector?: string; sectorLabel?: string; cronContext?: string;
 };
 const _notifSeen = new Set<string>();
 // F3.5.3 — ACK do toast: tracker do prazo de render (4s). Fallback bg/nativa quando não há prova.
@@ -245,6 +247,18 @@ function nativeNotify(p: NotifPayload, key: string, deep: string): boolean {
 function deliverNotification(p: NotifPayload): { ok: boolean; channel: string } {
   try {
     if (!p || typeof p !== "object") return { ok: false, channel: "none" };
+    // F3.5.5E — CINTO FINAL: payload de módulo retirado nunca é entregue (os produtores já bloqueiam
+    // na fonte; isto cobre qualquer resíduo). Só payloads task_* carregam sector; demais passam.
+    // Sintaxe JS-pura de propósito: os harnesses f343 extraem este corpo e avaliam como JS.
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const _neD = require("./notifEvents");
+      const _sctD = String((p && p.sector) || "");
+      if (_sctD && _neD.isRetiredSector(_sctD)) {
+        diag("notify.retired.dropped", { eventType: String(p.eventType || ""), taskId: nmask(p.taskId), motivo: "retired_module_" + _sctD });
+        return { ok: false, channel: "retired-dropped" };
+      }
+    } catch { /* */ }
     const key = String(p.dedupKey || `${p.eventType || "evt"}:${p.taskId || ""}:${p.createdAt || ""}`);
     if (_notifSeen.has(key)) { diag("deliver.dedup", { key }); nlog("notify.dedup.skipped", { dedupKey: key, taskId: nmask(p.taskId) }); return { ok: true, channel: "dedup" }; }
     diag("deliver.begin", { eventType: p.eventType, taskId: p.taskId, targetUserId: p.targetUserId, actorId: p.actorId, responsibleId: p.responsibleId, dedupKey: key, windowActive: windowActive(), visible: !!(mainWin && !mainWin.isDestroyed() && mainWin.isVisible()), minimized: !!(mainWin && !mainWin.isDestroyed() && mainWin.isMinimized()) });
@@ -987,6 +1001,19 @@ app.whenReady().then(() => {
           if (!slaTaskMapReady) return "unknown";
           const t = slaTaskMap.get(String(taskId || ""));
           if (!t) return "missing";
+          // F3.5.5E — MÓDULO RETIRADO (Copywriting/Roteiro/Programação de Posts): pendência/alerta
+          // antigo é invalidado SELETIVAMENTE pelas barreiras H2 já aprovadas (boot + pré-exibição),
+          // com motivo auditável. Identificação por chave canônica de setor (nunca título). NUNCA
+          // apaga a tarefa; NUNCA altera status/responsável; alertas de outros setores intactos.
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-var-requires
+            const _ne: any = require("./notifEvents");
+            const _sct = String(((t as any) && (t as any).sector) || "");
+            if (_ne.isRetiredSector(_sct)) {
+              diag("sla.reminder.retired_module", { taskId: String(taskId || ""), motivo: "retired_module_" + _sct });
+              return "terminal";
+            }
+          } catch { /* incerteza nunca derruba o gate */ }
           // eslint-disable-next-line @typescript-eslint/no-var-requires
           const _sr: any = require("./slaRules");
           if (_sr.slaPanelDelivered(t)) return "terminal";

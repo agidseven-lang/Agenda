@@ -1,4 +1,4 @@
-// F3.5.5C — QUANTIDADE PERSONALIZADA DE ROTEIROS + EDITOR RICO (Desktop 1.0.223): suíte estática.
+// F3.5.5C — QUANTIDADE PERSONALIZADA DE ROTEIROS + EDITOR RICO (Desktop 1.0.224): suíte estática.
 // A) versão · B) 35 testes obrigatórios da QUANTIDADE · C) 50 testes obrigatórios do EDITOR ·
 // D) segurança · E) Worker (portal) · F) congelados/isolamento.
 // Roda contra o fonte real (ou SRC= p/ gate empacotado). O Worker é lido do repo (WSRC= opcional).
@@ -46,11 +46,11 @@ const wrte = wseg('/* ═══ F3.5.5C — TEMA/LEGENDA RICOS NO PORTAL', 'func
 const wrender = wseg('contentsHtml = items.map(function (raw, i) {', 'histórico granular', 'worker-render');
 const wstate = wseg('async function handleClientCronogramaState(token, env)', 'Persistência ADITIVA e granular', 'worker-state');
 
-console.log('— A) versão 1.0.223 —');
+console.log('— A) versão 1.0.224 —');
 const pkg = JSON.parse(R('package.json'));
-ok('A1 package.json 1.0.223 (custom-script-quantity-rich-editor)', pkg.version === '1.0.223' && /custom-script-quantity-rich-editor/.test(pkg.description || ''));
-ok('A2 package-lock 1.0.223', JSON.parse(R('package-lock.json')).version === '1.0.223');
-ok('A3 lock packages[""] 1.0.223', JSON.parse(R('package-lock.json')).packages[''].version === '1.0.223');
+ok('A1 package.json 1.0.224 (custom-script-quantity-rich-editor)', pkg.version === '1.0.224' && /custom-script-quantity-rich-editor/.test(pkg.description || ''));
+ok('A2 package-lock 1.0.224', JSON.parse(R('package-lock.json')).version === '1.0.224');
+ok('A3 lock packages[""] 1.0.224', JSON.parse(R('package-lock.json')).packages[''].version === '1.0.224');
 
 console.log('— B) QUANTIDADE PERSONALIZADA DE ROTEIROS (35 obrigatórios) —');
 ok('B1 quantidade 1: subtipo sintético aceita n=1 com singular ("1 roteiro")', has(qcore, "return {label:n+(n===1?' roteiro':' roteiros')") && has(qcore, 'if(!(isFinite(n)&&n>=1))return null;'));
