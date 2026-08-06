@@ -250,7 +250,10 @@ console.log("F3.5.4L — lembrete central persistente de SLA (56 casos)");
   const s = fakeSurface(), c = mkCtl(s, mkStore());
   c.enqueue(pay("warning", "done2", "u1")); // amarelo aberto
   c.noteCompleted("done2");                   // concluída COM modal aberto
-  ok(/concluída enquanto o alerta estava aberto/.test(s._cur().body), "45 concluída com modal aberto ⇒ conteúdo vira 'concluída' (mantém OK)");
+  // [RE-PINADO F3.5.5C-H2 — mandato do owner] concluída com modal aberto ⇒ aviso "Esta tarefa já
+  // foi encerrada." SEM os botões de decisão (nenhuma resposta obsoleta) + recibo imediato +
+  // fechamento AUTOMÁTICO (autoCloseMs) — mais forte que o comportamento anterior (mantinha aberto).
+  ok(/já foi encerrada/.test(s._cur().body) && s._cur().decisionsEnabled === false, "45 concluída com modal aberto ⇒ 'Esta tarefa já foi encerrada.' sem decisões (auto-close F3.5.5C-H2)");
   const rr = c.enqueue(pay("critical", "done2", "u1"));
   eq(rr.channel, "sla-cancelled", "45b não gera o vermelho futuro após conclusão");
 }
@@ -337,7 +340,10 @@ function f354oPremiumControlledDiff() {
   const tsAdds = /export function updateBgGroup/.test(dts) && /bg-group-update/.test(dts);
   const tsOverlayKept = !rmTs.some((l) => /showInactive|alwaysOnTop|focusable/.test(l)); // overlay sem-foco preservado
   const htmlAdds = /renderGroupUpdate/.test(dhtml) && /data-group/.test(dhtml);
-  const htmlRenderKept = !rmHtml.some((l) => /bgAPI\.rendered|seen\[key\]/.test(l)); // render individual + prova de render preservados
+  // [RE-PINADO F3.5.5C-H2] a F3.5.4U reescreveu legitimamente a LINHA do bgAPI.rendered (visual
+  // premium, gated pela suíte f354u/77); a garantia REAL — prova de render com dedupKey + dedup
+  // seen — é verificada no arquivo ATUAL (igual-ou-mais-forte que checar ausência de remoção).
+  const htmlRenderKept = /bgAPI\.rendered\(\{dedupKey:/.test(fs.readFileSync(path.join(DESK, "src/renderer/bgnotify.html"), "utf8")) && /seen\[/.test(fs.readFileSync(path.join(DESK, "src/renderer/bgnotify.html"), "utf8")); void rmHtml;
   const curTs = fs.readFileSync(path.join(DESK, "src/main/bgNotify.ts"), "utf8");
   const curHtml = fs.readFileSync(path.join(DESK, "src/renderer/bgnotify.html"), "utf8");
   const anchors = /export function showBgNotify/.test(curTs) && /export function initBgNotify/.test(curTs) && /export function stopBgNotify/.test(curTs) && /export function updateBgGroup/.test(curTs)

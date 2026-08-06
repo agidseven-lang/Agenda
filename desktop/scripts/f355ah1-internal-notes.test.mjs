@@ -14,8 +14,8 @@ const seg = (from, len) => { const i = idx.indexOf(from); return i < 0 ? '' : id
 
 console.log('— A) versão 1.0.220 —');
 const pkg = JSON.parse(R('package.json'));
-ok('A1 package.json 1.0.221 (pin F3.5.5C-H1; base traz as observações internas)', pkg.version === '1.0.221' && /custom-script-quantity-rich-editor/.test(pkg.description || ''));
-ok('A2 package-lock 1.0.221', JSON.parse(R('package-lock.json')).version === '1.0.221');
+ok('A1 package.json 1.0.222 (pin F3.5.5C-H2; base traz as observações internas)', pkg.version === '1.0.222' && /custom-script-quantity-rich-editor/.test(pkg.description || ''));
+ok('A2 package-lock 1.0.222', JSON.parse(R('package-lock.json')).version === '1.0.222');
 
 console.log('— B) lápis por tema (ordem Copiar → Editar → Expandir; gates) —');
 const renderSeg = seg('var _canEdit=(isClientSector(secOf(t.sector).key)&&state.user&&canSeeAll(state.user))', 3200);

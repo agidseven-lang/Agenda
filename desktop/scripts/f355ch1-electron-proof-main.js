@@ -149,8 +149,8 @@ async function runScene(win, scene, idx) {
       const hiddenOk = scene !== 'ok_autostart' || m.winVisible === false;
       v = F(m.authSplash.hidden && !m.login.visible && m.app.visible && m.authed &&
         has(m, 'auth.startup.restore_succeeded') && !m.loginRendered && m.wpUid === 'u-real-1' &&
-        m.title.indexOf('1.0.221') >= 0 && hiddenOk,
-        'esperado: app autenticado sem login, título 1.0.221' + (autostart ? ', janela oculta' : ''));
+        m.title.indexOf('1.0.222') >= 0 && hiddenOk,
+        'esperado: app autenticado sem login, título 1.0.222' + (autostart ? ', janela oculta' : ''));
     } else if (scene === 'net_then_ok') {
       v = F(m.authSplash.hidden && m.app.visible && m.authed && has(m, 'auth.startup.offline_cached') &&
         has(m, 'auth.startup.restore_succeeded') && !m.loginRendered && m.wpUid === 'u-real-1',
