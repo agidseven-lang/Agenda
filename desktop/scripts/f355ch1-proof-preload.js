@@ -66,7 +66,7 @@ try {
   try { localStorage.setItem('wp_uid', 'u-real-1'); localStorage.setItem('wp_name', 'Fulano de Tal'); } catch (_) {}
   const base = {
     diagLog: diagLog,
-    version: '1.0.222',
+    version: '1.0.223',
     authLogout: function () { window.__CALLS.authLogout++; return Promise.resolve({ ok: true }); },
     sessionLogin: noop, sessionLogout: noop,
   };
@@ -81,5 +81,5 @@ try {
     window.desktopAPI = new Proxy(full, { get: (t, k) => (k in t ? t[k] : fnProxy()) });
     window.api = window.desktopAPI;
   }
-  window.__APP_VERSION = '1.0.222';
+  window.__APP_VERSION = '1.0.223';
 } catch (_) {}

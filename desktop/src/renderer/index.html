@@ -10106,7 +10106,9 @@ function _rteWireGlobal(){
     if(k==='escape'){var w2=ed.closest('.rte');if(w2&&w2.querySelector('.rte-menu:not([hidden])')){ev.preventDefault();ev.stopPropagation();_rteCloseMenus(w2);ed.focus();}}
   },true);
   /* colagem: Word/Docs/HTML → SANITIZADA (allowlist); texto puro → parágrafos/quebras. Fallback
-   * determinístico via clipboard do Electron (IPC, texto) quando o evento vier vazio. */
+   * determinístico via clipboard do Electron (IPC, texto) quando o evento vier vazio.
+   * F3.5.5D — o corpo virou _rtePasteApply (MESMO pipeline, byte-equivalente em comportamento)
+   * para o fallback determinístico de Ctrl+V/Shift+Insert reutilizar o sanitizador idêntico. */
   document.addEventListener('paste',function(ev){
     var ed=ev.target&&ev.target.closest?ev.target.closest('.rte-ed'):null;
     if(!ed)return;
@@ -10114,33 +10116,39 @@ function _rteWireGlobal(){
     var htmlD='',txt='';
     try{htmlD=(ev.clipboardData&&ev.clipboardData.getData('text/html'))||'';}catch(_e){}
     try{txt=(ev.clipboardData&&ev.clipboardData.getData('text/plain'))||'';}catch(_e){}
-    /* execCommand é só GESTO; quando o engine o recusa (contexto sem foco do SO/evento
-       sintético) insere o MESMO canônico já sanitizado via Range+template (inerte) —
-       o rteSync canonicaliza o resultado nas duas vias. */
-    function ins(html){
-      var okc=false;
-      try{okc=document.execCommand('insertHTML',false,html);}catch(_e){}
-      if(!okc){
-        try{
-          var s=getSelection();
-          if(s&&s.rangeCount&&ed.contains(s.getRangeAt(0).startContainer)){
-            var r=s.getRangeAt(0);r.deleteContents();
-            var tp=document.createElement('template');tp.innerHTML=html;
-            var last=tp.content.lastChild;
-            r.insertNode(tp.content);
-            if(last){var nr=document.createRange();nr.setStartAfter(last);nr.collapse(true);s.removeAllRanges();s.addRange(nr);}
-          }
-        }catch(_e2){}
-      }
-      rteSync(ed.getAttribute('data-rteed'),ed);
-    }
-    if(htmlD){var cl=rteSanitize(htmlD);if(cl){ins(cl);return;}}
-    if(txt){ins(esc(txt).replace(/\r\n/g,'\n').replace(/\r/g,'\n').replace(/\n/g,'<br>'));return;}
-    try{if(window.desktopAPI&&typeof window.desktopAPI.clipboardReadText==='function'){window.desktopAPI.clipboardReadText().then(function(t2){if(t2)ins(esc(String(t2)).replace(/\r\n/g,'\n').replace(/\r/g,'\n').replace(/\n/g,'<br>'));});}}catch(_e){}
+    _rtePasteApply(ed,htmlD,txt);
   },true);
 }
 try{_rteWireGlobal();}catch(_e){}
-function newForm(sector){return {id:null,step:0,sector:sector||null,title:'',client:'',assigneeId:null,assignee:'',status:'afazer',startDate:'',startTime:'',endDate:'',endTime:'',dueDate:'',dueTime:'',priority:false,subtype:null,videoQty:null,scriptQty:null,fields:{},contents:[],items:[],videos:[],checklist:[],link:'',obs:'',_openContent:null,_sendAfterSave:false,_sending:false,_draftId:null,/* F3.5.4I — estado de envio + id idempotente do draft *//* F3.5.2 — Edição de Cards (aditivo): N cards avulsos + quantidade. F3.5.2A: cada card com INTERVALO
+/* F3.5.5D — aplicação canônica de colagem no editor rico: COLAR → SANITIZAR (rteSanitize allowlist)
+   → NORMALIZAR → INSERIR → PROJEÇÃO (rteSync grava canônico + texto). Usada pelo evento 'paste'
+   nativo E pelo fallback determinístico via IPC (Ctrl+V/Shift+Insert quando o accelerator falha). */
+function _rtePasteApply(ed,htmlD,txt){
+  /* execCommand é só GESTO; quando o engine o recusa (contexto sem foco do SO/evento
+     sintético) insere o MESMO canônico já sanitizado via Range+template (inerte) —
+     o rteSync canonicaliza o resultado nas duas vias. */
+  function ins(html){
+    var okc=false;
+    try{okc=document.execCommand('insertHTML',false,html);}catch(_e){}
+    if(!okc){
+      try{
+        var s=getSelection();
+        if(s&&s.rangeCount&&ed.contains(s.getRangeAt(0).startContainer)){
+          var r=s.getRangeAt(0);r.deleteContents();
+          var tp=document.createElement('template');tp.innerHTML=html;
+          var last=tp.content.lastChild;
+          r.insertNode(tp.content);
+          if(last){var nr=document.createRange();nr.setStartAfter(last);nr.collapse(true);s.removeAllRanges();s.addRange(nr);}
+        }
+      }catch(_e2){}
+    }
+    rteSync(ed.getAttribute('data-rteed'),ed);
+  }
+  if(htmlD){var cl=rteSanitize(htmlD);if(cl){ins(cl);return;}}
+  if(txt){ins(esc(txt).replace(/\r\n/g,'\n').replace(/\r/g,'\n').replace(/\n/g,'<br>'));return;}
+  try{if(window.desktopAPI&&typeof window.desktopAPI.clipboardReadText==='function'){window.desktopAPI.clipboardReadText().then(function(t2){if(t2)ins(esc(String(t2)).replace(/\r\n/g,'\n').replace(/\r/g,'\n').replace(/\n/g,'<br>'));});}}catch(_e){}
+}
+function newForm(sector){return {id:null,step:0,sector:sector||null,title:'',client:'',assigneeId:null,assignee:'',status:'afazer',startDate:'',startTime:'',endDate:'',endTime:'',dueDate:'',dueTime:'',priority:false,subtype:null,videoQty:null,scriptQty:null,cronQty:null,fields:{},contents:[],items:[],videos:[],checklist:[],link:'',obs:'',_openContent:null,_sendAfterSave:false,_sending:false,_draftId:null,/* F3.5.4I — estado de envio + id idempotente do draft *//* F3.5.2 — Edição de Cards (aditivo): N cards avulsos + quantidade. F3.5.2A: cada card com INTERVALO
    completo {tema,legenda,obs,startDate,startTime,endDate,endTime} (início + término; término=prazo) */cards:[],cardsQty:1};}
 /* F3.5.2 — quem pode CRIAR tarefas de Edição de Cards: Social Media / Administrador (contrato atual
    de supervisão). Designer recebe/movimenta, mas não cria em nome da Social. Gate SÓ do novo setor. */
@@ -10280,14 +10288,96 @@ function openScriptShrinkConfirm(extra,prevN,newN){
     '<div class="del-actions"><button class="btn ghost" data-sqshrinkcancel="1">Cancelar</button><button class="btn btn-danger" data-sqshrinkok="1">Remover e reduzir</button></div>'+
   '</div></div>';
 }
+/* ══ F3.5.5D — CRONOGRAMA: QUANTIDADE PERSONALIZADA DE TEMAS (espelho fiel do padrão F3.5.4V/
+   F3.5.5C aprovado). O usuário define LIVREMENTE quantos conteúdos (blocos Tema/Legenda) o
+   Cronograma terá — os chips fixos de Periodicidade (Semanal/Quinzenal/Mensal) saem do fluxo de
+   CRIAÇÃO; tarefas antigas com subtipo legado permanecem 100% compatíveis (contagem = array real).
+   Teto TÉCNICO idêntico ao do Roteiro (render de N blocos no DOM e documento único ≤1MiB no
+   Firestore); ao exceder, mensagem clara e valor mantido no teto (nunca em silêncio). */
+var CRON_QTY_MAX=500;
+function normCronQty(raw){
+  var s=String(raw==null?'':raw).trim();
+  if(s==='')return '';
+  var n=Math.floor(Number(s));
+  if(!isFinite(n))return '';
+  if(n<1)return 1;
+  if(n>CRON_QTY_MAX){ try{ if(typeof flashToast==='function')flashToast('Quantidade máxima por tarefa: '+CRON_QTY_MAX+' conteúdos (limite técnico). Para mais, divida em tarefas.'); }catch(_){ } return CRON_QTY_MAX; }
+  return n;
+}
+/* Quantidade CANÔNICA de conteúdos do Cronograma: cronQty (fonte da verdade na criação). Fallback
+   defensivo SÓ em modo edição (f.id): tamanho REAL do array de conteúdos (a quantidade verdadeira,
+   nunca migração), ou o mapa legado semanal/quinzenal/mensal → 3/6/12. null = vazio. */
+function cronQtyOf(f){
+  if(!f)return null;
+  var raw=f.cronQty;
+  if(raw!==null&&raw!==undefined&&String(raw).trim()!==''){
+    var n=Math.floor(Number(raw));
+    return (isFinite(n)&&n>=1)?Math.min(n,CRON_QTY_MAX):null;
+  }
+  if(f.id){
+    if(Array.isArray(f.contents)&&f.contents.length)return Math.min(f.contents.length,CRON_QTY_MAX);
+    var m={semanal:3,quinzenal:6,mensal:12}; if(f.subtype&&m[f.subtype])return m[f.subtype];
+  }
+  return null;
+}
+/* Subtipo SINTÉTICO do Cronograma dirigido por N — MESMO contrato (formTitle/contentCount/fields/
+   checklist) dos subtipos fixos; TODO o pipeline a jusante (blocos tema/legenda, revisão,
+   composedDesc, cronContents, portal, aprovação) permanece idêntico — só a ORIGEM da contagem muda.
+   Em EDIÇÃO de tarefa legada (f.id + subtipo semanal/quinzenal/mensal) preserva os fields e o
+   checklist ORIGINAIS do subtipo (semana_ref/período/mês + canais) com a contagem REAL — nenhuma
+   informação histórica é apagada. Criação nova usa campos neutros de período + canais. */
+function synthCronSub(n,f){
+  if(!(isFinite(n)&&n>=1))return null;
+  var leg=null;
+  try{ if(f&&f.id&&f.subtype){var _t=TEMPLATES.cronograma; leg=(_t&&_t.subtypes&&_t.subtypes[f.subtype])||null;} }catch(_e){leg=null;}
+  var cnt=n+(n===1?' conteúdo':' conteúdos');
+  return {label:cnt,
+    formTitle:(leg?('Cronograma '+String(leg.label||'').toLowerCase()+' — '+cnt):('Cronograma — '+cnt)),
+    contentCount:n,
+    fields:leg?leg.fields:[{k:'periodo',l:'Período de referência',kind:'text',ph:'Ex.: Junho/2026'},{k:'canais',l:'Canais',kind:'choice',opts:['Instagram','Facebook','YouTube','WhatsApp']}],
+    checklist:leg?leg.checklist:['Definir temas','Organizar datas','Revisar cronograma','Aprovar cronograma','Enviar para produção']};
+}
+/* COMMIT central da quantidade de temas do Cronograma (digitação/colagem/setas via change, botões −/+).
+   Aumentar NUNCA toca itens existentes (novos blocos nascem vazios; nada é reordenado nem deslocado).
+   Diminuir: excedentes VAZIOS cortam direto; com QUALQUER conteúdo (tema/legenda/rico) → confirmação
+   explícita (Cancelar mantém tudo; Confirmar remove SÓ os excedentes). Nada se perde em silêncio. */
+function cronQtyCommit(newRaw){
+  var f=state.form; if(!f)return;
+  var prevN=cronQtyOf(f)||0;
+  var raw=String(newRaw==null?'':newRaw).trim();
+  f._cqErr=(raw!==''&&!(/^\d+$/.test(raw)&&Number(raw)>=1));
+  var norm=normCronQty(newRaw);
+  var newN=(norm===''?null:norm);
+  var extra=0;
+  if(newN!==null&&Array.isArray(f.contents)){
+    for(var i=newN;i<f.contents.length;i++){var c=f.contents[i];
+      if(c&&((c.tema&&String(c.tema).trim())||(c.legenda&&String(c.legenda).trim())||c.temaRich||c.legendaRich))extra++;}
+  }
+  if(newN!==null&&newN<prevN&&extra>0){ f._cqPend=newN; openCronShrinkConfirm(extra,prevN,newN); return; }
+  f.cronQty=norm;
+  if(newN!==null&&Array.isArray(f.contents)&&f.contents.length>newN)f.contents.length=newN; /* só vazios chegam aqui */
+  if(typeof f._openContent==='number'&&newN!==null&&f._openContent>=newN)f._openContent=null;
+  render();
+}
+function openCronShrinkConfirm(extra,prevN,newN){
+  document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg-keep="1"><div class="sheet" style="max-width:460px"><div class="grab"></div>'+
+    '<div style="font-size:18px;font-weight:800;margin-bottom:8px">Reduzir para '+newN+(newN===1?' conteúdo':' conteúdos')+'?</div>'+
+    '<div style="font-size:13.5px;color:var(--soft);line-height:1.55;margin-bottom:6px">Existem <b style="color:var(--ink)">'+extra+(extra===1?' conteúdo preenchido':' conteúdos preenchidos')+'</b> além do conteúdo '+newN+'. Ao confirmar, esses itens excedentes serão <b style="color:#F87171">removidos</b> do formulário.</div>'+
+    '<div style="font-size:12.5px;color:var(--faint);margin-bottom:14px">Os conteúdos 1 a '+newN+' permanecem exatamente como estão. Cancelar mantém todos os dados.</div>'+
+    '<div class="del-actions"><button class="btn ghost" data-cqshrinkcancel="1">Cancelar</button><button class="btn btn-danger" data-cqshrinkok="1">Remover e reduzir</button></div>'+
+  '</div></div>';
+}
 function curSub(){
   const t=tpl(); if(!t)return null;
   /* F3.5.4V — Edição de vídeos usa QUANTIDADE personalizada (subtipo sintético), não mais os chips
      fixos p4/p6/p12. Demais setores (Cronograma/Copywriting/Roteiro) mantêm t.subtypes intactos. */
   if(secOf(state.form.sector).key==='edicao_midia')return synthVideoSub(videoQtyOf(state.form));
   /* F3.5.5C — Roteiro usa QUANTIDADE personalizada (subtipo sintético) no lugar dos chips
-     q4/q6/q8/q12. Cronograma/Copywriting mantêm t.subtypes intactos. */
+     q4/q6/q8/q12. Copywriting mantém t.subtypes intactos. */
   if(secOf(state.form.sector).key==='roteiro')return synthScriptSub(scriptQtyOf(state.form));
+  /* F3.5.5D — Cronograma usa QUANTIDADE personalizada de temas (subtipo sintético) no lugar dos
+     chips Semanal/Quinzenal/Mensal. Copywriting segue com t.subtypes intactos (fora do escopo). */
+  if(secOf(state.form.sector).key==='cronograma')return synthCronSub(cronQtyOf(state.form),state.form);
   return (t.subtypes&&state.form.subtype)?t.subtypes[state.form.subtype]:null;
 }
 function renderForm(){
@@ -10419,6 +10509,21 @@ function stepBriefing(){const f=state.form;const t=tpl();const s=secOf(f.sector)
           +'<span class="vqty-suffix">'+(_sqn===1?'roteiro':'roteiros')+'</span>'
         +'</div>'
         +'<div class="sq-err" id="sqErr" role="alert"'+(f._sqErr?'':' hidden')+'>Informe uma quantidade inteira igual ou superior a 1.</div>';
+    }else if(secOf(f.sector).key==='cronograma'){
+      /* F3.5.5D — Cronograma: QUANTIDADE DE TEMAS personalizada [−][N][+] no lugar dos chips fixos
+         de Periodicidade (Semanal/Quinzenal/Mensal). Mesmo componente aprovado da F3.5.4V/F3.5.5C:
+         inteiro ≥1; digitação direta, apagar, selecionar, substituir, colar, setas do teclado e Tab
+         no input nativo type=number. Em edição de tarefa legada reflete a contagem REAL. */
+      var _cqn=cronQtyOf(f);
+      var _cq=(f.cronQty===0||f.cronQty)?f.cronQty:(_cqn||'');
+      h+='<div class="lbl">Quantidade de temas</div>'
+        +'<div class="vqty-row">'
+          +'<button type="button" class="vqty-btn" data-cqminus="1" aria-label="Diminuir quantidade"'+((!(_cqn>1))?' disabled':'')+'>−</button>'
+          +'<input class="inp vqty-input" id="fCronQty" type="number" min="1" step="1" inputmode="numeric" placeholder="Ex.: 10" aria-label="Quantidade de temas" value="'+esc(_cq)+'">'
+          +'<button type="button" class="vqty-btn" data-cqplus="1" aria-label="Aumentar quantidade">+</button>'
+          +'<span class="vqty-suffix">'+(_cqn===1?'tema':'temas')+'</span>'
+        +'</div>'
+        +'<div class="sq-err" id="cqErr" role="alert"'+(f._cqErr?'':' hidden')+'>Informe uma quantidade inteira igual ou superior a 1.</div>';
     }else{
       h+='<div class="lbl">'+esc(t.subLabel||'Tipo')+'</div><div class="chips" style="margin-bottom:14px">'+Object.keys(t.subtypes).map(k=>'<button class="chip" data-fsub="'+k+'" style="'+(f.subtype===k?'background:var(--accent);border-color:transparent;color:#fff':'')+'">'+esc(t.subtypes[k].label)+'</button>').join('')+'</div>';
     }
@@ -10580,6 +10685,10 @@ function afterForm(){
      o COMMIT (change/blur/Enter/setas) valida+normaliza+confirma corte via scriptQtyCommit. */
   bind('#fScriptQty',e=>{state.form.scriptQty=e.value;});
   {var _sqEl=c.querySelector('#fScriptQty'); if(_sqEl){_sqEl.onchange=function(ev){scriptQtyCommit(ev&&ev.target?ev.target.value:_sqEl.value);};}}
+  /* F3.5.5D — Cronograma: mesmo contrato do Roteiro — o input espelha a digitação livremente;
+     o COMMIT (change/blur/Enter/setas/colagem) valida+normaliza+confirma corte via cronQtyCommit. */
+  bind('#fCronQty',e=>{state.form.cronQty=e.value;});
+  {var _cqEl=c.querySelector('#fCronQty'); if(_cqEl){_cqEl.onchange=function(ev){cronQtyCommit(ev&&ev.target?ev.target.value:_cqEl.value);};}}
   bind('[data-cardtema]',e=>{const i=+e.dataset.cardtema;state.form.cards[i]=state.form.cards[i]||{};state.form.cards[i].tema=e.value;});
   bind('[data-cardleg]',e=>{const i=+e.dataset.cardleg;state.form.cards[i]=state.form.cards[i]||{};state.form.cards[i].legenda=e.value;});
   bind('[data-cardobs]',e=>{const i=+e.dataset.cardobs;state.form.cards[i]=state.form.cards[i]||{};state.form.cards[i].obs=e.value;});
@@ -10606,6 +10715,7 @@ function f353IsTextField(el){ if(!el||!el.tagName) return false; var tag=el.tagN
 function f353InsertPlainText(el, text){
   try{
     if(!el||!f353IsTextField(el)) return false;
+    if(el.readOnly||el.disabled) return false;   /* F3.5.5D — NUNCA colar em campo readOnly/disabled (choke-point único de inserção) */
     var t=String(text==null?'':text).replace(/\r\n/g,'\n').replace(/\r/g,'\n');
     if(!t) return false;
     var s=(typeof el.selectionStart==='number')?el.selectionStart:el.value.length;
@@ -10642,23 +10752,105 @@ function f353WirePasteRecovery(root){
       f353PasteFromClipboard(el);
     }
   }, true);
-  // (3) menu de contexto próprio — Colar/Copiar/Recortar, só nos campos de texto do formulário.
+  // (3) menu de contexto — F3.5.5D: o menu DOM próprio (f353Ctx) foi SUBSTITUÍDO pelo menu de
+  // contexto NATIVO do Electron (roles undo/redo/cut/copy/paste/selectAll no main, editContextMenu),
+  // que cobre TODOS os campos editáveis do app (superset desta superfície). O listener permanece
+  // como passthrough documentado: NÃO chama preventDefault (o evento chega ao main, que decide
+  // pelo params.isEditable) e NÃO monta menu DOM — zero duplicidade de menus.
   root.addEventListener('contextmenu', function(ev){
     if(!state.form) return; var el=ev.target; if(!f353IsTextField(el)) return;
-    ev.preventDefault(); f353CloseCtxMenu();
-    var m=document.createElement('div'); m.id='f353Ctx';
-    m.style.cssText='position:fixed;z-index:99999;background:var(--surface2,#1a1c24);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:6px;min-width:150px;box-shadow:0 12px 32px rgba(0,0,0,.45)';
-    function mi(label,fn){ var b=document.createElement('button'); b.textContent=label; b.style.cssText='display:block;width:100%;text-align:left;background:transparent;border:0;color:inherit;font:inherit;padding:8px 10px;border-radius:8px;cursor:pointer'; b.onmouseenter=function(){b.style.background='rgba(255,255,255,.08)';}; b.onmouseleave=function(){b.style.background='transparent';}; b.onclick=function(e){ e.preventDefault(); f353CloseCtxMenu(); fn(); }; return b; }
-    m.appendChild(mi('Colar', function(){ try{ el.focus(); }catch(_){} f353PasteFromClipboard(el); }));
-    m.appendChild(mi('Copiar', function(){ try{ var s=el.selectionStart||0, e2=el.selectionEnd||0; var v=(e2>s)?el.value.slice(s,e2):el.value; if(v&&typeof _copy==='function') _copy(v); }catch(_){} }));
-    m.appendChild(mi('Recortar', function(){ try{ var s=el.selectionStart||0, e2=el.selectionEnd||0; var v=el.value.slice(s,e2); if(v){ if(typeof _copy==='function') _copy(v); el.setRangeText('', s, e2, 'end'); el.dispatchEvent(new Event('input',{bubbles:true})); } }catch(_){} }));
-    var x=Math.min(ev.clientX, (window.innerWidth||1200)-170), y=Math.min(ev.clientY, (window.innerHeight||800)-140);
-    m.style.left=x+'px'; m.style.top=y+'px';
-    document.body.appendChild(m);
-    setTimeout(function(){ document.addEventListener('click', f353CloseCtxMenu, { once:true }); },0);
+    /* menu nativo assume (main.ts editContextMenu) — nada a fazer aqui */
   }, true);
 }
 try{ window.__f353InsertPlainText=f353InsertPlainText; window.__f353IsTextField=f353IsTextField; }catch(_){}
+/* ════ F3.5.5D — COLAGEM UNIVERSAL (todos os campos realmente editáveis do app) ════
+   Causa provada (herdada da F3.5.3): app sem menu de aplicação (main.ts removeMenu) ⇒ sem
+   accelerators/menu de edição registrados e SEM fallback fora do wizard — o caminho determinístico
+   f353 era escopado a state.form e excluía type=number; o RTE dependia do EVENTO nativo de paste.
+   Este pipeline UNIVERSAL (document, fase de CAPTURA — roda antes dos handlers escopados e os
+   substitui com as MESMAS funções) cobre: (a) todo input de texto/textarea editável do app
+   (Agenda, observações, Central de Detalhes, Configurações, correção, login, wizard, modais,
+   accordions); (b) o editor rico via fallback determinístico com o MESMO sanitizador
+   (_rtePasteApply ← clipboardReadHTML/Text por IPC); (c) campos numéricos de quantidade
+   (fCronQty/fScriptQty/fVideoQty/fCardsQty/Configurações) com validação VISÍVEL, nunca correção
+   silenciosa. Campos readOnly/disabled e controles não editáveis ficam intocados. O menu de
+   contexto é NATIVO (roles do Electron; editContextMenu no main). Nenhum conteúdo de clipboard
+   vai a logs/telemetria. Ctrl+C/X/A/Z/Y seguem NATIVOS (nenhum interceptador novo). */
+function f355dEditableTextEl(el){
+  if(!el||!f353IsTextField(el))return null;
+  if(el.readOnly||el.disabled)return null;
+  return el;
+}
+function f355dNumberEl(el){
+  if(!el||!el.tagName||String(el.tagName).toLowerCase()!=='input')return null;
+  if(String(el.getAttribute('type')||'').toLowerCase()!=='number')return null;
+  if(el.readOnly||el.disabled)return null;
+  return el;
+}
+/* Colagem em campo numérico: entrega o texto CRU ao commit do campo (onchange) — a validação do
+   próprio campo decide e MOSTRA a mensagem (ex.: "Informe uma quantidade inteira igual ou superior
+   a 1."); letras/decimais/negativos NUNCA viram outro valor em silêncio. */
+function f355dPasteIntoNumber(el,txt){
+  var raw=String(txt==null?'':txt).trim();
+  if(raw==='')return;
+  if(/^\d+$/.test(raw)){ try{ el.value=raw; }catch(_){} try{ el.dispatchEvent(new Event('input',{bubbles:true})); }catch(_){} }
+  if(typeof el.onchange==='function'){ try{ el.onchange({target:{value:raw}}); }catch(_){} }
+  else { try{ el.dispatchEvent(new Event('change',{bubbles:true})); }catch(_){} }
+}
+/* Fallback determinístico do RTE: lê text/html + text/plain do clipboard via IPC do Electron e
+   aplica o MESMO pipeline sanitizado do evento nativo (_rtePasteApply). */
+async function f355dRtePasteViaIPC(ed){
+  var htmlD='',txt='';
+  try{ if(window.desktopAPI&&typeof window.desktopAPI.clipboardReadHTML==='function') htmlD=await window.desktopAPI.clipboardReadHTML(); }catch(_){ htmlD=''; }
+  try{ if(window.desktopAPI&&typeof window.desktopAPI.clipboardReadText==='function') txt=await window.desktopAPI.clipboardReadText(); }catch(_){ txt=''; }
+  if(!txt&&!htmlD){ try{ if(navigator.clipboard&&navigator.clipboard.readText) txt=await navigator.clipboard.readText(); }catch(_){ txt=''; } }
+  try{ ed.focus(); }catch(_){}
+  _rtePasteApply(ed,String(htmlD||''),String(txt||''));
+}
+function f355dWireUniversalPaste(){
+  if(document.__f355dPaste)return; document.__f355dPaste=true;
+  /* (1) evento 'paste' — QUALQUER origem (menu nativo "Colar", Ctrl+V nativo, colagem do SO):
+     campos simples SEMPRE recebem texto PURO no cursor (HTML nunca entra em input/textarea);
+     o RTE segue no handler sanitizado próprio (este handler o ignora). */
+  document.addEventListener('paste',function(ev){
+    var t=ev.target;
+    if(t&&t.closest&&t.closest('.rte-ed'))return;               /* RTE: pipeline sanitizado próprio */
+    var el=f355dEditableTextEl(t);
+    if(el){
+      var txt=''; try{ txt=(ev.clipboardData&&ev.clipboardData.getData&&ev.clipboardData.getData('text/plain'))||''; }catch(_){ txt=''; }
+      ev.preventDefault(); ev.stopPropagation();
+      if(txt) f353InsertPlainText(el,txt); else f353PasteFromClipboard(el);
+      return;
+    }
+    var ne=f355dNumberEl(t);
+    if(ne){
+      var tn=''; try{ tn=(ev.clipboardData&&ev.clipboardData.getData&&ev.clipboardData.getData('text/plain'))||''; }catch(_){ tn=''; }
+      ev.preventDefault(); ev.stopPropagation();
+      if(tn){ f355dPasteIntoNumber(ne,tn); }
+      else { try{ if(window.desktopAPI&&typeof window.desktopAPI.clipboardReadText==='function') window.desktopAPI.clipboardReadText().then(function(t2){ f355dPasteIntoNumber(ne,t2); }); }catch(_){} }
+    }
+  },true);
+  /* (2) Ctrl+V / Meta+V / Shift+Insert — caminho DETERMINÍSTICO via clipboard do Electron (IPC),
+     independente do accelerator nativo. preventDefault ANTES do IPC ⇒ nunca cola em dobro. */
+  document.addEventListener('keydown',function(ev){
+    var isV=(ev.key==='v'||ev.key==='V'||ev.keyCode===86);
+    var isIns=(ev.key==='Insert'||ev.keyCode===45);
+    if(!(((ev.ctrlKey||ev.metaKey)&&!ev.altKey&&isV)||(ev.shiftKey&&isIns)))return;
+    var t=ev.target;
+    var ed=t&&t.closest?t.closest('.rte-ed'):null;
+    if(ed){ ev.preventDefault(); ev.stopPropagation(); f355dRtePasteViaIPC(ed); return; }
+    var el=f355dEditableTextEl(t);
+    if(el){ ev.preventDefault(); ev.stopPropagation(); f353PasteFromClipboard(el); return; }
+    var ne=f355dNumberEl(t);
+    if(ne){ ev.preventDefault(); ev.stopPropagation();
+      try{ if(window.desktopAPI&&typeof window.desktopAPI.clipboardReadText==='function') window.desktopAPI.clipboardReadText().then(function(t2){ f355dPasteIntoNumber(ne,t2); }); }catch(_){}
+      return;
+    }
+    /* fora de campo editável: NADA (nenhuma ação indevida; atalhos globais preservados) */
+  },true);
+}
+try{ f355dWireUniversalPaste(); }catch(_){}
+try{ window.__f355dEditableTextEl=f355dEditableTextEl; window.__f355dNumberEl=f355dNumberEl; window.__f355dPasteIntoNumber=f355dPasteIntoNumber; }catch(_){}
 function composedDesc(){const f=state.form;const sub=curSub();const t=tpl();let lines=[];
   if(sub)lines.push(sub.formTitle);
   const fields=(sub?sub.fields:(t?t.fields:[]))||[];
@@ -11470,6 +11662,11 @@ document.addEventListener('click',async e=>{
   if(el=g('[data-sqminus]')){var _sqm=Math.floor(Number(state.form&&state.form.scriptQty));var _sqc=(isFinite(_sqm)&&_sqm>=1)?_sqm:(scriptQtyOf(state.form)||0);if(_sqc>1)scriptQtyCommit(_sqc-1);return;}
   if(el=g('[data-sqshrinkok]')){var _f1=state.form;if(_f1&&typeof _f1._sqPend==='number'){_f1.scriptQty=_f1._sqPend;if(Array.isArray(_f1.contents))_f1.contents.length=_f1._sqPend;if(typeof _f1._openContent==='number'&&_f1._openContent>=_f1._sqPend)_f1._openContent=null;delete _f1._sqPend;_f1._sqErr=false;}closeModal();render();return;}
   if(el=g('[data-sqshrinkcancel]')){var _f2=state.form;if(_f2){delete _f2._sqPend;}closeModal();render();return;}
+  /* F3.5.5D — Cronograma: botões −/+ e confirmação de corte da QUANTIDADE DE TEMAS (espelho do sq). */
+  if(el=g('[data-cqplus]')){var _cqp=Math.floor(Number(state.form&&state.form.cronQty));var _cqb=(isFinite(_cqp)&&_cqp>=1)?_cqp:(cronQtyOf(state.form)||0);cronQtyCommit(_cqb+1);return;}
+  if(el=g('[data-cqminus]')){var _cqm=Math.floor(Number(state.form&&state.form.cronQty));var _cqc=(isFinite(_cqm)&&_cqm>=1)?_cqm:(cronQtyOf(state.form)||0);if(_cqc>1)cronQtyCommit(_cqc-1);return;}
+  if(el=g('[data-cqshrinkok]')){var _fc1=state.form;if(_fc1&&typeof _fc1._cqPend==='number'){_fc1.cronQty=_fc1._cqPend;if(Array.isArray(_fc1.contents))_fc1.contents.length=_fc1._cqPend;if(typeof _fc1._openContent==='number'&&_fc1._openContent>=_fc1._cqPend)_fc1._openContent=null;delete _fc1._cqPend;_fc1._cqErr=false;}closeModal();render();return;}
+  if(el=g('[data-cqshrinkcancel]')){var _fc2=state.form;if(_fc2){delete _fc2._cqPend;}closeModal();render();return;}
   if(el=g('[data-fchoice]')){const p=el.dataset.fchoice.split('|');state.form.fields[p[0]]=p[1];render();return;}
   if(el=g('[data-fbool]')){const k=el.dataset.fbool;state.form.fields[k]=!state.form.fields[k];render();return;}
   if(el=g('[data-content]')){state.form._openContent=(state.form._openContent===+el.dataset.content)?null:+el.dataset.content;render();return;}
@@ -11509,6 +11706,13 @@ function stepNext(){const f=state.form;
     f.step=Math.min(3,f.step+1);render();return;
   }
   if(f.step===1){const t=tpl();if(t&&t.clientRequired&&!f.client.trim()){alert('Para '+secOf(state.form.sector).label+' o cliente é obrigatório.');return;}if(!f.title.trim()){alert('Informe o título.');return;}}
+  /* F3.5.5D — Cronograma: não avança do Briefing sem quantidade válida (campo vazio ao avançar
+     NÃO é aceito — regra do mandato). A mensagem literal aparece no cqErr e o foco volta ao campo. */
+  if(f.step===2&&f.sector&&secOf(f.sector).key==='cronograma'&&!cronQtyOf(f)){
+    f._cqErr=true;render();
+    try{var _ce=document.getElementById('fCronQty');if(_ce)_ce.focus();}catch(_){}
+    return;
+  }
   f.step=Math.min(3,f.step+1);render();
 }
 

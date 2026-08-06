@@ -10,7 +10,7 @@
  *   • collection('events').doc(id).update(patch): REGISTRA {coll,id,patch} em
  *     window.__PATCHES e RESOLVE; .delete(): REGISTRA em window.__DELETES e RESOLVE
  *     (prova da exclusão definitiva SÓ após digitar EXCLUIR).
- *   • desktopAPI.version='1.0.222'; window.__DIAG registra cada diagLog. */
+ *   • desktopAPI.version='1.0.223'; window.__DIAG registra cada diagLog. */
 const noop = function () {};
 function fnProxy() { return new Proxy(noop, { get: () => fnProxy(), apply: () => undefined }); }
 
@@ -77,12 +77,12 @@ try {
     authSelf: authSelf,
     diagLog: diagLog,
     clipboardWriteText: function (s) { return Promise.resolve(true); },
-    version: '1.0.222',
+    version: '1.0.223',
     authLogout: function () { return Promise.resolve({ ok: true }); },
     sessionLogin: noop,
     sessionLogout: noop
   };
   window.desktopAPI = new Proxy(desktopAPI, { get: function (t, k) { return (k in t ? t[k] : fnProxy()); } });
   window.api = window.desktopAPI;
-  window.__APP_VERSION = '1.0.222';
+  window.__APP_VERSION = '1.0.223';
 } catch (_) {}

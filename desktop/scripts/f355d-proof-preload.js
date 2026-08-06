@@ -1,24 +1,20 @@
-/* F3.5.5A-H1 — PRELOAD de prova (offline, dirigido por SEMENTE). Mesmo padrão aprovado do
- * harness F3.5.4W-H1: injeta um STUB mínimo de `firebase` ANTES do script da página (o renderer
- * carrega firebase do CDN gstatic — sem rede isso falharia em firebase.initializeApp) e ENTREGA
- * uma SEMENTE REAL via collection(name).onSnapshot(cb) no formato que o renderer de produção
- * consome. TODO o DOM medido é produzido pelo CÓDIGO DE PRODUÇÃO (openDetails, detNoteOpen,
- * detNoteSave, detNoteCancel, openDesignerDeadline…) a partir de estado semeado — sem IA,
- * sem mockup, sem HTML à mão.
+/* F3.5.5D — PRELOAD de prova (offline, dirigido por SEMENTE). Mesmo padrão aprovado do
+ * harness F3.5.5C: stub mínimo de `firebase` ANTES do script da página + SEMENTE REAL via
+ * collection(name).onSnapshot(cb). Todo o DOM medido é do CÓDIGO DE PRODUÇÃO.
  *
- * ESPECÍFICO DA F3.5.5A-H1:
- *   • collection('tasks').doc(id).update(patch): REGISTRA {id, patch} em window.__PATCHES e
- *     REJEITA com {code:'unavailable'} enquanto window.__DB_FAIL=true (prova de falha de rede
- *     mantendo o texto) — senão RESOLVE. Nada é aplicado pelo stub: o pós-sucesso otimista é
- *     exercitado no código REAL (detNoteSave).
- *   • FieldValue.delete() marcado como {__del:true} (prova do vazio ⇒ remoção da chave).
- *   • desktopAPI.version='1.0.223'; window.__DIAG registra cada diagLog (observabilidade). */
+ * ESPECÍFICO DA F3.5.5D (colagem universal):
+ *   • desktopAPI.clipboardReadText/clipboardReadHTML usam os MESMOS canais IPC de produção
+ *     ("clipboard-read-text"/"clipboard-read-html"), registrados no main do harness com o
+ *     MESMO código do main.ts — o caminho determinístico Ctrl+V/Shift+Insert é provado de
+ *     ponta a ponta contra o clipboard REAL do Electron.
+ *   • clipboardWriteText registra em window.__CLIPS (paridade com o harness f355c). */
+const { ipcRenderer } = require('electron');
 const noop = function () {};
 function fnProxy() { return new Proxy(noop, { get: () => fnProxy(), apply: () => undefined }); }
 
 let SEED = { self: null, users: [], tasks: [], events: [] };
 try {
-  const _p = require('path').join(require('os').tmpdir(), 'f355ah1-seed.json');
+  const _p = require('path').join(require('os').tmpdir(), 'f355d-seed.json');
   SEED = JSON.parse(require('fs').readFileSync(_p, 'utf8')) || SEED;
 } catch (_) {}
 const SELF = SEED.self || { id: 'u-self', name: 'Admin', role: 'Administrador', admin: true };
@@ -40,7 +36,7 @@ function docStub(coll, id) {
       if (window.__DB_FAIL) { const e = new Error('unavailable'); e.code = 'unavailable'; return Promise.reject(e); }
       return Promise.resolve();
     },
-    delete: function () { return Promise.resolve(); } };
+    delete: function () { try { window.__DELETES.push({ coll: coll, id: id }); } catch (_) {} return Promise.resolve(); } };
 }
 function collStub(name) {
   const known = (name === 'usersPublic' || name === 'tasks' || name === 'events');
@@ -66,6 +62,8 @@ firestoreFn.Timestamp = { now: function () { return { toMillis: function () { re
 
 window.__DIAG = [];
 window.__PATCHES = [];
+window.__DELETES = [];
+window.__CLIPS = [];
 window.__DB_FAIL = false;
 function authSelf() { return Promise.resolve({ ok: true, self: Object.assign({}, SELF) }); }
 function diagLog(ev, payload) { try { window.__DIAG.push({ ev: ev, p: payload || {} }); } catch (_) {} }
@@ -77,7 +75,10 @@ try {
   const desktopAPI = {
     authSelf: authSelf,
     diagLog: diagLog,
-    clipboardWriteText: function (s) { return Promise.resolve(true); },
+    clipboardWriteText: function (s) { try { window.__CLIPS.push(String(s)); } catch (_) {} return Promise.resolve(true); },
+    /* MESMOS canais IPC de produção — clipboard REAL do Electron via main do harness */
+    clipboardReadText: function () { return ipcRenderer.invoke('clipboard-read-text'); },
+    clipboardReadHTML: function () { return ipcRenderer.invoke('clipboard-read-html'); },
     version: '1.0.223',
     authLogout: function () { return Promise.resolve({ ok: true }); },
     sessionLogin: noop,

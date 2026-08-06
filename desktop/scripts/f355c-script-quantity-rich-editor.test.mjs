@@ -1,4 +1,4 @@
-// F3.5.5C — QUANTIDADE PERSONALIZADA DE ROTEIROS + EDITOR RICO (Desktop 1.0.222): suíte estática.
+// F3.5.5C — QUANTIDADE PERSONALIZADA DE ROTEIROS + EDITOR RICO (Desktop 1.0.223): suíte estática.
 // A) versão · B) 35 testes obrigatórios da QUANTIDADE · C) 50 testes obrigatórios do EDITOR ·
 // D) segurança · E) Worker (portal) · F) congelados/isolamento.
 // Roda contra o fonte real (ou SRC= p/ gate empacotado). O Worker é lido do repo (WSRC= opcional).
@@ -34,6 +34,9 @@ const rte = seg('/* ════════════════ F3.5.5C —
 const sanit = seg('function rteSanitize(html){', 'function richToPlain(html){', 'sanitize');
 const proj = seg('function richToPlain(html){', 'function plainToRich(text){', 'projeção');
 const wire = seg('function _rteWireGlobal(){', 'try{_rteWireGlobal();}catch(_e){}', 'wire');
+// RE-PINADO F3.5.5D: o corpo da colagem do RTE virou _rtePasteApply (mesmo pipeline sanitizado),
+// reutilizado pelo evento nativo E pelo fallback determinístico Ctrl+V/Shift+Insert via IPC.
+const pasteApply = seg('function _rtePasteApply(ed,htmlD,txt){', 'function newForm(sector){', 'pasteApply');
 const ce = seg('function openContentEditor(taskId){', '/* ===== PRODUÇÃO DO CONTEÚDO', 'content-editor');
 const fixo = seg('function openItemFix(taskId,idx,field){', 'function detFooter(t,cron){', 'item-fix');
 const prod = seg('function openProductionModal(taskId){', 'async function saveProduction(taskId,resend){', 'produção');
@@ -43,11 +46,11 @@ const wrte = wseg('/* ═══ F3.5.5C — TEMA/LEGENDA RICOS NO PORTAL', 'func
 const wrender = wseg('contentsHtml = items.map(function (raw, i) {', 'histórico granular', 'worker-render');
 const wstate = wseg('async function handleClientCronogramaState(token, env)', 'Persistência ADITIVA e granular', 'worker-state');
 
-console.log('— A) versão 1.0.222 —');
+console.log('— A) versão 1.0.223 —');
 const pkg = JSON.parse(R('package.json'));
-ok('A1 package.json 1.0.222 (custom-script-quantity-rich-editor)', pkg.version === '1.0.222' && /custom-script-quantity-rich-editor/.test(pkg.description || ''));
-ok('A2 package-lock 1.0.222', JSON.parse(R('package-lock.json')).version === '1.0.222');
-ok('A3 lock packages[""] 1.0.222', JSON.parse(R('package-lock.json')).packages[''].version === '1.0.222');
+ok('A1 package.json 1.0.223 (custom-script-quantity-rich-editor)', pkg.version === '1.0.223' && /custom-script-quantity-rich-editor/.test(pkg.description || ''));
+ok('A2 package-lock 1.0.223', JSON.parse(R('package-lock.json')).version === '1.0.223');
+ok('A3 lock packages[""] 1.0.223', JSON.parse(R('package-lock.json')).packages[''].version === '1.0.223');
 
 console.log('— B) QUANTIDADE PERSONALIZADA DE ROTEIROS (35 obrigatórios) —');
 ok('B1 quantidade 1: subtipo sintético aceita n=1 com singular ("1 roteiro")', has(qcore, "return {label:n+(n===1?' roteiro':' roteiros')") && has(qcore, 'if(!(isFinite(n)&&n>=1))return null;'));
@@ -107,7 +110,7 @@ ok('C17 desfazer: botão undo + Ctrl+Z nativo do CE (não interceptado)', has(rt
 ok('C18 refazer: botão redo (Ctrl+Y nativo)', has(rte, "_rteBtn('redo','Refazer (Ctrl+Y)'"));
 ok('C19 limpar formatação: removeFormat+unlink + strip dos spans de paleta/tamanho', has(rte, "document.execCommand('removeFormat');document.execCommand('unlink');") && has(rte, "ed.querySelectorAll('span[data-cl],span[data-hl],span[data-fs]')"));
 ok('C20 atalhos NÃO vazam p/ o app (stopPropagation escopado ao editor)', count(wire, 'ev.stopPropagation()') >= 6 && has(wire, "var ed=ev.target&&ev.target.closest?ev.target.closest('.rte-ed'):null;\n    if(!ed)return;"));
-ok('C21 colar do Word: text/html sanitizado ANTES de inserir (mso/class/id descartados)', has(wire, "htmlD=(ev.clipboardData&&ev.clipboardData.getData('text/html'))||'';") && has(wire, 'var cl=rteSanitize(htmlD);if(cl){ins(cl);return;}'));
+ok('C21 colar do Word: text/html sanitizado ANTES de inserir (mso/class/id descartados) [RE-PINADO F3.5.5D: pipeline em _rtePasteApply]', has(wire, "htmlD=(ev.clipboardData&&ev.clipboardData.getData('text/html'))||'';") && has(wire, '_rtePasteApply(ed,htmlD,txt)') && has(pasteApply, 'var cl=rteSanitize(htmlD);if(cl){ins(cl);return;}'));
 ok('C22 colar do Google Docs: listas aninhadas ACHATADAS determinísticas', has(sanit, 'function liInline(node,ctx,skipLists){') && has(sanit, 'if(skipLists)return;'));
 ok('C23 colar HTML malicioso: perigosos somem COM o conteúdo', has(sanit, 'var DROP={SCRIPT:1,STYLE:1,IFRAME:1,OBJECT:1,EMBED:1,FORM:1,INPUT:1,BUTTON:1,SELECT:1,TEXTAREA:1,SVG:1,IMG:1,VIDEO:1,AUDIO:1,TEMPLATE:1,LINK:1,META:1,CANVAS:1,MAP:1,BASE:1,DIALOG:1};'));
 ok('C24 script: SCRIPT no DROP (drop com corpo)', has(sanit, 'SCRIPT:1'));
@@ -143,7 +146,7 @@ ok('D1 sem CSP nova/afrouxada (renderer segue sem meta CSP — inalterado)', cou
 ok('D2 execCommand APENAS como gesto (canônico = rteSanitize; documentado)', has(rte, 'O execCommand NUNCA é a fonte da verdade'));
 ok('D3 zero dependência nova (deps exatas: electron-updater + firebase)', JSON.stringify(Object.keys(pkg.dependencies)) === JSON.stringify(['electron-updater', 'firebase']));
 ok('D4 sem CDN/carregamento externo no RTE (sem <link>/@import/fetch/import())', !has(rte, '<link') && !has(rte, '@import') && !has(rte, 'fetch(') && !has(rte, 'import('));
-ok('D5 colagem: fallback clipboard via IPC EXISTENTE (texto puro; sem API nova)', has(wire, 'window.desktopAPI.clipboardReadText'));
+ok('D5 colagem: fallback clipboard via IPC preservado [RE-PINADO F3.5.5D: em _rtePasteApply; clipboardReadHTML é read-only e SEMPRE passa pelo rteSanitize]', has(pasteApply, 'window.desktopAPI.clipboardReadText') && has(S, 'clipboardReadHTML') && has(S, '_rtePasteApply(ed,String(htmlD||\'\'),String(txt||\'\'))'));
 ok('D6 links canônicos: rel="noopener noreferrer" target="_blank" FORÇADOS', has(sanit, '<a href="\'+esc(href)+\'" rel="noopener noreferrer" target="_blank">'));
 ok('D7 estilos arbitrários NUNCA no canônico (só data-al/ind/cl/hl/fs)', !has(sanit, "attrs+=' style") && has(sanit, 'data-fs="'));
 ok('D8 imagens externas automáticas: IMG no DROP (nem data-URL sobrevive)', has(sanit, 'IMG:1'));

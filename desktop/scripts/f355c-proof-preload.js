@@ -74,12 +74,12 @@ try {
     diagLog: diagLog,
     clipboardWriteText: function (s) { try { window.__CLIPS.push(String(s)); } catch (_) {} return Promise.resolve(true); },
     clipboardReadText: function () { return Promise.resolve(''); },
-    version: '1.0.222',
+    version: '1.0.223',
     authLogout: function () { return Promise.resolve({ ok: true }); },
     sessionLogin: noop,
     sessionLogout: noop
   };
   window.desktopAPI = new Proxy(desktopAPI, { get: function (t, k) { return (k in t ? t[k] : fnProxy()); } });
   window.api = window.desktopAPI;
-  window.__APP_VERSION = '1.0.222';
+  window.__APP_VERSION = '1.0.223';
 } catch (_) {}

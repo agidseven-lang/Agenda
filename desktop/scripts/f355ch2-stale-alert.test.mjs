@@ -72,7 +72,7 @@ function mkCtl(surface, store, g, extra) {
   const logs = [];
   const c = createSlaReminderController(Object.assign({
     surface, store, now: () => Date.now(),
-    appVersion: "1.0.222",
+    appVersion: "1.0.223",
     isLocked: () => false,
     getUid: () => (extra && extra.uid) || "u1",
     soundFor: () => "data:audio/wav;base64,X",

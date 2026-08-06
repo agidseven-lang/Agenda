@@ -5,7 +5,7 @@
  * - Autostart Windows opcional (sobe oculto na tray no login)
  * - Notifier + Reminder rodam aqui (sobrevivem a janela escondida)
  */
-import { app, BrowserWindow, ipcMain, Notification, shell, clipboard, nativeImage, dialog, powerMonitor, screen } from "electron";
+import { app, BrowserWindow, ipcMain, Notification, shell, clipboard, nativeImage, dialog, powerMonitor, screen, Menu } from "electron";
 import path from "path";
 import fs from "fs";
 import os from "os";
@@ -16,6 +16,7 @@ import { startNotifier } from "./notifier";
 import { startNotifierA } from "./notifierA"; // F3.5.3 — produtor DURÁVEL Categoria A (todos os usuários ativos; backlog/cursor/recibos)
 import { createToastAckTracker } from "./toastAck"; // F3.5.3 — prova de render do toast (paridade com o ACK da bg-window)
 import { diag, diagPath } from "./diag"; // F3.3.10-DIAG (logger local; build instrumentada)
+import { attachEditContextMenu } from "./editContextMenu"; // F3.5.5D — menu de contexto nativo de edição (roles PT-BR; só campos editáveis)
 import { startReminder } from "./reminder";
 import { startSlaScheduler } from "./slaScheduler"; // F3.4.3 — produtor AUTORITATIVO de SLA no main (amarelo/vermelho/crítico), sobrevive à janela oculta
 import { createUserSlaSeen } from "./slaSeenUser"; // F3.5.4-C3 — seen de SLA POR USUÁRIO (uid|dedupKey; legado honrado) injetado SEM tocar no scheduler
@@ -498,6 +499,10 @@ function createWindow() {
     },
   });
   mainWin.removeMenu();
+  // F3.5.5D — menu de contexto NATIVO de edição (Desfazer/Refazer/Recortar/Copiar/Colar/Selecionar
+  // tudo) em TODOS os campos realmente editáveis (params.isEditable + editFlags); botão direito em
+  // botões/cards/labels/readonly não mostra nada. Sem app-menu (removeMenu preservado).
+  try { attachEditContextMenu(mainWin.webContents, { Menu, onLog: (evt, p) => { try { diag(evt, p || {}); } catch { /* */ } } }); } catch { /* */ }
   mainWin.loadFile(path.join(app.getAppPath(), "src", "renderer", "index.html"));
   // Garante nitidez 1:1 (sem zoom acidental). Windows respeita HiDPI nativamente.
   mainWin.webContents.on("did-finish-load", () => {
@@ -1262,6 +1267,10 @@ app.whenReady().then(() => {
   // F3.5.3 — leitura de texto da área de transferência p/ o pipeline explícito de COLAGEM do
   // formulário (Legenda/Tema/Observações). SOMENTE texto simples; nunca HTML executável.
   ipcMain.handle("clipboard-read-text", () => { try { return String(clipboard.readText() || ""); } catch { return ""; } });
+  // F3.5.5D — leitura do HTML do clipboard (fallback determinístico de Ctrl+V no editor rico:
+  // Word/Google Docs preservam formatação básica APÓS o rteSanitize no renderer). Read-only;
+  // o conteúdo NUNCA é registrado em log/telemetria.
+  ipcMain.handle("clipboard-read-html", () => { try { return String(clipboard.readHTML() || ""); } catch { return ""; } });
   // F3.5.4W-H1 (E2) — ESCRITA de texto simples na área de transferência p/ os botões "Copiar tema" /
   // "Copiar legenda" da Central de Detalhes. SOMENTE texto puro (nunca HTML); determinístico via módulo
   // do Electron no main; espelha clipboard-read-text. Retorna boolean p/ o renderer decidir o feedback.

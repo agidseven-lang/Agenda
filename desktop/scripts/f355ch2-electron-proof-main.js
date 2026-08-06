@@ -77,7 +77,7 @@ function mkCtl(file, g, opts) {
   });
   const ctl = createSlaReminderController(Object.assign({
     surface, store: createSlaReminderStore({ file, log() {} }), now: () => Date.now(),
-    appVersion: "1.0.222", isLocked: () => false, getUid: () => "u1",
+    appVersion: "1.0.223", isLocked: () => false, getUid: () => "u1",
     soundFor: () => "", onLog: (t, d) => logs.push([t, d || {}]),
     taskGate: g ? g.gate : undefined, autoCloseMs: 1600,
     persistDecision: async () => ({ status: "committed" }),

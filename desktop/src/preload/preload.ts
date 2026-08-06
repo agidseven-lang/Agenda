@@ -34,6 +34,9 @@ contextBridge.exposeInMainWorld("desktopAPI", {
   // F3.5.3 — COLAGEM explícita no formulário (Legenda/Tema/Observações): texto simples do clipboard
   // via módulo do Electron no main (determinístico; independe do accelerator nativo). Nunca HTML.
   clipboardReadText: (): Promise<string> => ipcRenderer.invoke("clipboard-read-text"),
+  // F3.5.5D — COLAGEM UNIVERSAL: leitura do text/html do clipboard SÓ para o fallback determinístico
+  // do editor rico (o renderer SEMPRE passa o resultado pelo rteSanitize antes de inserir). Read-only.
+  clipboardReadHTML: (): Promise<string> => ipcRenderer.invoke("clipboard-read-html"),
   // F3.5.4W-H1 (E2) — ESCRITA de texto simples (Copiar tema/legenda na Central de Detalhes). Só texto puro.
   clipboardWriteText: (s: string): Promise<boolean> => ipcRenderer.invoke("clipboard-write-text", s),
   // F3.3.10 — main -> renderer: CAPTURA p/ a Central de Notificações (histórico local). Capture-only:
