@@ -18,8 +18,10 @@ const PKG  = R('../package.json', 'PKG_SRC');
 const LOCK = R('../package-lock.json', 'LOCK_SRC');
 
 const require_ = createRequire(import.meta.url);
-const NE = require_(process.env.NE_SRC || path.join(__dirname, '../src/main/notifEvents.js'));
-const ET = require_(process.env.ET_SRC || path.join(__dirname, '../src/main/executionTracking.js'));
+/* env paths podem vir RELATIVOS (modo asar do CI: NE_SRC=asar-x/dist/...); require() trata
+   caminho sem ./ como pacote — resolver para absoluto (mesma semântica do readFileSync acima). */
+const NE = require_(process.env.NE_SRC ? path.resolve(process.env.NE_SRC) : path.join(__dirname, '../src/main/notifEvents.js'));
+const ET = require_(process.env.ET_SRC ? path.resolve(process.env.ET_SRC) : path.join(__dirname, '../src/main/executionTracking.js'));
 
 let pass = 0, fail = 0; const bad = [];
 function ok(name, cond) { if (cond) { pass++; } else { fail++; bad.push(name); console.error('FAIL: ' + name); } }
