@@ -1,0 +1,301 @@
+# =====================================================================
+# F3.5.5C-H2 — Publicacao da Desktop 1.0.222 no CANAL DO ATUALIZADOR INTERNO (Latest)
+# ---------------------------------------------------------------------
+# Publica a 1.0.222 (F3.5.5C-H2 — HOTFIX P0 da invalidacao definitiva de alertas
+# residuais de tarefas concluidas: documento canonico da tarefa = autoridade;
+# BARREIRA 1 invalidacao na transicao terminal; BARREIRA 2 revalidacao antes de
+# exibir; BARREIRA 3 revalidacao no boot — nunca exibir bloqueio so por cache;
+# limpeza reparadora auditavel/idempotente por taskId; modal aberto fecha sozinho
+# com "Esta tarefa ja foi encerrada." quando outro usuario conclui).
+# USA EXCLUSIVAMENTE os BYTES do run de build F3.5.5C-H2 31104253410 (gated, verde
+# nos 2 jobs; --publish never): NAO RECOMPILA — baixa os 2 artifacts e publica os
+# MESMOS bytes. TUDO PINADO: run id, digests dos artifacts, 5 hashes SHA-256, tag
+# v1.0.222 no head EXATO da branch.
+# 6 assets: EXE, MSI, latest.yml, blockmap, SHA256SUMS, VERSAO-DESKTOP.txt.
+# ESCRITAS (tag + release + Latest) SO via token temporario do GitHub App "Agenda ID Seven Release
+# Bot" (expira sozinho); GITHUB_TOKEN permanece somente leitura; sem RELEASE_PAT.
+# Roda NA PROPRIA branch de teste (main INTOCAVEL): dispara no push DESTE arquivo + workflow_dispatch.
+# Rollback tecnico: v1.0.221. Rollback fisico imediato: v1.0.218 (baseline FISICAMENTE aprovada).
+# Rollback adicional: v1.0.216.
+# A publicacao NAO significa aprovacao fisica — o teste fisico do owner vem depois, pelo atualizador.
+# =====================================================================
+name: "F3.5.5C-H2 Desktop Release — 1.0.222 no canal do updater (Correcao de Alertas Residuais; sem build novo)"
+"on":
+  push:
+    branches:
+      - "desktop/f355c-h2-stale-alert-terminal-task-hotfix-1.0.222"
+    paths:
+      - ".github/workflows/desktop-release-f355ch2.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: agidseven-lang/Agenda
+      # ── PINAGEM COMPLETA (F3.5.5C-H2; run de build 31104253410 verde nos 2 jobs) ──
+      RUN_ID: "31104253410"
+      STABLE_SHA: "9ebc46828f9eabb38562402ba41db9b2ee6a36ed"
+      TEST_BRANCH: "desktop/f355c-h2-stale-alert-terminal-task-hotfix-1.0.222"
+      BASE_221_SHA: "98caad68e83230c2ada88ce1b35e709a0d62ab8c"
+      BASE_220_SHA: "2d003adaeeec00499e95a9eac5fe01f48859e4ed"
+      BASE_218_SHA: "1a945159dd563eba5c80657427519d0f22b4b673"
+      BASE_216_SHA: "e509f43ae8f3130a9922791f89db0ba29aa7a410"
+      TAG: "v1.0.222"
+      TITLE: "Agenda ID Seven Desktop 1.0.222 — Correção de Alertas Residuais"
+      ART_INST: "agenda-id-seven-desktop-1.0.222-installer"
+      ART_INST_DIGEST: "sha256:3c0dd4a981795f397ee1156dd5a4b748711f4a8c542a28e843bd542e234053c5"
+      ART_META: "agenda-id-seven-desktop-1.0.222-updatemeta"
+      ART_META_DIGEST: "sha256:6abfb4d42fe37942ab72a90ba9738352101bedbe62d4c446b75cbb53a869c467"
+      EXE_NAME: "Agenda-ID-Seven-Desktop-1.0.222-x64.exe"
+      MSI_NAME: "Agenda-ID-Seven-Desktop-1.0.222-x64.msi"
+      BM_NAME: "Agenda-ID-Seven-Desktop-1.0.222-x64.exe.blockmap"
+      LY_NAME: "latest.yml"
+      EXP_EXE: "1438490ac554c72c906eb9a1a670bbadce191de5abb52e658f45c3d70e265376"
+      EXP_MSI: "6641cf68ed3610e7c820e124c99d5d25a1b5dea5a5c8d16f5c67067d814d1ee0"
+      EXP_LY: "618934b43a909a9a78c6003de6d9c534fa6d0dc1754bbdc06db64f6737ba3544"
+      EXP_BM: "0fb05ac68ab6efe5fa39616de23f723c28faf654ae074d7f00f4d3e76f5712b8"
+      EXP_SBOM: "1a86bba6843814273c14414fce8f1fdee058a3a0ff5dc0ca0f792172340051f7"
+      PREV_LATEST_TAG: "v1.0.221"
+      PRES_220_TAG: "v1.0.220"
+      PROD_ROLLBACK_TAG: "v1.0.218"
+      PROD_ROLLBACK2_TAG: "v1.0.216"
+    steps:
+      - name: "Gate 0 — contexto: branch de teste correta (publicacao autorizada F3.5.5C-H2)"
+        run: |
+          set -euo pipefail
+          [ "${{ github.ref_name }}" = "$TEST_BRANCH" ] || { echo "::error::ref '${{ github.ref_name }}' != $TEST_BRANCH — nada publicado"; exit 1; }
+          echo "OK: rodando na branch de teste autorizada"
+
+      - name: "Gate 0a — token temporario do Release Bot (GitHub App; expira sozinho)"
+        id: release_bot
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: Agenda
+          permission-contents: write
+          permission-workflows: write
+
+      - name: "Gate 0b — token do Release Bot ATIVO + escopo SO Agenda"
+        env:
+          BOT_TOKEN: ${{ steps.release_bot.outputs.token }}
+        run: |
+          set -euo pipefail
+          [ -n "$BOT_TOKEN" ] || { echo "::error::token do Release Bot vazio — NADA publicado."; exit 1; }
+          FN="$(GH_TOKEN="$BOT_TOKEN" gh api "repos/$REPO" --jq '.full_name' 2>/dev/null || true)"
+          [ "$FN" = "$REPO" ] || { echo "::error::Release Bot sem acesso a $REPO."; exit 1; }
+          J="$(GH_TOKEN="$BOT_TOKEN" gh api /installation/repositories)"
+          N="$(echo "$J" | jq -r '.total_count')"; R="$(echo "$J" | jq -r '.repositories[0].full_name')"
+          { [ "$N" = "1" ] && [ "$R" = "$REPO" ]; } || { echo "::error::escopo do Release Bot != {1 repo, $REPO} ($N,$R)."; exit 1; }
+          echo "OK: Release Bot ativo, escopo restrito a $REPO"
+
+      - name: "Gate 1 — run de build F3.5.5C-H2 completed/success e head EXATO"
+        run: |
+          set -euo pipefail
+          J="$(gh api "repos/$REPO/actions/runs/$RUN_ID")"
+          ST="$(echo "$J" | jq -r '.status + "|" + .conclusion')"
+          HS="$(echo "$J" | jq -r '.head_sha')"
+          BR="$(echo "$J" | jq -r '.head_branch')"
+          echo "run $RUN_ID: $ST head=$HS branch=$BR"
+          [ "$ST" = "completed|success" ] || { echo "::error::run de build invalido"; exit 1; }
+          [ "$HS" = "$STABLE_SHA" ] || { echo "::error::head do run != STABLE_SHA"; exit 1; }
+          [ "$BR" = "$TEST_BRANCH" ] || { echo "::error::branch do run != branch de teste"; exit 1; }
+
+      - name: "Gate 2 — STABLE_SHA na linhagem do tip; commits alem dele SO o workflow de release"
+        run: |
+          set -euo pipefail
+          H="$(gh api "repos/$REPO/git/ref/heads/$TEST_BRANCH" --jq '.object.sha')"
+          CMP="$(gh api "repos/$REPO/compare/$STABLE_SHA...$H" --jq '.status')"
+          echo "compare $STABLE_SHA...$H: $CMP"
+          { [ "$CMP" = "identical" ] || [ "$CMP" = "ahead" ]; } || { echo "::error::STABLE_SHA fora da linhagem do tip ($CMP)"; exit 1; }
+          gh api "repos/$REPO/compare/$STABLE_SHA...$H" --jq '.files[].filename' | tee /tmp/extra.txt || true
+          if grep -vE '^\.github/workflows/desktop-release-f355ch2\.yml$' /tmp/extra.txt | grep -q .; then
+            echo "::error::commits pos-candidato tocam arquivos alem do workflow de release"; exit 1; fi
+          if grep -qE '^(desktop/src/|desktop/scripts/copy-renderer\.js|desktop/package\.json|desktop/package-lock\.json|desktop/tsconfig\.json|desktop/electron-builder)' /tmp/extra.txt; then
+            echo "::error::insumo de build alterado apos STABLE_SHA — bytes publicados nao corresponderiam ao build"; exit 1; fi
+          CMP21="$(gh api "repos/$REPO/compare/$BASE_221_SHA...$STABLE_SHA" --jq '.status')"
+          { [ "$CMP21" = "ahead" ] || [ "$CMP21" = "identical" ]; } || { echo "::error::STABLE_SHA nao descende da base 1.0.221 ($CMP21)"; exit 1; }
+          CMP20="$(gh api "repos/$REPO/compare/$BASE_220_SHA...$STABLE_SHA" --jq '.status')"
+          { [ "$CMP20" = "ahead" ] || [ "$CMP20" = "identical" ]; } || { echo "::error::STABLE_SHA nao descende da base 1.0.220 ($CMP20)"; exit 1; }
+          CMP0="$(gh api "repos/$REPO/compare/$BASE_218_SHA...$STABLE_SHA" --jq '.status')"
+          { [ "$CMP0" = "ahead" ] || [ "$CMP0" = "identical" ]; } || { echo "::error::STABLE_SHA nao descende da baseline 1.0.218 ($CMP0)"; exit 1; }
+          CMP1="$(gh api "repos/$REPO/compare/$BASE_216_SHA...$STABLE_SHA" --jq '.status')"
+          { [ "$CMP1" = "ahead" ] || [ "$CMP1" = "identical" ]; } || { echo "::error::STABLE_SHA nao descende da 1.0.216 ($CMP1)"; exit 1; }
+          echo "OK: STABLE_SHA ancestral do tip; extras = so o workflow de release; bases 1.0.221/1.0.220/1.0.218/1.0.216 na linhagem"
+
+      - name: "Gate 3 — release v1.0.222 NAO existe; tag so pode preexistir apontando p/ STABLE_SHA"
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then echo "::error::release $TAG ja existe"; exit 1; fi
+          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            TS="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+            [ "$TS" = "$STABLE_SHA" ] || { echo "::error::tag $TAG aponta para outro sha ($TS)"; exit 1; }
+          fi
+          echo "OK: release/tag livres (ou tag ja em STABLE_SHA)"
+
+      - name: "Gate 4 — artifacts: ids+digests conferem (mesmos bytes do run verde)"
+        run: |
+          set -euo pipefail
+          json="$(gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts" --paginate)"
+          chk() { local d; d="$(echo "$json" | jq -r --arg n "$1" '.artifacts[]|select(.name==$n)|.digest')"; echo "$1: $d"; [ "$d" = "$2" ] || { echo "::error::digest $1 divergente"; exit 1; }; }
+          chk "$ART_INST" "$ART_INST_DIGEST"
+          chk "$ART_META" "$ART_META_DIGEST"
+
+      - name: "Baixar artifacts (installer + updatemeta) — SEM recompilar"
+        run: |
+          set -euo pipefail
+          gh run download "$RUN_ID" -R "$REPO" -n "$ART_INST" -D pacote
+          gh run download "$RUN_ID" -R "$REPO" -n "$ART_META" -D pacote
+          for f in "$EXE_NAME" "$MSI_NAME" "$LY_NAME" "$BM_NAME" SHA256SUMS SBOM-cyclonedx.json VERSAO-DESKTOP.txt; do
+            test -f "pacote/$f" || { echo "::error::arquivo ausente: $f"; exit 1; }
+          done
+          if [ -f pacote/canary.yml ]; then echo "::error::canary.yml presente — canal ambiguo"; exit 1; fi
+
+      - name: "Gate 5 — hashes SHA-256 + latest.yml (versao/EXE/sha512) + VERSAO-DESKTOP"
+        run: |
+          set -euo pipefail
+          declare -A EXP=( ["$EXE_NAME"]="$EXP_EXE" ["$MSI_NAME"]="$EXP_MSI" ["$LY_NAME"]="$EXP_LY" ["$BM_NAME"]="$EXP_BM" ["SBOM-cyclonedx.json"]="$EXP_SBOM" )
+          for f in "${!EXP[@]}"; do
+            H="$(sha256sum "pacote/$f" | awk '{print $1}')"; echo "$f=$H"
+            [ "$H" = "${EXP[$f]}" ] || { echo "::error::hash $f divergente"; exit 1; }
+          done
+          ( cd pacote && sha256sum -c SHA256SUMS ) || { echo "::error::SHA256SUMS nao confere"; exit 1; }
+          grep -q "version: 1.0.222" "pacote/$LY_NAME" || { echo "::error::latest.yml version != 1.0.222"; exit 1; }
+          grep -qE "^path: $EXE_NAME" "pacote/$LY_NAME" || { echo "::error::latest.yml path != EXE"; exit 1; }
+          META_SHA512=$(grep -E '^sha512:' "pacote/$LY_NAME" | head -1 | sed -E 's/^sha512:[[:space:]]*//' | tr -d '\r')
+          CALC_SHA512=$(openssl dgst -sha512 -binary "pacote/$EXE_NAME" | openssl base64 -A)
+          [ "$META_SHA512" = "$CALC_SHA512" ] || { echo "::error::sha512 do latest.yml != EXE (updater rejeitaria)"; exit 1; }
+          grep -q "versionName : 1.0.222" pacote/VERSAO-DESKTOP.txt || { echo "::error::VERSAO-DESKTOP sem 1.0.222"; exit 1; }
+          grep -q "1.0.222-f355ch2-stale-alert-terminal-task-hotfix" pacote/VERSAO-DESKTOP.txt || { echo "::error::rotulo da candidata ausente"; exit 1; }
+          echo "OK: 5 hashes + SHA256SUMS + latest.yml (1.0.222/EXE/sha512==EXE) + VERSAO-DESKTOP"
+
+      - name: "Release notes"
+        run: |
+          cat > notas.md <<'NOTAS'
+          Agenda ID Seven Desktop 1.0.222 — Correção de Alertas Residuais
+
+          Atualização disponibilizada pelo ATUALIZADOR INTERNO do app (Configurações ->
+          Atualizações -> Verificar atualizações -> Baixar -> Instalar e reiniciar).
+          NENHUM download manual é necessário. Máquinas em versões anteriores
+          (incluindo 1.0.219) recebem esta versão pelo fluxo normal do atualizador.
+
+          O QUE MUDA vs 1.0.221 (F3.5.5C-H2 — HOTFIX P0)
+
+          PROBLEMA CORRIGIDO: o modal vermelho URGENTE de bloqueio operacional podia
+          REAPARECER em todo boot do Windows / abertura do app para uma tarefa JÁ
+          CONCLUÍDA dias antes, exigindo resposta ("Iniciar agora", "Estou
+          finalizando" etc.) sobre uma tarefa encerrada. A auditoria provou que o
+          defeito era LATENTE (arquivos do fluxo de alertas byte-idênticos em
+          1.0.218/219/220/221): a pendência local persistida era reexibida no boot
+          SEM revalidar o estado atual da tarefa (validação nunca foi ligada —
+          fail-open), a supressão de conclusão vivia só em memória e o modal aberto
+          não fechava quando outro usuário concluía a tarefa.
+
+          A PARTIR DESTA VERSÃO, O DOCUMENTO CANÔNICO DA TAREFA É A AUTORIDADE:
+          nenhum alerta antigo, claim, fila, recibo ou cache se sobrepõe ao estado
+          atual da tarefa. Três barreiras independentes (sempre por taskId
+          canônico, NUNCA por título ou nome de usuário):
+          - BARREIRA 1 — invalidação na transição terminal: quando a tarefa vira
+            concluída/cancelada/removida (pelo próprio usuário, por outro usuário,
+            pelo portal ou por outro dispositivo), fila, pendência persistida e
+            check-ins daquela tarefa são invalidados na hora, com recibo auditável;
+          - BARREIRA 2 — revalidação antes de exibir: todo alerta é conferido
+            contra o estado atual imediatamente antes de aparecer; residuais são
+            descartados com motivo registrado (stale_terminal_task /
+            stale_missing_task / stale_assignee_changed);
+          - BARREIRA 3 — revalidação no boot: pendências restauradas do disco só
+            reaparecem DEPOIS da revalidação — nunca é exibido bloqueio baseado
+            somente em cache antigo. Sem conexão no boot: nada é apagado e nada é
+            bloqueado por cache — o app aguarda a conexão e revalida.
+          - LIMPEZA REPARADORA: resíduos antigos comprovadamente terminais são
+            removidos de forma auditável e idempotente (contagem read-only
+            registrada antes; só remove residual comprovado; NUNCA altera a
+            tarefa, o status canônico ou o responsável).
+          - MODAL ABERTO: se a tarefa for concluída por outro usuário enquanto o
+            modal está na tela, ele avisa discretamente "Esta tarefa já foi
+            encerrada.", desabilita as decisões, fecha sozinho e NENHUMA resposta
+            obsoleta é aceita ou gravada.
+
+          O QUE NÃO MUDA (segurança e fluxos preservados):
+          - alertas LEGÍTIMOS de tarefas realmente pendentes continuam exatamente
+            iguais (vermelhos/bloqueantes, Monitor SLA, Acompanhamento de
+            Execução, check-ins, sons, tudo preservado);
+          - NADA vira "não bloqueante"; NENHUMA tarefa é concluída automaticamente;
+            status canônico e responsável NUNCA são modificados pelo app;
+          - os 5 botões do modal continuam os mesmos para alertas legítimos;
+          - a restauração automática de sessão da 1.0.221 permanece intacta;
+          - histórico e registros de auditoria preservados (nenhuma limpeza global);
+          - updater, autostart, Worker, Functions, Rules e Android INTOCADOS;
+          - TODAS as entregas aprovadas até a 1.0.221 preservadas — congelados
+            byte-idênticos fora de slaReminder/main; todas as suítes herdadas verdes.
+
+          IMPORTANTE: esta versão DEPENDE DE VALIDAÇÃO FÍSICA do owner no Windows
+          (na máquina do Designer: atualizar pelo updater, reiniciar o Windows e
+          conferir que o modal residual NÃO volta; conferir que alertas legítimos
+          continuam; conferir a conclusão por outro usuário com o modal aberto).
+          A publicação não é aprovação física. Em caso de problema: rollback
+          técnico v1.0.221; rollback físico imediato v1.0.218; adicional v1.0.216;
+          a 1.0.221 e a 1.0.220 permanecem publicadas.
+
+          Procedência: run de build F3.5.5C-H2 31104253410 (success; --publish
+          never; verify + Windows verdes: suíte da invalidação 53 — incluindo 20
+          ciclos de boot com store real — rodada TAMBÉM contra os bytes do
+          app.asar; 9 provas Electron REAIS do modal com surface/HTML/preload
+          reais; suíte da sessão 29 herdada contra o asar; todas as suítes
+          herdadas 128+97+84+72+f355a+56+126+94; smoke RTE; provas herdadas
+          32+20+15+25+10; paridade cruzada Desktop↔Worker) @ commit
+          9ebc46828f9eabb38562402ba41db9b2ee6a36ed (branch
+          desktop/f355c-h2-stale-alert-terminal-task-hotfix-1.0.222). Mesmos
+          bytes; sem recompilar. Confira SHA-256 em SHA256SUMS.
+          NOTAS
+
+      - name: "Criar tag v1.0.222 pinada em STABLE_SHA — ESCRITA via Release Bot"
+        env:
+          GH_TOKEN: ${{ steps.release_bot.outputs.token }}
+        run: |
+          set -euo pipefail
+          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            TS="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+            [ "$TS" = "$STABLE_SHA" ] || { echo "::error::tag $TAG aponta para outro sha ($TS)"; exit 1; }
+          else
+            gh api -X POST "repos/$REPO/git/refs" -f ref="refs/tags/$TAG" -f sha="$STABLE_SHA" >/dev/null
+            echo "tag $TAG criada em $STABLE_SHA"
+          fi
+
+      - name: "Publicar release no canal do updater (latest=true, prerelease=false) — 6 assets — via Release Bot"
+        env:
+          GH_TOKEN: ${{ steps.release_bot.outputs.token }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" -R "$REPO" \
+            --target "$STABLE_SHA" --latest=true \
+            --title "$TITLE" --notes-file notas.md \
+            "pacote/$EXE_NAME" "pacote/$MSI_NAME" "pacote/$LY_NAME" "pacote/$BM_NAME" "pacote/SHA256SUMS" "pacote/VERSAO-DESKTOP.txt"
+          echo "publicado: $TAG (canal do electron-updater: release Latest com latest.yml)"
+
+      - name: "Pos-verificacao (Latest=1.0.222; 1.0.221/1.0.220 preservadas; rollbacks 1.0.218/1.0.216 preservados)"
+        run: |
+          set -euo pipefail
+          FLAGS="$(gh release view "$TAG" -R "$REPO" --json isPrerelease,isDraft --jq '(.isPrerelease|tostring)+"|"+(.isDraft|tostring)')"
+          [ "$FLAGS" = "false|false" ] || { echo "::error::flags incorretas: $FLAGS"; exit 1; }
+          N="$(gh release view "$TAG" -R "$REPO" --json assets --jq '.assets|length')"
+          [ "$N" = "6" ] || { echo "::error::esperado 6 assets, encontrados $N"; exit 1; }
+          for a in "$EXE_NAME" "$MSI_NAME" "$LY_NAME" "$BM_NAME" SHA256SUMS VERSAO-DESKTOP.txt; do
+            gh release view "$TAG" -R "$REPO" --json assets --jq '.assets[].name' | grep -qx "$a" || { echo "::error::asset $a ausente"; exit 1; }
+          done
+          if gh release view "$TAG" -R "$REPO" --json assets --jq '.assets[].name' | grep -qx "app-update.yml"; then echo "::error::app-update.yml nao pode ser asset"; exit 1; fi
+          TAGSHA="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+          [ "$TAGSHA" = "$STABLE_SHA" ] || { echo "::error::tag != STABLE_SHA"; exit 1; }
+          LATEST_TAG="$(gh api "repos/$REPO/releases/latest" --jq '.tag_name')"
+          [ "$LATEST_TAG" = "$TAG" ] || { echo "::error::Latest do repo != $TAG (got $LATEST_TAG)"; exit 1; }
+          for t in "$PREV_LATEST_TAG" "$PRES_220_TAG" "$PROD_ROLLBACK_TAG" "$PROD_ROLLBACK2_TAG"; do
+            gh release view "$t" -R "$REPO" --json tagName --jq '.tagName' | grep -qx "$t" || { echo "::error::$t (preservada/rollback) sumiu"; exit 1; }
+          done
+          echo "===== GO: 1.0.222 no canal do updater (Latest); 1.0.221 rollback tecnico; 1.0.220 preservada; 1.0.218 rollback fisico; 1.0.216 rollback adicional ====="
