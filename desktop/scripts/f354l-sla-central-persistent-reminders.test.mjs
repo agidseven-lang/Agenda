@@ -316,6 +316,12 @@ ok(bytesIdenticalVs201("src/main/slaRules.js"), "51 slaRules.js (T-30/T-10/desti
 ok(bytesIdenticalVs201("src/main/cardsRules.js"), "52 cardsRules.js (T-30/T-10 cards) byte-idêntico");
 // F3.5.4P — notifEvents.js SAIU dos byte-congelados: recebe a derivação ADITIVA de help_requested/blocked
 // (Categoria A/destinatários da 1.0.201 preservados; ZERO remoção). Passa a DIFF CONTROLADO.
+// [RE-PINADO F3.5.5E] a F3.5.5E reescreveu legitimamente DUAS linhas: (a) o payload da Categoria A
+// abandona o clientName '' fixo e passa a carregar o cliente REAL do snapshot (causa provada do card
+// "sem cliente vinculado"); (b) module.exports estendido com os helpers canônicos de retirada/contexto
+// (isRetiredSector/sectorLabelOf/cronNotifContext). As remoções líquidas permitidas são EXATAMENTE
+// essas duas; a garantia REAL — payload ainda com taskId/taskTitle (Categoria A) + cliente real +
+// buildCategoryAPayload exportado — é verificada no arquivo ATUAL (igual-ou-mais-forte que ZERO remoção).
 function f354pNotifEventsAdditive() {
   let d = "";
   try { d = execSync("git -C " + JSON.stringify(DESK) + " diff 047261b7587951e0496d5f4eff0cda5998269161 HEAD -- src/main/notifEvents.js", { encoding: "utf8" }); } catch { return false; }
@@ -323,9 +329,17 @@ function f354pNotifEventsAdditive() {
   const netRem = d.split("\n").filter((l) => l.startsWith("-") && !l.startsWith("---")).map((l) => l.slice(1).trim()).filter((l) => l && !add.has(l));
   const A = [...add];
   const hasF354p = A.some((l) => /help_requested/.test(l)) && A.some((l) => /\bblocked\b/.test(l)) && A.some((l) => /assigned_designer/.test(l));
-  return netRem.length === 0 && hasF354p;
+  const ALLOWED_F355E = new Set([
+    "taskId: ev.taskId, taskTitle: ev.taskTitle, clientName: '',",
+    "buildCategoryAPayload: buildCategoryAPayload"
+  ]);
+  const remFora = netRem.filter((l) => !ALLOWED_F355E.has(l));
+  const cur = fs.readFileSync(path.join(DESK, "src/main/notifEvents.js"), "utf8");
+  const payloadReal = /taskId: ev\.taskId, taskTitle: ev\.taskTitle, clientName: str\(ev\.client/.test(cur);
+  const exportKept = /module\.exports\s*=\s*\{[\s\S]*buildCategoryAPayload/.test(cur);
+  return remFora.length === 0 && hasF354p && payloadReal && exportKept;
 }
-ok(f354pNotifEventsAdditive(), "53 notifEvents.js — DIFF CONTROLADO F3.5.4P (help_requested/blocked aditivos; Categoria A/destinatários preservados, ZERO remoção)");
+ok(f354pNotifEventsAdditive(), "53 notifEvents.js — DIFF CONTROLADO F3.5.4P+F3.5.5E (help_requested/blocked aditivos; Categoria A/destinatários preservados; únicas remoções líquidas = clientName vazio→cliente real + exports estendido)");
 ok(bytesIdenticalVs201("src/main/notifier.ts") && bytesIdenticalVs201("src/main/notifierA.ts"), "54 notifier/notifierA byte-idênticos (comuns 1.0.201 intactas)");
 // F3.5.4O — a janela premium das comuns recebe o AGRUPAMENTO (aditivo): bgNotify.ts ganha updateBgGroup
 // (canal bg-group-update) e bgnotify.html ganha o card agrupado (renderGroupUpdate/data-group). O overlay
