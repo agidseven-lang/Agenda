@@ -1,0 +1,245 @@
+{
+  "when": "2026-08-07T16:02:17.549Z",
+  "results": [
+    {
+      "name": "E00 bytes idênticos (fonte == asar) p/ index e bgnotify + dist real presente",
+      "ok": true,
+      "info": {
+        "idx": "25a85e72f41f",
+        "bg": "a3818a009c4a"
+      }
+    },
+    {
+      "name": "E00b corpos REAIS extraídos do dist (deliver/handoff/bring/windowActive/collect-reply)",
+      "ok": true,
+      "info": {
+        "d": true,
+        "h": true,
+        "b": true,
+        "w": true,
+        "c": true
+      }
+    },
+    {
+      "name": "E01 BOOT app real do asar (semente + canais reais de coleta)",
+      "ok": true,
+      "info": {
+        "user": true,
+        "tasks": 2,
+        "api": true
+      }
+    },
+    {
+      "name": "E02 FOCADO → toast real no stack interno (canal toast; premium fechada)",
+      "ok": true,
+      "info": {
+        "channel": "toast",
+        "dom": {
+          "n": 1,
+          "key": "h3:1"
+        },
+        "bgVisible": false
+      }
+    },
+    {
+      "name": "E03 BLUR → HANDOFF real: card MIGROU p/ janela premium (coleta respondida; toast interno fechado; som suprimido)",
+      "ok": true,
+      "info": {
+        "bgVisible": true,
+        "card": {
+          "cards": 1,
+          "fl": true,
+          "cta": "Abrir→"
+        },
+        "stackInterno": 0,
+        "replyLog": true,
+        "movedLog": 1,
+        "sound": "suppressed_by_payload",
+        "shot": "e03-handoff-blur.png"
+      }
+    },
+    {
+      "name": "E04 Agenda ABERTO ATRÁS → canal bg-window direto (o renderer oculto nunca recebe toast)",
+      "ok": true,
+      "info": {
+        "channel": "bg-window",
+        "cards": 2,
+        "outroFocado": true,
+        "shot": "e04-atras-bg.png"
+      }
+    },
+    {
+      "name": "E05 janela premium: alwaysOnTop + dentro da workArea + NUNCA focada (focusable:false/showInactive)",
+      "ok": true,
+      "info": {
+        "alwaysOnTop": true,
+        "focused": false,
+        "bounds": {
+          "x": 766,
+          "y": 503,
+          "width": 500,
+          "height": 507
+        },
+        "workArea": {
+          "x": 0,
+          "y": 0,
+          "width": 1280,
+          "height": 1024
+        }
+      }
+    },
+    {
+      "name": "E06 Agenda MINIMIZADO → janela premium visível (roteador vê perda de foco; minimize REAL do WM = validação física — xvfb não tem window manager)",
+      "ok": true,
+      "info": {
+        "channel": "bg-window",
+        "minimizedApi": false,
+        "mainFocused": false,
+        "bgVisible": true,
+        "limitacao": "xvfb sem WM: isMinimized pode não refletir"
+      }
+    },
+    {
+      "name": "E07 Agenda OCULTO (X→tray) → janela premium continua entregando",
+      "ok": true,
+      "info": {
+        "channel": "bg-window",
+        "mainVisible": false
+      }
+    },
+    {
+      "name": "E08 FOCO NUNCA roubado: digitação íntegra no outro app com 2 notificações no meio",
+      "ok": true,
+      "info": {
+        "typed": true,
+        "focoSempre": true,
+        "bgFocada": false,
+        "shot": "e08-digitacao.png"
+      }
+    },
+    {
+      "name": "E09 CTA 'Abrir →' (clique REAL no segmento): mainWindow restaurada+focada + deep-link entregue",
+      "ok": true,
+      "info": {
+        "mainVisible": true,
+        "mainFocused": true,
+        "deepLinks": 1
+      }
+    },
+    {
+      "name": "E10 X fecha só a notificação; fila vazia → janela premium esconde (bgnotify-empty→hide reais)",
+      "ok": true,
+      "info": {
+        "antes": 1,
+        "bgVisible": false,
+        "cards": 0,
+        "outroFocado": true
+      }
+    },
+    {
+      "name": "E11 reassert de apresentação: hide→show volta VISÍVEL, topmost e re-ancorada no canto (workArea−14px)",
+      "ok": true,
+      "info": {
+        "bounds": {
+          "x": 766,
+          "y": 752,
+          "width": 500,
+          "height": 258
+        },
+        "cantoOk": true,
+        "alwaysOnTop": true
+      }
+    },
+    {
+      "name": "E12 janela destruída → recriada sozinha no próximo evento (nunca fica sem superfície)",
+      "ok": true,
+      "info": {
+        "status": {
+          "initialized": true,
+          "hasWindow": true
+        }
+      }
+    },
+    {
+      "name": "E13 20 consecutivas: processo estável, cap 5 do stack premium respeitado, renders provados por ACK",
+      "ok": true,
+      "info": {
+        "cards": 5,
+        "acks": 20
+      }
+    },
+    {
+      "name": "E14 4 empilhadas: avatar+cápsula+CTA presentes em TODAS; nenhuma invade a vizinha",
+      "ok": true,
+      "info": {
+        "n": 4,
+        "invade": false,
+        "shot": "e14-empilhadas.png"
+      }
+    },
+    {
+      "name": "E15 dedupe do HUB: segunda emissão da MESMA chave não gera novo card/som",
+      "ok": true,
+      "info": {
+        "a": "bg-window",
+        "b": "dedup"
+      }
+    },
+    {
+      "name": "E16 grupo comum: 1º card + update MORFADO no card existente; topmost reafirmado no update",
+      "ok": true,
+      "info": {
+        "g1": "bg-window",
+        "g2": "grouped",
+        "morfado": true,
+        "alwaysOnTop": true
+      }
+    },
+    {
+      "name": "E17 escala 125%: avatar flutuante visível e NÃO cortado (headroom no bounding)",
+      "ok": true,
+      "info": {
+        "flTop": 11,
+        "flAcimaDoCard": 23,
+        "dentroDaJanela": true,
+        "shot": "e17-zoom125.png"
+      }
+    },
+    {
+      "name": "E18 escala 150%: avatar flutuante visível e NÃO cortado (headroom no bounding)",
+      "ok": true,
+      "info": {
+        "flTop": 11,
+        "flAcimaDoCard": 23,
+        "dentroDaJanela": true,
+        "shot": "e18-zoom150.png"
+      }
+    },
+    {
+      "name": "E19 posição = canto inferior direito da workArea REAL (margem 14px; nunca fora da tela)",
+      "ok": true,
+      "info": {
+        "bounds": {
+          "x": 766,
+          "y": 804,
+          "width": 500,
+          "height": 206
+        },
+        "workArea": {
+          "x": 0,
+          "y": 0,
+          "width": 1280,
+          "height": 1024
+        }
+      }
+    },
+    {
+      "name": "E20 teardown (quit real): janela premium destruída e fallbacks pendentes cancelados",
+      "ok": true,
+      "info": {
+        "initialized": true,
+        "hasWindow": false
+      }
+    }
+  ]
+}

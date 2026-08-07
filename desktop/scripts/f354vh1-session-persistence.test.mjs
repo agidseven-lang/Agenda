@@ -81,8 +81,8 @@ ok('37 startApp preserva fluxo (authed + app flex + subscribeData + sessionLogin
 ok('38 startApp esconde splash defensivamente', /function startApp\(u\)\{try\{var _sp=document\.getElementById\('authSplash'\)[\s\S]{0,80}classList\.add\('hidden'\)/.test(H));
 // [ATUALIZADA F3.5.4W-H1] O contrato de persistência/máquina de estados de auth (1.0.213) é PRESERVADO
 // [ATUALIZADA F3.5.5C-H1] na 1.0.224 (hotfix P0 da restauração de sessão no boot: auth-core self() com autoridade do servidor + renderer no_bridge/guarda offline — a MÁQUINA de estados da 1.0.213 segue preservada).
-// A versão do pacote agora é 1.0.226 (RE-PINADO F3.5.5E-H2 — notificação na referência do owner; máquina de estados intacta).
-ok('39 versão 1.0.226 no package.json (persistência 1.0.213 preservada — RE-PINADO F3.5.5E-H2)', JSON.parse(fs.readFileSync(path.resolve(__dirname,'..','package.json'),'utf8')).version==='1.0.226');
+// A versão do pacote agora é 1.0.227 (RE-PINADO F3.5.5E-H3 — notificação na referência do owner; máquina de estados intacta).
+ok('39 versão 1.0.227 no package.json (persistência 1.0.213 preservada — RE-PINADO F3.5.5E-H3)', JSON.parse(fs.readFileSync(path.resolve(__dirname,'..','package.json'),'utf8')).version==='1.0.227');
 
 /* ===== J — mapa cenários→cobertura (documental) ===== */
 ok('40 cenários físicos (reinício/Fast Startup/5 reboots/escala) cobertos pelo contrato+prova Electron+físico', true);
