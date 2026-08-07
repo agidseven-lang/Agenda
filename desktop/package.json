@@ -1,7 +1,7 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.224",
-  "description": "Agenda ID Seven Desktop 1.0.224-f355e-retire-legacy-modules-premium-notifications (Estrutura Operacional e Notificações Premium; base 1.0.223-f355d-custom-cronograma-quantity-universal-paste; base 1.0.222-f355ch2-stale-alert-terminal-task-hotfix; base 1.0.221-f355ch1-session-restore-boot-hotfix; base 1.0.220-custom-script-quantity-rich-editor)",
+  "version": "1.0.225",
+  "description": "Agenda ID Seven Desktop 1.0.225-f355eh1-ultra-premium-notifications (Redesign Ultra Premium das Notificações Imediatas; base 1.0.224-f355e-retire-legacy-modules-premium-notifications; base 1.0.223-f355d-custom-cronograma-quantity-universal-paste; base 1.0.222-f355ch2-stale-alert-terminal-task-hotfix; base 1.0.221-f355ch1-session-restore-boot-hotfix; base 1.0.220-custom-script-quantity-rich-editor)",
   "main": "dist/main/main.js",
   "private": true,
   "scripts": {
