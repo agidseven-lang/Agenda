@@ -5709,19 +5709,35 @@ function afterNotifCentral(){
 try{ if(window.desktopAPI&&typeof window.desktopAPI.onNotifHistory==='function'){ window.desktopAPI.onNotifHistory(function(p){ try{ notifHistoryAppend(p); }catch(_){} try{ if(!(p&&p._groupUpdate)&&(typeof document==='undefined'||(typeof document.hasFocus==='function'?document.hasFocus():document.visibilityState!=='hidden'))) notifToastOnce(p); }catch(_){} }); } }catch(_){}   /* F3.5.4K — compensação do toast in-app SÓ com FOCO real (não apenas "visível"): quando o Agenda está atrás de outro programa/minimizado, o MAIN já entrega pela JANELA PREMIUM always-on-top; sem foco NÃO se levanta um toast in-app invisível que duplicaria o overlay. O sino (notifHistoryAppend) continua SEMPRE. F3.5.4O — eventos de ATUALIZAÇÃO de grupo (_groupUpdate) NÃO levantam 2º toast pela compensação: o main já envia notif-group-update que morfa o toast existente; o sino segue registrando CADA evento. */
 /* F3.5.4O — canal de ATUALIZAÇÃO de grupo comum (morfa o toast existente; sem novo toast/som/foco). */
 try{ if(window.desktopAPI&&typeof window.desktopAPI.onNotifGroupUpdate==='function'){ window.desktopAPI.onNotifGroupUpdate(function(v){ try{ if(typeof notifGroupUpdate==='function') notifGroupUpdate(v); }catch(_){} }); } }catch(_){}
-/* F3.5.5E-H3 — COLETA DO HANDOFF (blur da janela): devolve ao main as chaves dos toasts AINDA vivos
-   no stack e os FECHA (o main re-exibe os mesmos cards na janela premium topmost com sound:false —
-   mover, nunca duplicar; som/recibos/sino/dedupe intocados). Cards de GRUPO (data-group) não migram:
-   a superfície premium só MORFA grupo existente (regra congelada F3.5.4O) — o sino já tem cada evento. */
+/* F3.5.5E-H3/H4 — COLETA DO HANDOFF (blur da janela): devolve ao main TODOS os cards AINDA vivos no
+   stack — individuais como "i:<dedupKey>" e GRUPOS (data-group) como "g:<groupKey>" — SEM fechar
+   nada aqui (H4). O fechamento é TRANSACIONAL: só no COMMIT ("notif-collect-commit"), depois que a
+   janela premium PROVOU o render do card (aceite) — mover, nunca duplicar; som/recibos/sino/dedupe
+   intocados; card fechado pelo usuário não é devolvido e não reaparece. */
 try{ if(window.desktopAPI&&typeof window.desktopAPI.onNotifCollect==='function'){ window.desktopAPI.onNotifCollect(function(reqId){ try{
   var out=[]; var st=document.getElementById('notif-stack');
   if(st){ var ks=st.querySelectorAll('.ntf'); for(var i=0;i<ks.length;i++){ var e=ks[i]; try{
-    if(e.getAttribute('data-group')) continue;
+    var gk=e.getAttribute('data-group')||'';
+    if(gk){ out.push('g:'+gk); continue; }
     var k=e.__ntfKey||''; if(!k) continue;
-    out.push(k); try{ (e.__ntfDismiss||function(){})(); }catch(_){ }
+    out.push('i:'+k);
   }catch(_){ } } }
   if(typeof window.desktopAPI.notifCollectReply==='function') window.desktopAPI.notifCollectReply(reqId,out);
 }catch(_){ try{ if(window.desktopAPI&&typeof window.desktopAPI.notifCollectReply==='function') window.desktopAPI.notifCollectReply(reqId,[]); }catch(__){} } }); } }catch(_){}
+/* F3.5.5E-H4 — COMMIT DO HANDOFF: a premium ACEITOU (prova de render do card). Fecha a representação
+   interna correspondente (individual pela chave; grupo por data-group) pelo dismiss do próprio card —
+   sem reapresentação, sem som, sem tocar sino/recibos. Entrada sem card correspondente é no-op. */
+try{ if(window.desktopAPI&&typeof window.desktopAPI.onNotifCollectCommit==='function'){ window.desktopAPI.onNotifCollectCommit(function(entries){ try{
+  entries=Array.isArray(entries)?entries:[]; var st=document.getElementById('notif-stack'); if(!st) return;
+  for(var i=0;i<entries.length;i++){ var en=String(entries[i]||''); var ks=st.querySelectorAll('.ntf');
+    for(var j=0;j<ks.length;j++){ var e=ks[j]; try{
+      var gk=e.getAttribute('data-group')||''; var hit=false;
+      if(en.indexOf('g:')===0){ hit=(!!gk&&gk===en.slice(2)); }
+      else if(en.indexOf('i:')===0){ hit=(!gk&&(e.__ntfKey||'')===en.slice(2)); }
+      if(hit){ try{ (e.__ntfDismiss||function(){})(); }catch(_){ } }
+    }catch(_){ } }
+  }
+}catch(_){} }); } }catch(_){}
 /* ════════════════════════ F3.3.10-NOTIF-CENTRAL END ════════════════════════ */
 
 /* ---- HOJE ---- */

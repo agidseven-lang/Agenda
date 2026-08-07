@@ -161,13 +161,23 @@ type NotifPayload = {
 const _notifSeen = new Set<string>();
 // F3.5.3 — ACK do toast: tracker do prazo de render (4s). Fallback bg/nativa quando não há prova.
 const toastAck = createToastAckTracker({ onLog: (t, d) => { try { diag(t, d as any); } catch { /* */ } } });
-// F3.5.5E-H3 — HANDOFF DO TOAST NO BLUR (P0 de visibilidade). O toast in-app vive DENTRO da
-// mainWindow: se o usuário alterna para outro programa com o toast ainda ATIVO (TTL 6/8/11s), o card
-// ficava invisível atrás da outra janela até expirar. Registro (payload por dedupKey, TTL espelhado do
-// renderer + margem) dos toasts entregues; no blur da mainWindow o main COLETA via IPC os cards ainda
-// vivos no stack (o renderer os fecha e devolve as chaves) e os RE-EXIBE na janela premium topmost com
-// sound:false (o som já tocou no toast; recibos/sino/dedupe NÃO são tocados — a re-exibição não passa
-// pelo HUB). Mover, nunca duplicar: o mesmo evento jamais fica visível nas duas superfícies.
+// F3.5.5E-H3/H4 — HANDOFF COMPLETO DO TOAST NO BLUR (P0 de visibilidade; H4 = TRANSACIONAL e com
+// GRUPOS). O toast in-app vive DENTRO da mainWindow: se o usuário alterna para outro programa com
+// cards ainda ATIVOS (individuais OU o card agrupado "N atualizações"), eles ficavam invisíveis
+// atrás da outra janela até expirar. Registro no main: INDIVIDUAIS por dedupKey (TTL espelhado do
+// renderer + margem) e GRUPOS por groupKey (p0 = payload do 1º evento COM groupKey — recria o card
+// data-group na premium pelo caminho congelado F3.5.4O; view = último GroupView consolidado — morfa
+// contagem/itens/CTA; teto de 15s espelhado do renderer). No blur o main COLETA via IPC os cards
+// ainda vivos (o renderer responde "i:<dedupKey>"/"g:<groupKey>" SEM fechar nada) e executa a
+// TRANSAÇÃO por card:  showBgNotify(sound:false) → ACEITE (prova de render "bgnotify-rendered" do
+// MESMO dedupKey) → [grupo] updateBgGroup(view) morfa o card recém-aceito → COMMIT
+// "notif-collect-commit" → SÓ ENTÃO o renderer fecha a representação interna.
+// Sem aceite no prazo (espelho do ACK de 4s da premium + margem): 1 RETRY; falhando de novo, o card
+// interno é PRESERVADO (zero perda; sino/recibos intocados; o próximo blur tenta de novo). O som
+// NUNCA repete (sound:false; a re-exibição não passa pelo HUB). Mover, nunca duplicar: o mesmo
+// evento jamais fica visível nas duas superfícies (o commit fecha o interno imediatamente após o
+// aceite; foco de volta ANTES da reply aborta sem mostrar nada; após shows disparados a transação
+// COMPLETA — determinístico).
 const activeToasts = new Map<string, { p: NotifPayload; timer: ReturnType<typeof setTimeout> }>();
 const toastTtlMs = (sev?: string) => (sev === "critical" ? 11000 : (sev === "warning" ? 8000 : 6000));
 function toastUnregister(key: string): void { const e = activeToasts.get(key); if (!e) return; try { clearTimeout(e.timer); } catch { /* */ } activeToasts.delete(key); }
@@ -176,25 +186,101 @@ function toastRegister(key: string, p: NotifPayload): void {
   const timer = setTimeout(() => { activeToasts.delete(key); }, toastTtlMs(String(p.severity || "")) + 900);
   activeToasts.set(key, { p, timer });
 }
+// F3.5.5E-H4 — espelho dos GRUPOS ativos no toast (fonte visual: index.html, card data-group; o
+// estado canônico do agrupamento segue SÓ no notificationGrouping — aqui é registro de handoff).
+const GROUP_MAX_MS = 15000; // espelho do teto do renderer (index.html/bgnotify.html)
+const activeToastGroups = new Map<string, { p0: NotifPayload; view: any | null; firstAt: number; timer: ReturnType<typeof setTimeout> }>();
+function groupUnregister(gk: string): void { const e = activeToastGroups.get(gk); if (!e) return; try { clearTimeout(e.timer); } catch { /* */ } activeToastGroups.delete(gk); }
+function groupTimerMs(sev: string, firstAt: number): number {
+  const cap = GROUP_MAX_MS - (Date.now() - firstAt);
+  return Math.max(1200, Math.min(toastTtlMs(sev), cap)) + 900;
+}
+function groupRegister(gk: string, p0: NotifPayload): void {
+  groupUnregister(gk);
+  const firstAt = Date.now();
+  const timer = setTimeout(() => { activeToastGroups.delete(gk); }, groupTimerMs(String(p0.severity || ""), firstAt));
+  activeToastGroups.set(gk, { p0, view: null, firstAt, timer });
+}
+function groupTouch(gk: string, view: any): void {
+  const e = activeToastGroups.get(gk); if (!e) return;
+  if (view) e.view = view;
+  try { clearTimeout(e.timer); } catch { /* */ }
+  const sev = String((view && view.severity) || (e.p0 && e.p0.severity) || "");
+  e.timer = setTimeout(() => { activeToastGroups.delete(gk); }, groupTimerMs(sev, e.firstAt));
+}
+function groupUnregisterByDedup(key: string): void {
+  for (const [gk, e] of activeToastGroups) { if (String((e.p0 && e.p0.dedupKey) || "") === key) { groupUnregister(gk); return; } }
+}
 let handoffSeq = 0;
 let handoffPending: { reqId: number; timer: ReturnType<typeof setTimeout> } | null = null;
-function handoffShow(keys: string[]): void {
-  for (const k of keys) {
-    const e = activeToasts.get(k); if (!e) continue;
-    toastUnregister(k);
-    const hp = Object.assign({}, e.p, { sound: false, _handoff: true });
-    // Sem fallback nativo no handoff: o EVENTO já foi entregue (toast visível + sino/recibos); isto é
-    // só a continuidade VISUAL do card na superfície topmost. Falha aqui nunca re-dispara canais.
-    const ok = showBgNotify(hp, () => { /* no-op */ });
-    nlog("notify.handoff.moved", { dedupKey: k, taskId: nmask(e.p.taskId), bgOk: ok });
+// F3.5.5E-H4 — transações de handoff em voo, indexadas pelo dedupKey esperado no "bgnotify-rendered".
+const handoffTx = new Map<string, { entry: string; gk: string; view: any | null; hp: NotifPayload; timer: ReturnType<typeof setTimeout>; retried: boolean }>();
+const HANDOFF_ACCEPT_MS = 4600; // espelho do ACK_TIMEOUT_MS (4s) da premium + margem de IPC
+function txCommit(key: string): void {
+  const tx = handoffTx.get(key); if (!tx) return;
+  try { clearTimeout(tx.timer); } catch { /* */ }
+  handoffTx.delete(key);
+  if (tx.gk) {
+    // grupo: morfa o card recém-aceito para o estado consolidado MAIS NOVO (um update pode ter
+    // chegado durante a transação — groupTouch mantém o espelho vivo). FIFO de IPC garante o
+    // bg-card processado antes do bg-group-update; morph idempotente. Grupo de 1 evento (view
+    // null) já está correto como card individual com data-group.
+    const live = activeToastGroups.get(tx.gk);
+    const v = (live && live.view) || tx.view;
+    if (v) { try { updateBgGroup(v); } catch { /* morph best-effort (regra F3.5.4O) */ } }
+    groupUnregister(tx.gk);
+  } else { toastUnregister(key); }
+  try { mainWin?.webContents.send("notif-collect-commit", [tx.entry]); } catch { /* renderer fecha ao acordar; a premium é a superfície viva */ }
+  nlog("notify.handoff.accepted", { dedupKey: key, grouped: !!tx.gk });
+}
+function txFail(key: string): void {
+  const tx = handoffTx.get(key); if (!tx) return;
+  if (!tx.retried) {
+    tx.retried = true;
+    const ok = showBgNotify(tx.hp, () => { /* aceite/timeout desta transação decidem */ });
+    try { clearTimeout(tx.timer); } catch { /* */ }
+    tx.timer = setTimeout(() => { try { txFail(key); } catch { /* */ } }, HANDOFF_ACCEPT_MS);
+    nlog("notify.handoff.retry", { dedupKey: key, grouped: !!tx.gk, bgOk: ok });
+    return;
   }
+  handoffTx.delete(key);
+  // 2ª falha: PRESERVA a representação interna (sem commit) — zero perda; o registro continua e o
+  // próximo blur tenta de novo enquanto o card viver; o sino/recibos já têm cada evento.
+  nlog("notify.handoff.preserved", { dedupKey: key, grouped: !!tx.gk });
+}
+function txBegin(entry: string): void {
+  const isGroup = entry.startsWith("g:");
+  const id = entry.startsWith("i:") || entry.startsWith("g:") ? entry.slice(2) : entry; // compat: cru = individual
+  if (isGroup) {
+    const e = activeToastGroups.get(id); if (!e) return;
+    const key = String((e.p0 && e.p0.dedupKey) || ""); if (!key || handoffTx.has(key)) return;
+    const hp = Object.assign({}, e.p0, { sound: false, _handoff: true }) as NotifPayload;
+    const timer = setTimeout(() => { try { txFail(key); } catch { /* */ } }, HANDOFF_ACCEPT_MS);
+    handoffTx.set(key, { entry: "g:" + id, gk: id, view: e.view, hp, timer, retried: false });
+    // Sem fallback nativo no handoff: o EVENTO já foi entregue (toast + sino/recibos); isto é só a
+    // continuidade VISUAL do card na superfície topmost. Falha aqui nunca re-dispara canais.
+    const ok = showBgNotify(hp, () => { /* aceite/timeout da transação decidem */ });
+    nlog("notify.handoff.begin.tx", { dedupKey: key, grouped: true, count: (e.view && e.view.count) || 1, bgOk: ok });
+    return;
+  }
+  const e = activeToasts.get(id); if (!e) return;
+  if (handoffTx.has(id)) return;
+  const hp = Object.assign({}, e.p, { sound: false, _handoff: true }) as NotifPayload;
+  const timer = setTimeout(() => { try { txFail(id); } catch { /* */ } }, HANDOFF_ACCEPT_MS);
+  handoffTx.set(id, { entry: "i:" + id, gk: "", view: null, hp, timer, retried: false });
+  const ok = showBgNotify(hp, () => { /* aceite/timeout da transação decidem */ });
+  nlog("notify.handoff.begin.tx", { dedupKey: id, grouped: false, bgOk: ok });
+}
+function handoffShow(entries: string[]): void {
+  for (const en of entries) { try { txBegin(String(en || "")); } catch { /* transação isolada por card */ } }
 }
 function handoffActiveToasts(): void {
   try {
-    if (!activeToasts.size) return;
+    if (!activeToasts.size && !activeToastGroups.size) return;
     if (windowActive()) return; // blur transitório: a janela já voltou a estar focada
     const w = mainWin;
-    if (!w || w.isDestroyed() || w.webContents.isLoading()) { handoffShow(Array.from(activeToasts.keys())); return; }
+    const allEntries = () => Array.from(activeToasts.keys()).map((k) => "i:" + k).concat(Array.from(activeToastGroups.keys()).map((g) => "g:" + g));
+    if (!w || w.isDestroyed() || w.webContents.isLoading()) { handoffShow(allEntries()); return; }
     const reqId = ++handoffSeq;
     if (handoffPending) { try { clearTimeout(handoffPending.timer); } catch { /* */ } handoffPending = null; }
     // 700ms para o renderer responder; sem resposta (renderer suspenso/ocupado), migra TODOS os
@@ -202,13 +288,14 @@ function handoffActiveToasts(): void {
     const timer = setTimeout(() => {
       if (handoffPending && handoffPending.reqId === reqId) {
         handoffPending = null;
-        nlog("notify.handoff.timeout", { pending: activeToasts.size });
-        handoffShow(Array.from(activeToasts.keys()));
+        nlog("notify.handoff.timeout", { pending: activeToasts.size + activeToastGroups.size });
+        if (windowActive()) return; // foco voltou: nada foi mostrado; os internos continuam visíveis
+        handoffShow(allEntries());
       }
     }, 700);
     handoffPending = { reqId, timer };
     try { w.webContents.send("notif-collect-request", reqId); } catch { /* timeout cobre */ }
-    nlog("notify.handoff.begin", { pending: activeToasts.size, reqId });
+    nlog("notify.handoff.begin", { pending: activeToasts.size + activeToastGroups.size, reqId });
   } catch { /* handoff nunca derruba a entrega */ }
 }
 function _appIcon(): string | undefined {
@@ -362,6 +449,10 @@ function deliverNotification(p: NotifPayload): { ok: boolean; channel: string } 
       try { if (__group.view) (__group.view as any)._premiumCommon = premiumCommonEnabled; } catch { /* */ }
       try { mainWin?.webContents.send("notif-group-update", __group.view); } catch { /* atualização do toast é best-effort */ }
       try { if (typeof updateBgGroup === "function") updateBgGroup(__group.view); } catch { /* atualização da premium é best-effort */ }
+      // F3.5.5E-H4 — mantém o ESPELHO do handoff em dia quando o grupo vive no TOAST (registrado no
+      // ramo focado): view consolidado + TTL refrescado (espelho do renderer, teto 15s). Grupo que
+      // vive na premium (nasceu desfocado) não está no espelho ⇒ no-op. try/catch padrão fixtures.
+      try { if (__group.groupKey) groupTouch(String(__group.groupKey), __group.view); } catch { /* espelho do handoff nunca afeta a entrega */ }
       try { diag("notification.sound.suppressed_by_grouping", { eventType: String(p.eventType || ""), deliverySurface: "group_update", grouped: true, firstInGroup: false, appVersion: app.getVersion(), timestamp: Date.now() }); } catch { /* F3.5.4W-H2 — observabilidade sanitizada */ }
       markSeen();
       notifTele.lastAt = Date.now(); notifTele.lastChannel = "grouped"; notifTele.lastEventType = String(p.eventType || "");
@@ -413,13 +504,18 @@ function deliverNotification(p: NotifPayload): { ok: boolean; channel: string } 
       if (typeof toastAck !== "undefined" && toastAck) {
         toastAck.arm(key, () => {
           toastUnregister(key); // F3.5.5E-H3 — o card vai p/ a premium pelo FALLBACK; o handoff do blur não pode re-mostrá-lo
+          try { groupUnregisterByDedup(key); } catch { /* F3.5.5E-H4 — idem para o espelho de grupo */ }
           const bgOk2 = showBgNotify(p, () => { const l2 = nativeNotify(p, key, deep); diag("deliver.toast.noAck.bg.noAck.native", { dedupKey: key, nativeOk: l2 }); });
           let nOk2 = false;
           if (!bgOk2) nOk2 = nativeNotify(p, key, deep);
           diag("deliver.toast.noAck.fallback", { dedupKey: key, channel: bgOk2 ? "bg-window" : (nOk2 ? "native" : "none") });
         });
       }
-      try { toastRegister(key, p); } catch { /* F3.5.5E-H3 — registro do handoff nunca afeta a entrega */ }
+      // F3.5.5E-H4 — registro do handoff por TIPO de card: payload agrupável (p.groupKey do route
+      // "first") gera no toast um card COM data-group ⇒ registra no espelho de GRUPOS (p0; o view
+      // consolidado chega pelos updates); os demais seguem no registro individual (H3). try/catch
+      // no padrão H3: fixtures que extraem só este corpo rodam sem os registradores no escopo.
+      try { if ((p as any).groupKey) groupRegister(String((p as any).groupKey), p); else toastRegister(key, p); } catch { /* registro do handoff nunca afeta a entrega */ }
       try { premiumObserve(p, "toast"); } catch { /* observabilidade nunca derruba a entrega */ }
       markSeen();
       notifTele.lastAt = Date.now(); notifTele.lastChannel = "toast"; notifTele.lastEventType = String(p.eventType || "");
@@ -1233,20 +1329,34 @@ app.whenReady().then(() => {
   ipcMain.handle("notify", (_e, payload: NotifPayload) => deliverNotification(payload));
   // F3.5.3 — renderer confirma o RENDER do toast (dedupKey): cancela o fallback pendente.
   ipcMain.on("notif-toast-ack", (_e, key: string) => { toastAck.ack(String(key || "")); });
-  // F3.5.5E-H3 — resposta da COLETA do handoff: o renderer devolve as chaves dos toasts que AINDA
-  // estavam vivos no stack (e que ele acabou de fechar). Chaves fora da resposta = cards que o usuário
-  // já tinha fechado ⇒ saem do registro (não devem reaparecer). Só a requisição em voo é aceita.
+  // F3.5.5E-H3/H4 — resposta da COLETA do handoff: o renderer devolve os cards AINDA vivos no stack
+  // ("i:<dedupKey>" individuais / "g:<groupKey>" grupos), SEM fechar nada — o fechamento agora é
+  // TRANSACIONAL, no COMMIT, depois que a premium PROVA o render (aceite). Entradas fora da resposta
+  // = cards que o usuário já fechou ⇒ saem do registro (não devem reaparecer). Só a requisição em
+  // voo é aceita. Se o foco JÁ voltou, aborta ANTES de mostrar qualquer card (nada foi apresentado;
+  // os internos continuam visíveis para o usuário focado).
   ipcMain.on("notif-collect-reply", (_e, reqId: number, keys: unknown) => {
     try {
       if (!handoffPending || handoffPending.reqId !== Number(reqId)) return;
       try { clearTimeout(handoffPending.timer); } catch { /* */ }
       handoffPending = null;
-      const alive = (Array.isArray(keys) ? keys : []).map((k) => String(k || "")).filter(Boolean);
-      const aliveSet = new Set(alive);
-      for (const k of Array.from(activeToasts.keys())) { if (!aliveSet.has(k)) toastUnregister(k); }
-      nlog("notify.handoff.reply", { alive: alive.length });
+      const raw = (Array.isArray(keys) ? keys : []).map((k) => String(k || "")).filter(Boolean);
+      const alive = raw.map((k) => (k.startsWith("i:") || k.startsWith("g:")) ? k : ("i:" + k)); // compat: chave crua = individual
+      const aliveI = new Set(alive.filter((k) => k.startsWith("i:")).map((k) => k.slice(2)));
+      const aliveG = new Set(alive.filter((k) => k.startsWith("g:")).map((k) => k.slice(2)));
+      for (const k of Array.from(activeToasts.keys())) { if (!aliveI.has(k)) toastUnregister(k); }
+      for (const g of Array.from(activeToastGroups.keys())) { if (!aliveG.has(g)) groupUnregister(g); }
+      nlog("notify.handoff.reply", { alive: alive.length, groups: aliveG.size });
+      if (windowActive()) { nlog("notify.handoff.aborted.focus", { alive: alive.length }); return; }
       handoffShow(alive);
     } catch { /* handoff nunca derruba nada */ }
+  });
+  // F3.5.5E-H4 — ACEITE da transação do handoff: a janela premium PROVOU o render do card (mesmo
+  // canal/payload da prova de render F3.4.7, com dedupKey). Segundo listener do canal — o listener
+  // do bgNotify segue intacto fazendo o ackCancel do fallback nativo. Só dedupKeys com transação em
+  // voo são tratados; o resto é ignorado (entregas normais da premium não passam por aqui).
+  ipcMain.on("bgnotify-rendered", (_e, info: unknown) => {
+    try { const k = info && (info as any).dedupKey; if (k && handoffTx.has(String(k))) txCommit(String(k)); } catch { /* aceite nunca derruba nada */ }
   });
   // F3.5.4K — painel Configurações → Notificações: status técnico SANITIZADO (sem token/senha/uid|taskId
   // integral/conteúdo). Somente booleans/rótulos/timestamps + versão. Read-only; nunca dispara entrega.
