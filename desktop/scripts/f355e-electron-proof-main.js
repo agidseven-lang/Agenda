@@ -178,7 +178,7 @@ app.whenReady().then(async () => {
   await shot("p9-reaberta");
 
   /* P10 — cliente claramente visível (linha própria, canônica do doc via enriquecimento) */
-  rec("P10 cliente claramente visível (Hospital Visão do DOC — nunca do título)", p9 && /<div class="ntfp-client">Hospital Visão<\/div>/.test(p9.html), {});
+  rec("P10 cliente claramente visível (Hospital Visão do DOC — nunca do título; tooltip — RE-PINADO F3.5.5E-H1)", p9 && /<div class="ntfp-client" title="Hospital Visão">Hospital Visão<\/div>/.test(p9.html), {});
 
   /* P11-P13 — cronogramas LEGADOS (contexto do doc real no state) */
   const p11 = await showToast({ eventType: "task_moved", title: "Tarefa movimentada", taskId: "cronSem", taskTitle: "Cronograma da Ótica", fromStatus: "afazer", toStatus: "andamento", actorName: "Ana Beatriz Social Media" });
@@ -197,7 +197,8 @@ app.whenReady().then(async () => {
 
   /* P15 — autor ≠ responsável (linhas separadas, hierarquia correta) */
   const p15 = await showToast({ eventType: "task_reopened", title: "Tarefa reaberta", taskId: "cronMen", taskTitle: "TEMAS", fromStatus: "concluido", toStatus: "andamento", actorName: "Miercohévisk Niheb Ferreira", responsibleName: "Felipe Teodozio", severity: "warning" });
-  const ordOk = p15 && (p15.html.indexOf('ntfp-task') < p15.html.indexOf('ntfp-client')) && (p15.html.indexOf('ntfp-client') < p15.html.indexOf('ntfp-ctx')) && (p15.html.indexOf('ntfp-ctx') < p15.html.indexOf('ntfp-chips')) && (p15.html.indexOf('ntfp-chips') < p15.html.indexOf('ntfp-by')) && (p15.html.indexOf('ntfp-by') < p15.html.indexOf('ntfp-respline'));
+  /* RE-PINADO F3.5.5E-H1: responsável em linha própria ACIMA do footer; autor+CTA no footer estruturado */
+  const ordOk = p15 && (p15.html.indexOf('ntfp-task') < p15.html.indexOf('ntfp-client')) && (p15.html.indexOf('ntfp-client') < p15.html.indexOf('ntfp-ctx')) && (p15.html.indexOf('ntfp-ctx') < p15.html.indexOf('ntfp-chips')) && (p15.html.indexOf('ntfp-chips') < p15.html.indexOf('ntfp-respline')) && (p15.html.indexOf('ntfp-respline') < p15.html.indexOf('ntfp-ft')) && (p15.html.indexOf('ntfp-ft') < p15.html.indexOf('ntfp-by'));
   rec("P15 autor e responsável separados (Reaberta por Miercohévisk… + Responsável: Felipe)", p15 && /Reaberta por Miercohévisk/.test(p15.html) && /Responsável: Felipe Teodozio/.test(p15.html) && ordOk, { hierarquiaOk: !!ordOk });
   await shot("p15-autor-responsavel");
 

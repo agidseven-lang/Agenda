@@ -1,0 +1,176 @@
+{
+  "at": "2026-08-07T01:00:31.253Z",
+  "indexSha": "5dca6ae2ae5fc6000d666325dc464ad66536d00110882f0c983bc920e949094d",
+  "antes": {
+    "movimentada": {
+      "cardW": 480,
+      "cardH": 242,
+      "avatar": 36,
+      "chipH": 24,
+      "ctaH": 27,
+      "ctaW": 93,
+      "closeW": 22
+    },
+    "concluidaSemChips": {
+      "cardW": 480,
+      "cardH": 209
+    },
+    "tresEmpilhadas": {
+      "stackH": 747
+    }
+  },
+  "results": [
+    {
+      "name": "BOOT app real do asar (semente aplicada)",
+      "ok": true,
+      "info": {
+        "indexSha": "5dca6ae2ae5f",
+        "user": true,
+        "tasks": 5
+      }
+    },
+    {
+      "name": "E01 movimentada: violeta + swap + chips Em andamento→Revisão + hora 20:30",
+      "ok": true,
+      "info": {
+        "w": 440,
+        "h": 198
+      }
+    },
+    {
+      "name": "E00 métricas DEPOIS dentro dos alvos (440px; altura ≤215; avatar 28; chip 26; CTA 30; fechar 32×32) vs ANTES medido (480×242; 36; 24; 27; 22)",
+      "ok": true,
+      "info": {
+        "antes": {
+          "cardW": 480,
+          "cardH": 242,
+          "avatar": 36,
+          "chipH": 24,
+          "ctaH": 27,
+          "ctaW": 93,
+          "closeW": 22
+        },
+        "depois": {
+          "cardW": 440,
+          "cardH": 198,
+          "avatar": 28,
+          "chipH": 26,
+          "ctaH": 30,
+          "ctaW": 109,
+          "closeW": 32,
+          "closeH": 32
+        }
+      }
+    },
+    {
+      "name": "E02 concluída: verde + check + 'Concluída por' + altura < ANTES sem chips (209px)",
+      "ok": true,
+      "info": {
+        "h": 164,
+        "antes": 209
+      }
+    },
+    {
+      "name": "E03 reaberta: âmbar + revise + chips Concluído→Em andamento",
+      "ok": true,
+      "info": {}
+    },
+    {
+      "name": "E04 variante cancelada no COMPONENTE empacotado: vermelha + ban (x-circle do set) + autor no footer (elegibilidade PREMIUM_TYPES congelada: segue no toast comum — regra 1.0.224 preservada)",
+      "ok": true,
+      "info": {
+        "w": 440,
+        "h": 164
+      }
+    },
+    {
+      "name": "E05 variante aprovação no COMPONENTE empacotado: verde + check + eyebrow 'Aprovação do cliente' (elegibilidade PREMIUM_TYPES congelada — regra 1.0.224 preservada)",
+      "ok": true,
+      "info": {
+        "w": 440,
+        "h": 164
+      }
+    },
+    {
+      "name": "E06 cliente curto: linha própria 'ULTRA' (do DOC) + contexto 'Edição de vídeos'",
+      "ok": true,
+      "info": {}
+    },
+    {
+      "name": "E07 cliente longo: truncado em 1 linha (ellipsis real) + tooltip com nome completo + sem overflow",
+      "ok": true,
+      "info": {
+        "ell": true,
+        "title": "Clínica Oftalmológica Visão Integrada de Alta Complexidade do Norte e Nordeste LTDA"
+      }
+    },
+    {
+      "name": "E08 autor longo: 1 linha com ellipsis REAL + tooltip 'Movimentada por <nome completo>'",
+      "ok": true,
+      "info": {
+        "title": "Movimentada por Miercohévisk Niheb Ferreira Nascimento Carlôto"
+      }
+    },
+    {
+      "name": "E09 sem avatar: iniciais geradas (2 letras) em 28px com ring 1px + fonte 11px",
+      "ok": true,
+      "info": {
+        "w": 28,
+        "txt": "MN",
+        "ring": true,
+        "fs": "11px"
+      }
+    },
+    {
+      "name": "E10 responsável distinto: 'Responsável · Felipe Teodozio' (linha própria, antes do footer; tooltip)",
+      "ok": true,
+      "info": {}
+    },
+    {
+      "name": "E10b responsável = autor (perfil real do actorId): SEM linha duplicada",
+      "ok": true,
+      "info": {}
+    },
+    {
+      "name": "E11 legado mensal: 'Cronograma mensal • 12 temas' EXATO (tooltip incluso)",
+      "ok": true,
+      "info": {}
+    },
+    {
+      "name": "E12 personalizado: 'Cronograma • 7 temas' sem semanal/quinzenal/mensal",
+      "ok": true,
+      "info": {}
+    },
+    {
+      "name": "E13 três empilhadas: 3 cards, sem sobreposição, na tela, coluna 614px < ANTES 747px",
+      "ok": true,
+      "info": {
+        "antesStackH": 747,
+        "n": 3,
+        "overlap": false,
+        "inScreen": true,
+        "stackH": 614
+      }
+    },
+    {
+      "name": "E14 escala 125%: sem corte de conteúdo, sem overflow, chips/CTA/fechar visíveis",
+      "ok": true,
+      "info": {}
+    },
+    {
+      "name": "E15 escala 150%: sem corte de conteúdo, sem overflow, chips/CTA/fechar visíveis",
+      "ok": true,
+      "info": {}
+    },
+    {
+      "name": "E16 1366×768: canto inferior direito, sem overflow",
+      "ok": true,
+      "info": {}
+    },
+    {
+      "name": "E17 1920×1080: canto inferior direito, sem overflow",
+      "ok": true,
+      "info": {}
+    }
+  ]
+}

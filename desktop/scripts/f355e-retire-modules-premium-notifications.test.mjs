@@ -38,9 +38,9 @@ function extract(src, name) {
 }
 
 /* ============ A. VERSÃO ============ */
-ok('A1 package version 1.0.224', /"version":\s*"1\.0\.224"/.test(PKG));
-ok('A2 lock version 1.0.224 (2x)', (LOCK.match(/"version":\s*"1\.0\.224"/g) || []).length >= 2);
-ok('A3 description marker f355e', PKG.indexOf('1.0.224-f355e-retire-legacy-modules-premium-notifications') >= 0 && PKG.indexOf('base 1.0.223-f355d-custom-cronograma-quantity-universal-paste') >= 0);
+ok('A1 package version 1.0.225 (RE-PINADO F3.5.5E-H1)', /"version":\s*"1\.0\.225"/.test(PKG));
+ok('A2 lock version 1.0.225 (2x) (RE-PINADO F3.5.5E-H1)', (LOCK.match(/"version":\s*"1\.0\.225"/g) || []).length >= 2);
+ok('A3 description marker f355eh1 + cadeia (RE-PINADO F3.5.5E-H1)', PKG.indexOf('1.0.225-f355eh1-ultra-premium-notifications') >= 0 && PKG.indexOf('base 1.0.224-f355e-retire-legacy-modules-premium-notifications') >= 0 && PKG.indexOf('base 1.0.223-f355d-custom-cronograma-quantity-universal-paste') >= 0);
 
 /* ============ B. RETIRADA DOS MÓDULOS (mandato 1–30) ============ */
 /* núcleo extraído e executado de verdade */
@@ -208,6 +208,7 @@ vm.runInContext([
   "function initials(name){try{var p=String(name||'').trim().split(/\\s+/).filter(Boolean);if(!p.length)return '';var a=p[0][0]||'';var b=p.length>1?(p[p.length-1][0]||''):'';return (a+b).toUpperCase();}catch(_){return '';}}",
   builderOf(S, 'premiumSevIcon') || extract(BG, 'premiumSevIcon'),
   extract(BG, 'premiumHM'), extract(BG, 'premiumChip'), extract(BG, 'premiumAvatar'),
+  builderOf(S, 'premiumEvtIcon'), /* RE-PINADO F3.5.5E-H1: builder novo do ícone de evento (paths do icon set) */
   builderOf(S, 'premiumEvtCat'), builderOf(S, 'premiumByVerb'), builderOf(S, 'premiumHMOf'), bldIdx,
 ].join('\n'), BCTX);
 const render = (p) => vm.runInContext('premiumCommonInner(' + JSON.stringify(p) + ')', BCTX);
@@ -215,7 +216,7 @@ const basePay = { eventType: 'task_reopened', title: 'Tarefa reaberta', taskTitl
 const html = render(basePay);
 
 /* C9-C11 cliente */
-ok('C9 cliente claramente visível (linha própria)', html.indexOf('<div class="ntfp-client">Hospital Visão</div>') >= 0);
+ok('C9 cliente claramente visível (linha própria + tooltip — RE-PINADO F3.5.5E-H1)', html.indexOf('<div class="ntfp-client" title="Hospital Visão">Hospital Visão</div>') >= 0);
 const longCli = render({ ...basePay, clientName: 'Clínica Oftalmológica Visão Integrada de Alta Complexidade do Norte LTDA' });
 ok('C10 cliente longo escapado e presente', longCli.indexOf('Clínica Oftalmológica Visão Integrada') >= 0);
 ok('C11 sem cliente ⇒ fallback profissional', render({ ...basePay, clientName: '' }).indexOf('Sem cliente vinculado') >= 0);
@@ -239,15 +240,15 @@ ok('C27 chips from→to presentes', html.indexOf('cs-concluido') >= 0 && html.in
 ok('C28 chips traduzidos (nunca chave crua)', html.indexOf('Concluído') >= 0 && html.indexOf('Em andamento') >= 0 && html.indexOf('>concluido<') < 0);
 
 /* hierarquia obrigatória (ordem DOM) */
-const order = ['ntfp-hd', 'ntfp-task', 'ntfp-client', 'ntfp-ctx', 'ntfp-chips', 'ntfp-by', 'ntfp-respline', 'ntfp-cta'];
+const order = ['ntfp-hd', 'ntfp-task', 'ntfp-client', 'ntfp-ctx', 'ntfp-chips', 'ntfp-respline', 'ntfp-ft', 'ntfp-by', 'ntfp-cta']; /* RE-PINADO F3.5.5E-H1: responsável acima do footer; autor+CTA no footer estruturado */
 let lastIdx = -1, orderOk = true;
 for (const c of order) { const i2 = html.indexOf(c); if (i2 < 0 || i2 < lastIdx) { orderOk = false; break; } lastIdx = i2; }
-ok('CH1 hierarquia: evento→título→cliente→contexto→status→autor→responsável→ação', orderOk);
+ok('CH1 hierarquia: evento→título→cliente→contexto→status→responsável→footer(autor→ação) (RE-PINADO F3.5.5E-H1)', orderOk);
 ok('CH2 horário DO EVENTO (15:02, 24h)', html.indexOf('15:02') >= 0);
-ok('CH3 categoria âmbar na reaberta (linha lateral + ícone)', html.indexOf('cat-amber') >= 0 && html.indexOf('ntfp-ic') >= 0);
+ok('CH3 categoria âmbar na reaberta (linha lateral + pastilha de ícone — RE-PINADO F3.5.5E-H1)', html.indexOf('cat-amber') >= 0 && html.indexOf('ntfp-ei') >= 0);
 ok('CH4 concluída=verde / atribuída=azul / movimentada=violeta', render({ ...basePay, eventType: 'task_completed' }).indexOf('cat-green') >= 0 && render({ ...basePay, eventType: 'task_assigned', fromStatus: '', toStatus: '' }).indexOf('cat-blue') >= 0 && render({ ...basePay, eventType: 'task_moved' }).indexOf('cat-violet') >= 0);
 ok('CH5 contexto sem duplicar setor (cronContext OU sectorLabel)', (html.match(/ntfp-ctx/g) || []).length === 1 && html.indexOf('Cronograma mensal • 12 temas') >= 0 && html.indexOf('>Cronograma<') < 0);
-ok('CH6 setor vivo sem cronContext mostra o rótulo', render({ ...basePay, cronContext: '', sectorLabel: 'Edição de vídeos' }).indexOf('<div class="ntfp-ctx">Edição de vídeos</div>') >= 0);
+ok('CH6 setor vivo sem cronContext mostra o rótulo (tooltip — RE-PINADO F3.5.5E-H1)', render({ ...basePay, cronContext: '', sectorLabel: 'Edição de vídeos' }).indexOf('<div class="ntfp-ctx" title="Edição de vídeos">Edição de vídeos</div>') >= 0);
 ok('CH7 nunca undefined/null/[object Object]', html.indexOf('undefined') < 0 && html.indexOf('[object') < 0 && render({ eventType: 'task_moved', createdAt: 1 }).indexOf('undefined') < 0);
 
 /* C29-C30 ação + fechar (acessibilidade) */
@@ -269,7 +270,7 @@ has(S, "if(all.length>4){ for(var i=0;i<all.length-4;i++)", 'C34 fila do toast p
 has(BG, 'while(stack.children.length>5){ stack.removeChild(stack.firstChild); }', 'C35 fila da janela premium preservada');
 
 /* C36-C39: escalas/resoluções ⇒ provas Electron reais (harness). Largura no intervalo do mandato: */
-has(S, ".ntf.ntfp-w{width:480px;max-width:calc(100vw - 36px)}", 'C36 largura 480px (420–500) no toast');
+has(S, ".ntf.ntfp-w{width:440px;max-width:calc(100vw - 36px)}", 'C36 largura 440px (RE-PINADO F3.5.5E-H1 — mandato 420–460) no toast');
 has(BG, '.ntf.ntfp-w{width:100%;max-width:100%}', 'C37 janela premium responsiva (dimensionada pelo bgNotify.ts)');
 has(S, '.ntfp-task{color:#ffffff', 'C38 título legível (contraste)');
 has(S, '-webkit-line-clamp:2', 'C39 título máx 2 linhas');
