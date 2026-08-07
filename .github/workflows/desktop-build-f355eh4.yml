@@ -1,0 +1,438 @@
+# F3.5.5E-H4 — Desktop 1.0.228 (P0: HANDOFF COMPLETO DE NOTIFICAÇÕES AGRUPADAS)
+# build GATED, --publish never. Publicação SÓ no desktop-release-f355eh4.yml (mesmos bytes).
+# Base de código: 1.0.227 @ fce316f0 (F3.5.5E-H3). BASELINE FÍSICA OFICIAL: 1.0.226 @ 267f8c8
+# (FISICAMENTE APROVADA). ROLLBACK IMEDIATO 1.0.226. Elimina a ÚNICA exceção declarada da H3
+# ("card de GRUPO ativo no toast não migra no blur"): QUALQUER notificação imediata interna —
+# individual, agrupada, rajada, já apresentada ou chegando durante a troca de foco — agora MIGRA
+# para a janela premium quando o Agenda perde o foco. Handoff TRANSACIONAL: coleta (i:/g:) SEM
+# fechar nada → serialização canônica (payload p0 do grupo + GroupView consolidado) → entrega à
+# premium pelos caminhos CONGELADOS F3.5.4O (showBgNotify com groupKey recria o card data-group;
+# updateBgGroup morfa contagem/itens/CTA) → ACEITE pela prova de render REAL (bgnotify-rendered)
+# → COMMIT (notif-collect-commit) fecha a representação interna. Sem aceite: 1 RETRY; 2ª falha
+# PRESERVA o interno (zero perda). Som 0× na migração; dedupe/recibos/sino/deep-link intocados;
+# agrupamento NÃO desmontado (controlador F3.5.4O byte-congelado); reassert/topmost/workArea/
+# display da 1.0.227 preservados; VISUAL 1.0.226 BYTE-CONGELADO (bgnotify.html E bgNotify.ts
+# diff-vazio nesta fase).
+name: "[push/manual] F3.5.5E-H4 — Desktop 1.0.228 (Handoff Completo de Notificações Agrupadas) — Desktop Build"
+"on":
+  push:
+    branches: ["desktop/f355eh4-grouped-notification-handoff-1.0.228"]
+    paths-ignore: [".github/workflows/desktop-release-f355eh4.yml"]
+  workflow_dispatch: {}
+permissions: { contents: read }
+env:
+  TEST_BRANCH: "desktop/f355eh4-grouped-notification-handoff-1.0.228"
+  BASE_227_SHA: "fce316f0eccba45760e0d2953fa6482ab3032401"
+  BASE_226_SHA: "267f8c8593e6724ad6460ed8bbb42201ade09d0b"
+  BASE_225_SHA: "24b76b51faf4d2778f025df79d6047563f089b48"
+  BASE_224_SHA: "0fcad3e56d39320b8853807861417a0a5eca1e78"
+  BASE_223_SHA: "217ed0622993acced1a20b72ba677e9d17ed2f03"
+  BASE_222_SHA: "1eac3672ab07a56bfd5d692e9ecb24688ac2ee83"
+  BASE_221_SHA: "98caad68e83230c2ada88ce1b35e709a0d62ab8c"
+  BASE_220_SHA: "2d003adaeeec00499e95a9eac5fe01f48859e4ed"
+  BASE_218_SHA: "1a945159dd563eba5c80657427519d0f22b4b673"
+  BASE_216_SHA: "e509f43ae8f3130a9922791f89db0ba29aa7a410"
+  APP_DIR: desktop
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: "Gate REF + ANCESTRIA (descende da 1.0.227, 1.0.226, 1.0.225, 1.0.224, 1.0.223, 1.0.222, 1.0.221, 1.0.220, 1.0.218 e 1.0.216)"
+        run: |
+          set -euo pipefail
+          [ "${GITHUB_REF_NAME}" = "$TEST_BRANCH" ] || { echo "::error::branch errada"; exit 1; }
+          git merge-base --is-ancestor "$BASE_227_SHA" HEAD || { echo "::error::não descende da 1.0.227 (base desta fase)"; exit 1; }
+          git merge-base --is-ancestor "$BASE_226_SHA" HEAD || { echo "::error::não descende da 1.0.226"; exit 1; }
+          git merge-base --is-ancestor "$BASE_225_SHA" HEAD || { echo "::error::não descende da 1.0.225"; exit 1; }
+          git merge-base --is-ancestor "$BASE_224_SHA" HEAD || { echo "::error::não descende da 1.0.224"; exit 1; }
+          git merge-base --is-ancestor "$BASE_223_SHA" HEAD || { echo "::error::não descende da 1.0.223"; exit 1; }
+          git merge-base --is-ancestor "$BASE_222_SHA" HEAD || { echo "::error::não descende da 1.0.222"; exit 1; }
+          git merge-base --is-ancestor "$BASE_221_SHA" HEAD || { echo "::error::não descende da 1.0.221"; exit 1; }
+          git merge-base --is-ancestor "$BASE_220_SHA" HEAD || { echo "::error::não descende da 1.0.220"; exit 1; }
+          git merge-base --is-ancestor "$BASE_218_SHA" HEAD || { echo "::error::não descende da 1.0.218"; exit 1; }
+          git merge-base --is-ancestor "$BASE_216_SHA" HEAD || { echo "::error::não descende da 1.0.216"; exit 1; }
+      - name: "Gate VERSAO 1.0.228 (package + lock x2 + description da fase + cadeia de bases preservada)"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node -e "const p=require('./package.json'); if(p.version!=='1.0.228') process.exit(1); if(!/grouped-notification-handoff/.test(p.description||'')) process.exit(1); if(!/global-notification-visibility/.test(p.description||'')) process.exit(1); if(!/FISICAMENTE APROVADA/.test(p.description||'')) process.exit(1); if(!/reference-notification/.test(p.description||'')) process.exit(1); if(!/f355eh1-ultra-premium-notifications/.test(p.description||'')) process.exit(1); if(!/retire-legacy-modules-premium-notifications/.test(p.description||'')) process.exit(1); if(!/custom-cronograma-quantity-universal-paste/.test(p.description||'')) process.exit(1); if(!/stale-alert-terminal-task-hotfix/.test(p.description||'')) process.exit(1); if(!/session-restore-boot-hotfix/.test(p.description||'')) process.exit(1); if(!/custom-script-quantity-rich-editor/.test(p.description||'')) process.exit(1);"
+          [ "$(grep -c '"version": "1.0.228"' package-lock.json)" -ge 2 ]
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: "npm ci + TypeScript + sintaxe dos renderers como SCRIPT CLÁSSICO (vm.Script — parser do browser; new Function mascara return de topo) + worker"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          ./node_modules/.bin/tsc --noEmit -p tsconfig.json
+          node -e "const fs=require('fs'),vm=require('vm');const s=fs.readFileSync('src/renderer/bgnotify.html','utf8');const m=s.match(/<script>([\s\S]*?)<\/script>/);new vm.Script(m[1],{filename:'bgnotify-inline'});"
+          node -e "const fs=require('fs'),vm=require('vm');const s=fs.readFileSync('src/renderer/slareminder.html','utf8');const m=s.match(/<script>([\s\S]*?)<\/script>/);new vm.Script(m[1],{filename:'slareminder-inline'});"
+          node -e "const fs=require('fs'),vm=require('vm');const s=fs.readFileSync('src/renderer/index.html','utf8');const b=[...s.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(x=>x[1]);if(b.length<2){console.error('esperados >=2 blocos inline (guarda + principal)');process.exit(1);}b.forEach((x,i)=>new vm.Script(x,{filename:'index-inline-'+i}));console.log('blocos inline OK (Script clássico):',b.length);"
+          node --check ../cloudflare-worker.js
+      - name: "Gate F3.5.5E-H4 — HANDOFF COMPLETO DE GRUPOS (53: espelho de grupos + transação coleta→entrega→ACEITE→commit + retry/preservação + som 0× + i:/g: + commit no renderer + controlador F3.5.4O intocado + comportamento do dist em sandbox) [dist]"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          npm run build
+          node scripts/f355eh4-grouped-notification-handoff.test.mjs
+      - name: "Gate F3.5.5E-H3 herdado — VISIBILIDADE GLOBAL (57: reassert + roteamento por foco + visual 1.0.226 byte-congelado) [RE-PINADO F3.5.5E-H4: versão + handoff TRANSACIONAL com grupos] [dist]"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f355eh3-global-notification-visibility.test.mjs
+      - name: "Gate F3.5.5E-H2 herdado — CONTRATO da REFERÊNCIA do owner (62; design APROVADO congelado) [RE-PINADO F3.5.5E-H3: versão] [dist]"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f355eh2-reference-notification.test.mjs
+      - name: "Gate F3.5.5E herdado — retirada dos módulos (30) + notificações premium (40) + segurança + congelados [RE-PINADOS F3.5.5E-H2/H3: versão/visual] [dist]"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f355e-retire-modules-premium-notifications.test.mjs
+      - name: "Gate F3.5.5D herdado — cronograma qty + colagem universal + menu nativo 88 [dist]"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f355d-cron-quantity-universal-paste.test.mjs
+      - name: "Gate F3.5.3 herdado — colagem base 15 (choke-point com guard readOnly) + duráveis 37"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f353-paste-recovery.test.mjs
+          node scripts/f353-durable-notifications.test.mjs
+      - name: "Gate F3.5.5C-H2 herdado — alertas residuais 53 (3 barreiras + limpeza + ciclos) [dist]"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f355ch2-stale-alert.test.mjs
+      - name: "Gate central herdado — f354l 56 + f354p 126 + f354q 94 + f354o 50 + f354u 108 [dist]"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f354l-sla-central-persistent-reminders.test.mjs
+          node scripts/f354p-sla-decision-actions.test.mjs
+          node scripts/f354q-task-idle-detection.test.mjs
+          node scripts/f354o-common-notification-grouping.test.mjs
+          node scripts/f354u-premium-common-notifications.test.mjs
+          node scripts/f354u-h1-notification-hotfix.test.mjs
+      - name: "Gate F3.5.5C-H1 herdado — restauração de sessão + auth-core [dist]"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f355ch1-session-restore.test.mjs
+          node scripts/f3356-auth-core.test.mjs
+      - name: "Gate F3.5.5C herdado — quantidade + editor rico 128"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f355c-script-quantity-rich-editor.test.mjs
+      - name: "Gate F3.5.5C herdado — validador RTE do PORTAL 97"
+        run: |
+          set -euo pipefail
+          node scripts/worker-ops/f355c-rte-worker-validator.test.mjs
+      - name: "Gate F3.5.5B herdado — Agenda Premium 84"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f355b-agenda-premium.test.mjs
+      - name: "Gate F3.5.5A-H1 herdado — observações internas 72"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f355ah1-internal-notes.test.mjs
+      - name: "Gate F3.5.5A herdado — planner + orquestrador + central + integração (dist)"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f355a-execution-planner.test.mjs
+          node scripts/f355a-orchestrator.test.mjs
+          node scripts/f355a-execution-central.test.mjs
+          node scripts/f355a-integration.test.mjs
+      - name: "Gate REGRESSÃO canônica — som 37 + detalhes 74 + cards 53 + sessão 40"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f354wh2-immediate-notification-sound.test.mjs
+          node scripts/f354wh1-details-status-notes.test.mjs
+          node scripts/f354w-compact-cards-details.test.mjs
+          node scripts/f354vh1-session-persistence.test.mjs
+      - name: "Gate PROVAS REAIS Electron — F3.5.5E-H4 (21 provas: 18 cenários do mandato — individual/grupo 2-3-4/rajada/update durante handoff/blur-focus rápido/Alt+Tab repetido/minimizado/X-tray + som 0× + zero duplicação + CTA + retry real + preservação; PNGs) — xvfb"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y >/dev/null 2>&1 || true
+          sudo apt-get install -y xvfb >/dev/null 2>&1 || true
+          timeout -k 15 780 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f355eh4-electron-proof-main.js
+      - name: "Gate PROVAS herdadas F3.5.5E-H3 — 22 provas da visibilidade global [RE-PINADO F3.5.5E-H4: aceite transacional no wiring + preload com canal do commit] — xvfb"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          timeout -k 15 700 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f355eh3-electron-proof-main.js
+      - name: "Gate PROVAS herdadas F3.5.5E-H2 — 23 provas do design da referência (bytes visuais congelados) — xvfb"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          timeout -k 15 700 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f355eh2-electron-proof-main.js
+      - name: "Gate PROVAS herdadas F3.5.5E — 27 cenas (retirada + notificações premium) [RE-PINADOS F3.5.5E-H1/H2: P10 tooltip + cápsula/CTA/ordem] — xvfb"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          timeout -k 15 700 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f355e-electron-proof-main.js
+      - name: "Gate PROVAS herdadas F3.5.5D — 27 cenas (asar real, clipboard real, right-click real) — xvfb"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          timeout -k 15 700 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f355d-electron-proof-main.js
+      - name: "Gate PROVAS herdadas F3.5.5C-H2 — 9 cenas (janela slareminder REAL) — xvfb"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          timeout -k 15 500 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f355ch2-electron-proof-main.js
+      - name: "Gate PROVAS herdadas F3.5.5C-H1 — boot de sessão (10 cenas) + ciclos 20x — xvfb"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          timeout -k 15 600 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f355ch1-electron-proof-main.js
+          timeout -k 15 400 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f355ch1-cycle-proof-main.js
+      - name: "Gate SMOKE RTE herdado — 91 comportamentais no Chromium REAL"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          timeout -k 15 300 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f355c-rte-behavior-main.js
+      - name: "Gate PROVAS herdadas — F3.5.5C re-escopado (superfície do Roteiro retirada; verdade herdada da F3.5.5E) — xvfb"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          timeout -k 15 600 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f355e-retired-legacy-inherited-proof.js
+      - name: "Gate PARIDADE CRUZADA herdada — canônicos validados pelo Worker"
+        run: |
+          set -euo pipefail
+          node scripts/worker-ops/f355c-canon-crossparity.mjs
+      - name: "Gate PROVAS herdadas — F3.5.5B (20) + F3.5.5A-H1 (15) + F3.5.5A (25) — xvfb"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          timeout -k 15 600 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f355b-proof-main.js
+          timeout -k 15 600 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f355ah1-proof-main.js
+          timeout -k 15 600 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f355a-execution-proof-main.js
+      - uses: actions/upload-artifact@v4
+        with: { name: f355eh4-provas-qa, path: "docs/f355eh4-qa/**", if-no-files-found: error, retention-days: 30 }
+      - uses: actions/upload-artifact@v4
+        with: { name: f355eh4-provas-herdadas-qa, path: "docs/f355eh3-qa/**\ndocs/f355eh2-qa/**\ndocs/f355e-qa/**\ndocs/f355d-qa/**\ndocs/f355ch2-qa/**\ndocs/f355ch1-qa/**", if-no-files-found: error, retention-days: 30 }
+      - name: "Gate ISOLAMENTO — delta vs 1.0.227 SÓ nos arquivos autorizados; bgNotify.ts + bgnotify.html + controlador F3.5.4O + funcional alheio CONGELADOS diff-vazio"
+        run: |
+          set -euo pipefail
+          git diff --name-only "$BASE_227_SHA"..HEAD > /tmp/delta.txt; cat /tmp/delta.txt
+          # allowlist F3.5.5E-H4: SOMENTE a camada do handoff transacional (main.ts registro de grupos
+          # + transações; preload.ts canal do commit; index.html coleta i:/g: + commit — ajustes
+          # técnicos não-visuais) + versão + suíte/harness/docs/workflows da fase + re-pins herdados
+          # ROTULADOS (RE-PINADO F3.5.5E-H4: pins de versão 1.0.228 nas 10 suítes; contratos do
+          # protocolo H3→H4 na suíte/harness/preload de prova f355eh3; zero pin FUNCIONAL alheio).
+          BAD=$(grep -vE '^(\.github/workflows/desktop-(build|release)-f355eh4\.yml$|desktop/src/main/main\.ts$|desktop/src/preload/preload\.ts$|desktop/src/renderer/index\.html$|desktop/package(-lock)?\.json$|desktop/scripts/f355eh4-|desktop/scripts/f355eh3-global-notification-visibility\.test\.mjs$|desktop/scripts/f355eh3-electron-proof-main\.js$|desktop/scripts/f355eh3-proof-preload\.js$|desktop/scripts/f355eh2-reference-notification\.test\.mjs$|desktop/scripts/f355e-retire-modules-premium-notifications\.test\.mjs$|desktop/scripts/f355d-cron-quantity-universal-paste\.test\.mjs$|desktop/scripts/f354p-sla-decision-actions\.test\.mjs$|desktop/scripts/f354vh1-session-persistence\.test\.mjs$|desktop/scripts/f354wh2-immediate-notification-sound\.test\.mjs$|desktop/scripts/f355a-integration\.test\.mjs$|desktop/scripts/f355ah1-internal-notes\.test\.mjs$|desktop/scripts/f355b-agenda-premium\.test\.mjs$|desktop/scripts/f355c-script-quantity-rich-editor\.test\.mjs$|docs/f355eh4(-qa)?/)' /tmp/delta.txt || true)
+          [ -z "$BAD" ] || { echo "::error::fora da allowlist: $BAD"; exit 1; }
+          # REGRA MÁXIMA da fase: visual 1.0.226 BYTE-CONGELADO + a PRÓPRIA janela premium (bgNotify.ts)
+          # e o CONTROLADOR do agrupamento (notificationGrouping.ts) intocados — o handoff usa SÓ os
+          # caminhos já suportados; nada de novo renderer/nível/timer. Funcional alheio diff-vazio.
+          git diff --quiet "$BASE_227_SHA"..HEAD -- desktop/src/main/bgNotify.ts desktop/src/main/notificationGrouping.ts desktop/src/renderer/bgnotify.html desktop/src/renderer/slareminder.html desktop/src/renderer/bgcall.html desktop/src/renderer/sounds desktop/src/renderer/priorityEngine.js desktop/src/preload/bgnotify-preload.ts desktop/src/preload/slareminder-preload.ts desktop/scripts/copy-renderer.js desktop/tsconfig.json desktop/electron-builder.yml cloudflare-worker.js scripts/worker-ops functions android-native android-native-beta desktop/scripts/f355eh1-visual-redesign.test.mjs desktop/scripts/f355eh1-electron-proof-main.js desktop/scripts/f355eh2-electron-proof-main.js || { echo "::error::congelado alterado (bgNotify.ts/controlador F3.5.4O/visual 1.0.226/funcional alheio devem ser byte-idênticos à 1.0.227)"; exit 1; }
+          # baseline física continua na linhagem: bgnotify.html também byte-idêntico à 1.0.226.
+          git diff --quiet "$BASE_226_SHA"..HEAD -- desktop/src/renderer/bgnotify.html || { echo "::error::bgnotify.html divergiu da baseline física 1.0.226"; exit 1; }
+      - name: "Gate MARCADORES F3.5.5E-H4 — handoff transacional de grupos no fonte + H3 herdado + referência (visual congelado) nas 2 superfícies + herdados preservados"
+        run: |
+          set -euo pipefail
+          # F3.5.5E-H4 — handoff transacional COMPLETO (fonte):
+          grep -q 'const activeToastGroups = new Map' desktop/src/main/main.ts
+          grep -q 'GROUP_MAX_MS = 15000' desktop/src/main/main.ts
+          grep -q 'function groupRegister' desktop/src/main/main.ts
+          grep -q 'function groupTouch' desktop/src/main/main.ts
+          grep -q 'function groupUnregisterByDedup' desktop/src/main/main.ts
+          grep -q 'const handoffTx = new Map' desktop/src/main/main.ts
+          grep -q 'HANDOFF_ACCEPT_MS = 4600' desktop/src/main/main.ts
+          grep -q 'function txCommit' desktop/src/main/main.ts
+          grep -q 'function txFail' desktop/src/main/main.ts
+          grep -q 'function txBegin' desktop/src/main/main.ts
+          grep -q 'notif-collect-commit' desktop/src/main/main.ts
+          grep -q 'notify.handoff.accepted' desktop/src/main/main.ts
+          grep -q 'notify.handoff.preserved' desktop/src/main/main.ts
+          grep -q 'notify.handoff.aborted.focus' desktop/src/main/main.ts
+          grep -q 'ipcMain.on("bgnotify-rendered"' desktop/src/main/main.ts
+          grep -q 'onNotifCollectCommit' desktop/src/preload/preload.ts
+          grep -q "out.push('g:'+gk); continue;" desktop/src/renderer/index.html
+          grep -q "out.push('i:'+k);" desktop/src/renderer/index.html
+          grep -q 'onNotifCollectCommit' desktop/src/renderer/index.html
+          # F3.5.5E-H3 herdado — visibilidade global (fonte):
+          grep -q 'function reassert' desktop/src/main/bgNotify.ts
+          grep -q 'moveTop()' desktop/src/main/bgNotify.ts
+          [ "$(grep -c 'setAlwaysOnTop(true, "screen-saver")' desktop/src/main/bgNotify.ts)" -ge 3 ]
+          grep -q 'display-metrics-changed' desktop/src/main/bgNotify.ts
+          grep -q 'lastHeight' desktop/src/main/bgNotify.ts
+          grep -q 'handoffActiveToasts' desktop/src/main/main.ts
+          grep -q 'notif-collect-reply' desktop/src/main/main.ts
+          grep -q 'mainWin.on("blur"' desktop/src/main/main.ts
+          grep -q 'toastRegister' desktop/src/main/main.ts
+          grep -q 'notif-collect-request' desktop/src/preload/preload.ts
+          grep -q '__ntfKey' desktop/src/renderer/index.html
+          grep -q 'w.isFocused()' desktop/src/main/main.ts
+          # referência (design APROVADO 1.0.226) preservada nas DUAS superfícies:
+          for F in desktop/src/renderer/index.html desktop/src/renderer/bgnotify.html; do
+            grep -q 'function premiumEvtIcon' "$F"
+            grep -q 'ntfp-fl' "$F"
+            grep -q 'ntfp-pill' "$F"
+            grep -q 'ntfp-pr' "$F"
+            grep -q 'width:62px;height:62px' "$F"
+            grep -q 'width:32px;height:32px' "$F"
+            grep -q 'border-radius:24px' "$F"
+            grep -q 'padding:18px 18px 16px' "$F"
+            grep -q 'aria-label="Abrir tarefa"' "$F"
+            grep -q 'Responsável · ' "$F"
+          done
+          grep -q '.ntf.ntfp-w{width:450px;max-width:calc(100vw - 36px);padding-top:26px;overflow:visible}' desktop/src/renderer/index.html
+          grep -q '.ntf.ntfp-w{width:100%;max-width:100%;padding-top:26px;overflow:visible}' desktop/src/renderer/bgnotify.html
+          # herdados F3.5.5E preservados (retirada + premium + D + H2 + H1):
+          grep -q 'const RETIRED_SECTOR_KEYS={copywriting:1,roteiro:1,programacao_posts:1};' desktop/src/renderer/index.html
+          grep -q 'function retiredCutoffFilter' desktop/src/renderer/index.html
+          grep -q 'Este módulo foi descontinuado e não está mais disponível no Agenda ID Seven.' desktop/src/renderer/index.html
+          grep -q 'function isRetiredSector' desktop/src/main/notifEvents.js
+          grep -q 'retired-dropped' desktop/src/main/main.ts
+          grep -q 'sla.reminder.retired_module' desktop/src/main/main.ts
+          grep -q 'isRetiredSector' desktop/src/main/taskIdleScheduler.ts
+          grep -q 'modulo_descontinuado' desktop/src/main/executionTracking.js
+          grep -q 'function cronNotifContext' desktop/src/main/notifEvents.js
+          grep -q 'function cronNotifContextR' desktop/src/renderer/index.html
+          grep -q 'ntfp-client' desktop/src/renderer/index.html
+          grep -q 'ntfp-client' desktop/src/renderer/bgnotify.html
+          grep -q 'Sem cliente vinculado' desktop/src/renderer/index.html
+          grep -q 'Sem cliente vinculado' desktop/src/renderer/bgnotify.html
+          grep -q 'aria-live' desktop/src/renderer/index.html
+          grep -q 'function cronQtyCommit' desktop/src/renderer/index.html
+          grep -q 'function f355dWireUniversalPaste' desktop/src/renderer/index.html
+          grep -q 'attachEditContextMenu' desktop/src/main/main.ts
+          grep -q 'taskGate' desktop/src/main/slaReminder.ts
+          grep -q 'Esta tarefa já foi encerrada.' desktop/src/main/slaReminder.ts
+          grep -q 'server_unauthorized_confirmed' desktop/src/main/auth-core.ts
+          grep -q 'authRetryNow' desktop/src/renderer/index.html
+          grep -q 'id="fScriptQty"' desktop/src/renderer/index.html
+          grep -q 'id="fVideoQty"' desktop/src/renderer/index.html
+          echo "MARCADORES F3.5.5E-H3: VERIFIED."
+  build:
+    needs: verify
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: npm ci + build + electron-builder (--publish never)
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm run build
+          npx electron-builder --win nsis msi --publish never
+      - name: "Gate EMPACOTADO — versão + HANDOFF H4 + VISIBILIDADE H3 + REFERÊNCIA H2 + herdados no app.asar (suítes contra o pacote)"
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          ASAR="dist-installer/win-unpacked/resources/app.asar"; test -f "$ASAR"
+          npx --yes @electron/asar extract "$ASAR" asar-x
+          node -e "const p=require('./asar-x/package.json'); if(p.version!=='1.0.228') process.exit(1);"
+          # HANDOFF H4 nos BYTES do pacote (main compilado + preload + renderer):
+          grep -q 'activeToastGroups' asar-x/dist/main/main.js
+          grep -q 'txCommit' asar-x/dist/main/main.js
+          grep -q 'txFail' asar-x/dist/main/main.js
+          grep -q 'HANDOFF_ACCEPT_MS = 4600' asar-x/dist/main/main.js
+          grep -q 'notif-collect-commit' asar-x/dist/main/main.js
+          grep -q 'notify.handoff.preserved' asar-x/dist/main/main.js
+          grep -q 'notif-collect-commit' asar-x/dist/preload/preload.js
+          grep -q "out.push('g:'+gk); continue;" asar-x/src/renderer/index.html
+          grep -q 'onNotifCollectCommit' asar-x/src/renderer/index.html
+          # VISIBILIDADE H3 nos BYTES do pacote (main compilado + preload + renderer):
+          grep -q 'function reassert' asar-x/dist/main/bgNotify.js
+          grep -q 'moveTop()' asar-x/dist/main/bgNotify.js
+          grep -q 'screen-saver' asar-x/dist/main/bgNotify.js
+          grep -q 'display-metrics-changed' asar-x/dist/main/bgNotify.js
+          grep -q 'handoffActiveToasts' asar-x/dist/main/main.js
+          grep -q 'notif-collect-reply' asar-x/dist/main/main.js
+          grep -q 'toastRegister' asar-x/dist/main/main.js
+          grep -q 'notif-collect-request' asar-x/dist/preload/preload.js
+          grep -q '__ntfKey' asar-x/src/renderer/index.html
+          # REFERÊNCIA H2 nos BYTES do pacote (2 superfícies):
+          grep -q 'function premiumEvtIcon' asar-x/src/renderer/index.html
+          grep -q 'function premiumEvtIcon' asar-x/src/renderer/bgnotify.html
+          grep -q 'ntfp-fl' asar-x/src/renderer/index.html
+          grep -q 'ntfp-pill' asar-x/src/renderer/bgnotify.html
+          grep -q '.ntf.ntfp-w{width:450px;max-width:calc(100vw - 36px);padding-top:26px;overflow:visible}' asar-x/src/renderer/index.html
+          grep -q '.ntf.ntfp-w{width:100%;max-width:100%;padding-top:26px;overflow:visible}' asar-x/src/renderer/bgnotify.html
+          grep -q 'width:62px;height:62px' asar-x/src/renderer/index.html
+          grep -q 'width:32px;height:32px' asar-x/src/renderer/index.html
+          # F3.5.5E intacto nos BYTES do pacote:
+          grep -q 'function retiredCutoffFilter' asar-x/src/renderer/index.html
+          grep -q 'Este módulo foi descontinuado e não está mais disponível no Agenda ID Seven.' asar-x/src/renderer/index.html
+          grep -q 'ntfp-client' asar-x/src/renderer/index.html
+          grep -q 'ntfp-client' asar-x/src/renderer/bgnotify.html
+          grep -q 'Sem cliente vinculado' asar-x/src/renderer/bgnotify.html
+          grep -q 'isRetiredSector' asar-x/dist/main/notifEvents.js
+          grep -q 'cronNotifContext' asar-x/dist/main/notifEvents.js
+          grep -q 'retired-dropped' asar-x/dist/main/main.js
+          grep -q 'retired_module' asar-x/dist/main/main.js
+          grep -q 'isRetiredSector' asar-x/dist/main/taskIdleScheduler.js
+          grep -q 'modulo_descontinuado' asar-x/dist/main/executionTracking.js
+          # F3.5.5D intacto no pacote:
+          grep -q 'id="fCronQty"' asar-x/src/renderer/index.html
+          grep -q 'function f355dWireUniversalPaste' asar-x/src/renderer/index.html
+          test -f asar-x/dist/main/editContextMenu.js
+          grep -q 'Colar' asar-x/dist/main/editContextMenu.js
+          grep -q 'attachEditContextMenu' asar-x/dist/main/main.js
+          grep -q 'clipboardReadHTML' asar-x/dist/preload/preload.js
+          # H2 intacto no pacote:
+          grep -q 'stale_terminal_task' asar-x/dist/main/slaReminder.js
+          grep -q 'Esta tarefa já foi encerrada.' asar-x/dist/main/slaReminder.js
+          grep -q 'slaTaskMapReady' asar-x/dist/main/main.js
+          # H1 (sessão) intacto no pacote:
+          grep -q 'server_unauthorized_confirmed' asar-x/dist/main/auth-core.js
+          grep -q 'authRetryNow' asar-x/src/renderer/index.html
+          # herdados intactos no pacote:
+          grep -q 'id="fScriptQty"' asar-x/src/renderer/index.html
+          grep -q 'function rteSanitize' asar-x/src/renderer/index.html
+          grep -q "CHECK-IN DE EXECUÇÃO" asar-x/src/renderer/slareminder.html
+          test -f asar-x/dist/main/executionOrchestrator.js
+          # SUÍTE DA FASE contra os BYTES EMPACOTADOS (renderers + dist + package do asar):
+          ASAR_MODE=1 SRC=asar-x/src/renderer/index.html BG_SRC=asar-x/src/renderer/bgnotify.html PKG_SRC=asar-x/package.json DIST_MAIN=asar-x/dist/main/main.js DIST_BG=asar-x/dist/main/bgNotify.js DIST_PRE=asar-x/dist/preload/preload.js DIST_GROUP=asar-x/dist/main/notificationGrouping.js node scripts/f355eh4-grouped-notification-handoff.test.mjs
+          # suíte da VISIBILIDADE H3 (herdada re-pinada) contra o pacote:
+          ASAR_MODE=1 SRC=asar-x/src/renderer/index.html BG_SRC=asar-x/src/renderer/bgnotify.html PKG_SRC=asar-x/package.json DIST_MAIN=asar-x/dist/main/main.js DIST_BG=asar-x/dist/main/bgNotify.js node scripts/f355eh3-global-notification-visibility.test.mjs
+          # suíte da REFERÊNCIA (design congelado) contra o pacote:
+          SRC=asar-x/src/renderer/index.html BG_SRC=asar-x/src/renderer/bgnotify.html PKG_SRC=asar-x/package.json node scripts/f355eh2-reference-notification.test.mjs
+          # herdadas contra o pacote (mesma bateria da F3.5.5E):
+          SRC=asar-x/src/renderer/index.html BG_SRC=asar-x/src/renderer/bgnotify.html PKG_SRC=asar-x/package.json NE_SRC=asar-x/dist/main/notifEvents.js ET_SRC=asar-x/dist/main/executionTracking.js node scripts/f355e-retire-modules-premium-notifications.test.mjs
+          SRC=asar-x/src/renderer/index.html WSRC=../cloudflare-worker.js F355D_DIST=asar-x/dist/main node scripts/f355d-cron-quantity-universal-paste.test.mjs
+          SLA_DIST=asar-x/dist/main node scripts/f355ch2-stale-alert.test.mjs
+          AUTH_CORE_SRC=asar-x/dist/main/auth-core.js node scripts/f355ch1-session-restore.test.mjs
+          SRC=asar-x/src/renderer/index.html WSRC=../cloudflare-worker.js node scripts/f355c-script-quantity-rich-editor.test.mjs
+          SRC=asar-x/src/renderer/index.html node scripts/f355b-agenda-premium.test.mjs
+          SRC=asar-x/src/renderer/index.html node scripts/f355ah1-internal-notes.test.mjs
+          SRC=asar-x/src/renderer/index.html BG_SRC=asar-x/src/renderer/bgnotify.html MAIN_SRC=src/main/main.ts BGM_SRC=src/main/bgNotify.ts node scripts/f354wh2-immediate-notification-sound.test.mjs
+          SRC=asar-x/src/renderer/index.html node scripts/f354wh1-details-status-notes.test.mjs
+          echo "GATE F3.5.5E-H4 EMPACOTADO: VERIFIED."
+      - name: Empacotar bundle + SHA256SUMS + VERSAO-DESKTOP
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes @cyclonedx/cyclonedx-npm --omit dev --output-format JSON --output-file "$RUNNER_TEMP/sbom.json" || echo '{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}' > "$RUNNER_TEMP/sbom.json"
+          OUT="$GITHUB_WORKSPACE/dist-pkg"; mkdir -p "$OUT"
+          EXE=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe | head -1); MSI=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.msi | head -1); BM=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap | head -1)
+          cp "$EXE" "$MSI" "$BM" dist-installer/latest.yml "$OUT/"; cp "$RUNNER_TEMP/sbom.json" "$OUT/SBOM-cyclonedx.json"
+          EXE_NAME=$(basename "$EXE"); MSI_NAME=$(basename "$MSI"); BM_NAME=$(basename "$BM")
+          ( cd "$OUT" && sha256sum "$EXE_NAME" "$MSI_NAME" latest.yml "$BM_NAME" SBOM-cyclonedx.json > SHA256SUMS )
+          { echo "productName : Agenda ID Seven Desktop"; echo "versionName : 1.0.228"; echo "rotulo      : 1.0.228-f355eh4-grouped-notification-handoff (CANDIDATA — Handoff Completo de Notificações Agrupadas)"; echo "channel     : latest (NADA publicado neste build)"; echo "appId       : br.com.idseven.agenda.desktop"; echo "instalador  : $EXE_NAME"; echo "SHA-256 exe : $(sha256sum "$OUT/$EXE_NAME" | awk '{print $1}')"; echo "instalador2 : $MSI_NAME"; echo "SHA-256 msi : $(sha256sum "$OUT/$MSI_NAME" | awk '{print $1}')"; echo "commit      : $GITHUB_SHA (branch $GITHUB_REF_NAME)"; echo "base-codigo : Desktop 1.0.227 (commit fce316f0; F3.5.5E-H3); BASELINE FISICA OFICIAL: Desktop 1.0.226 (commit 267f8c85; FISICAMENTE APROVADA)"; echo "rollback    : imediato 1.0.226 (267f8c85 — baseline física); adicional 1.0.224 (0fcad3e5); físico de segurança 1.0.223 (217ed062); extra 1.0.218 (1a94515)"; echo "origem      : F3.5.5E-H4 — HANDOFF COMPLETO DE NOTIFICACOES AGRUPADAS sobre a 1.0.227 (que corrigiu a visibilidade global) e a baseline fisica 1.0.226 (design da referencia do owner 100 por cento CONGELADO — bgnotify.html byte-identico por gate). Problema (nao conformidade apontada pelo owner na H3): o card de GRUPO ativo no toast interno NAO migrava quando o usuario trocava do Agenda para outro programa — qualquer notificacao comum agrupavel (ate um grupo de 1 evento) podia ficar escondida atras da janela por ate 15 segundos; o sino NAO substitui notificacao imediata. Correcao cirurgica: o registro do handoff passa a espelhar TAMBEM os grupos (payload do 1o evento com groupKey + GroupView consolidado + teto de 15s espelhado do renderer) e o handoff no blur vira TRANSACIONAL — a coleta devolve TODOS os cards vivos (i:<dedupKey> individuais e g:<groupKey> grupos) SEM fechar nada; cada card vira uma transacao: showBgNotify silencioso (sound:false) recria o card na janela premium topmost pelo caminho congelado F3.5.4O (groupKey gera data-group), o ACEITE e a prova de render REAL da premium (bgnotify-rendered), o morph updateBgGroup aplica a contagem/itens/CTA MAIS NOVOS apos o aceite, e SO ENTAO o COMMIT (notif-collect-commit) fecha a representacao interna. Sem aceite no prazo (espelho do ACK de 4s): 1 RETRY; falhando de novo o card interno e PRESERVADO — zero perda, zero som repetido, zero duplicacao (o mesmo evento nunca fica visivel nas duas superficies; blur/focus rapidos tem desfecho deterministico). Agrupamento NAO desmontado: o controlador puro F3.5.4O esta byte-congelado por gate, assim como bgNotify.ts (reassert/topmost/workArea da 1.0.227 preservados), o visual 1.0.226 e todo o funcional alheio (som/dedupe/fila/caps/recibos/sino/deep-link/SLA/Acompanhamento/sessao/tray/autostart/updater/Worker/Functions/Rules/Android)."; echo "distribuicao: CANDIDATA — publicação no Latest ocorre no workflow desktop-release-f355eh3.yml (mesmos bytes)"; } > "$OUT/VERSAO-DESKTOP.txt"
+          echo "== SHA256SUMS =="; cat "$OUT/SHA256SUMS"
+      - uses: actions/upload-artifact@v4
+        with: { name: agenda-id-seven-desktop-1.0.228-installer, path: "dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe\ndist-pkg/Agenda-ID-Seven-Desktop-*-x64.msi", if-no-files-found: error, retention-days: 30 }
+      - uses: actions/upload-artifact@v4
+        with: { name: agenda-id-seven-desktop-1.0.228-updatemeta, path: "dist-pkg/latest.yml\ndist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap\ndist-pkg/SHA256SUMS\ndist-pkg/SBOM-cyclonedx.json\ndist-pkg/VERSAO-DESKTOP.txt", if-no-files-found: error, retention-days: 30 }
