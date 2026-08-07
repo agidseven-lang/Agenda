@@ -74,15 +74,15 @@ const bgSrc = srcMode ? bgTs : dBg; // contra o asar valida o compilado
 ok("B1 reassert na ORDEM do mandato: position → setAlwaysOnTop(screen-saver) → showInactive → moveTop",
   /function reassert\([^)]*\)[^]*?position\(lastHeight\);[^]*?setAlwaysOnTop\(true, "screen-saver"\);[^]*?showInactive\(\);[^]*?moveTop\(\);/.test(bgSrc));
 ok("B2 showBgNotify usa reassert a CADA card (não só na criação)",
-  /const send = \(\) => \{ try \{ if \(!win\.isDestroyed\(\)\) \{ reassert\(win\); win\.webContents\.send\("bg-card", p\);/.test(bgSrc));
+  /!win\.isDestroyed\(\)\)[\s\S]{0,20}?\{?[\s\S]{0,20}?reassert\(win\);[\s\S]{0,80}?win\.webContents\.send\("bg-card", p\)/.test(bgSrc));
 ok("B3 updateBgGroup reafirma topmost+z-order quando visível (sem novo showInactive)",
-  /if \(win\.isVisible\(\)\) \{ win\.setAlwaysOnTop\(true, "screen-saver"\); win\.moveTop\(\); \}/.test(bgSrc)
-  && !/isVisible\(\)\) \{[^}]*showInactive/.test(bgSrc));
+  /if \(win\.isVisible\(\)\) \{[\s\S]{0,120}?win\.setAlwaysOnTop\(true, "screen-saver"\);[\s\S]{0,60}?win\.moveTop\(\)/.test(bgSrc)
+  && !/if \(win\.isVisible\(\)\) \{[\s\S]{0,200}?showInactive/.test(bgSrc));
 ok("B4 altura viva memorizada no bgnotify-resize (reposição sem esperar novo ack)",
   /lastHeight = Number\(h\) \|\| 160; position\(lastHeight\);/.test(bgSrc));
 ok("B5 mudança de display (metrics/added/removed) reposiciona a janela visível",
-  /display-metrics-changed", onDisplayChange\); screen\.on\("display-added", onDisplayChange\); screen\.on\("display-removed", onDisplayChange\)/.test(bgSrc)
-  && /isVisible\(\)\) position\(lastHeight\)/.test(bgSrc));
+  /display-metrics-changed", onDisplayChange\)/.test(bgSrc) && /display-added", onDisplayChange\)/.test(bgSrc) && /display-removed", onDisplayChange\)/.test(bgSrc)
+  && /bgWin\.isVisible\(\)\)[\s\S]{0,20}?position\(lastHeight\)/.test(bgSrc));
 ok("B6 criação sem foco/taskbar/frame + transparente (design aprovado)",
   /skipTaskbar: true, focusable: false/.test(bgSrc) && /frame: false, transparent: true/.test(bgSrc)
   && /alwaysOnTop: true/.test(bgSrc) && /#00000000/.test(bgSrc));
@@ -93,10 +93,10 @@ ok("B8 visível em todas as workspaces incl. fullscreen",
 ok("B9 PROIBIDO roubar foco: nenhum win.show()/win.focus() na janela premium",
   !/bgWin\.show\(\)/.test(bgSrc) && !/win\.show\(\)/.test(bgSrc) && !/\.focus\(\)/.test(bgSrc));
 ok("B10 posição = workArea do display do CURSOR (multimonitor), canto inferior direito",
-  /getDisplayNearestPoint\(screen\.getCursorScreenPoint\(\)\)\.workArea/.test(bgSrc)
+  /getDisplayNearestPoint\((electron_1\.)?screen\.getCursorScreenPoint\(\)\)\.workArea/.test(bgSrc)
   && /wa\.x \+ wa\.width - WIDTH - EDGE_MARGIN/.test(bgSrc) && /wa\.y \+ wa\.height - height - EDGE_MARGIN/.test(bgSrc));
 ok("B11 recriação quando destroyed (ensureWin) + closed limpa referência",
-  /if \(bgWin && !bgWin\.isDestroyed\(\)\) return bgWin;/.test(bgSrc) && /on\("closed", \(\) => \{ bgWin = null; \}\)/.test(bgSrc));
+  /if \(bgWin && !bgWin\.isDestroyed\(\)\)\s*return bgWin;/.test(bgSrc) && /on\("closed", \(\) => \{[\s\S]{0,20}?bgWin = null;/.test(bgSrc));
 ok("B12 hide SÓ com fila vazia (bgnotify-empty) — nunca esconde com card vivo",
   /ipcMain\.on\("bgnotify-empty",[^]*?bgWin\.hide\(\)/.test(bgSrc)
   && (bgSrc.match(/bgWin\.hide\(\)/g) || []).length === 1);
@@ -108,26 +108,26 @@ ok("C1 CONGELADO F3.5.4K: canal por FOCO REAL (windowActive == isFocused)",
 ok("C2 CONGELADO: sessão bloqueada → Notification NATIVA (nunca overlay no lock)",
   /if \(sessionLocked\) \{[^]*?nativeNotify\(p, key, deep\)/.test(mSrc));
 ok("C3 ramo toast REGISTRA o card p/ handoff (após o arm do ACK)",
-  /toastRegister\(key, p\); \} catch \{ \/\* F3\.5\.5E-H3/.test(mSrc));
+  /toastRegister\(key, p\);[\s\S]{0,160}?F3\.5\.5E-H3/.test(mSrc));
 ok("C4 fallback por falta de ACK REMOVE o registro (nunca re-mostrar no blur)",
   /toastAck\.arm\(key, \(\) => \{\s*toastUnregister\(key\);/.test(mSrc));
 ok("C5 blur da mainWindow dispara o handoff",
-  /mainWin\.on\("blur", \(\) => \{ try \{ handoffActiveToasts\(\);/.test(mSrc));
+  /mainWin\.on\("blur", \(\) => \{[\s\S]{0,80}?handoffActiveToasts\(\)/.test(mSrc));
 ok("C6 handoff re-exibe com sound:false + _handoff (mover, nunca duplicar; sem fallback nativo)",
   /Object\.assign\(\{\}, e\.p, \{ sound: false, _handoff: true \}\)/.test(mSrc)
-  && /showBgNotify\(hp, \(\) => \{ \/\* no-op \*\/ \}\)/.test(mSrc));
+  && /showBgNotify\)?\(hp, \(\) => \{ ?(\/\* no-op \*\/ )?\}\)/.test(mSrc));
 ok("C7 resposta da coleta: guarda de reqId + limpa fechados + migra só os vivos",
-  /if \(!handoffPending \|\| handoffPending\.reqId !== Number\(reqId\)\) return;/.test(mSrc)
-  && /if \(!aliveSet\.has\(k\)\) toastUnregister\(k\);/.test(mSrc) && /handoffShow\(alive\);/.test(mSrc));
+  /handoffPending\.reqId !== Number\(reqId\)\)\s*return;/.test(mSrc)
+  && /!aliveSet\.has\(k\)\)\s*toastUnregister\(k\);/.test(mSrc) && /handoffShow\(alive\);/.test(mSrc));
 ok("C8 blur transitório não migra (early-return com foco de volta) + timeout 700ms migra todos",
-  /if \(windowActive\(\)\) return; \/\/ blur transitório/.test(mSrc) && /\}, 700\);/.test(mSrc)
+  /windowActive\(\)\)\s*return; \/\/ blur transitório/.test(mSrc) && /\}, 700\);/.test(mSrc)
   && /handoffShow\(Array\.from\(activeToasts\.keys\(\)\)\)/.test(mSrc));
 ok("C9 dedupKey canônico materializado no payload (mesma derivação do HUB)",
   /if \(!p\.dedupKey\) \(p as any\)\.dedupKey = key;/.test(mainTs) || (!srcMode && /p\.dedupKey = key/.test(dMain)));
 ok("C10 TTL do registro espelha o toast (6/8/11s + margem)",
   /sev === "critical" \? 11000 : \(sev === "warning" \? 8000 : 6000\)/.test(mSrc) && /\+ 900\);/.test(mSrc));
 ok("C11 CONGELADO: desfocado/minimizado/oculto → janela premium + fallback nativa por ACK",
-  /const bgOk = showBgNotify\(p, \(\) => \{\s*const lateOk = nativeNotify\(p, key, deep\);/.test(mSrc));
+  /showBgNotify\)?\(p, \(\) => \{[\s\S]{0,80}?lateOk = nativeNotify\(p, key, deep\)/.test(mSrc));
 ok("C12 handoff NUNCA traz o Agenda à frente (bringToFrontAndOpen só em cliques)",
   !/handoffShow[^]*?bringToFrontAndOpen/.test(mSrc.slice(0, mSrc.indexOf("function handoffActiveToasts"))));
 
