@@ -57,16 +57,17 @@ const dBg = fs.existsSync(P.distBg) ? R(P.distBg) : "";
 const srcMode = process.env.ASAR_MODE === "1" ? false : !!mainTs;
 
 // ───────────────────────── A. IDENTIDADE ─────────────────────────
-ok("A1 versão 1.0.227", pkg.version === "1.0.227", pkg.version);
-ok("A2 description: fase f355eh3 + base 1.0.226 FISICAMENTE APROVADA + cadeia",
-  /1\.0\.227-f355eh3-global-notification-visibility/.test(pkg.description)
+ok("A1 versão 1.0.228 (RE-PINADO F3.5.5E-H4)", pkg.version === "1.0.228", pkg.version);
+ok("A2 description: fase f355eh4 sobre a f355eh3 + base 1.0.226 FISICAMENTE APROVADA + cadeia (RE-PINADO F3.5.5E-H4)",
+  /1\.0\.228-f355eh4-grouped-notification-handoff/.test(pkg.description)
+  && /1\.0\.227-f355eh3-global-notification-visibility/.test(pkg.description)
   && /1\.0\.226-f355eh2-reference-notification FISICAMENTE APROVADA/.test(pkg.description)
   && /1\.0\.225-f355eh1-ultra-premium-notifications/.test(pkg.description)
   && /1\.0\.224-f355e-retire-legacy-modules-premium-notifications/.test(pkg.description)
   && /1\.0\.223-f355d-custom-cronograma-quantity-universal-paste/.test(pkg.description));
 if (fs.existsSync(P.lock)) {
   const lock = JSON.parse(R(P.lock));
-  ok("A3 lock 1.0.227 ×2", lock.version === "1.0.227" && lock.packages[""].version === "1.0.227");
+  ok("A3 lock 1.0.228 ×2 (RE-PINADO F3.5.5E-H4)", lock.version === "1.0.228" && lock.packages[""].version === "1.0.228");
 } else { ok("A3 lock (ausente no pacote — ok)", true); }
 
 // ───────────────────────── B. bgNotify.ts (fonte) ─────────────────────────
@@ -107,21 +108,26 @@ ok("C1 CONGELADO F3.5.4K: canal por FOCO REAL (windowActive == isFocused)",
   /function windowActive\(\): boolean \{\s*const w = mainWin;\s*return !!\(w && !w\.isDestroyed\(\) && w\.isFocused\(\)\);/.test(mainTs) || (!srcMode && /windowActive\(\)/.test(dMain)));
 ok("C2 CONGELADO: sessão bloqueada → Notification NATIVA (nunca overlay no lock)",
   /if \(sessionLocked\) \{[^]*?nativeNotify\(p, key, deep\)/.test(mSrc));
-ok("C3 ramo toast REGISTRA o card p/ handoff (após o arm do ACK)",
-  /toastRegister\(key, p\);[\s\S]{0,160}?F3\.5\.5E-H3/.test(mSrc));
+ok("C3 ramo toast REGISTRA o card p/ handoff por TIPO — grupo no espelho de grupos, individual no registro H3 (RE-PINADO F3.5.5E-H4)",
+  /if \(\(?p(?: as any)?\)?\.groupKey\)[\s\S]{0,30}?groupRegister\(String\(\(?p(?: as any)?\)?\.groupKey\), p\);[\s\S]{0,30}?else[\s\S]{0,30}?toastRegister\(key, p\);/.test(mSrc));
 ok("C4 fallback por falta de ACK REMOVE o registro (nunca re-mostrar no blur)",
   /toastAck\.arm\(key, \(\) => \{\s*toastUnregister\(key\);/.test(mSrc));
 ok("C5 blur da mainWindow dispara o handoff",
   /mainWin\.on\("blur", \(\) => \{[\s\S]{0,80}?handoffActiveToasts\(\)/.test(mSrc));
-ok("C6 handoff re-exibe com sound:false + _handoff (mover, nunca duplicar; sem fallback nativo)",
+ok("C6 handoff TRANSACIONAL re-exibe com sound:false + _handoff nas 2 vias (individual e p0 do GRUPO; sem fallback nativo) (RE-PINADO F3.5.5E-H4)",
   /Object\.assign\(\{\}, e\.p, \{ sound: false, _handoff: true \}\)/.test(mSrc)
-  && /showBgNotify\)?\(hp, \(\) => \{ ?(\/\* no-op \*\/ )?\}\)/.test(mSrc));
-ok("C7 resposta da coleta: guarda de reqId + limpa fechados + migra só os vivos",
+  && /Object\.assign\(\{\}, e\.p0, \{ sound: false, _handoff: true \}\)/.test(mSrc)
+  && !/function txBegin[\s\S]{0,1400}?nativeNotify/.test(mSrc));
+ok("C7 resposta da coleta: guarda de reqId + prefixos i:/g: + limpa fechados dos 2 registros + aborta com foco + migra os vivos (RE-PINADO F3.5.5E-H4)",
   /handoffPending\.reqId !== Number\(reqId\)\)\s*return;/.test(mSrc)
-  && /!aliveSet\.has\(k\)\)\s*toastUnregister\(k\);/.test(mSrc) && /handoffShow\(alive\);/.test(mSrc));
-ok("C8 blur transitório não migra (early-return com foco de volta) + timeout 700ms migra todos",
+  && /!aliveI\.has\(k\)\)\s*toastUnregister\(k\);/.test(mSrc)
+  && /!aliveG\.has\(g\)\)\s*groupUnregister\(g\);/.test(mSrc)
+  && /notify\.handoff\.aborted\.focus/.test(mSrc)
+  && /handoffShow\(alive\);/.test(mSrc));
+ok("C8 blur transitório não migra (early-return com foco de volta) + timeout 700ms migra todos os REGISTROS (2 mapas) com abort por foco (RE-PINADO F3.5.5E-H4)",
   /windowActive\(\)\)\s*return; \/\/ blur transitório/.test(mSrc) && /\}, 700\);/.test(mSrc)
-  && /handoffShow\(Array\.from\(activeToasts\.keys\(\)\)\)/.test(mSrc));
+  && /handoffShow\(allEntries\(\)\)/.test(mSrc)
+  && /windowActive\(\)\)\s*return; \/\/ foco voltou/.test(mSrc));
 ok("C9 dedupKey canônico materializado no payload (mesma derivação do HUB)",
   /if \(!p\.dedupKey\) \(p as any\)\.dedupKey = key;/.test(mainTs) || (!srcMode && /p\.dedupKey = key/.test(dMain)));
 ok("C10 TTL do registro espelha o toast (6/8/11s + margem)",
@@ -150,11 +156,14 @@ if (srcMode) {
 // ───────────────────────── E. index.html (renderer) ─────────────────────────
 ok("E1 toast guarda payload+chave no elemento (handoff)",
   /el\.__ntfPayload=p; el\.__ntfKey=String\(\(p&&\(p\.dedupKey\|\|p\.eventId\)\)\|\|''\);/.test(idx));
-ok("E2 coleta PULA cards de grupo (regra F3.5.4O congelada)",
-  /if\(e\.getAttribute\('data-group'\)\) continue;/.test(idx));
-ok("E3 coleta FECHA o card (mover) e responde SEMPRE (inclusive no erro)",
-  /out\.push\(k\); try\{ \(e\.__ntfDismiss\|\|function\(\)\{\}\)\(\); \}/.test(idx)
-  && /notifCollectReply\(reqId,out\)/.test(idx) && /notifCollectReply\(reqId,\[\]\)/.test(idx));
+ok("E2 coleta INCLUI os cards de GRUPO como g:<groupKey> — a exceção da H3 foi ELIMINADA por mandato (RE-PINADO F3.5.5E-H4)",
+  /out\.push\('g:'\+gk\); continue;/.test(idx)
+  && !/if\(e\.getAttribute\('data-group'\)\) continue;/.test(idx));
+ok("E3 coleta NÃO fecha nada (transacional) + responde SEMPRE; o COMMIT fecha via __ntfDismiss (RE-PINADO F3.5.5E-H4)",
+  /out\.push\('i:'\+k\);/.test(idx)
+  && (() => { const a = idx.indexOf("onNotifCollect("); const b = idx.indexOf("onNotifCollectCommit("); return a > 0 && b > a && !idx.slice(a, b).includes("__ntfDismiss"); })()
+  && /notifCollectReply\(reqId,out\)/.test(idx) && /notifCollectReply\(reqId,\[\]\)/.test(idx)
+  && /onNotifCollectCommit/.test(idx) && /\(e\.__ntfDismiss\|\|function\(\)\{\}\)\(\);/.test(idx));
 ok("E4 CONGELADO: TTL do toast 6/8/11s byte-idêntico",
   /var ttl=sev==='critical'\?11000:\(sev==='warning'\?8000:6000\);/.test(idx));
 ok("E5 wiring da coleta com guard (nunca quebra sem desktopAPI)",
@@ -190,32 +199,38 @@ function grab(src, startRe, endMark) {
   return src.slice(i, j + endMark.length);
 }
 // bloco do handoff no dist (JS puro): de "const activeToasts" até o fim de handoffActiveToasts
+// RE-PINADO F3.5.5E-H4: o bloco agora inclui o espelho de GRUPOS + as TRANSAÇÕES (txBegin/txCommit/
+// txFail); a reply espelha o handler novo (prefixos i:/g:, limpeza dupla, abort por foco) e o aceite
+// espelha o listener "bgnotify-rendered" (commit SÓ após a prova de render da premium).
 const hBlock = grab(dMain, /const activeToasts = new Map\(\);?/, "/* handoff nunca derruba a entrega */ }\n}");
 ok("G0 bloco do handoff extraível do dist (JS compilado)", !!hBlock);
 if (hBlock) {
-  const calls = { bg: [], logs: [] };
+  const calls = { bg: [], group: [], commits: [], logs: [] };
   const ctx = {
-    console, setTimeout, clearTimeout,
+    console, setTimeout, clearTimeout, Date,
     windowActive: () => false,
-    mainWin: { isDestroyed: () => false, webContents: { isLoading: () => false, send: () => { /* coleta simulada via reply manual */ } } },
+    mainWin: { isDestroyed: () => false, webContents: { isLoading: () => false, send: (ch, args) => { if (ch === "notif-collect-commit") calls.commits.push(args); } } },
     showBgNotify: (p) => { calls.bg.push(p); return true; },
-    bgNotify_1: { showBgNotify: (p) => { calls.bg.push(p); return true; }, updateBgGroup: () => { } }, // import transpilado do dist
+    bgNotify_1: { showBgNotify: (p) => { calls.bg.push(p); return true; }, updateBgGroup: (v) => { calls.group.push(v); } }, // import transpilado do dist
+    updateBgGroup: (v) => { calls.group.push(v); },
     nlog: (t, d) => calls.logs.push([t, d]),
     nmask: (s) => String(s || "").slice(0, 3),
   };
   vm.createContext(ctx);
-  new vm.Script(hBlock + "\n;globalThis.__h={activeToasts,toastRegister,toastUnregister,handoffShow,handoffActiveToasts,get pending(){return handoffPending;},reply(reqId,keys){/*espelha o handler ipc*/ if(!handoffPending||handoffPending.reqId!==Number(reqId))return; clearTimeout(handoffPending.timer); handoffPending=null; const alive=(Array.isArray(keys)?keys:[]).map(k=>String(k||'')).filter(Boolean); const s=new Set(alive); for(const k of Array.from(activeToasts.keys())){ if(!s.has(k)) toastUnregister(k);} handoffShow(alive);}};", { filename: "handoff.js" }).runInContext(ctx);
+  new vm.Script(hBlock + "\n;globalThis.__h={activeToasts,activeToastGroups,toastRegister,toastUnregister,groupRegister,groupTouch,handoffShow,handoffActiveToasts,get pending(){return handoffPending;},get tx(){return handoffTx;},accept(key){/*espelha ipcMain.on bgnotify-rendered*/ if(handoffTx.has(String(key))) txCommit(String(key));},reply(reqId,keys){/*espelha o handler ipc H4*/ if(!handoffPending||handoffPending.reqId!==Number(reqId))return; clearTimeout(handoffPending.timer); handoffPending=null; const raw=(Array.isArray(keys)?keys:[]).map(k=>String(k||'')).filter(Boolean); const alive=raw.map(k=>(k.startsWith('i:')||k.startsWith('g:'))?k:('i:'+k)); const aliveI=new Set(alive.filter(k=>k.startsWith('i:')).map(k=>k.slice(2))); const aliveG=new Set(alive.filter(k=>k.startsWith('g:')).map(k=>k.slice(2))); for(const k of Array.from(activeToasts.keys())){ if(!aliveI.has(k)) toastUnregister(k);} for(const g of Array.from(activeToastGroups.keys())){ if(!aliveG.has(g)) groupUnregister(g);} if(windowActive())return; handoffShow(alive);}};", { filename: "handoff.js" }).runInContext(ctx);
   const H = ctx.__h;
-  H.toastRegister("k1", { severity: "info", taskId: "T1", sound: true, title: "A" });
-  H.toastRegister("k2", { severity: "warning", taskId: "T2", sound: true, title: "B" });
+  H.toastRegister("k1", { severity: "info", taskId: "T1", sound: true, title: "A", dedupKey: "k1" });
+  H.toastRegister("k2", { severity: "warning", taskId: "T2", sound: true, title: "B", dedupKey: "k2" });
   ok("G1 registro guarda os toasts ativos", H.activeToasts.size === 2);
   H.handoffActiveToasts();
   ok("G2 blur pede coleta (pendência armada; nada migrado ainda)", !!H.pending && calls.bg.length === 0);
-  H.reply(H.pending.reqId, ["k2"]); // usuário fechou k1; só k2 vivo
-  ok("G3 migra SÓ os vivos; fechado sai do registro", calls.bg.length === 1 && H.activeToasts.size === 0 && calls.bg[0].title === "B");
+  H.reply(H.pending.reqId, ["i:k2"]); // usuário fechou k1; só k2 vivo
+  ok("G3 TRANSAÇÃO: entrega SÓ os vivos (fechado sai do registro) e o interno SÓ fecha no ACEITE (RE-PINADO F3.5.5E-H4)",
+    calls.bg.length === 1 && calls.bg[0].title === "B" && H.activeToasts.size === 1 && H.tx.has("k2") && calls.commits.length === 0
+    && (H.accept("k2"), H.activeToasts.size === 0 && !H.tx.has("k2") && calls.commits.length === 1 && calls.commits[0][0] === "i:k2"));
   ok("G4 card migrado vai SILENCIOSO e marcado (sound:false + _handoff)", calls.bg[0].sound === false && calls.bg[0]._handoff === true);
-  ok("G5 reply com reqId errado é ignorada", (H.reply(999, ["kX"]), calls.bg.length === 1));
-  H.toastRegister("k3", { severity: "critical", taskId: "T3", sound: true });
+  ok("G5 reply com reqId errado é ignorada", (H.reply(999, ["i:kX"]), calls.bg.length === 1));
+  H.toastRegister("k3", { severity: "critical", taskId: "T3", sound: true, dedupKey: "k3" });
   ctx.windowActive = () => true;
   H.handoffActiveToasts();
   ok("G6 blur transitório (foco de volta) NÃO migra", calls.bg.length === 1 && H.activeToasts.size === 1);
@@ -223,6 +238,17 @@ if (hBlock) {
   ctx.mainWin = null; // janela morta ⇒ migra direto (sem coleta)
   H.handoffActiveToasts();
   ok("G7 janela principal morta ⇒ migra os registrados imediatamente", calls.bg.length === 2 && calls.bg[1]._handoff === true);
+  // RE-PINADO F3.5.5E-H4 — G7b: GRUPO ativo migra com aceite → morph consolidado + commit g:
+  ctx.mainWin = { isDestroyed: () => false, webContents: { isLoading: () => false, send: (ch, args) => { if (ch === "notif-collect-commit") calls.commits.push(args); } } };
+  H.groupRegister("common_group:U1:T9", { severity: "info", taskId: "T9", sound: true, title: "G1", dedupKey: "kg", groupKey: "common_group:U1:T9" });
+  H.groupTouch("common_group:U1:T9", { groupKey: "common_group:U1:T9", count: 3, severity: "info", items: [{}, {}, {}], taskTitle: "Tarefa 9" });
+  H.handoffActiveToasts();
+  H.reply(H.pending.reqId, ["g:common_group:U1:T9"]);
+  const gIdx = calls.bg.length - 1;
+  ok("G7b GRUPO: p0 com groupKey vai silencioso; aceite morfa com o view consolidado (count=3) e commita g: (RE-PINADO F3.5.5E-H4)",
+    calls.bg[gIdx].groupKey === "common_group:U1:T9" && calls.bg[gIdx].sound === false
+    && (H.accept("kg"), H.activeToastGroups.size === 0 && calls.group.length === 1 && calls.group[0].count === 3
+        && calls.commits[calls.commits.length - 1][0] === "g:common_group:U1:T9"));
 }
 // deliverNotification do dist: roteamento por estado com stubs
 const dBody = grab(dMain, /function deliverNotification\(p\) \{/, "\n}\n");

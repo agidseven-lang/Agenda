@@ -117,6 +117,9 @@ app.whenReady().then(async () => {
   const bodyBring = grabBalanced(dMain, "function bringToFrontAndOpen(deep)");
   const bodyWinActive = grabBalanced(dMain, "function windowActive()");
   const collectCbSrc = (() => { const m = dMain.match(/ipcMain\.on\("notif-collect-reply", (\(_e, reqId, keys\) => \{)/); if (!m) return null; const i = dMain.indexOf(m[1], m.index); let d = 0; for (let k = dMain.indexOf("{", i); k < dMain.length; k++) { if (dMain[k] === "{") d++; else if (dMain[k] === "}") { d--; if (!d) return dMain.slice(i, k + 1); } } return null; })();
+  /* RE-PINADO F3.5.5E-H4 — handler do ACEITE transacional (bgnotify-rendered → txCommit), tambem
+   * extraido byte-a-byte do dist: sem ele o commit do handoff nao fecha o toast interno. */
+  const acceptCbSrc = (() => { const m = dMain.indexOf('ipcMain.on("bgnotify-rendered", (_e, info)'); if (m < 0) return null; const i = dMain.indexOf("(_e", m); let d = 0; for (let k = dMain.indexOf("{", i); k < dMain.length; k++) { if (dMain[k] === "{") d++; else if (dMain[k] === "}") { d--; if (!d) return dMain.slice(i, k + 1); } } return null; })();
   rec("E00b corpos REAIS extraídos do dist (deliver/handoff/bring/windowActive/collect-reply)",
     !!(bodyDeliver && bodyHandoff && bodyBring && bodyWinActive && collectCbSrc), { d: !!bodyDeliver, h: !!bodyHandoff, b: !!bodyBring, w: !!bodyWinActive, c: !!collectCbSrc });
 
@@ -145,6 +148,7 @@ app.whenReady().then(async () => {
     "globalThis.__deliver = " + bodyDeliver.replace(/^function deliverNotification/, "function") + ";\n" +
     "globalThis.__bring = " + bodyBring.replace(/^function bringToFrontAndOpen/, "function") + ";\n" +
     "globalThis.__collectCb = " + collectCbSrc + ";\n" +
+    "globalThis.__acceptCb = " + acceptCbSrc + ";\n" +
     "globalThis.__h = { get active(){ return activeToasts.size; }, handoff: handoffActiveToasts };",
     { filename: "dist-extract.js" }).runInContext(ctx);
   const deliver = (p) => ctx.__deliver(p);
@@ -152,6 +156,7 @@ app.whenReady().then(async () => {
   /* IPC do main do harness — MESMOS canais de produção */
   ipcMain.on("notif-toast-ack", (_e, key) => { ctx.toastAck.ack(String(key || "")); });
   ipcMain.on("notif-collect-reply", (_e, reqId, keys) => ctx.__collectCb(_e, reqId, keys));
+  ipcMain.on("bgnotify-rendered", (_e, info) => ctx.__acceptCb(_e, info)); // RE-PINADO F3.5.5E-H4 — ACEITE do handoff transacional (wiring de produção)
   bgReal.initBgNotify((deep) => ctx.__bring(String(deep || "")));
 
   /* janela principal REAL (index do asar + canais reais) */
@@ -204,7 +209,7 @@ app.whenReady().then(async () => {
   const card03 = await bgJ(`(function(){ var s=document.getElementById('bgstack')||document.body; var c=document.querySelectorAll('.ntf').length; var fl=!!document.querySelector('.ntfp-fl'); var pr=document.querySelector('.ntfp-pr'); return { cards:c, fl:fl, cta: pr?pr.textContent:'' }; })()`);
   const dom03 = await J(`(function(){ var s=document.getElementById('notif-stack'); return { n: s?s.querySelectorAll('.ntf').length:0 }; })()`);
   const replyLog = logs.some((l) => l[0] === "notify.handoff.reply");
-  const movedLog = logs.filter((l) => l[0] === "notify.handoff.moved").length;
+  const movedLog = logs.filter((l) => l[0] === "notify.handoff.accepted").length; // RE-PINADO F3.5.5E-H4: o handoff virou TRANSACIONAL — a migração provada agora é o ACEITE (render provado na premium) + commit; o comportamento externo desta cena é o MESMO (toast fecha, premium mostra, som suprimido)
   const ack03 = logs.find((l) => l[0] === "bg.rendered" && l[1] && String(l[1].dedupKey || "").startsWith("h3:"));
   rec("E03 BLUR → HANDOFF real: card MIGROU p/ janela premium (coleta respondida; toast interno fechado; som suprimido)",
     !!bg03 && bg03.isVisible() && card03.cards === 1 && card03.fl && /Abrir/.test(card03.cta) && dom03.n === 0 && replyLog && movedLog === 1

@@ -1,0 +1,245 @@
+{
+  "when": "2026-08-07T18:25:58.315Z",
+  "results": [
+    {
+      "name": "E00 bytes idênticos (fonte == asar) p/ index e bgnotify + dist H4 real presente",
+      "ok": true,
+      "info": {
+        "idx": "c5b77e2519bd",
+        "bg": "a3818a009c4a"
+      }
+    },
+    {
+      "name": "E00b corpos REAIS extraídos do dist (deliver/handoff-tx/bring/windowActive/collect-reply/ACEITE)",
+      "ok": true,
+      "info": {
+        "d": true,
+        "h": true,
+        "b": true,
+        "w": true,
+        "c": true,
+        "a": true
+      }
+    },
+    {
+      "name": "E01 BOOT app real do asar (semente + canal do COMMIT exposto)",
+      "ok": true,
+      "info": {
+        "user": true,
+        "tasks": 2,
+        "api": true
+      }
+    },
+    {
+      "name": "E02 [1-4] individual: toast focado → Alt+Tab → MIGRA transacional (aceite real → commit fecha o interno)",
+      "ok": true,
+      "info": {
+        "channel": "toast",
+        "antes": 1,
+        "internoDepois": 0,
+        "premium": 1,
+        "accepted": 1,
+        "shot": "e02-individual-migra.png"
+      }
+    },
+    {
+      "name": "E03 [5-9] GRUPO de 2: card agrupado interno → Alt+Tab → MIGRA para a premium com a contagem (2 atualizações)",
+      "ok": true,
+      "info": {
+        "g1": "toast",
+        "g2": "grouped",
+        "interno": {
+          "has": true,
+          "txt": "DD2 atualizações18:24×Reels institucionalDiego Designer movimentou a tarefaDiego"
+        },
+        "premium": {
+          "has": true,
+          "txt": "DD2 atualizações18:24×Reels institucionalDiego Designer movimentou a tarefaDiego Designer ",
+          "n": 1
+        },
+        "stackInterno": 0,
+        "shot": "e03-grupo2-migra.png"
+      }
+    },
+    {
+      "name": "E04 [10] grupo de 3 eventos: migra com contagem preservada (3 atualizações)",
+      "ok": true,
+      "info": {
+        "premium": {
+          "has": true,
+          "txt": "DD3 atualizações18:24×Reels institucionalDiego Designer movimentou a tarefaDiego Designer "
+        },
+        "stackInterno": 0
+      }
+    },
+    {
+      "name": "E05 [11] grupo de 4 eventos: migra com contagem preservada (4 atualizações)",
+      "ok": true,
+      "info": {
+        "premium": {
+          "has": true,
+          "txt": "DD4 atualizações18:24×Reels institucionalDiego Designer movimentou a tarefaDiego Designer "
+        },
+        "stackInterno": 0
+      }
+    },
+    {
+      "name": "E06 [12] rajada mista: TODOS os cards internos migram (2 individuais + grupo com contagem); zero deixado atrás",
+      "ok": true,
+      "info": {
+        "antes": 3,
+        "depois": 0,
+        "premium": 3,
+        "grupos": [
+          "DDTarefa movimentada20:30×TEMASHospital VisãoEdição de vídeo",
+          "DD2 atualizações18:24×Reels institucionalDiego Designer movi"
+        ],
+        "shot": "e06-rajada.png"
+      }
+    },
+    {
+      "name": "E07 [13] grupo alterado DURANTE o handoff: a premium termina com a contagem MAIS NOVA (3) — sem duplicar, sem perder",
+      "ok": true,
+      "info": {
+        "canalDoMeio": "grouped",
+        "premium": {
+          "has": true,
+          "txt": "DD3 atualizações18:24×Reels institucionalDiego Designer movimentou a tarefaDiego Designer "
+        },
+        "stackInterno": 0,
+        "shot": "e07-update-durante-handoff.png"
+      }
+    },
+    {
+      "name": "E08 [14] eventos durante o blur: premium DIRETO (1º cria data-group; 2º morfa; toast nunca envolvido)",
+      "ok": true,
+      "info": {
+        "a": "bg-window",
+        "b": "grouped",
+        "premium": {
+          "has": true,
+          "txt": "DD2 atualizações18:25×Reels institucionalDiego Designer movimentou a tarefaDiego"
+        },
+        "stackInterno": 0
+      }
+    },
+    {
+      "name": "E09 [15] blur/focus rápidos: desfecho DETERMINÍSTICO e limpo — aborta sem mostrar OU completa a transação; nunca duplica, nunca perde",
+      "ok": true,
+      "info": {
+        "abortou": false,
+        "abortLimpo": false,
+        "migrouLimpo": true,
+        "interno": 0,
+        "premium": 1,
+        "premiumAntes": 0,
+        "txAtivas": 0
+      }
+    },
+    {
+      "name": "E10 [16] Alt+Tab repetido: os DOIS ciclos migram tudo (interno zera; premium recebe; nada some)",
+      "ok": true,
+      "info": {
+        "ciclo1": {
+          "interno": 0,
+          "premium": 1
+        },
+        "ciclo2": {
+          "interno": 0,
+          "premium": 2
+        }
+      }
+    },
+    {
+      "name": "E11 [17] minimizado logo após formar grupo: grupo MIGRA (2 atualizações na premium; roteia por perda de foco — minimize real do WM fica ao físico)",
+      "ok": true,
+      "info": {
+        "premium": {
+          "has": true,
+          "txt": "DD2 atualizações18:25×Reels institucionalDiego Designer movimentou a tarefaDiego"
+        },
+        "stackInterno": 0,
+        "limitacao": "xvfb sem WM: isMinimized pode não refletir"
+      }
+    },
+    {
+      "name": "E12 [18] X→tray com grupo ativo: grupo migrou (2 atualizações) e NOVOS eventos seguem pela premium",
+      "ok": true,
+      "info": {
+        "mainVisible": false,
+        "premium": {
+          "has": true,
+          "txt": "DD2 atualizações18:25×Reels institucionalDiego Designer movimentou a tarefaDiego"
+        },
+        "novoEvento": "bg-window",
+        "shot": "e12-xtray-grupo.png"
+      }
+    },
+    {
+      "name": "E13 som NUNCA repete na migração (todas as re-exibições do handoff com som suprimido)",
+      "ok": true,
+      "info": {
+        "migracoesComAck": 13,
+        "algumTocou": false
+      }
+    },
+    {
+      "name": "E14 zero duplicação: nenhum card simultâneo nas 2 superfícies após o commit",
+      "ok": true,
+      "info": {
+        "interno": [],
+        "premium": [
+          "common_group:u-soc-ana:vid1"
+        ]
+      }
+    },
+    {
+      "name": "E15 CTA do grupo migrado: clique real traz o Agenda (ÚNICO caminho que foca) e abre o deep da tarefa",
+      "ok": true,
+      "info": {
+        "mainFocada": true,
+        "deep": "task/vid1"
+      }
+    },
+    {
+      "name": "E16 retry REAL: 1ª entrega falha (premium destruída antes do render) → retry recria e entrega → aceite → commit (zero perda)",
+      "ok": true,
+      "info": {
+        "retries": 1,
+        "accepted": true,
+        "interno": 0,
+        "premium": 1,
+        "shot": "e16-retry-recupera.png"
+      }
+    },
+    {
+      "name": "E17 sino/histórico: CADA evento do grupo registrado individualmente (3 eventos = +3 no histórico)",
+      "ok": true,
+      "info": {
+        "antes": 31,
+        "depois": 34
+      }
+    },
+    {
+      "name": "E18 falha dupla de aceite: interno PRESERVADO (NUNCA houve commit; log preserved; zero perda — sino tem o evento)",
+      "ok": true,
+      "info": {
+        "preserved": true,
+        "commit": false,
+        "internoDOM": 1,
+        "txAtivas": 0
+      }
+    },
+    {
+      "name": "E19 teardown (quit real): janela premium destruída; sem transações penduradas",
+      "ok": true,
+      "info": {
+        "status": {
+          "initialized": true,
+          "hasWindow": false
+        },
+        "tx": 0
+      }
+    }
+  ]
+}

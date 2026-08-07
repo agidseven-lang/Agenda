@@ -38,8 +38,8 @@ function extract(src, name) {
 }
 
 /* ============ A. VERSÃO ============ */
-ok('A1 package version 1.0.227 (RE-PINADO F3.5.5E-H3)', /"version":\s*"1\.0\.227"/.test(PKG));
-ok('A2 lock version 1.0.227 (2x) (RE-PINADO F3.5.5E-H3)', (LOCK.match(/"version":\s*"1\.0\.227"/g) || []).length >= 2);
+ok('A1 package version 1.0.228 (RE-PINADO F3.5.5E-H4)', /"version":\s*"1\.0\.228"/.test(PKG));
+ok('A2 lock version 1.0.228 (2x) (RE-PINADO F3.5.5E-H4)', (LOCK.match(/"version":\s*"1\.0\.228"/g) || []).length >= 2);
 ok('A3 description marker f355eh1 + cadeia (RE-PINADO F3.5.5E-H1)', PKG.indexOf('1.0.225-f355eh1-ultra-premium-notifications') >= 0 && PKG.indexOf('base 1.0.224-f355e-retire-legacy-modules-premium-notifications') >= 0 && PKG.indexOf('base 1.0.223-f355d-custom-cronograma-quantity-universal-paste') >= 0);
 
 /* ============ B. RETIRADA DOS MÓDULOS (mandato 1–30) ============ */

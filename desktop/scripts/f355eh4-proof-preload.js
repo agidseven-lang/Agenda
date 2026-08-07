@@ -1,4 +1,4 @@
-/* F3.5.5E-H3 — PRELOAD de prova (offline, semente). Mesma infraestrutura aprovada dos harnesses
+/* F3.5.5E-H4 — PRELOAD de prova (offline, semente). Mesma infraestrutura aprovada dos harnesses
  * F3.5.5C/D/E (firebase stub + seed + desktopAPI Proxy), MAS com os CANAIS REAIS de notificação
  * ligados ao ipcRenderer — os MESMOS nomes de canal do preload de produção (contrato):
  *   main→renderer: notif-toast, notif-group-update, notif-history, notif-open, notif-collect-request
@@ -11,7 +11,7 @@ function fnProxy() { return new Proxy(noop, { get: () => fnProxy(), apply: () =>
 
 let SEED = { self: null, users: [], tasks: [], events: [] };
 try {
-  const _p = require('path').join(require('os').tmpdir(), 'f355eh3-seed.json');
+  const _p = require('path').join(require('os').tmpdir(), 'f355eh4-seed.json');
   SEED = JSON.parse(require('fs').readFileSync(_p, 'utf8')) || SEED;
 } catch (_) {}
 const SELF = SEED.self || { id: 'u-self', name: 'Admin', role: 'Administrador', admin: true };
@@ -63,22 +63,21 @@ try {
   const desktopAPI = {
     authSelf: function () { return Promise.resolve({ ok: true, self: Object.assign({}, SELF) }); },
     diagLog: function (ev, p) { try { window.__DIAG.push({ ev: ev, p: p || {} }); } catch (_) {} },
-    version: '1.0.227',
+    version: '1.0.228',
     authLogout: function () { return Promise.resolve({ ok: true }); },
     sessionLogin: noop, sessionLogout: noop,
     /* CANAIS REAIS DE NOTIFICAÇÃO (mesmos nomes do preload de produção) */
     onNotifToast: function (cb) { ipcRenderer.on('notif-toast', function (_e, p) { cb(p); }); },
     onNotifGroupUpdate: function (cb) { ipcRenderer.on('notif-group-update', function (_e, v) { cb(v); }); },
-    onNotifHistory: function (cb) { ipcRenderer.on('notif-history', function (_e, p) { cb(p); }); },
+    onNotifHistory: function (cb) { ipcRenderer.on('notif-history', function (_e, p) { try { window.__NOTIF_HIST = (window.__NOTIF_HIST || 0) + 1; } catch (_) {} cb(p); }); },
     onNotifOpen: function (cb) { ipcRenderer.on('notif-open', function (_e, d) { try { window.__NOTIF_OPEN.push(String(d || '')); } catch (_) {} cb(d); }); },
     notifToastAck: function (k) { try { ipcRenderer.send('notif-toast-ack', String(k || '')); } catch (_) {} },
     onNotifCollect: function (cb) { ipcRenderer.on('notif-collect-request', function (_e, r) { cb(Number(r) || 0); }); },
     notifCollectReply: function (reqId, keys) { try { ipcRenderer.send('notif-collect-reply', Number(reqId) || 0, (Array.isArray(keys) ? keys : []).map(function (k) { return String(k || ''); })); } catch (_) {} },
-    /* RE-PINADO F3.5.5E-H4 — canal do COMMIT do handoff transacional (sem ele o Proxy engole o
-     * registro e o commit real nunca fecha a representação interna no renderer do asar) */
+    /* F3.5.5E-H4 — canal do COMMIT do handoff transacional */
     onNotifCollectCommit: function (cb) { ipcRenderer.on('notif-collect-commit', function (_e, entries) { cb((Array.isArray(entries) ? entries : []).map(function (k) { return String(k || ''); })); }); }
   };
   window.desktopAPI = new Proxy(desktopAPI, { get: function (t, k) { return (k in t ? t[k] : fnProxy()); } });
   window.api = window.desktopAPI;
-  window.__APP_VERSION = '1.0.227';
+  window.__APP_VERSION = '1.0.228';
 } catch (_) {}

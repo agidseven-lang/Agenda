@@ -11,8 +11,8 @@ const ok = (t, c) => { n++; if (c) console.log('  ✓', n, t); else { fail++; co
 
 console.log('— A) versão 1.0.220 —');
 const pkg = JSON.parse(R('package.json'));
-ok('A1 package.json 1.0.227 + description da candidata (RE-PINADO F3.5.5E-H3)', pkg.version === '1.0.227' && /custom-script-quantity-rich-editor/.test(pkg.description || ''));
-ok('A2 package-lock 1.0.227 (RE-PINADO F3.5.5E-H3)', JSON.parse(R('package-lock.json')).version === '1.0.227');
+ok('A1 package.json 1.0.228 + description da candidata (RE-PINADO F3.5.5E-H4)', pkg.version === '1.0.228' && /custom-script-quantity-rich-editor/.test(pkg.description || ''));
+ok('A2 package-lock 1.0.228 (RE-PINADO F3.5.5E-H4)', JSON.parse(R('package-lock.json')).version === '1.0.228');
 
 console.log('— B) deadlineVersion SÓ na operação autoritativa de prazo —');
 ok('B1 saveCardsEdit incrementa deadlineVersion JUNTO do cardDeadlineRev (mesma condição dueChanged)', idx.includes('if(dueChanged) patch.deadlineVersion=(Number(t.deadlineVersion)||0)+1;'));
