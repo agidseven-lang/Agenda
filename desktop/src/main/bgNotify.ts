@@ -56,6 +56,9 @@ function ackCancel(key: string): void {
   pendingAck.delete(key);
 }
 
+// F3.5.5E-H3 — última altura VIVA do conteúdo (ack de bgnotify-resize). Usada para reposicionar a
+// janela ANTES de cada apresentação sem esperar novo ack (display/DPI podem ter mudado entre shows).
+let lastHeight = 160;
 function position(h: number): void {
   if (!bgWin || bgWin.isDestroyed()) return;
   try {
@@ -76,7 +79,13 @@ function position(h: number): void {
 function wireIpc(): void {
   if (wired) return; wired = true;
   // bg renderer -> main: ajustar altura ao conteúdo (mantém ancorado no canto inferior direito)
-  ipcMain.on("bgnotify-resize", (_e, h: number) => position(Number(h) || 160));
+  ipcMain.on("bgnotify-resize", (_e, h: number) => { lastHeight = Number(h) || 160; position(lastHeight); }); // F3.5.5E-H3 — memoriza a altura viva p/ o reassert
+  // F3.5.5E-H3 — display mudou (DPI/resolução/monitor conectado-desconectado/taskbar): se a janela
+  // premium está VISÍVEL, reposiciona imediatamente dentro da workArea correta (nada fica fora da tela
+  // nem em coordenada de um monitor que não existe mais). Sem janela visível é no-op (o próximo
+  // reassert() reposiciona de qualquer forma antes de mostrar).
+  const onDisplayChange = () => { try { if (bgWin && !bgWin.isDestroyed() && bgWin.isVisible()) position(lastHeight); } catch { /* */ } };
+  try { screen.on("display-metrics-changed", onDisplayChange); screen.on("display-added", onDisplayChange); screen.on("display-removed", onDisplayChange); } catch { /* */ }
   // bg renderer -> main: fila vazia -> esconder a janela (não fica um retângulo invisível na tela)
   ipcMain.on("bgnotify-empty", () => { try { diag("notification.premium.closed", { eventType: "", deliverySurface: "premium_window", appVersion: bgVersion(), timestamp: Date.now() }); } catch { /* F3.5.4U — observabilidade sanitizada */ } try { if (bgWin && !bgWin.isDestroyed()) bgWin.hide(); } catch { /* */ } });
   // bg renderer -> main: clique em "Abrir tarefa" -> reabrir mainWindow + navegar (deep link)
@@ -116,13 +125,30 @@ function ensureWin(): BrowserWindow {
 /** Registra o callback de "abrir tarefa" (reabrir mainWindow + deep link) e os IPC. */
 export function initBgNotify(openCb: (deep: string) => void): void { onOpen = openCb; wireIpc(); }
 
+/** F3.5.5E-H3 — REASSERT COMPLETO DE APRESENTAÇÃO (causa-raiz do P0 de visibilidade): o topmost e os
+ *  bounds eram definidos SÓ na criação da janela; depois de hide() (fila vazia) ou de mudança de
+ *  display/DPI, um novo showInactive() podia reaparecer ABAIXO de janelas comuns (z-order do Windows
+ *  não reafirmado) e com bounds antigos. Antes de CADA apresentação, na ordem do mandato:
+ *  1) janela existe (ensureWin recria se destroyed); 2) bounds recalculados na workArea do display
+ *  ativo (altura viva do último ack); 3) topmost REAFIRMADO no nível "screen-saver" (mesmo nível
+ *  aprovado da criação — acima de janelas comuns/maximizadas; NÃO cobre Secure Desktop/lock, que já
+ *  vai pela Notification nativa); 4) showInactive (NUNCA show/focus — não rouba o foco de quem está
+ *  digitando); 5) moveTop() re-senta a janela no topo do seu nível. Sem timers/hacks agressivos —
+ *  reassert acontece SÓ na apresentação (e no update de grupo com janela visível). */
+function reassert(win: BrowserWindow): void {
+  try { position(lastHeight); } catch { /* */ }
+  try { win.setAlwaysOnTop(true, "screen-saver"); } catch { /* */ }
+  try { win.showInactive(); } catch { /* */ }
+  try { win.moveTop(); } catch { /* */ }
+}
+
 /** Exibe (ou enfileira) um card premium em background. Retorna false se não conseguiu exibir.
  *  F3.4.7 — onNoRender (opcional): chamado UMA vez se o card não provar render (ACK
  *  "bgnotify-rendered" do mesmo dedupKey) dentro de ACK_TIMEOUT_MS — fallback do chamador. */
 export function showBgNotify(p: any, onNoRender?: () => void): boolean {
   try {
     const win = ensureWin();
-    const send = () => { try { if (!win.isDestroyed()) { win.showInactive(); win.webContents.send("bg-card", p); } } catch { /* */ } };
+    const send = () => { try { if (!win.isDestroyed()) { reassert(win); win.webContents.send("bg-card", p); } } catch { /* */ } }; // F3.5.5E-H3 — reassert (bounds+topmost+showInactive+moveTop) a CADA card
     if (win.webContents.isLoading()) win.webContents.once("did-finish-load", send); else send();
     const key = p && p.dedupKey ? String(p.dedupKey) : "";
     if (key && typeof onNoRender === "function") ackArm(key, onNoRender);
@@ -141,6 +167,11 @@ export function updateBgGroup(view: any): void {
     if (!view || !view.groupKey) return;
     const win = bgWin;
     if (!win || win.isDestroyed()) return; // sem janela premium viva ⇒ nada a atualizar (1º evento caiu p/ nativa/toast)
+    // F3.5.5E-H3 — o morph do grupo NÃO reapresentava a janela: se o topmost tinha sido perdido, o
+    // card "N atualizações" seguia ATRÁS do programa em 1º plano. Com a janela VISÍVEL, reafirma
+    // topmost+z-order (sem novo showInactive — a janela já está mostrada; sem som; sem foco). Janela
+    // oculta (card do grupo já fechado pelo usuário) permanece no-op — regra de grupo CONGELADA.
+    try { if (win.isVisible()) { win.setAlwaysOnTop(true, "screen-saver"); win.moveTop(); } } catch { /* */ }
     const send = () => { try { if (!win.isDestroyed()) win.webContents.send("bg-group-update", view); } catch { /* */ } };
     if (win.webContents.isLoading()) win.webContents.once("did-finish-load", send); else send();
     diag("bg.group.update", { groupKey: String(view.groupKey || "").slice(0, 8) + "…", count: view.count, visible: view.items ? view.items.length : 0, extra: view.extraCount });

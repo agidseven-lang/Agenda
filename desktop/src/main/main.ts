@@ -161,6 +161,56 @@ type NotifPayload = {
 const _notifSeen = new Set<string>();
 // F3.5.3 — ACK do toast: tracker do prazo de render (4s). Fallback bg/nativa quando não há prova.
 const toastAck = createToastAckTracker({ onLog: (t, d) => { try { diag(t, d as any); } catch { /* */ } } });
+// F3.5.5E-H3 — HANDOFF DO TOAST NO BLUR (P0 de visibilidade). O toast in-app vive DENTRO da
+// mainWindow: se o usuário alterna para outro programa com o toast ainda ATIVO (TTL 6/8/11s), o card
+// ficava invisível atrás da outra janela até expirar. Registro (payload por dedupKey, TTL espelhado do
+// renderer + margem) dos toasts entregues; no blur da mainWindow o main COLETA via IPC os cards ainda
+// vivos no stack (o renderer os fecha e devolve as chaves) e os RE-EXIBE na janela premium topmost com
+// sound:false (o som já tocou no toast; recibos/sino/dedupe NÃO são tocados — a re-exibição não passa
+// pelo HUB). Mover, nunca duplicar: o mesmo evento jamais fica visível nas duas superfícies.
+const activeToasts = new Map<string, { p: NotifPayload; timer: ReturnType<typeof setTimeout> }>();
+const toastTtlMs = (sev?: string) => (sev === "critical" ? 11000 : (sev === "warning" ? 8000 : 6000));
+function toastUnregister(key: string): void { const e = activeToasts.get(key); if (!e) return; try { clearTimeout(e.timer); } catch { /* */ } activeToasts.delete(key); }
+function toastRegister(key: string, p: NotifPayload): void {
+  toastUnregister(key);
+  const timer = setTimeout(() => { activeToasts.delete(key); }, toastTtlMs(String(p.severity || "")) + 900);
+  activeToasts.set(key, { p, timer });
+}
+let handoffSeq = 0;
+let handoffPending: { reqId: number; timer: ReturnType<typeof setTimeout> } | null = null;
+function handoffShow(keys: string[]): void {
+  for (const k of keys) {
+    const e = activeToasts.get(k); if (!e) continue;
+    toastUnregister(k);
+    const hp = Object.assign({}, e.p, { sound: false, _handoff: true });
+    // Sem fallback nativo no handoff: o EVENTO já foi entregue (toast visível + sino/recibos); isto é
+    // só a continuidade VISUAL do card na superfície topmost. Falha aqui nunca re-dispara canais.
+    const ok = showBgNotify(hp, () => { /* no-op */ });
+    nlog("notify.handoff.moved", { dedupKey: k, taskId: nmask(e.p.taskId), bgOk: ok });
+  }
+}
+function handoffActiveToasts(): void {
+  try {
+    if (!activeToasts.size) return;
+    if (windowActive()) return; // blur transitório: a janela já voltou a estar focada
+    const w = mainWin;
+    if (!w || w.isDestroyed() || w.webContents.isLoading()) { handoffShow(Array.from(activeToasts.keys())); return; }
+    const reqId = ++handoffSeq;
+    if (handoffPending) { try { clearTimeout(handoffPending.timer); } catch { /* */ } handoffPending = null; }
+    // 700ms para o renderer responder; sem resposta (renderer suspenso/ocupado), migra TODOS os
+    // registrados (o TTL espelhado limita a janela de imprecisão a cards fechados há <1s).
+    const timer = setTimeout(() => {
+      if (handoffPending && handoffPending.reqId === reqId) {
+        handoffPending = null;
+        nlog("notify.handoff.timeout", { pending: activeToasts.size });
+        handoffShow(Array.from(activeToasts.keys()));
+      }
+    }, 700);
+    handoffPending = { reqId, timer };
+    try { w.webContents.send("notif-collect-request", reqId); } catch { /* timeout cobre */ }
+    nlog("notify.handoff.begin", { pending: activeToasts.size, reqId });
+  } catch { /* handoff nunca derruba a entrega */ }
+}
 function _appIcon(): string | undefined {
   try { return path.join(app.getAppPath(), "build", "icon.png"); } catch { return undefined; }
 }
@@ -260,6 +310,10 @@ function deliverNotification(p: NotifPayload): { ok: boolean; channel: string } 
       }
     } catch { /* */ }
     const key = String(p.dedupKey || `${p.eventType || "evt"}:${p.taskId || ""}:${p.createdAt || ""}`);
+    // F3.5.5E-H3 — materializa no payload a MESMA chave que o HUB já usa (derivação idêntica, valor
+    // idêntico quando p.dedupKey existe — caso real dos produtores). O renderer (ack/handoff) e a
+    // janela premium (ack de render) passam a ver a chave canônica; dedupe/roteamento inalterados.
+    if (!p.dedupKey) (p as any).dedupKey = key;
     if (_notifSeen.has(key)) { diag("deliver.dedup", { key }); nlog("notify.dedup.skipped", { dedupKey: key, taskId: nmask(p.taskId) }); return { ok: true, channel: "dedup" }; }
     diag("deliver.begin", { eventType: p.eventType, taskId: p.taskId, targetUserId: p.targetUserId, actorId: p.actorId, responsibleId: p.responsibleId, dedupKey: key, windowActive: windowActive(), visible: !!(mainWin && !mainWin.isDestroyed() && mainWin.isVisible()), minimized: !!(mainWin && !mainWin.isDestroyed() && mainWin.isMinimized()) });
     // F3.5.4O — AGRUPAMENTO DAS NOTIFICAÇÕES COMUNS. Decisão TOMADA AQUI (após o dedup individual,
@@ -358,12 +412,14 @@ function deliverNotification(p: NotifPayload): { ok: boolean; channel: string } 
       // rodam SEM o tracker e mantêm a semântica aprovada byte-a-byte.
       if (typeof toastAck !== "undefined" && toastAck) {
         toastAck.arm(key, () => {
+          toastUnregister(key); // F3.5.5E-H3 — o card vai p/ a premium pelo FALLBACK; o handoff do blur não pode re-mostrá-lo
           const bgOk2 = showBgNotify(p, () => { const l2 = nativeNotify(p, key, deep); diag("deliver.toast.noAck.bg.noAck.native", { dedupKey: key, nativeOk: l2 }); });
           let nOk2 = false;
           if (!bgOk2) nOk2 = nativeNotify(p, key, deep);
           diag("deliver.toast.noAck.fallback", { dedupKey: key, channel: bgOk2 ? "bg-window" : (nOk2 ? "native" : "none") });
         });
       }
+      try { toastRegister(key, p); } catch { /* F3.5.5E-H3 — registro do handoff nunca afeta a entrega */ }
       try { premiumObserve(p, "toast"); } catch { /* observabilidade nunca derruba a entrega */ }
       markSeen();
       notifTele.lastAt = Date.now(); notifTele.lastChannel = "toast"; notifTele.lastEventType = String(p.eventType || "");
@@ -539,6 +595,10 @@ function createWindow() {
   // F3.3.10-DIAG — lifecycle (só log; não altera comportamento)
   mainWin.on("minimize", () => diag("window.minimize"));
   mainWin.on("restore", () => diag("window.restore"));
+  // F3.5.5E-H3 — BLUR = o usuário foi para outro programa. Toasts in-app ainda ATIVOS migram para a
+  // janela premium topmost (coleta via IPC; sound:false; mover, nunca duplicar). O roteamento de NOVOS
+  // eventos já muda sozinho (windowActive()==isFocused()); isto cobre os cards JÁ NA TELA.
+  mainWin.on("blur", () => { try { handoffActiveToasts(); } catch { /* nunca derruba nada */ } });
   mainWin.on("show", () => diag("window.show"));
   mainWin.on("hide", () => diag("window.hide(tray)"));
 }
@@ -1173,6 +1233,21 @@ app.whenReady().then(() => {
   ipcMain.handle("notify", (_e, payload: NotifPayload) => deliverNotification(payload));
   // F3.5.3 — renderer confirma o RENDER do toast (dedupKey): cancela o fallback pendente.
   ipcMain.on("notif-toast-ack", (_e, key: string) => { toastAck.ack(String(key || "")); });
+  // F3.5.5E-H3 — resposta da COLETA do handoff: o renderer devolve as chaves dos toasts que AINDA
+  // estavam vivos no stack (e que ele acabou de fechar). Chaves fora da resposta = cards que o usuário
+  // já tinha fechado ⇒ saem do registro (não devem reaparecer). Só a requisição em voo é aceita.
+  ipcMain.on("notif-collect-reply", (_e, reqId: number, keys: unknown) => {
+    try {
+      if (!handoffPending || handoffPending.reqId !== Number(reqId)) return;
+      try { clearTimeout(handoffPending.timer); } catch { /* */ }
+      handoffPending = null;
+      const alive = (Array.isArray(keys) ? keys : []).map((k) => String(k || "")).filter(Boolean);
+      const aliveSet = new Set(alive);
+      for (const k of Array.from(activeToasts.keys())) { if (!aliveSet.has(k)) toastUnregister(k); }
+      nlog("notify.handoff.reply", { alive: alive.length });
+      handoffShow(alive);
+    } catch { /* handoff nunca derruba nada */ }
+  });
   // F3.5.4K — painel Configurações → Notificações: status técnico SANITIZADO (sem token/senha/uid|taskId
   // integral/conteúdo). Somente booleans/rótulos/timestamps + versão. Read-only; nunca dispara entrega.
   ipcMain.handle("notif-diag", () => {

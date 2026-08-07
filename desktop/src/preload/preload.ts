@@ -31,6 +31,12 @@ contextBridge.exposeInMainWorld("desktopAPI", {
   },
   // F3.5.3 — renderer confirma o RENDER do toast (dedupKey): sem ACK, o main entrega pelo fallback.
   notifToastAck: (dedupKey: string) => { try { ipcRenderer.send("notif-toast-ack", String(dedupKey || "")); } catch { /* */ } },
+  // F3.5.5E-H3 — handoff do toast no blur: o main pede a lista dos toasts AINDA vivos no stack; o
+  // renderer os fecha e devolve as chaves (dedupKey) para re-exibição na janela premium topmost.
+  onNotifCollect: (cb: (reqId: number) => void) => {
+    ipcRenderer.on("notif-collect-request", (_e, r: number) => cb(Number(r) || 0));
+  },
+  notifCollectReply: (reqId: number, keys: string[]) => { try { ipcRenderer.send("notif-collect-reply", Number(reqId) || 0, (Array.isArray(keys) ? keys : []).map((k) => String(k || ""))); } catch { /* */ } },
   // F3.5.3 — COLAGEM explícita no formulário (Legenda/Tema/Observações): texto simples do clipboard
   // via módulo do Electron no main (determinístico; independe do accelerator nativo). Nunca HTML.
   clipboardReadText: (): Promise<string> => ipcRenderer.invoke("clipboard-read-text"),
