@@ -352,7 +352,13 @@ function f354oPremiumControlledDiff() {
   const rmTs = dts.split("\n").filter((l) => l.startsWith("-") && !l.startsWith("---"));
   const rmHtml = dhtml.split("\n").filter((l) => l.startsWith("-") && !l.startsWith("---"));
   const tsAdds = /export function updateBgGroup/.test(dts) && /bg-group-update/.test(dts);
-  const tsOverlayKept = !rmTs.some((l) => /showInactive|alwaysOnTop|focusable/.test(l)); // overlay sem-foco preservado
+  // [RE-PINADO F3.5.5E-H3] a F3.5.5E-H3 moveu legitimamente o showInactive() para DENTRO do
+  // reassert() (topmost/bounds reafirmados a CADA apresentação — gated pela suíte f355eh3/56 e
+  // pelo harness de 22 provas), então a linha antiga aparece como remoção no diff. A garantia
+  // REAL do caso — overlay SEM FOCO (focusable:false + showInactive + alwaysOnTop screen-saver)
+  // — é verificada no arquivo ATUAL (igual-ou-mais-forte que checar ausência de remoção). void rmTs.
+  const tsOverlayNow = fs.readFileSync(path.join(DESK, "src/main/bgNotify.ts"), "utf8");
+  const tsOverlayKept = /focusable: false/.test(tsOverlayNow) && /showInactive\(\)/.test(tsOverlayNow) && /setAlwaysOnTop\(true, "screen-saver"\)/.test(tsOverlayNow); void rmTs;
   const htmlAdds = /renderGroupUpdate/.test(dhtml) && /data-group/.test(dhtml);
   // [RE-PINADO F3.5.5C-H2] a F3.5.4U reescreveu legitimamente a LINHA do bgAPI.rendered (visual
   // premium, gated pela suíte f354u/77); a garantia REAL — prova de render com dedupKey + dedup
