@@ -1,19 +1,20 @@
-# F3.5.5E-H1 — Desktop 1.0.226 (Redesign Ultra Premium das Notificações Imediatas)
+# F3.5.5E-H2 — Desktop 1.0.226 (Notificação Premium EXATAMENTE na Referência do Owner)
 # build GATED, --publish never. Publicação SÓ no desktop-release-f355eh2.yml (mesmos bytes).
-# Base de código 1.0.224 @ 0fcad3e5 (Latest publicada e FISICAMENTE aprovada — BASELINE OFICIAL);
-# rollback imediato 1.0.224; adicional 1.0.223; físico seguro 1.0.218. Delta: SOMENTE CAMADA
-# VISUAL das notificações imediatas nas DUAS superfícies (toast index.html + janela premium
-# bgnotify.html) — conceito A "Compact Enterprise": card 440px (antes 480), header em grid com
-# pastilha de ícone do EVENTO (paths do PRÓPRIO icon set do app; sem emoji), título 18/700,
-# CLIENTE em linha própria 14/650 (1 linha + tooltip), contexto 12.5/450, chips 26px sutis
-# (borda 1px fraca + fundo 9%), responsável em linha própria, FOOTER com hairline (avatar 28px
-# ring 1px + autor com ellipsis/tooltip + CTA ghost "Abrir tarefa →" 30px), fechar com hit-area
-# 32×32, barra lateral 2px, animação preservada (180ms fade+translateY + reduced-motion).
-# ZERO mudança funcional: evento/hora/payload, clique/deep-link, fechar, fila/caps, dedupe,
-# agrupamento, recibos, som (1.0.216), sino, prioridade, permissões, aria-live, teclado — tudo
-# CONGELADO byte-a-byte no main/preloads/worker/functions/android vs 1.0.224 (diff vazio).
-# PARIDADE byte-a-byte dos builders nas 2 superfícies verificada por suíte própria (77 asserts).
-name: "[push/manual] F3.5.5E-H1 — Desktop 1.0.226 (Notificações Ultra Premium) — Desktop Build"
+# Base de código 1.0.225 @ 24b76b5 (publicada no Latest; VISUALMENTE REPROVADA pelo owner —
+# NÃO-baseline). BASELINE FÍSICA OFICIAL: 1.0.224 @ 0fcad3e5; ROLLBACK IMEDIATO 1.0.224;
+# adicional 1.0.223; físico seguro 1.0.218. A imagem do owner É o conceito (nenhuma proposta
+# criativa nova): AVATAR circular 62px FLUTUANTE parcialmente fora do card (~37% acima; ring
+# 2px gradiente azul→violeta; micro-scale .98→1 sem bounce/glow), card radius 24 SEM barra
+# lateral (navy premium #151D30→#101726, borda 1px discreta, sombra profunda suave), topo
+# limpo (evento com ícone do PRÓPRIO set + hora tabular + fechar 32×32), hierarquia título
+# 18/700 > cliente 14/650 > contexto 12.5/450 > autor 12 (ellipsis+tooltip) > responsável
+# (só quando distinto), e CÁPSULA horizontal inferior 40px com transição de status INTEGRADA
+# (dot origem → destino) + SEGMENTO direito na cor contextual do evento como CTA único
+# "Abrir →" (clique/taskId/deep-link/teclado/aria preservados). Headroom do avatar = padding
+# transparente no bounding (nada cortado; bgNotify.ts CONGELADO auto-dimensiona). ZERO mudança
+# funcional (payload/dedupe/fila/caps/agrupamento/recibos/som 1.0.216/sino/permissões).
+# PARIDADE byte-a-byte dos 9 builders nas 2 superfícies verificada por suíte própria (62).
+name: "[push/manual] F3.5.5E-H2 — Desktop 1.0.226 (Notificação Premium na Referência do Owner) — Desktop Build"
 "on":
   push:
     branches: ["desktop/f355eh2-reference-notification-1.0.226"]
@@ -68,13 +69,13 @@ jobs:
           node -e "const fs=require('fs'),vm=require('vm');const s=fs.readFileSync('src/renderer/slareminder.html','utf8');const m=s.match(/<script>([\s\S]*?)<\/script>/);new vm.Script(m[1],{filename:'slareminder-inline'});"
           node -e "const fs=require('fs'),vm=require('vm');const s=fs.readFileSync('src/renderer/index.html','utf8');const b=[...s.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(x=>x[1]);if(b.length<2){console.error('esperados >=2 blocos inline (guarda + principal)');process.exit(1);}b.forEach((x,i)=>new vm.Script(x,{filename:'index-inline-'+i}));console.log('blocos inline OK (Script clássico):',b.length);"
           node --check ../cloudflare-worker.js
-      - name: "Gate F3.5.5E-H1 — CONTRATO VISUAL do redesign (77: CSS 2 superfícies + paridade 8 builders + icon set + variantes + tooltips + a11y + congelados) [dist]"
+      - name: "Gate F3.5.5E-H2 — CONTRATO da REFERÊNCIA do owner (62: CSS 2 superfícies + paridade 9 builders + icon set + variantes + tooltips + a11y + congelados) [dist]"
         working-directory: desktop
         run: |
           set -euo pipefail
           npm run build
           node scripts/f355eh2-reference-notification.test.mjs
-      - name: "Gate F3.5.5E herdado — retirada dos módulos (30) + notificações premium (40) + segurança + congelados [RE-PINADO F3.5.5E-H1: versão/visual] [dist]"
+      - name: "Gate F3.5.5E herdado — retirada dos módulos (30) + notificações premium (40) + segurança + congelados [RE-PINADO F3.5.5E-H2: versão/visual] [dist]"
         working-directory: desktop
         run: |
           set -euo pipefail
@@ -146,14 +147,14 @@ jobs:
           node scripts/f354wh1-details-status-notes.test.mjs
           node scripts/f354w-compact-cards-details.test.mjs
           node scripts/f354vh1-session-persistence.test.mjs
-      - name: "Gate PROVAS REAIS Electron — F3.5.5E-H1 (20 provas: 17 cenas do mandato + métricas ANTES×DEPOIS + variantes; PNGs) — xvfb"
+      - name: "Gate PROVAS REAIS Electron — F3.5.5E-H2 (23 provas: 20 cenas do mandato + métricas da referência + variantes; PNGs) — xvfb"
         working-directory: desktop
         run: |
           set -euo pipefail
           sudo apt-get update -y >/dev/null 2>&1 || true
           sudo apt-get install -y xvfb >/dev/null 2>&1 || true
           timeout -k 15 700 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f355eh2-electron-proof-main.js
-      - name: "Gate PROVAS herdadas F3.5.5E — 27 cenas (retirada + notificações premium) [RE-PINADO F3.5.5E-H1: P10 tooltip + P15 ordem responsável/footer] — xvfb"
+      - name: "Gate PROVAS herdadas F3.5.5E — 27 cenas (retirada + notificações premium) [RE-PINADOS F3.5.5E-H1/H2: P10 tooltip + cápsula/CTA/ordem] — xvfb"
         working-directory: desktop
         run: |
           set -euo pipefail
@@ -203,19 +204,19 @@ jobs:
         run: |
           set -euo pipefail
           git diff --name-only "$BASE_225_SHA"..HEAD > /tmp/delta.txt; cat /tmp/delta.txt
-          # allowlist F3.5.5E-H1: SOMENTE camada visual (renderers das 2 superfícies) + versão +
-          # suíte/harness/docs/workflows da fase + re-pins herdados ROTULADOS (RE-PINADO F3.5.5E-H1:
-          # pins de versão 1.0.226 e pins visuais que apontavam para o design de 480px/38px/uppercase;
+          # allowlist F3.5.5E-H2: SOMENTE camada visual (renderers das 2 superfícies) + versão +
+          # suíte/harness/docs/workflows da fase + re-pins herdados ROTULADOS (RE-PINADO F3.5.5E-H2:
+          # pins de versão 1.0.226 e pins visuais que apontavam para o design H1 reprovado de 440px;
           # nenhum pin FUNCIONAL foi alterado) + desktop-release-f355e.yml (registro pinado da release
           # 1.0.224, commit 0c88a32, posterior ao STABLE_SHA da base).
           BAD=$(grep -vE '^(\.github/workflows/desktop-(build|release)-f355eh2\.yml$|\.github/workflows/desktop-release-f355e(h1)?\.yml$|desktop/src/renderer/index\.html$|desktop/src/renderer/bgnotify\.html$|desktop/package(-lock)?\.json$|desktop/scripts/f355eh2-|desktop/scripts/f355e-retire-modules-premium-notifications\.test\.mjs$|desktop/scripts/f355e-electron-proof-main\.js$|desktop/scripts/f355d-cron-quantity-universal-paste\.test\.mjs$|desktop/scripts/f354p-sla-decision-actions\.test\.mjs$|desktop/scripts/f354u-premium-common-notifications\.test\.mjs$|desktop/scripts/f354u-h1-notification-hotfix\.test\.mjs$|desktop/scripts/f354vh1-session-persistence\.test\.mjs$|desktop/scripts/f354wh2-immediate-notification-sound\.test\.mjs$|desktop/scripts/f355a-integration\.test\.mjs$|desktop/scripts/f355ah1-internal-notes\.test\.mjs$|desktop/scripts/f355b-agenda-premium\.test\.mjs$|desktop/scripts/f355c-script-quantity-rich-editor\.test\.mjs$|docs/f355eh2(-qa)?/)' /tmp/delta.txt || true)
           [ -z "$BAD" ] || { echo "::error::fora da allowlist: $BAD"; exit 1; }
           # REGRA MÁXIMA da fase: ZERO mudança fora da camada visual dos renderers.
           git diff --quiet "$BASE_225_SHA"..HEAD -- desktop/src/main desktop/src/preload desktop/src/renderer/slareminder.html desktop/src/renderer/bgcall.html desktop/src/renderer/sounds desktop/src/renderer/priorityEngine.js desktop/scripts/copy-renderer.js desktop/tsconfig.json desktop/electron-builder.yml cloudflare-worker.js scripts/worker-ops functions android-native android-native-beta desktop/scripts/f355eh1-visual-redesign.test.mjs desktop/scripts/f355eh1-electron-proof-main.js || { echo "::error::código funcional/congelado alterado (fase é SÓ visual; artefatos f355eh1 são históricos byte-idênticos)"; exit 1; }
-      - name: "Gate MARCADORES F3.5.5E-H1 — redesign nas 2 superfícies + herdados F3.5.5E preservados (fonte)"
+      - name: "Gate MARCADORES F3.5.5E-H2 — referência nas 2 superfícies + herdados F3.5.5E preservados (fonte)"
         run: |
           set -euo pipefail
-          # redesign H1 nas DUAS superfícies (paridade de marcadores):
+          # referência H2 nas DUAS superfícies (paridade de marcadores):
           for F in desktop/src/renderer/index.html desktop/src/renderer/bgnotify.html; do
             grep -q 'function premiumEvtIcon' "$F"
             grep -q 'ntfp-fl' "$F"
@@ -255,7 +256,7 @@ jobs:
           grep -q 'authRetryNow' desktop/src/renderer/index.html
           grep -q 'id="fScriptQty"' desktop/src/renderer/index.html
           grep -q 'id="fVideoQty"' desktop/src/renderer/index.html
-          echo "MARCADORES F3.5.5E-H1: VERIFIED."
+          echo "MARCADORES F3.5.5E-H2: VERIFIED."
   build:
     needs: verify
     runs-on: windows-latest
@@ -273,7 +274,7 @@ jobs:
           npm ci --no-audit --no-fund
           npm run build
           npx electron-builder --win nsis msi --publish never
-      - name: "Gate EMPACOTADO — versão + REDESIGN H1 + herdados no app.asar (suítes contra o pacote)"
+      - name: "Gate EMPACOTADO — versão + REFERÊNCIA H2 + herdados no app.asar (suítes contra o pacote)"
         working-directory: desktop
         shell: bash
         run: |
@@ -281,7 +282,7 @@ jobs:
           ASAR="dist-installer/win-unpacked/resources/app.asar"; test -f "$ASAR"
           npx --yes @electron/asar extract "$ASAR" asar-x
           node -e "const p=require('./asar-x/package.json'); if(p.version!=='1.0.226') process.exit(1);"
-          # REDESIGN H1 nos BYTES do pacote (2 superfícies):
+          # REFERÊNCIA H2 nos BYTES do pacote (2 superfícies):
           grep -q 'function premiumEvtIcon' asar-x/src/renderer/index.html
           grep -q 'function premiumEvtIcon' asar-x/src/renderer/bgnotify.html
           grep -q 'ntfp-fl' asar-x/src/renderer/index.html
@@ -333,7 +334,7 @@ jobs:
           SRC=asar-x/src/renderer/index.html node scripts/f355ah1-internal-notes.test.mjs
           SRC=asar-x/src/renderer/index.html BG_SRC=asar-x/src/renderer/bgnotify.html MAIN_SRC=src/main/main.ts BGM_SRC=src/main/bgNotify.ts node scripts/f354wh2-immediate-notification-sound.test.mjs
           SRC=asar-x/src/renderer/index.html node scripts/f354wh1-details-status-notes.test.mjs
-          echo "GATE F3.5.5E-H1 EMPACOTADO: VERIFIED."
+          echo "GATE F3.5.5E-H2 EMPACOTADO: VERIFIED."
       - name: Empacotar bundle + SHA256SUMS + VERSAO-DESKTOP
         working-directory: desktop
         shell: bash
