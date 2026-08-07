@@ -75,45 +75,45 @@ ok(typeof NEmod.columnLabel === "function" && NEmod.columnLabel("andamento") ===
 // ══════════════════════ B) CARD PREMIUM — CARTÃO ÚNICO ══════════════════════
 ok(api.premiumUse(move) === true, "B01 premiumUse=true p/ task_moved com _premiumCommon:true");
 ok(/ntfp-eyebrow[^>]*>[\s\S]*?Tarefa movimentada/.test(hMove), "B02 TIPO como eyebrow discreto");
-ok(/ntfp-by">[\s\S]*?Movimentada por Miercoh/.test(hMove), "B03 ATOR como METADADO da ação (RE-PINADO F3.5.5E — hierarquia do owner)");
+ok(/ntfp-meta"[^>]*>Movimentada por Miercoh/.test(hMove), "B03 ATOR como METADADO da ação (RE-PINADO F3.5.5E-H2: linha ntfp-meta)");
 ok(/ntfp-task" title="[^"]*">Edição do Reels Institucional/.test(hMove), "B04 TÍTULO da tarefa (elemento dominante; tooltip title — RE-PINADO F3.5.5E-H1)");
-ok(/ntfp-chip cs-afazer[^>]*>[\s\S]*?A Fazer/.test(hMove), "B05 chip origem [A Fazer] cor do estado");
-ok(/ntfp-chip cs-andamento[^>]*>[\s\S]*?Em andamento/.test(hMove), "B06 chip destino [Em andamento] cor do estado");
+ok(/cdot cs-afazer/.test(hMove) && /A Fazer/.test(hMove), "B05 origem [A Fazer] com dot na cor do estado na CÁPSULA (RE-PINADO F3.5.5E-H2)");
+ok(/pto">Em andamento/.test(hMove), "B06 destino [Em andamento] em destaque na CÁPSULA (RE-PINADO F3.5.5E-H2)");
 ok(/ntfp-arrow/.test(hMove), "B07 seta entre os chips");
 ok(!/moveu\s+‘/.test(hMove), "B08 NÃO usa o body genérico (sem 'moveu ‘tarefa’')");
 ok((hMove.replace(/title="[^"]*"/g, '').match(/Ferreira/g) || []).length === 1, "B09 ATOR não repetido no texto visível (tooltip title permitido — RE-PINADO F3.5.5E-H1)");
 ok(/ntfp-ctx" title="[^"]*">Edição de vídeos/.test(hMove) && /ntfp-client" title="[^"]*">Sem cliente vinculado/.test(hMove), "B10 setor com rótulo oficial + cliente com fallback (RE-PINADO F3.5.5E-H1: tooltips)");
-ok(/ntfp-cta[^>]*>Abrir tarefa/.test(hMove), "B11 CTA discreta 'Abrir tarefa'");
+ok(/ntfp-pill" role="button" tabindex="0" data-cta="1" aria-label="Abrir tarefa"/.test(hMove) && /ntfp-pr">Abrir</.test(hMove), "B11 CTA integrado ao segmento direito da cápsula (RE-PINADO F3.5.5E-H2)");
 ok(/class="ntf-x"/.test(hMove), "B12 botão fechar (X)");
 ok(/ntfp-eyebrow"><span class="ntfp-ei"/.test(hMove), "B13 pastilha de ícone da categoria INTEGRADA ao eyebrow (RE-PINADO F3.5.5E-H1)");
 ok(/ntfp-hd/.test(hMove) && !/ntfp-sev/.test(hMove), "B13b cabeçalho em GRID reservado (ntfp-hd) SEM ntfp-sev grande sobreposto (H1 Defeito 1)");
-ok(/role="group" aria-label="Movimento de/.test(hMove), "B14 acessibilidade: aria-label nos chips");
+ok(/plab" title="De A Fazer para Em andamento"/.test(hMove), "B14 acessibilidade: transição descrita no title da cápsula (RE-PINADO F3.5.5E-H2)");
 ok(/ntfp-av" style="background-image:url\('https/.test(hMove), "B15 avatar por foto real quando há URL");
 ok(/ntfp-av gen[^>]*>AS?</.test(hAssign) || /ntfp-av gen/.test(hAssign), "B16 avatar iniciais quando SEM foto (assign)");
 { const noName = api.premiumCommonInner({ _premiumCommon: true, eventType: "task_completed", title: "Tarefa concluída", actorName: "", actorAvatar: "", taskTitle: "Z", fromStatus: "andamento", toStatus: "concluido", severity: "success" }); ok(/ntfp-av gen[^>]*>✓</.test(noName), "B17 avatar ícone de severidade quando sem nome+sem foto"); }
-ok(/cs-concluido[^>]*>[\s\S]*?Concluído/.test(hDone), "B18 task_completed → chip Concluído");
-{ const reop = api.premiumCommonInner({ _premiumCommon: true, eventType: "task_reopened", title: "Tarefa reaberta", actorName: "Ana", taskTitle: "W", fromStatus: "concluido", toStatus: "afazer", severity: "warning" }); ok(/cs-concluido/.test(reop) && /cs-afazer/.test(reop), "B19 task_reopened → chips (Concluído → A Fazer)"); }
+ok(/pto">Concluído/.test(hDone), "B18 task_completed → destino Concluído na cápsula (RE-PINADO F3.5.5E-H2)");
+{ const reop = api.premiumCommonInner({ _premiumCommon: true, eventType: "task_reopened", title: "Tarefa reaberta", actorName: "Ana", taskTitle: "W", fromStatus: "concluido", toStatus: "afazer", severity: "warning" }); ok(/cdot cs-concluido/.test(reop) && /pto">A Fazer/.test(reop), "B19 task_reopened → cápsula (dot Concluído → A Fazer) (RE-PINADO F3.5.5E-H2)"); }
 ok(!/ntfp-chip/.test(hAssign), "B20 assign: SEM chips (sem transição)");
-ok(/ntfp-action">Atribuída a Bruno Lima/.test(hAssign), "B21 assign: ação curta 'Atribuída a {designer}'");
-ok(!/ntfp-action">Tarefas/.test(hAssign), "B22 assign: context genérico 'Tarefas' suprimido");
-ok(/ntfp-action">Prazo: 01\/08/.test(hUpd), "B23 updated: ação = context (prazo anterior→novo)");
+ok(/plab"[^>]*>Atribuída a Bruno Lima/.test(hAssign), "B21 assign: ação curta 'Atribuída a {designer}' na cápsula (RE-PINADO F3.5.5E-H2)");
+ok(!/plab"[^>]*>Tarefas</.test(hAssign), "B22 assign: context genérico 'Tarefas' suprimido (RE-PINADO F3.5.5E-H2)");
+ok(/plab"[^>]*>Prazo: 01\/08/.test(hUpd), "B23 updated: ação = context na cápsula (RE-PINADO F3.5.5E-H2)");
 ok(!/ntfp-chip/.test(hUpd), "B24 updated: SEM chips");
 ok((hAssign.replace(/title="[^"]*"/g, '').match(/Ana Souza/g) || []).length === 1, "B25 assign: ator não repetido no texto visível (tooltip permitido — RE-PINADO F3.5.5E-H1)");
 ok(!/ntfp-task">Card Institucional[\s\S]*Card Institucional/.test(hAssign), "B26 título não repetido em outra área");
 
 // ══════════════════════ C) CSS — hierarquia/tamanhos/clamp ══════════════════════
 ok(/\.ntfp-task\{[^}]*font-size:18px/.test(BG) && /\.ntfp-task\{[^}]*font-size:18px/.test(IDX), "C01 título 18px (dominante) nas duas superfícies");
-ok(/\.ntfp-actor\{[^}]*font-size:15px/.test(BG), "C02 ator 15px");
+ok(/\.ntfp-meta\{[^}]*font-size:12px/.test(BG), "C02 autor como metadata 12px (RE-PINADO F3.5.5E-H2)");
 ok(/\.ntfp-eyebrow\{[^}]*font-size:12px/.test(BG), "C03 eyebrow 12px (não domina — RE-PINADO F3.5.5E-H1, mandato 12–13)");
-ok(/\.ntfp-chip\{[^}]*font-size:12\.5px/.test(BG), "C04 chips 12.5px");
-ok(/\.ntfp-av\{[^}]*width:28px/.test(BG), "C05 avatar 28px SECUNDÁRIO (RE-PINADO F3.5.5E-H1 — mandato 28-34px)");
+ok(/\.ntfp-pl\{[^}]*font-size:12\.5px/.test(BG), "C04 cápsula 12.5px (RE-PINADO F3.5.5E-H2)");
+ok(/\.ntfp-fl \.ntfp-av\{[^}]*width:62px/.test(BG), "C05 avatar FLUTUANTE 62px (RE-PINADO F3.5.5E-H2 — mandato 58-72px, referência do owner)");
 ok(/\.ntfp-task\{[^}]*-webkit-line-clamp:2/.test(BG), "C06 título máx 2 linhas (clamp)");
-ok(/\.ntfp-actor\{[^}]*-webkit-line-clamp:2/.test(BG), "C07 ator máx 2 linhas (clamp)");
+ok(/\.ntfp-task\{[^}]*-webkit-line-clamp:2/.test(BG), "C07 título máx 2 linhas; autor 1 linha com ellipsis (RE-PINADO F3.5.5E-H2)");
 ok(/\.ntfp-task\{[^}]*overflow:hidden/.test(BG), "C08 título ellipsis/overflow hidden");
 ok(/cs-afazer\{--cfg:/.test(BG) && /cs-andamento\{--cfg:/.test(BG) && /cs-revisao\{--cfg:/.test(BG) && /cs-concluido\{--cfg:/.test(BG), "C09 chips têm cor por estado real (4 estados)");
 ok(/prefers-reduced-motion: reduce/.test(BG) && /prefers-reduced-motion: reduce/.test(IDX), "C10 acessibilidade: prefers-reduced-motion");
 ok(/\.ntf\.ntfp-w\{width:100%/.test(BG), "C11 janela premium: card ocupa largura responsiva (100%)");
-ok(/\.ntf\.ntfp-w\{width:440px;max-width:calc\(100vw - 36px\)/.test(IDX), "C12 toast: largura 440 responsiva (RE-PINADO F3.5.5E-H1 — mandato 420-460)");
+ok(/\.ntf\.ntfp-w\{width:450px;max-width:calc\(100vw - 36px\)/.test(IDX), "C12 toast: largura 450 responsiva (RE-PINADO F3.5.5E-H2 — mandato 430-470)");
 
 // ══════════════════════ D) CARD PREMIUM — GRUPO ══════════════════════
 const view = { _premiumCommon: true, groupKey: "g1", taskTitle: "Edição do Reels Institucional", count: 4, items: [{ actorName: "Miercohévisk", title: "Tarefa movimentada", body: "..." }, { actorName: "Ana", title: "Tarefa atualizada", body: "..." }], extraCount: 2, primaryName: "Miercohévisk", primaryAvatar: "", severity: "info", deep: "detail/t1" };
@@ -124,7 +124,7 @@ ok(/ntfp-gi"><b>Miercohévisk<\/b> movimentou a tarefa/.test(hGrp), "D03 item: a
 ok(!/ntfp-chip/.test(hGrp), "D04 grupo: SEM chips por item");
 ok((hGrp.replace(/title="[^"]*"/g, '').match(/Edição do Reels Institucional/g) || []).length === 1, "D05 título NÃO repetido por item no texto visível (tooltip permitido — RE-PINADO F3.5.5E-H1)");
 ok(/ntfp-more">\+2 outras atualizações/.test(hGrp), "D06 '+N outras atualizações'");
-ok(/ntfp-cta[^>]*>Abrir tarefa/.test(hGrp), "D07 grupo preserva deep-link/CTA");
+ok(/ntfp-pill"[^>]*data-cta="1"/.test(hGrp), "D07 grupo preserva deep-link/CTA na cápsula (RE-PINADO F3.5.5E-H2)");
 ok(/<b>Ana<\/b> atualizou a tarefa/.test(hGrp), "D08 mapeamento de ação por tipo (atualizou)");
 
 // ══════════════════════ E) PARIDADE + FLAG OPT-IN ══════════════════════

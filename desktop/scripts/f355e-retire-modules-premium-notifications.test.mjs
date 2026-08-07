@@ -38,8 +38,8 @@ function extract(src, name) {
 }
 
 /* ============ A. VERSÃO ============ */
-ok('A1 package version 1.0.225 (RE-PINADO F3.5.5E-H1)', /"version":\s*"1\.0\.225"/.test(PKG));
-ok('A2 lock version 1.0.225 (2x) (RE-PINADO F3.5.5E-H1)', (LOCK.match(/"version":\s*"1\.0\.225"/g) || []).length >= 2);
+ok('A1 package version 1.0.226 (RE-PINADO F3.5.5E-H2)', /"version":\s*"1\.0\.226"/.test(PKG));
+ok('A2 lock version 1.0.226 (2x) (RE-PINADO F3.5.5E-H2)', (LOCK.match(/"version":\s*"1\.0\.226"/g) || []).length >= 2);
 ok('A3 description marker f355eh1 + cadeia (RE-PINADO F3.5.5E-H1)', PKG.indexOf('1.0.225-f355eh1-ultra-premium-notifications') >= 0 && PKG.indexOf('base 1.0.224-f355e-retire-legacy-modules-premium-notifications') >= 0 && PKG.indexOf('base 1.0.223-f355d-custom-cronograma-quantity-universal-paste') >= 0);
 
 /* ============ B. RETIRADA DOS MÓDULOS (mandato 1–30) ============ */
@@ -222,13 +222,13 @@ ok('C10 cliente longo escapado e presente', longCli.indexOf('Clínica Oftalmoló
 ok('C11 sem cliente ⇒ fallback profissional', render({ ...basePay, clientName: '' }).indexOf('Sem cliente vinculado') >= 0);
 
 /* C21-C23 autor × responsável */
-ok('C21 autor é METADADO com verbo (nunca título)', html.indexOf('Reaberta por Miercohévisk Niheb Ferreira') >= 0 && html.indexOf('class="ntfp-by"') > html.indexOf('class="ntfp-task"'));
+ok('C21 autor é METADADO com verbo (nunca título) (RE-PINADO F3.5.5E-H2: linha ntfp-meta abaixo do contexto)', html.indexOf('Reaberta por Miercohévisk Niheb Ferreira') >= 0 && html.indexOf('class="ntfp-meta"') > html.indexOf('class="ntfp-task"'));
 ok('C22 responsável em linha própria', html.indexOf('Responsável: Felipe Teodozio') >= 0);
 ok('C23 autor==responsável ⇒ sem linha duplicada', render({ ...basePay, responsibleName: 'Miercohévisk Niheb Ferreira' }).indexOf('Responsável:') < 0);
 ok('C23b sem autor ⇒ Usuário não identificado', render({ ...basePay, actorName: '' }).indexOf('Usuário não identificado') >= 0);
 
 /* C24 avatar secundário */
-ok('C24 sem foto ⇒ iniciais (MF), dentro da linha do autor', /ntfp-by[^]*ntfp-av gen[^]*MF/.test(html));
+ok('C24 sem foto ⇒ iniciais (MF) no AVATAR FLUTUANTE (RE-PINADO F3.5.5E-H2: referência do owner)', /ntfp-fl[^]*ntfp-av gen[^]*MF/.test(html));
 
 /* C25-C26 textos longos escapados */
 const xss = render({ ...basePay, taskTitle: '<img src=x onerror=alert(1)>', clientName: '<script>x</script>' });
@@ -236,14 +236,14 @@ ok('C25 título malicioso escapado', xss.indexOf('<img src=x') < 0 && xss.indexO
 ok('C26 cliente malicioso escapado', xss.indexOf('<script>x</script>') < 0 && xss.indexOf('&lt;script&gt;') >= 0);
 
 /* C27-C28 status compactos */
-ok('C27 chips from→to presentes', html.indexOf('cs-concluido') >= 0 && html.indexOf('cs-andamento') >= 0 && html.indexOf('ntfp-arrow') >= 0);
+ok('C27 transição from→to na CÁPSULA (RE-PINADO F3.5.5E-H2: dot cs do estado origem + destino em texto + seta)', html.indexOf('cdot cs-concluido') >= 0 && html.indexOf('pto">Em andamento') >= 0 && html.indexOf('ntfp-arrow') >= 0);
 ok('C28 chips traduzidos (nunca chave crua)', html.indexOf('Concluído') >= 0 && html.indexOf('Em andamento') >= 0 && html.indexOf('>concluido<') < 0);
 
 /* hierarquia obrigatória (ordem DOM) */
-const order = ['ntfp-hd', 'ntfp-task', 'ntfp-client', 'ntfp-ctx', 'ntfp-chips', 'ntfp-respline', 'ntfp-ft', 'ntfp-by', 'ntfp-cta']; /* RE-PINADO F3.5.5E-H1: responsável acima do footer; autor+CTA no footer estruturado */
+const order = ['ntfp-fl', 'ntfp-hd', 'ntfp-task', 'ntfp-client', 'ntfp-ctx', 'ntfp-meta', 'ntfp-respline', 'ntfp-pill']; /* RE-PINADO F3.5.5E-H2: avatar flutuante no topo; autor como metadata; cápsula inferior com CTA integrado (referência do owner) */
 let lastIdx = -1, orderOk = true;
 for (const c of order) { const i2 = html.indexOf(c); if (i2 < 0 || i2 < lastIdx) { orderOk = false; break; } lastIdx = i2; }
-ok('CH1 hierarquia: evento→título→cliente→contexto→status→responsável→footer(autor→ação) (RE-PINADO F3.5.5E-H1)', orderOk);
+ok('CH1 hierarquia: avatar→evento→título→cliente→contexto→autor→responsável→cápsula (RE-PINADO F3.5.5E-H2)', orderOk);
 ok('CH2 horário DO EVENTO (15:02, 24h)', html.indexOf('15:02') >= 0);
 ok('CH3 categoria âmbar na reaberta (linha lateral + pastilha de ícone — RE-PINADO F3.5.5E-H1)', html.indexOf('cat-amber') >= 0 && html.indexOf('ntfp-ei') >= 0);
 ok('CH4 concluída=verde / atribuída=azul / movimentada=violeta', render({ ...basePay, eventType: 'task_completed' }).indexOf('cat-green') >= 0 && render({ ...basePay, eventType: 'task_assigned', fromStatus: '', toStatus: '' }).indexOf('cat-blue') >= 0 && render({ ...basePay, eventType: 'task_moved' }).indexOf('cat-violet') >= 0);
@@ -252,13 +252,13 @@ ok('CH6 setor vivo sem cronContext mostra o rótulo (tooltip — RE-PINADO F3.5.
 ok('CH7 nunca undefined/null/[object Object]', html.indexOf('undefined') < 0 && html.indexOf('[object') < 0 && render({ eventType: 'task_moved', createdAt: 1 }).indexOf('undefined') < 0);
 
 /* C29-C30 ação + fechar (acessibilidade) */
-ok('C29 CTA Abrir tarefa com role/tabindex', html.indexOf('class="ntfp-cta" role="button" tabindex="0" data-cta="1">Abrir tarefa') >= 0);
+ok('C29 CTA integrado na cápsula com role/tabindex/aria (RE-PINADO F3.5.5E-H2)', html.indexOf('class="ntfp-pill" role="button" tabindex="0" data-cta="1" aria-label="Abrir tarefa"') >= 0 && html.indexOf('class="ntfp-pr">Abrir') >= 0);
 ok('C30 fechar com aria-label', html.indexOf('aria-label="Fechar notificação"') >= 0);
 has(S, "el.addEventListener('keydown',function(ev){ try{ var k=ev.key; if(k!=='Enter'&&k!==' ')return;", 'C30b teclado Enter/Espaço (toast)');
 has(BG, "el.addEventListener('keydown',function(ev){ try{ var k=ev.key; if(k!=='Enter'&&k!==' ')return;", 'C30c teclado Enter/Espaço (janela premium)');
 has(S, "s.setAttribute('role','status'); s.setAttribute('aria-live','polite');", 'C30d aria-live único (toast)');
 has(BG, '<div id="stack" role="status" aria-live="polite">', 'C30e aria-live único (janela premium)');
-has(S, '@media (prefers-reduced-motion: reduce){.ntf{transition:none}}', 'C30f reduced motion preservado');
+has(S, '@media (prefers-reduced-motion: reduce){.ntf{transition:none}.ntfp-fl{transform:none;transition:none}}', 'C30f reduced motion preservado (RE-PINADO F3.5.5E-H2: inclui o avatar flutuante)');
 
 /* C31-C35 som/dedup/agrupamento/fila preservados */
 ok('C31 som preservado no payload (sound:true)', pay.sound === true);
@@ -270,8 +270,8 @@ has(S, "if(all.length>4){ for(var i=0;i<all.length-4;i++)", 'C34 fila do toast p
 has(BG, 'while(stack.children.length>5){ stack.removeChild(stack.firstChild); }', 'C35 fila da janela premium preservada');
 
 /* C36-C39: escalas/resoluções ⇒ provas Electron reais (harness). Largura no intervalo do mandato: */
-has(S, ".ntf.ntfp-w{width:440px;max-width:calc(100vw - 36px)}", 'C36 largura 440px (RE-PINADO F3.5.5E-H1 — mandato 420–460) no toast');
-has(BG, '.ntf.ntfp-w{width:100%;max-width:100%}', 'C37 janela premium responsiva (dimensionada pelo bgNotify.ts)');
+has(S, ".ntf.ntfp-w{width:450px;max-width:calc(100vw - 36px);padding-top:26px;overflow:visible}", 'C36 largura 450px + headroom do avatar flutuante (RE-PINADO F3.5.5E-H2 — mandato 430–470)');
+has(BG, '.ntf.ntfp-w{width:100%;max-width:100%;padding-top:26px;overflow:visible}', 'C37 janela premium responsiva + headroom do avatar (RE-PINADO F3.5.5E-H2; dimensionada pelo bgNotify.ts)');
 has(S, '.ntfp-task{color:#ffffff', 'C38 título legível (contraste)');
 has(S, '-webkit-line-clamp:2', 'C39 título máx 2 linhas');
 

@@ -171,10 +171,10 @@ app.whenReady().then(async () => {
   rec("P7 notificação de tarefa criada/atribuída (azul; Atribuída a Felipe)", p7 && !p7.none && /cat-blue/.test(p7.html) && /Tarefa atribuída/.test(p7.html) && /Atribuída a Felipe Teodozio/.test(p7.html) && /15:02/.test(p7.html), { w: p7 && p7.w });
   await shot("p7-atribuida");
   const p8 = await showToast({ eventType: "task_completed", title: "Tarefa concluída", taskId: "cronMen", taskTitle: "TEMAS", fromStatus: "andamento", toStatus: "concluido", actorName: "Miercohévisk Niheb Ferreira", severity: "success" });
-  rec("P8 tarefa concluída (verde; chips Em andamento→Concluído; Concluída por)", p8 && /cat-green/.test(p8.html) && /Concluída por Miercohévisk/.test(p8.html) && /cs-concluido/.test(p8.html), {});
+  rec("P8 tarefa concluída (verde; Em andamento→Concluído na cápsula; Concluída por) (RE-PINADO F3.5.5E-H2)", p8 && /cat-green/.test(p8.html) && /Concluída por Miercohévisk/.test(p8.html) && /cdot cs-andamento/.test(p8.html) && /pto">Concluído/.test(p8.html), {});
   await shot("p8-concluida");
   const p9 = await showToast({ eventType: "task_reopened", title: "Tarefa reaberta", taskId: "cronMen", taskTitle: "TEMAS", fromStatus: "concluido", toStatus: "andamento", actorName: "Miercohévisk Niheb Ferreira", severity: "warning" });
-  rec("P9 tarefa reaberta (âmbar; Concluído→Em andamento; Reaberta por)", p9 && /cat-amber/.test(p9.html) && /Reaberta por Miercohévisk/.test(p9.html) && /cs-concluido/.test(p9.html) && /cs-andamento/.test(p9.html), {});
+  rec("P9 tarefa reaberta (âmbar; Concluído→Em andamento na cápsula; Reaberta por) (RE-PINADO F3.5.5E-H2)", p9 && /cat-amber/.test(p9.html) && /Reaberta por Miercohévisk/.test(p9.html) && /cdot cs-concluido/.test(p9.html) && /pto">Em andamento/.test(p9.html), {});
   await shot("p9-reaberta");
 
   /* P10 — cliente claramente visível (linha própria, canônica do doc via enriquecimento) */
@@ -197,16 +197,16 @@ app.whenReady().then(async () => {
 
   /* P15 — autor ≠ responsável (linhas separadas, hierarquia correta) */
   const p15 = await showToast({ eventType: "task_reopened", title: "Tarefa reaberta", taskId: "cronMen", taskTitle: "TEMAS", fromStatus: "concluido", toStatus: "andamento", actorName: "Miercohévisk Niheb Ferreira", responsibleName: "Felipe Teodozio", severity: "warning" });
-  /* RE-PINADO F3.5.5E-H1: responsável em linha própria ACIMA do footer; autor+CTA no footer estruturado */
-  const ordOk = p15 && (p15.html.indexOf('ntfp-task') < p15.html.indexOf('ntfp-client')) && (p15.html.indexOf('ntfp-client') < p15.html.indexOf('ntfp-ctx')) && (p15.html.indexOf('ntfp-ctx') < p15.html.indexOf('ntfp-chips')) && (p15.html.indexOf('ntfp-chips') < p15.html.indexOf('ntfp-respline')) && (p15.html.indexOf('ntfp-respline') < p15.html.indexOf('ntfp-ft')) && (p15.html.indexOf('ntfp-ft') < p15.html.indexOf('ntfp-by'));
+  /* RE-PINADO F3.5.5E-H2: autor como metadata abaixo do contexto; responsável em seguida; cápsula com CTA no fim (referência do owner) */
+  const ordOk = p15 && (p15.html.indexOf('ntfp-task') < p15.html.indexOf('ntfp-client')) && (p15.html.indexOf('ntfp-client') < p15.html.indexOf('ntfp-ctx')) && (p15.html.indexOf('ntfp-ctx') < p15.html.indexOf('ntfp-meta')) && (p15.html.indexOf('ntfp-meta') < p15.html.indexOf('ntfp-respline')) && (p15.html.indexOf('ntfp-respline') < p15.html.indexOf('ntfp-pill'));
   rec("P15 autor e responsável separados (Reaberta por Miercohévisk… + Responsável: Felipe)", p15 && /Reaberta por Miercohévisk/.test(p15.html) && /Responsável: Felipe Teodozio/.test(p15.html) && ordOk, { hierarquiaOk: !!ordOk });
   await shot("p15-autor-responsavel");
 
-  /* P16 — status organizado (chips compactos com rótulos traduzidos) */
-  const p16 = await J(`(function(){ var chips=document.querySelectorAll('#notif-stack .ntfp-chip'); if(chips.length!==2) return { n: chips.length };
-    var h=Math.max(chips[0].getBoundingClientRect().height, chips[1].getBoundingClientRect().height);
-    return { n: 2, h: h, t: chips[0].textContent+'>'+chips[1].textContent }; })()`);
-  rec("P16 transição de status organizada (2 chips compactos ≤30px; Concluído→Em andamento)", p16 && p16.n === 2 && p16.h <= 30 && /Concluído>Em andamento/.test(p16.t || ""), p16);
+  /* P16 — status organizado NA CÁPSULA (RE-PINADO F3.5.5E-H2: transição integrada + segmento CTA) */
+  const p16 = await J(`(function(){ var pill=document.querySelector('#notif-stack .ntfp-pill'); if(!pill) return { n: 0 };
+    var pl=pill.querySelector('.ntfp-pl'); var seg=pill.querySelector('.ntfp-pr');
+    return { n: 1, h: pill.getBoundingClientRect().height, t: (pl?pl.textContent:'')+'>'+(seg?seg.textContent:'') }; })()`);
+  rec("P16 transição integrada na cápsula (≤44px; Concluído → Em andamento + segmento Abrir) (RE-PINADO F3.5.5E-H2)", p16 && p16.n === 1 && p16.h <= 44 && /Concluído/.test(p16.t || "") && /Em andamento/.test(p16.t || "") && /Abrir/.test(p16.t || ""), p16);
 
   /* P17/P18 — título e cliente longos sem estourar o card */
   const p17 = await showToast({ eventType: "task_moved", title: "Tarefa movimentada", taskTitle: "Planejamento completo de conteúdo audiovisual institucional do segundo semestre com desdobramentos", clientName: "Hospital Visão", fromStatus: "afazer", toStatus: "andamento", actorName: "Ana Beatriz Social Media" });
@@ -246,7 +246,7 @@ app.whenReady().then(async () => {
   /* P22 — clique em Abrir tarefa abre a Central de Detalhes da tarefa certa */
   const p22 = await J(`(function(){ var st=document.getElementById('notif-stack'); st.innerHTML='';
     notifShowToast(Object.assign(${JSON.stringify(basePay({}))},{eventType:'task_reopened',title:'Tarefa reaberta',taskId:'cronCustom',taskTitle:'TEMAS',actorName:'Miercohévisk Niheb Ferreira',fromStatus:'concluido',toStatus:'andamento',action:{type:'detail',deep:'detail/cronCustom'}}));
-    var cta=document.querySelector('#notif-stack .ntfp-cta'); if(!cta) return { none:true };
+    var cta=document.querySelector('#notif-stack .ntfp-pill'); if(!cta) return { none:true }; /* RE-PINADO F3.5.5E-H2: CTA integrado na cápsula */
     cta.click();
     var m=document.querySelector('.modal-back[data-detmodal]');
     return { modal: !!m, titulo: m ? (m.textContent.indexOf('TEMAS')>=0) : false, toastFechado: document.querySelectorAll('#notif-stack .ntf').length===0 }; })()`);

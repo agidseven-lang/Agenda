@@ -20,12 +20,12 @@ const ok = (c, m) => { if (c) pass++; else { fail++; fails.push(m); } };
 // ───────────────────────── DEFEITO 1 — cabeçalho reservado (bgnotify + index) ─────────────────────────
 const bg = R("src/renderer/bgnotify.html"), ix = R("src/renderer/index.html");
 for (const [name, s] of [["bgnotify", bg], ["index", ix]]) {
-  ok(/\.ntfp-hd\{display:grid;grid-template-columns:1fr auto auto/.test(s), `H1-01 ${name}: cabeçalho premium em GRID de colunas reservadas`);
-  ok(/\.ntfp-eyebrow \.esev\{/.test(s), `H1-02 ${name}: glifo de severidade PEQUENO (esev) no eyebrow`);
-  ok(/\.ntf-card\.ntfp \.ntfp-hd \.ntf-x\{position:static/.test(s), `H1-03 ${name}: X em coluna própria (position:static), sem absoluto sobreposto`);
-  ok(/\.ntf-card\.ntfp\{gap:0;padding:0\}/.test(s) && /\.ntfp-wrap\{[^}]*padding:12px 14px 12px 13px/.test(s), `H1-04 ${name}: padding compacto no wrap (12/14; 13 à esq. pela barra 2px) — sem reserva p/ absolutos (RE-PINADO F3.5.5E-H1)`);
+  ok(/\.ntfp-hd\{display:flex;align-items:center;justify-content:flex-end/.test(s), `H1-01 ${name}: cabeçalho reservado à direita do avatar flutuante (RE-PINADO F3.5.5E-H2)`);
+  ok(/\.ntfp-ei\{/.test(s) && /\.ntfp-ei svg\{width:13px/.test(s), `H1-02 ${name}: ícone do EVENTO pequeno e inline no eyebrow (RE-PINADO F3.5.5E-H2)`);
+  ok(/\.ntf-card\.ntfp \.ntf-x\{position:static/.test(s), `H1-03 ${name}: X em coluna própria (position:static), sem absoluto sobreposto (RE-PINADO F3.5.5E-H2)`);
+  ok(/\.ntf-card\.ntfp\{gap:0;padding:0/.test(s) && /\.ntfp-wrap\{[^}]*padding:18px 18px 16px/.test(s), `H1-04 ${name}: superfície com respiro (18/18/16) — referência do owner (RE-PINADO F3.5.5E-H2)`);
   // builder premium: eyebrow(esev+tipo) → tm → X, dentro de ntfp-hd; SEM ntfp-sev grande sobreposto
-  ok(/<div class="ntfp-hd"><span class="ntfp-eyebrow"><span class="esev"[^]*?<\/span><span class="ntfp-tm">[^]*?<button class="ntf-x"/.test(s), `H1-05 ${name}: ordem reservada eyebrow→horário→fechar`);
+  ok(/<div class="ntfp-hd"><span class="ntfp-eyebrow">[^]*?<span class="ntfp-tm">[^]*?<button class="ntf-x"/.test(s), `H1-05 ${name}: ordem reservada eyebrow→horário→fechar (RE-PINADO F3.5.5E-H2)`);
   ok(!/<span class="ntfp-sev"/.test(s), `H1-06 ${name}: ícone grande ntfp-sev sobreposto REMOVIDO do markup`);
 }
 // paridade dos construtores (mesma extração do gate de build)

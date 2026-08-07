@@ -1,0 +1,168 @@
+{
+  "at": "2026-08-07T11:53:15.006Z",
+  "indexSha": "9adc666420933a7c7a2c5c5d647f2633cc28f4bfdb4587460fc6f08fa64c9c1d",
+  "bgSha": "a3818a009c4ace343c25152d0e54b235bb4fbeae47a5d73cb6bb0ac83a5a3d88",
+  "results": [
+    {
+      "name": "BOOT app real do asar (semente aplicada)",
+      "ok": true,
+      "info": {
+        "indexSha": "9adc66642093",
+        "user": true,
+        "tasks": 4
+      }
+    },
+    {
+      "name": "E01 movimentada: composição da referência (avatar flutuante + cápsula + segmento) + violeta + hora",
+      "ok": true,
+      "info": {
+        "w": 450,
+        "h": 212
+      }
+    },
+    {
+      "name": "E01b MÉTRICAS: superfície 450×~212 (mandato 430–470 / 190–230); avatar 65px (58–72) com ~37% fora (30–40%); cápsula 40px; fechar 32×32; radius 24",
+      "ok": true,
+      "info": {
+        "antes_1_0_225": {
+          "surfW": 440,
+          "surfH": 198
+        },
+        "depois": {
+          "boxW": 450,
+          "boxH": 238,
+          "surfW": 450,
+          "surfH": 212,
+          "flW": 65,
+          "flAcima": 22,
+          "pillH": 40,
+          "segW": 83,
+          "radius": "24px"
+        }
+      }
+    },
+    {
+      "name": "E02 concluída: verde + check + 'Concluída por' + cápsula com segmento Abrir",
+      "ok": true,
+      "info": {
+        "h": 212
+      }
+    },
+    {
+      "name": "E03 reaberta: âmbar + revise + transição Concluído→Em andamento na cápsula",
+      "ok": true,
+      "info": {}
+    },
+    {
+      "name": "E04 ajuste no COMPONENTE empacotado: laranja + chat (icon set) + cápsula (elegibilidade PREMIUM_TYPES congelada — regra 1.0.224 preservada)",
+      "ok": true,
+      "info": {}
+    },
+    {
+      "name": "E05 aprovação no COMPONENTE empacotado: verde + check + eyebrow 'Aprovação do cliente' (elegibilidade congelada)",
+      "ok": true,
+      "info": {}
+    },
+    {
+      "name": "E06 cliente curto: 'ULTRA' (do DOC) em linha própria + contexto 'Edição de vídeos'",
+      "ok": true,
+      "info": {}
+    },
+    {
+      "name": "E07 cliente longo: 1 linha (ellipsis real) + tooltip completo + sem overflow",
+      "ok": true,
+      "info": {}
+    },
+    {
+      "name": "E08 autor longo: metadata 1 linha com ellipsis REAL + tooltip 'Movimentada por <completo>'",
+      "ok": true,
+      "info": {
+        "title": "Movimentada por Miercohévisk Niheb Ferreira Nascimento Carlôto de Albuquerque Monteiro dos Santos Figueiredo"
+      }
+    },
+    {
+      "name": "E09 responsável distinto: 'Responsável · Felipe Teodozio' discreto (autor≠responsável; sem repetição quando igual)",
+      "ok": true,
+      "info": {}
+    },
+    {
+      "name": "E09b responsável = autor (perfil real): SEM linha duplicada",
+      "ok": true,
+      "info": {}
+    },
+    {
+      "name": "E10 sem avatar: iniciais geradas (2 letras, 22px) no avatar FLUTUANTE 62px com ring em gradiente",
+      "ok": true,
+      "info": {
+        "w": 62,
+        "txt": "FT",
+        "fs": "22px",
+        "ring": true
+      }
+    },
+    {
+      "name": "E11 legado mensal: 'Cronograma mensal • 12 temas' EXATO",
+      "ok": true,
+      "info": {}
+    },
+    {
+      "name": "E12 personalizado: 'Cronograma • 7 temas' sem periodicidade inventada",
+      "ok": true,
+      "info": {}
+    },
+    {
+      "name": "E13 três simultâneas: 3 cards, sem sobreposição, avatar NÃO invade o card vizinho, tudo na tela",
+      "ok": true,
+      "info": {
+        "n": 3,
+        "overlap": false,
+        "invade": false,
+        "inScreen": true,
+        "stackH": 733
+      }
+    },
+    {
+      "name": "E14 escala 100%: avatar/cápsula/segmento/fechar íntegros, sem corte",
+      "ok": true,
+      "info": {}
+    },
+    {
+      "name": "E15 escala 125%: avatar/cápsula/segmento/fechar íntegros, sem corte",
+      "ok": true,
+      "info": {}
+    },
+    {
+      "name": "E16 escala 150%: avatar/cápsula/segmento/fechar íntegros, sem corte",
+      "ok": true,
+      "info": {}
+    },
+    {
+      "name": "E17 1366×768: canto inferior direito, avatar dentro da área útil, sem overflow",
+      "ok": true,
+      "info": {}
+    },
+    {
+      "name": "E18 1920×1080: canto inferior direito, avatar dentro da área útil, sem overflow",
+      "ok": true,
+      "info": {}
+    },
+    {
+      "name": "E19 app aberto (toast interno): componente da referência renderizado no app real",
+      "ok": true,
+      "info": {}
+    },
+    {
+      "name": "E20 app minimizado (JANELA PREMIUM REAL, asar + preload real + IPC bg-card): mesma composição da referência (avatar flutuante SEM corte + cápsula + segmento + cliente)",
+      "ok": true,
+      "info": {
+        "acks": 1,
+        "fl": true,
+        "pill": true,
+        "seg": true,
+        "client": "Hospital Visão",
+        "flAcima": 23,
+        "flVisivel": true
+      }
+    }
+  ]
+}
