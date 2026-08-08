@@ -68,6 +68,12 @@ export function startWorkflowNotifier(uid: string, deliver: Deliver, opts?: Work
 
   const tasks = new Map<string, any>();
   const names = new Map<string, { name: string; photo: string }>();
+  // F3.5.6A-H1 — MIGRAÇÃO dos recibos legados da 1.0.229 (formato "wf:"+chave do ledger, SEM taskId,
+  // que colidia entre tarefas). Um recibo legado só é aceito para eventos que a 1.0.229 JÁ processou
+  // (ev.at ≤ cursor no momento do start — o cursor só avança quando um evento é receiptado, logo todo
+  // evento com recibo legado tem at ≤ cursor). Eventos NOVOS (at > cursor do start) NUNCA casam com
+  // recibo legado ⇒ a colisão morre sem reentregar o histórico já notificado.
+  const legacyCursor = store.cursorGet(uid);
   // buffer de rajada POR TAREFA: eventos agregáveis aguardando a janela fechar
   const aggBuf = new Map<string, { events: any[]; timer: any; firstAt: number }>();
   let stopped = false;
@@ -93,6 +99,7 @@ export function startWorkflowNotifier(uid: string, deliver: Deliver, opts?: Work
         if (!ev || !ev.id || !ev.at) continue;
         if (ev.at <= floor) continue;
         if (store.receiptHas(uid, "wf:" + ev.id)) continue;
+        if (ev.at <= legacyCursor && ev.lk && store.receiptHas(uid, "wf:" + ev.lk)) continue;   // F3.5.6A-H1 — recibo legado (só p/ eventos ≤ cursor do start)
         let ok = false;
         try { ok = WE.wfRecipientOk(ev, t, c) === true; } catch { ok = false; }
         if (!ok) continue;

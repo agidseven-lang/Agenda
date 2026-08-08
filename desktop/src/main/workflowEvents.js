@@ -49,13 +49,19 @@ function wfIsWaitingClientPhase(p) {
 }
 
 /* ── LEDGER → eventos canônicos ─────────────────────────────────────────────── */
-/** deriveLedgerEvents(t, {nowMs, retentionMs}) → [{id,type,at,phase,roundKey,src,by,ru,ii,n,tot}] asc. */
+/** deriveLedgerEvents(t, {nowMs, retentionMs}) → [{id,lk,type,at,phase,roundKey,src,by,ru,ii,n,tot}] asc.
+ *  F3.5.6A-H1 — o id do evento é GLOBAL (taskId + chave do ledger). A chave do ledger sozinha
+ *  ('ev_dec_ar_themes_r1') se repete em TODA tarefa (toda tarefa começa na rodada 1): usar só ela
+ *  colidia recibo persistente, dedupe do HUB e dedupe das superfícies ENTRE TAREFAS — a 1ª tarefa
+ *  aprovada carimbava o recibo e silenciava para sempre a aprovação de todas as seguintes (causa
+ *  provada da falha física da 1.0.229). lk preserva a chave crua p/ a migração dos recibos legados. */
 function deriveLedgerEvents(t, o) {
   o = o || {};
   var nowMs = Number(o.nowMs) || 0;
   var retMs = Number(o.retentionMs) || WF_RETENTION_MS_DEFAULT;
   var minAt = nowMs > 0 ? (nowMs - retMs) : 0;
   var led = (t && t.workflowEvents && typeof t.workflowEvents === 'object') ? t.workflowEvents : {};
+  var tid = String((t && t.id) || '');
   var out = [];
   for (var k in led) {
     if (!Object.prototype.hasOwnProperty.call(led, k)) continue;
@@ -64,7 +70,7 @@ function deriveLedgerEvents(t, o) {
     if (minAt > 0 && at < minAt) continue;
     var type = String(e.t || ''); if (!type) continue;
     out.push({
-      id: String(k), type: type, at: at,
+      id: (tid ? (tid + ':') : '') + String(k), lk: String(k), type: type, at: at,
       phase: String(e.ph || ''), roundKey: String(e.rd || ''),
       src: String(e.src || ''), by: String(e.by || ''),
       ru: String(e.ru || ''), ii: (e.ii == null ? null : Number(e.ii)),
