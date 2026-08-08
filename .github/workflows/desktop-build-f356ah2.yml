@@ -95,7 +95,7 @@ jobs:
           grep -q 'APROVAÇÕES PENDENTES' "$S"
           grep -q 'role="dialog"' "$S"
           grep -q 'aria-modal="true"' "$S"
-          grep -q "id=\"wfapRoot\"" "$S"
+          grep -q "getElementById('wfapRoot')" "$S"
           grep -q 'id="wfapList"' "$S"
           grep -q 'data-wfapprovalsclose="1"' "$S"
           grep -q 'data-wfapprovalsscrim="1"' "$S"
@@ -254,7 +254,7 @@ jobs:
           grep -q 'APROVAÇÕES PENDENTES' "$I"
           grep -q '.wfap-panel{position:fixed;top:0;right:0' "$I"
           grep -q 'data-wfapprovalsopen="1"' "$I"
-          grep -q 'id="wfapRoot"' "$I"
+          grep -q "getElementById('wfapRoot')" "$I"
           grep -q 'function wfApprovalsPendingHtml' "$I" && { echo "::error::wfApprovalsPendingHtml no pacote"; exit 1; } || true
           # H1 — correção da colisão nos BYTES do pacote (main compilado):
           grep -q "id: (tid ? (tid + ':') : '') + String(k), lk: String(k)" asar-x/dist/main/workflowEvents.js
