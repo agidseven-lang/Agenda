@@ -26,7 +26,10 @@ const HTML = fs.readFileSync(process.env.F356AH3_SRC || path.join(DESK, 'src', '
 const SLARULES = process.env.F356AH3_SLARULES || path.join(DESK, 'src', 'main', 'slaRules.js');
 const PKG = JSON.parse(fs.readFileSync(process.env.F356AH3_PKG || path.join(DESK, 'package.json'), 'utf8'));
 const LOCK = JSON.parse(fs.readFileSync(path.join(DESK, 'package-lock.json'), 'utf8'));
-const rules = require(SLARULES);
+/* require() trata caminho relativo "nu" (ex.: asar-x/dist/main/slaRules.js do gate EMPACOTADO)
+ * como NOME DE PACOTE (node_modules), não arquivo → MODULE_NOT_FOUND. Resolver p/ absoluto
+ * (relativo ao CWD quando relativo; no-op quando já absoluto, como no modo fonte). */
+const rules = require(path.resolve(SLARULES));
 
 let pass = 0, fail = 0; const flog = [];
 const ok = (n, c) => { if (c) { pass++; } else { fail++; flog.push('FAIL: ' + n); } };
