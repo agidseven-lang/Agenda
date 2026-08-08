@@ -1,0 +1,271 @@
+# F3.5.6A-H4 — Desktop 1.0.233 (P0 FÍSICO: 1.0.232 REPROVADA). Tarefa NOVA de Cronograma (1 tema):
+# clicar "Enviar para o cliente" SEM confirmar já mostrava "Temas enviados ao cliente" (Responsável:
+# Cliente). Causa PROVADA pelo CAMINHO REAL de criação (não por seed): saveTask() gravava
+# clientFlowStatus='enviado' na CRIAÇÃO (sendAfter=true), ANTES da confirmação (o modal de envio abre
+# depois); flowCanonicalSentSignal tratava esse espelho legado como ENVIO, divergindo da Central
+# (externalWaitOf, que exige a fase de espera server-side). Correção RENDERER (index.html) + espelho MAIN
+# (slaRules.js): WRITER — a criação NUNCA marca envio (clientFlowStatus nasce 'afazer'; "Enviar" só deixa
+# cronStatus='pronto_cliente'); READER — flowCanonicalSentSignal e flowSentToClientSignal recebem o MESMO
+# guard da Central (se HÁ workflowPhase o espelho legado NÃO conta; fallback legado SÓ p/ registro antigo
+# sem workflowPhase); flowThemesReadySignal reconhece 'pronto_cliente'. "enviado" canônico = EXCLUSIVAMENTE
+# o Worker (confirmClientSend → workflowPhase=themes_waiting_client + approvalRound + sentAt + externalWait).
+# Worker V64.61 CORRETO e INALTERADO (RED do caminho real provou; zero deploy). REGRA MÁXIMA: infra de
+# notificações 1.0.228 INTOCADA; Central 1.0.231, workflow 1.0.230/1.0.229 preservados; paridade
+# renderer×main (golden master F3.4.4) mantida. build GATED, --publish never. Publicação SÓ no
+# desktop-release-f356ah4.yml (mesmos bytes). Base técnica: 1.0.232 @ 2ce29a7. BASELINE FÍSICA OFICIAL:
+# 1.0.228 @ 3f0d0af1. ROLLBACK IMEDIATO 1.0.228. NÃO promover 1.0.231/1.0.232.
+name: "[push/manual] F3.5.6A-H4 — Desktop 1.0.233 (fonte única pelo CAMINHO REAL de criação) — Desktop Build"
+"on":
+  push:
+    branches: ["desktop/f356ah4-sent-state-real-path-1.0.233"]
+    paths-ignore: [".github/workflows/desktop-release-f356ah4.yml"]
+  workflow_dispatch: {}
+permissions: { contents: read }
+env:
+  TEST_BRANCH: "desktop/f356ah4-sent-state-real-path-1.0.233"
+  BASE_232_SHA: "2ce29a7db056a99b1722c11287e0919dd0ce2c43"
+  BASE_231_SHA: "a378e5c1f2f4217249252eae7e261e17580c2050"
+  BASE_230_SHA: "e89867de5120fe88e2f639effd59d24c3181f427"
+  BASE_228_SHA: "3f0d0af192b4b6b32a8e8bbda4153dcf4df1bc6d"
+  BASE_226_SHA: "267f8c8593e6724ad6460ed8bbb42201ade09d0b"
+  APP_DIR: desktop
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: "Gate REF + ANCESTRIA (descende da 1.0.232 base técnica, 1.0.231, 1.0.230, 1.0.228 baseline física)"
+        run: |
+          set -euo pipefail
+          [ "${GITHUB_REF_NAME}" = "$TEST_BRANCH" ] || { echo "::error::branch errada"; exit 1; }
+          git merge-base --is-ancestor "$BASE_232_SHA" HEAD || { echo "::error::não descende da 1.0.232 (base técnica desta fase)"; exit 1; }
+          git merge-base --is-ancestor "$BASE_231_SHA" HEAD || { echo "::error::não descende da 1.0.231"; exit 1; }
+          git merge-base --is-ancestor "$BASE_230_SHA" HEAD || { echo "::error::não descende da 1.0.230"; exit 1; }
+          git merge-base --is-ancestor "$BASE_228_SHA" HEAD || { echo "::error::não descende da 1.0.228 (baseline física)"; exit 1; }
+      - name: "Gate VERSAO 1.0.233 (package + lock x2 + description da fase H4 + cadeia de bases)"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node -e "const p=require('./package.json'); if(p.version!=='1.0.233') process.exit(1); if(!/single-source-real-path/.test(p.description||'')) process.exit(1); if(!/single-source-sent-state/.test(p.description||'')) process.exit(1); if(!/client-approvals-compact-drawer/.test(p.description||'')) process.exit(1); if(!/workflow-notification-receipt-collision/.test(p.description||'')) process.exit(1); if(!/realtime-workflow-client-approval/.test(p.description||'')) process.exit(1); if(!/FISICAMENTE APROVADA/.test(p.description||'')) process.exit(1);"
+          [ "$(grep -c '"version": "1.0.233"' package-lock.json)" -ge 2 ]
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: "npm ci + TypeScript + sintaxe dos renderers como SCRIPT CLÁSSICO (vm.Script) + worker"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          ./node_modules/.bin/tsc --noEmit -p tsconfig.json
+          node -e "const fs=require('fs'),vm=require('vm');const s=fs.readFileSync('src/renderer/bgnotify.html','utf8');const m=s.match(/<script>([\s\S]*?)<\/script>/);new vm.Script(m[1],{filename:'bgnotify-inline'});"
+          node -e "const fs=require('fs'),vm=require('vm');const s=fs.readFileSync('src/renderer/slareminder.html','utf8');const m=s.match(/<script>([\s\S]*?)<\/script>/);new vm.Script(m[1],{filename:'slareminder-inline'});"
+          node -e "const fs=require('fs'),vm=require('vm');const s=fs.readFileSync('src/renderer/index.html','utf8');const b=[...s.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(x=>x[1]);if(b.length<2){console.error('esperados >=2 blocos inline');process.exit(1);}b.forEach((x,i)=>new vm.Script(x,{filename:'index-inline-'+i}));console.log('blocos inline OK:',b.length);"
+          node --check ../cloudflare-worker.js
+      - name: "npm run build (tsc + copy-renderer) — necessário p/ dist e provas Electron"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          npm run build
+      - name: "Gate MARCADORES F3.5.6A-H4 — WRITER (criação nunca 'enviado') + READER (guard da Central) no renderer + espelho main/slaRules"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          S=src/renderer/index.html
+          M=src/main/slaRules.js
+          # RENDERER — WRITER: a criação grava 'afazer' e NUNCA 'enviado' (o produtor do bug foi eliminado):
+          grep -q "data.clientFlowStatus='afazer';data.clientWorkflowStage='afazer';" "$S"
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/renderer/index.html','utf8');const i=s.indexOf('async function saveTask(');const j=s.indexOf('async function ',i+10);const body=s.slice(i,j>0?j:s.length);if(/clientFlowStatus=sendAfter\?'enviado'/.test(body)){console.error('WRITER antigo ressurgiu: criação ainda grava enviado');process.exit(1);}"
+          # RENDERER — READER: guard da Central em flowCanonicalSentSignal + flowSentToClientSignal; THEMES_READY reconhece pronto_cliente:
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/renderer/index.html','utf8');const i=s.indexOf('function flowCanonicalSentSignal(');const j=s.indexOf('}',s.indexOf('return ',i));const body=s.slice(i,j+1);if(!/if\(wp\)return false;/.test(body)){console.error('flowCanonicalSentSignal SEM o guard if(wp)return false');process.exit(1);}"
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/renderer/index.html','utf8');const i=s.indexOf('function flowSentToClientSignal(');const j=s.indexOf('}',i);const body=s.slice(i,j+1);if(!/if\(wp\)return false;/.test(body)){console.error('flowSentToClientSignal SEM o guard da Central');process.exit(1);}"
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/renderer/index.html','utf8');const i=s.indexOf('function flowThemesReadySignal(');const j=s.indexOf('}',i);const body=s.slice(i,j+1);if(!/cs==='pronto_cliente'/.test(body)){console.error('flowThemesReadySignal NÃO reconhece pronto_cliente');process.exit(1);}"
+          # ESPELHO MAIN (slaRules) — mesma correção (paridade do golden master F3.4.4):
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/main/slaRules.js','utf8');const i=s.indexOf('function flowCanonicalSentSignal(');const j=s.indexOf('}',s.indexOf('return ',i));const body=s.slice(i,j+1);if(!/if\(wp\)return false;/.test(body)){console.error('slaRules flowCanonicalSentSignal SEM o guard');process.exit(1);}"
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/main/slaRules.js','utf8');const i=s.indexOf('function flowSentToClientSignal(');const j=s.indexOf('}',i);if(!/if\(wp\)return false;/.test(s.slice(i,j+1))){console.error('slaRules flowSentToClientSignal SEM o guard');process.exit(1);}"
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/main/slaRules.js','utf8');const i=s.indexOf('function flowThemesReadySignal(');const j=s.indexOf('}',i);if(!/cs==='pronto_cliente'/.test(s.slice(i,j+1))){console.error('slaRules flowThemesReadySignal NÃO reconhece pronto_cliente');process.exit(1);}"
+          echo "MARCADORES F3.5.6A-H4: VERIFIED."
+      - name: "Gate MARCADORES herdados H3 (fonte única/THEMES_READY) + H2 (barra/drawer) + H1 (id GLOBAL) intactos"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          S=src/renderer/index.html
+          grep -q 'function flowThemesReadySignal' "$S"
+          grep -q "THEMES_READY:'themes_ready'" "$S"
+          grep -q 'themes_ready:{social:{' "$S"
+          grep -q 'Temas prontos — confirmar envio ao cliente' "$S"
+          grep -q "flowThemesReadySignal(t))return {phase:TASK_PHASE.THEMES_READY,owner:'social'" "$S"
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/renderer/index.html','utf8');const i=s.indexOf('function flowThemesSentSignal(');const j=s.indexOf('}',i);const body=s.slice(i,j+1);if(/clientReviewToken|shareToken|clientSentBy/.test(body)){console.error('flowThemesSentSignal ainda trata token como envio');process.exit(1);}if(!/flowCanonicalSentSignal/.test(body)){console.error('flowThemesSentSignal não delega à fonte única');process.exit(1);}"
+          grep -q 'function wfApprovalsBarHtml' "$S"
+          grep -q 'wfApprovalsBarHtml(list)+boardToolbar()' "$S"
+          grep -q 'function wfApprovalsDrawerHtml' "$S"
+          grep -q "getElementById('wfapRoot')" "$S"
+          grep -q 'function wfApprovalsPendingHtml' "$S" && { echo "::error::wfApprovalsPendingHtml ressurgiu"; exit 1; } || true
+          grep -q "id: (tid ? (tid + ':') : '') + String(k), lk: String(k)" src/main/workflowEvents.js
+          grep -q 'legacyCursor' dist/main/workflowNotifier.js
+          echo "MARCADORES herdados H3+H2+H1: VERIFIED."
+      - name: "Gate SUÍTE DA FASE F3.5.6A-H4 — fonte única pelo CAMINHO REAL (RED da lógica antiga → GREEN A/B + compat + paridade) [fonte]"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f356ah4-single-source-real-path.test.mjs
+      - name: "Gate SUÍTE HERDADA F3.5.6A-H3 — fonte única (token≠envio) + paridade renderer×main (golden master F3.4.4 com THEMES_READY) + H2 + motor F3.5.6A [dist]"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f356ah3-single-source-sent-state.test.mjs
+          node scripts/f344-flow-golden-master.test.mjs
+          H2_BASE_228="$BASE_228_SHA" H2_BASE_230="$BASE_230_SHA" node scripts/f356ah2-client-approvals.test.mjs
+          node scripts/f356a-workflow-orchestration.test.mjs
+      - name: "Gate SUÍTES herdadas — notificações/handoff/visibilidade/referência + cadeia F3.5.5* [dist]"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f355eh4-grouped-notification-handoff.test.mjs
+          node scripts/f355eh3-global-notification-visibility.test.mjs
+          node scripts/f355eh2-reference-notification.test.mjs
+          node scripts/f355e-retire-modules-premium-notifications.test.mjs
+          node scripts/f355d-cron-quantity-universal-paste.test.mjs
+          node scripts/f353-paste-recovery.test.mjs
+          node scripts/f353-durable-notifications.test.mjs
+          node scripts/f355ch2-stale-alert.test.mjs
+      - name: "Gate central herdado — f354l + f354p + f354q + f354o + f354u + f354u-h1 [dist]"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f354l-sla-central-persistent-reminders.test.mjs
+          node scripts/f354p-sla-decision-actions.test.mjs
+          node scripts/f354q-task-idle-detection.test.mjs
+          node scripts/f354o-common-notification-grouping.test.mjs
+          node scripts/f354u-premium-common-notifications.test.mjs
+          node scripts/f354u-h1-notification-hotfix.test.mjs
+      - name: "Gate herdado — sessão/auth + rich editor + agenda + notas + planner/orquestrador/central/integração"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f355ch1-session-restore.test.mjs
+          node scripts/f3356-auth-core.test.mjs
+          node scripts/f355c-script-quantity-rich-editor.test.mjs
+          node scripts/f355b-agenda-premium.test.mjs
+          node scripts/f355ah1-internal-notes.test.mjs
+          node scripts/f355a-execution-planner.test.mjs
+          node scripts/f355a-orchestrator.test.mjs
+          node scripts/f355a-execution-central.test.mjs
+          node scripts/f355a-integration.test.mjs
+      - name: "Gate REGRESSÃO canônica — som 37 + detalhes 74 + cards 53 + sessão 40"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f354wh2-immediate-notification-sound.test.mjs
+          node scripts/f354wh1-details-status-notes.test.mjs
+          node scripts/f354w-compact-cards-details.test.mjs
+          node scripts/f354vh1-session-persistence.test.mjs
+      - name: "Gate RED EMPACOTADO F3.5.6A-H4 — CAMINHO REAL: saveTask REAL nas 2 builds (BASE 1.0.232 reproduz o bug; FIX 1.0.233 A/B/C/D/E + compat) + Worker REAL — xvfb"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y >/dev/null 2>&1 || true
+          sudo apt-get install -y xvfb >/dev/null 2>&1 || true
+          H4_VERSION=1.0.233 timeout -k 15 600 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f356ah4-red-main.js
+      - name: "Gate RED EMPACOTADO herdado F3.5.6A-H3 (token≠envio; GREEN em 1.0.233) — xvfb"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          H3_VERSION=1.0.233 timeout -k 15 600 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f356ah3-red-main.js
+      - name: "Gate PROVAS REAIS Electron herdadas — H2 (barra/drawer) + F3.5.6A (motor) + H1 (superfície) — xvfb"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          timeout -k 15 780 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f356ah2-electron-proof-main.js
+          timeout -k 15 780 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f356a-electron-proof-main.js
+          node scripts/f356ah1-dump-docs.mjs
+          timeout -k 15 600 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f356ah1-surface-proof-main.js
+      - uses: actions/upload-artifact@v4
+        with: { name: f356ah4-provas-qa, path: "docs/f356ah4-qa/**\ndocs/f356ah3-qa/**", if-no-files-found: warn, retention-days: 30 }
+      - uses: actions/upload-artifact@v4
+        with: { name: f356ah4-provas-herdadas-qa, path: "docs/f356ah2-qa/**\ndocs/f356a-qa/**\ndocs/f356ah1-qa/**", if-no-files-found: warn, retention-days: 30 }
+      - name: "Gate ISOLAMENTO — produção = SOMENTE index.html + slaRules.js (espelho canônico) vs 1.0.232; resto byte-idêntico; REGRA MÁXIMA 1.0.228"
+        run: |
+          set -euo pipefail
+          git diff --name-only "$BASE_232_SHA"..HEAD > /tmp/delta.txt; echo "== DELTA vs 1.0.232 =="; cat /tmp/delta.txt
+          # allowlist H4: renderer index.html + main/slaRules.js (produção) + versão + suítes/provas/preload da fase H4
+          # + re-pins ROTULADOS (1.0.232→1.0.233) herdados + os dois workflows f356ah4.
+          BAD=$(grep -vE '^(\.github/workflows/desktop-(build|release)-f356ah4\.yml$|desktop/src/renderer/index\.html$|desktop/src/main/slaRules\.js$|desktop/package(-lock)?\.json$|desktop/scripts/f356ah4-|desktop/scripts/f356ah3-red-main\.js$|desktop/scripts/f356ah3-red-preload\.js$|desktop/scripts/f356ah3-single-source-sent-state\.test\.mjs$|desktop/scripts/f356ah2-client-approvals\.test\.mjs$|desktop/scripts/f356ah2-proof-preload\.js$|desktop/scripts/f356ah1-surface-proof-main\.js$|desktop/scripts/f356a-workflow-orchestration\.test\.mjs$|desktop/scripts/f354p-sla-decision-actions\.test\.mjs$|desktop/scripts/f354vh1-session-persistence\.test\.mjs$|desktop/scripts/f354wh2-immediate-notification-sound\.test\.mjs$|desktop/scripts/f355a-integration\.test\.mjs$|desktop/scripts/f355ah1-internal-notes\.test\.mjs$|desktop/scripts/f355b-agenda-premium\.test\.mjs$|desktop/scripts/f355c-script-quantity-rich-editor\.test\.mjs$|desktop/scripts/f355d-cron-quantity-universal-paste\.test\.mjs$|desktop/scripts/f355e-retire-modules-premium-notifications\.test\.mjs$|desktop/scripts/f355eh2-reference-notification\.test\.mjs$|desktop/scripts/f355eh3-global-notification-visibility\.test\.mjs$|desktop/scripts/f355eh4-grouped-notification-handoff\.test\.mjs$|docs/f356ah4(-qa)?/)' /tmp/delta.txt || true)
+          [ -z "$BAD" ] || { echo "::error::fora da allowlist H4: $BAD"; exit 1; }
+          # B) src/main: SÓ slaRules.js muda; todo o resto de src/main byte-idêntico à 1.0.232
+          CHG_MAIN=$(git diff --name-only "$BASE_232_SHA"..HEAD -- desktop/src/main | grep -v '^desktop/src/main/slaRules\.js$' || true)
+          [ -z "$CHG_MAIN" ] || { echo "::error::src/main além de slaRules.js alterado: $CHG_MAIN"; exit 1; }
+          # demais superfícies de produção byte-idênticas à 1.0.232:
+          git diff --quiet "$BASE_232_SHA"..HEAD -- desktop/src/preload cloudflare-worker.js desktop/scripts/copy-renderer.js desktop/electron-builder.yml desktop/tsconfig.json functions android-native android-native-beta desktop/src/renderer/priorityEngine.js desktop/src/renderer/bgnotify.html desktop/src/renderer/slareminder.html desktop/src/renderer/bgcall.html desktop/src/renderer/sounds || { echo "::error::mudança fora de index.html+slaRules.js — H4 altera SOMENTE esses dois de produção"; exit 1; }
+          # C) REGRA MÁXIMA — infraestrutura de notificações 1.0.228 byte-idêntica à baseline física.
+          git diff --quiet "$BASE_228_SHA"..HEAD -- desktop/src/main/bgNotify.ts desktop/src/main/notificationGrouping.ts desktop/src/renderer/bgnotify.html desktop/src/renderer/slareminder.html desktop/src/renderer/bgcall.html desktop/src/renderer/sounds desktop/src/preload/bgnotify-preload.ts desktop/src/preload/slareminder-preload.ts desktop/src/preload/preload.ts desktop/electron-builder.yml desktop/tsconfig.json || { echo "::error::congelado alterado (infra de notificações 1.0.228 deve ser byte-idêntica à baseline física 3f0d0af)"; exit 1; }
+          echo "ISOLAMENTO H4: VERIFIED (index.html + slaRules.js são os únicos arquivos de produção alterados vs 1.0.232)."
+  build:
+    needs: verify
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: npm ci + build + electron-builder (--publish never)
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm run build
+          npx electron-builder --win nsis msi --publish never
+      - name: "Gate EMPACOTADO — versão 1.0.233 + fonte única H4 (renderer + slaRules) + H3/H2/H1/motor/infra congelada no app.asar (suítes contra o pacote)"
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          ASAR="dist-installer/win-unpacked/resources/app.asar"; test -f "$ASAR"
+          npx --yes @electron/asar extract "$ASAR" asar-x
+          node -e "const p=require('./asar-x/package.json'); if(p.version!=='1.0.233') process.exit(1);"
+          I=asar-x/src/renderer/index.html
+          MJ=asar-x/dist/main/slaRules.js
+          # H4 — WRITER + READER nos BYTES do pacote (renderer + main compilado):
+          grep -q "data.clientFlowStatus='afazer';data.clientWorkflowStage='afazer';" "$I"
+          node -e "const fs=require('fs');const s=fs.readFileSync('asar-x/src/renderer/index.html','utf8');const i=s.indexOf('async function saveTask(');const j=s.indexOf('async function ',i+10);if(/clientFlowStatus=sendAfter\?'enviado'/.test(s.slice(i,j>0?j:s.length))){console.error('pacote: WRITER antigo (criação grava enviado)');process.exit(1);}"
+          node -e "const fs=require('fs');const s=fs.readFileSync('asar-x/src/renderer/index.html','utf8');const i=s.indexOf('function flowCanonicalSentSignal(');const j=s.indexOf('}',s.indexOf('return ',i));if(!/if\(wp\)return false;/.test(s.slice(i,j+1))){console.error('pacote: flowCanonicalSentSignal SEM guard');process.exit(1);}"
+          grep -q 'Temas prontos — confirmar envio ao cliente' "$I"
+          node -e "const fs=require('fs');const s=fs.readFileSync('asar-x/dist/main/slaRules.js','utf8');const i=s.indexOf('function flowCanonicalSentSignal(');const j=s.indexOf('}',s.indexOf('return ',i));if(!/if\(wp\)return false;/.test(s.slice(i,j+1))){console.error('pacote: slaRules flowCanonicalSentSignal SEM guard');process.exit(1);}"
+          grep -q "THEMES_READY:'themes_ready'" "$MJ"
+          # H3/H2/H1/motor no pacote:
+          grep -q 'function flowThemesReadySignal' "$I"
+          node -e "const fs=require('fs');const s=fs.readFileSync('asar-x/src/renderer/index.html','utf8');const i=s.indexOf('function flowThemesSentSignal(');const j=s.indexOf('}',i);if(/clientReviewToken|shareToken|clientSentBy/.test(s.slice(i,j+1))){console.error('pacote: flowThemesSentSignal ainda trata token como envio');process.exit(1);}"
+          grep -q 'wfApprovalsBarHtml(list)+boardToolbar()' "$I"
+          grep -q "getElementById('wfapRoot')" "$I"
+          grep -q "id: (tid ? (tid + ':') : '') + String(k), lk: String(k)" asar-x/dist/main/workflowEvents.js
+          grep -q 'legacyCursor' asar-x/dist/main/workflowNotifier.js
+          grep -q 'externalWaitOf' asar-x/dist/main/slaRules.js
+          # REGRA MÁXIMA — infra de notificações 1.0.228 no pacote:
+          grep -q 'function premiumEvtIcon' asar-x/src/renderer/index.html
+          grep -q 'function premiumEvtIcon' asar-x/src/renderer/bgnotify.html
+          grep -q 'activeToastGroups' asar-x/dist/main/main.js
+          grep -q 'function reassert' asar-x/dist/main/bgNotify.js
+          # SUÍTE DA FASE H4 + herdada H3 + paridade + H2 contra os BYTES EMPACOTADOS:
+          F356AH4_SRC=asar-x/src/renderer/index.html F356AH4_SLARULES=asar-x/dist/main/slaRules.js node scripts/f356ah4-single-source-real-path.test.mjs
+          F356AH3_SRC=asar-x/src/renderer/index.html F356AH3_SLARULES=asar-x/dist/main/slaRules.js F356AH3_PKG=asar-x/package.json node scripts/f356ah3-single-source-sent-state.test.mjs
+          H2_SRC=asar-x/src/renderer/index.html H2_PKG=asar-x/package.json H2_LOCK=package-lock.json node scripts/f356ah2-client-approvals.test.mjs
+          echo "GATE F3.5.6A-H4 EMPACOTADO: VERIFIED."
+      - name: Empacotar bundle + SHA256SUMS + VERSAO-DESKTOP
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes @cyclonedx/cyclonedx-npm --omit dev --output-format JSON --output-file "$RUNNER_TEMP/sbom.json" || echo '{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}' > "$RUNNER_TEMP/sbom.json"
+          OUT="$GITHUB_WORKSPACE/dist-pkg"; mkdir -p "$OUT"
+          EXE=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe | head -1); MSI=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.msi | head -1); BM=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap | head -1)
+          cp "$EXE" "$MSI" "$BM" dist-installer/latest.yml "$OUT/"; cp "$RUNNER_TEMP/sbom.json" "$OUT/SBOM-cyclonedx.json"
+          EXE_NAME=$(basename "$EXE"); MSI_NAME=$(basename "$MSI"); BM_NAME=$(basename "$BM")
+          ( cd "$OUT" && sha256sum "$EXE_NAME" "$MSI_NAME" latest.yml "$BM_NAME" SBOM-cyclonedx.json > SHA256SUMS )
+          { echo "productName : Agenda ID Seven Desktop"; echo "versionName : 1.0.233"; echo "rotulo      : 1.0.233-f356ah4-single-source-real-path (CANDIDATA — fonte única pelo CAMINHO REAL de criacao)"; echo "channel     : latest (NADA publicado neste build)"; echo "appId       : br.com.idseven.agenda.desktop"; echo "instalador  : $EXE_NAME"; echo "SHA-256 exe : $(sha256sum "$OUT/$EXE_NAME" | awk '{print $1}')"; echo "instalador2 : $MSI_NAME"; echo "SHA-256 msi : $(sha256sum "$OUT/$MSI_NAME" | awk '{print $1}')"; echo "commit      : $GITHUB_SHA (branch $GITHUB_REF_NAME)"; echo "base-codigo : Desktop 1.0.232 (commit 2ce29a7; F3.5.6A-H3). BASELINE FISICA OFICIAL: 1.0.228 (3f0d0af1; FISICAMENTE APROVADA)"; echo "rollback    : imediato 1.0.228 (877795ef stable — baseline física). NAO promover 1.0.231/1.0.232."; echo "origem      : F3.5.6A-H4 — P0 FISICO. 1.0.232 REPROVADA: tarefa NOVA de Cronograma (1 tema), clicar 'Enviar para o cliente' SEM confirmar ja mostrava 'Temas enviados ao cliente' (Responsavel: Cliente). Causa PROVADA pelo CAMINHO REAL de criacao (RED empacotado dirige o saveTask REAL nas 2 builds): saveTask() gravava clientFlowStatus='enviado' na CRIACAO; flowCanonicalSentSignal tratava esse espelho legado como ENVIO, divergindo da Central (externalWaitOf). Correcao RENDERER (index.html) + espelho MAIN (slaRules.js): WRITER — a criacao NUNCA marca envio (clientFlowStatus nasce 'afazer'; 'Enviar' so deixa cronStatus='pronto_cliente'); READER — flowCanonicalSentSignal e flowSentToClientSignal recebem o guard da Central (se HA workflowPhase o espelho legado NAO conta; fallback legado SO p/ registro antigo sem workflowPhase); flowThemesReadySignal reconhece 'pronto_cliente'. 'enviado' canonico = EXCLUSIVAMENTE o Worker (confirmClientSend). Worker V64.61 CORRETO e INALTERADO (zero deploy). REGRA MAXIMA: infra de notificacoes 1.0.228 INTOCADA; Central 1.0.231 e workflow 1.0.230/1.0.229 preservados; paridade renderer×main (golden master F3.4.4) mantida. MUDANCA: desktop/src/renderer/index.html + desktop/src/main/slaRules.js. PROVAS: RED empacotado do CAMINHO REAL (BASE 1.0.232 reproduz o bug; FIX 1.0.233 cenarios A/B/C/D/E + compat legado; Worker real); suite da fase 33/33; golden master F3.4.4 9/9; bateria herdada completa + provas Electron herdadas."; echo "distribuicao: CANDIDATA — publicação no Latest ocorre no workflow desktop-release-f356ah4.yml (mesmos bytes)"; } > "$OUT/VERSAO-DESKTOP.txt"
+          echo "== SHA256SUMS =="; cat "$OUT/SHA256SUMS"
+      - uses: actions/upload-artifact@v4
+        with: { name: agenda-id-seven-desktop-1.0.233-installer, path: "dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe\ndist-pkg/Agenda-ID-Seven-Desktop-*-x64.msi", if-no-files-found: error, retention-days: 30 }
+      - uses: actions/upload-artifact@v4
+        with: { name: agenda-id-seven-desktop-1.0.233-updatemeta, path: "dist-pkg/latest.yml\ndist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap\ndist-pkg/SHA256SUMS\ndist-pkg/SBOM-cyclonedx.json\ndist-pkg/VERSAO-DESKTOP.txt", if-no-files-found: error, retention-days: 30 }
