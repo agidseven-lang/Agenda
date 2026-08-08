@@ -312,22 +312,28 @@ function f354oIndexControlledDiff() {
 }
 ok(f354oIndexControlledDiff(), "49 index.html — DIFF CONTROLADO F3.5.4N+F3.5.4O (Inicialização/autocorreção + agrupamento das comuns aditivos; toast/Monitor SLA/sino/Cronograma intactos)");
 ok(bytesIdenticalVs201("src/main/slaScheduler.ts"), "50 slaScheduler.ts (tempos/boundaries) byte-idêntico a 1.0.201");
-// [RE-PINADO F3.5.6A] slaRules.js SAI do byte-congelado: recebe DIFF CONTROLADO **PURAMENTE
-// ADITIVO** — externalWaitOf (espera externa: bola com o CLIENTE) + branch waiting_client no
-// display state (inPanel:false pausa alertas SÓ da tarefa em espera) + export. ZERO linha
-// removida vs 1.0.201; T-30/T-10/destinatários/dedup/timeline seguem provados por PRESENÇA.
+// [RE-PINADO F3.5.6A-H3] slaRules.js recebe DIFF CONTROLADO: além do ADITIVO F3.5.6A (externalWaitOf +
+// branch waiting_client + inPanel:false + export), a H3 corrige a FONTE ÚNICA do estado "enviado ao
+// cliente" — flowThemesSentSignal deixa de tratar clientReviewToken/shareToken (LINK) como ENVIO e passa
+// a delegar a flowCanonicalSentSignal; + flowThemesReadySignal + TASK_PHASE.THEMES_READY (ESPELHO do
+// renderer; paridade golden master F3.4.4). As ÚNICAS remoções são da derivação de "enviado"; NENHUMA
+// linha de SLA/timeline/destinatários/dedup/T-30/T-10/externalWaitOf é removida (provado abaixo).
 function f356aSlaRulesControlledDiff() {
   let d = "";
   try { d = execSync("git -C " + JSON.stringify(DESK) + " diff 047261b7587951e0496d5f4eff0cda5998269161 HEAD -- src/main/slaRules.js", { encoding: "utf8" }); } catch { return false; }
   const rm = d.split("\n").filter((l) => l.startsWith("-") && !l.startsWith("---"));
-  const additiveOnly = rm.length === 0;
+  // H3 — remoções PERMITIDAS SÓ na derivação de "enviado"; NENHUMA remoção pode tocar SLA/timeline/
+  // destinatários/dedup/externalWait (o que garante o "zero remoção" da lógica congelada).
+  const SLA_CRITICAL = /warningMinutes|overdueGraceMinutes|resolveCanonicalSlaTimeline|slaEmissionsFor|resolveNotificationTargets|resolveTaskDisplayState|externalWaitOf|sla_warning|sla_overdue/;
+  const removalsOnlySentState = rm.every((l) => !SLA_CRITICAL.test(l));
   const hasF356a = /function externalWaitOf\(/.test(d) && /state:'waiting_client'/.test(d) && /inPanel:false/.test(d);
+  const hasH3 = /function flowCanonicalSentSignal\(/.test(d) && /function flowThemesReadySignal\(/.test(d) && /THEMES_READY:'themes_ready'/.test(d);
   let cur = "";
   try { cur = fs.readFileSync(path.join(DESK, "src/main/slaRules.js"), "utf8"); } catch { return false; }
-  const anchorsPresent = /function resolveTaskDisplayState\(/.test(cur) && /function resolveCanonicalSlaTimeline\(/.test(cur) && /function resolveNotificationTargets\(/.test(cur) && /function slaEmissionsFor\(/.test(cur) && /function notifBuildPayload\(/.test(cur) && /warningMinutes:30/.test(cur) && /overdueGraceMinutes:10/.test(cur);
-  return additiveOnly && hasF356a && anchorsPresent;
+  const anchorsPresent = /function resolveTaskDisplayState\(/.test(cur) && /function resolveCanonicalSlaTimeline\(/.test(cur) && /function resolveNotificationTargets\(/.test(cur) && /function slaEmissionsFor\(/.test(cur) && /function notifBuildPayload\(/.test(cur) && /warningMinutes:30/.test(cur) && /overdueGraceMinutes:10/.test(cur) && /function externalWaitOf\(/.test(cur);
+  return removalsOnlySentState && hasF356a && hasH3 && anchorsPresent;
 }
-ok(f356aSlaRulesControlledDiff(), "51 slaRules.js — DIFF CONTROLADO F3.5.6A (externalWaitOf ADITIVO-PURO; T-30/T-10/destinatários/dedup/timeline presentes; zero remoção)");
+ok(f356aSlaRulesControlledDiff(), "51 slaRules.js — DIFF CONTROLADO F3.5.6A-H3 (fonte única do envio: flowThemesSentSignal→flowCanonicalSentSignal + THEMES_READY; SLA/timeline/destinatários/dedup/externalWait SEM remoção; espelho do renderer)");
 ok(bytesIdenticalVs201("src/main/cardsRules.js"), "52 cardsRules.js (T-30/T-10 cards) byte-idêntico");
 // F3.5.4P — notifEvents.js SAIU dos byte-congelados: recebe a derivação ADITIVA de help_requested/blocked
 // (Categoria A/destinatários da 1.0.201 preservados; ZERO remoção). Passa a DIFF CONTROLADO.
