@@ -62,11 +62,11 @@ function extractFn(src, marker) {
 
 /* ═══ A — IDENTIDADE ═══ */
 const pkg = JSON.parse(read(PKG));
-ok("A1 versão 1.0.230", pkg.version === "1.0.230", pkg.version);
+ok("A1 versão 1.0.231", pkg.version === "1.0.231", pkg.version);
 try {
   const lock = JSON.parse(read(LOCK));
-  ok("A2 lock 1.0.230 ×2", lock.version === "1.0.230" && lock.packages[""].version === "1.0.230");
-} catch (e) { ok("A2 lock 1.0.230 ×2", false, String(e.message)); }
+  ok("A2 lock 1.0.231 ×2", lock.version === "1.0.231" && lock.packages[""].version === "1.0.231");
+} catch (e) { ok("A2 lock 1.0.231 ×2", false, String(e.message)); }
 ok("A3 workflowEvents.js existe (motor puro)", fs.existsSync(WE_PATH));
 ok("A4 workflowNotifier compilado no dist", fs.existsSync(WN_DIST));
 
@@ -357,7 +357,7 @@ const SLA = require2(SLARULES);
   ok("G8 atribuição grava fase+run+ledger+itens (idempotente por ciclo)", idx.includes("'workflowEvents.ev_dassign_'+designerId+'_c'+_cyc") && /wfOpenRunPatch\(patch, t, 'design_production', 'designer', designerId/.test(idx));
   ok("G9 produção concluída canônica no moveStatus (fase captions_preparation + ev_dpc)", idx.includes("'workflowEvents.ev_dpc_c'+_cyc2") && idx.includes("wfOpenRunPatch(patch, t, 'captions_preparation', 'social'"));
   ok("G10 fase persistida DESDE O NASCIMENTO (saveTask)", idx.includes("data.workflowPhase='themes_preparation'") && idx.includes("pr01_themes_preparation"));
-  ok("G11 Central do Cliente: Aprovações pendentes (4 categorias)", idx.includes("wfApprovalsPendingHtml(list)") && idx.includes("Não visualizadas") && idx.includes("Visualizadas sem resposta") && idx.includes("Ajustes solicitados") && idx.includes("Aprovadas recentemente"));
+  ok("G11 Central do Cliente: 4 categorias preservadas [RE-PINADO F3.5.6A-H2: barra compacta + drawer; wfApprovalsPendingHtml→wfApprovalsBarHtml]", idx.includes("wfApprovalsBarHtml(list)") && idx.includes("function wfApprovalsCats") && idx.includes("Não visualizadas") && idx.includes("Visualizadas sem resposta") && idx.includes("Ajustes solicitados") && idx.includes("Aprovadas recentemente"));
   ok("G12 chip do card: Aguardando cliente + subtipo + visualização + tempo", idx.includes("statusLabel='Aguardando cliente · '"));
   ok("G13 Minhas Prioridades: filtro + seção Aguardando cliente", idx.includes("['awaitclient','Aguardando cliente']") && idx.includes("wfPriAwaitRow"));
   ok("G14 checklist POR ITEM no sheet do Designer", idx.includes("data-wfitemdone=") && idx.includes("Itens desta produção"));

@@ -101,7 +101,7 @@ app.whenReady().then(async () => {
   const bodyWinActive = grabBalanced(dMain, "function windowActive()");
   const collectCbSrc = grabHandler(dMain, 'ipcMain.on("notif-collect-reply"');
   const acceptCbSrc = grabHandler(dMain, 'ipcMain.on("bgnotify-rendered", (_e, info)');
-  rec("R00 corpos REAIS extraídos do dist 1.0.230 (deliver/handoff/bring/windowActive/collect/aceite) + classify real",
+  rec("R00 corpos REAIS extraídos do dist 1.0.231 (deliver/handoff/bring/windowActive/collect/aceite) + classify real",
     !!(bodyDeliver && bodyHandoff && bodyBring && bodyWinActive && collectCbSrc && acceptCbSrc && typeof slaRemMod.classifyReminderLevel === "function"),
     { d: !!bodyDeliver, h: !!bodyHandoff, b: !!bodyBring, w: !!bodyWinActive, c: !!collectCbSrc, a: !!acceptCbSrc, cls: typeof slaRemMod.classifyReminderLevel });
 
@@ -118,8 +118,8 @@ app.whenReady().then(async () => {
     bgNotify_1: { showBgNotify: bgReal.showBgNotify, updateBgGroup: bgReal.updateBgGroup },
     showBgNotify: bgReal.showBgNotify, updateBgGroup: bgReal.updateBgGroup,
     nativeNotify: (p, key) => { nativeCalls.push(String(key || "")); return true; },
-    notifTele: {}, groupTele: { updates: 0, opens: 0 }, app: { getVersion: () => "1.0.230" },
-    electron_1: { app: { getVersion: () => "1.0.230" } },
+    notifTele: {}, groupTele: { updates: 0, opens: 0 }, app: { getVersion: () => "1.0.231" },
+    electron_1: { app: { getVersion: () => "1.0.231" } },
     /* classificação REAL da 1.0.228 (não stub): wf_* deve retornar null e seguir p/ toast/premium.
      * O dist compilado referencia slaReminder_1.classifyReminderLevel — módulo REAL no contexto
      * (a produção o tem importado; sem ele o gate lançaria ReferenceError com ctl truthy). */

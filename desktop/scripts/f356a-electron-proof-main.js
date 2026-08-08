@@ -362,18 +362,30 @@ app.whenReady().then(async () => {
         r && r.followUp === "LONG_WAIT" && r.waitingH >= 29 && r.copied && r.hasLink && r.noWa, { r });
     }
 
-    /* P16 — Central do Cliente: APROVAÇÕES PENDENTES (4 categorias) */
+    /* P16 — Central do Cliente [RE-PINADO F3.5.6A-H2]: BARRA COMPACTA por padrão (sem lista) +
+       DRAWER lateral sob demanda com categorias/tarefa/lembrete/abrir. */
     {
       const r = await J(`(function(){ closeClientView&&closeClientView();
+        try{ var _r=document.getElementById('wfapRoot'); if(_r)_r.innerHTML=''; }catch(_){}
         var h=renderClientFlowBoard();
         var c=document.querySelector('.scr'); var host=c?c.parentNode:document.body; host.innerHTML=h;
-        return { has: h.indexOf('Aprovações pendentes')>=0,
-          nv: h.indexOf('Não visualizadas')>=0, vs: h.indexOf('Visualizadas sem resposta')>=0,
-          aj: h.indexOf('Ajustes solicitados')>=0, ap: h.indexOf('Aprovadas recentemente')>=0,
-          rowB: h.indexOf('Hospital Visão')>=0, lembrete: h.indexOf('Lembrete')>=0 }; })()`);
-      const png = await shot("p16-central-cliente-aprovacoes-pendentes");
-      rec("P16 Central do Cliente: visão APROVAÇÕES PENDENTES (categorias + tarefa em espera + lembrete + abrir)",
-        r && r.has && r.nv && (r.vs || true) && r.aj !== undefined && r.rowB && r.lembrete, { r, png });
+        // BARRA COMPACTA: título + total + "Ver aprovações"; SEM linhas/cliente; SEM títulos de categoria capitalizados.
+        var bar={ has: h.indexOf('Aprovações pendentes')>=0, ver: h.indexOf('Ver aprovações')>=0,
+          semCliente: h.indexOf('Hospital Visão')<0, semLembrete: h.indexOf('Lembrete')<0,
+          resumo: h.indexOf('não visualizadas')>=0 };
+        // DRAWER sob demanda:
+        wfApprovalsOpen();
+        var root=document.getElementById('wfapRoot'); var d=root?root.innerHTML:'';
+        var drawer={ tt: d.indexOf('APROVAÇÕES PENDENTES')>=0, nv: d.indexOf('Não visualizadas')>=0,
+          filtros: d.indexOf('data-wfapprovalsfilter="all"')>=0 && d.indexOf('data-wfapprovalsfilter="nv"')>=0,
+          rowB: d.indexOf('Hospital Visão')>=0, lembrete: d.indexOf('Lembrete')>=0, abrir: d.indexOf('data-clientview')>=0,
+          panel: !!(root&&root.querySelector('.wfap-panel')) };
+        return { bar:bar, drawer:drawer }; })()`);
+      const png = await shot("p16-central-cliente-barra-compacta-drawer");
+      const ok = r && r.bar && r.bar.has && r.bar.ver && r.bar.semCliente && r.bar.semLembrete && r.bar.resumo
+        && r.drawer && r.drawer.tt && r.drawer.nv && r.drawer.filtros && r.drawer.rowB && r.drawer.lembrete && r.drawer.abrir && r.drawer.panel;
+      rec("P16 Central do Cliente: BARRA COMPACTA por padrão (sem lista) + DRAWER sob demanda (categorias/tarefa/lembrete/abrir/filtros)", ok, { r, png });
+      await J(`(function(){ try{ wfApprovalsClose(); }catch(_){} return 1; })()`);
     }
 
     /* P17 — histórico de SLA por fase (phase runs preservados; espera não fabrica atraso interno) */
