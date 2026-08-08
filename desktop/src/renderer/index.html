@@ -6230,7 +6230,7 @@ function clientCol(t){
   if(cs==='ready_for_final_client_review'||cs==='reenviado_cliente')return 'reenviado';
   if(hasDesigner(t)||cs==='sent_to_designer'||ws==='producao'||ws==='entrega'||ws==='revisao_final')return 'producao';
   if(cr==='aprovado'||cs==='aprovado_cliente')return 'aprovado';
-  if(cs==='enviado_cliente'||t.clientSentBy||t.clientReviewToken||t.shareToken)return 'enviado';
+  if(flowCanonicalSentSignal(t))return 'enviado';   // F3.5.6A-H3 — token/shareToken = LINK (≠ envio); usa a MESMA regra canônica do card/Central
   return 'afazer';
 }
 // Coluna do DESIGNER: eixo de trabalho do designer (designerFlowStatus; senão status).
@@ -7248,6 +7248,7 @@ function kbv2SlaLocal(t,nowMs){
 const TASK_PHASE={
   PLANNING:'planning',                                 // Social planeja; designer não atribuído
   THEMES_SENT:'themes_sent',                           // F3.3.17-R5/C1 — temas enviados ao cliente (sem designer)
+  THEMES_READY:'themes_ready',                         // F3.5.6A-H3 — temas prontos / link gerado, aguardando CONFIRMAR envio (SEM envio canônico)
   THEMES_APPROVED:'themes_approved',                   // F3.3.17-R5/C1 — cliente aprovou os temas; aguardando envio ao designer
   AWAITING_DESIGNER:'awaiting_designer',               // designer atribuído, ainda não iniciou
   DESIGNER_PRODUCING:'designer_producing',             // designerFlowStatus='andamento'
@@ -7263,7 +7264,24 @@ function flowSentToClientSignal(t){const cs=(t&&t.cronStatus||'').toString();ret
 function flowClientChangesSignal(t){const cr=(t&&t.clientReview&&t.clientReview.status||'').toString();return cr==='revisao'||(t&&t.clientFlowStatus==='revisao')||hasPendingItemRevision(t);}
 /* F3.3.17-R5/C1 — sub-jornada de TEMAS (só ANTES de haver designer; lê campos já existentes). */
 function flowThemesApprovedSignal(t){if(hasDesigner(t))return false;const cf=(t&&t.clientFlowStatus||'').toString();const cr=(t&&t.clientReview&&t.clientReview.status||'').toString();const ph=(t&&t.clientApprovalPhase||'').toString();return cf==='aprovado'||(cr==='aprovado'&&ph!=='final'&&ph!=='production');}
-function flowThemesSentSignal(t){if(hasDesigner(t))return false;const cf=(t&&t.clientFlowStatus||'').toString();const cs=(t&&t.cronStatus||'').toString();const ph=(t&&t.clientApprovalPhase||'').toString();if(ph==='final')return false;return cf==='enviado'||cf==='reenviado'||cs==='enviado_cliente'||!!(t&&(t.clientSentBy||t.clientReviewToken||t.shareToken));}
+/* F3.5.6A-H3 — FONTE ÚNICA de "enviado ao cliente" = ENVIO CONFIRMADO server-side, NUNCA a mera
+   existência do link. É EXATAMENTE o discriminador da Central (externalWaitOf): workflowPhase de
+   espera (só o Worker/confirmClientSend grava) OU espelhos legados clientFlowStatus/cronStatus (que
+   o Worker também grava no MESMO commit; e as tarefas antigas já têm). clientReviewToken/shareToken
+   = LINK DISPONÍVEL, jamais ENVIO. Card e Central passam a usar a MESMA regra (sem derivação concorrente). */
+function flowCanonicalSentSignal(t){
+  if(!t)return false;
+  const wp=(t.workflowPhase||'').toString();
+  if(wp==='themes_waiting_client'||wp==='captions_waiting_client')return true;
+  const cf=(t.clientFlowStatus||'').toString();
+  const cs=(t.cronStatus||'').toString();
+  return cf==='enviado'||cf==='reenviado'||cs==='enviado_cliente';
+}
+function flowThemesSentSignal(t){if(hasDesigner(t))return false;const ph=(t&&t.clientApprovalPhase||'').toString();if(ph==='final')return false;return flowCanonicalSentSignal(t);}
+/* F3.5.6A-H3 — TEMAS PRONTOS: link gerado (ou marcados prontos) SEM envio confirmado. Estado
+   intermediário honesto — "confirmar envio ao cliente". NUNCA vira Responsável Cliente, NUNCA
+   entra na Central, NUNCA cria sentAt/approvalRound. Só é avaliado DEPOIS de flowThemesSentSignal. */
+function flowThemesReadySignal(t){if(!t||hasDesigner(t))return false;if(flowCanonicalSentSignal(t))return false;const ph=(t.clientApprovalPhase||'').toString();if(ph==='final')return false;return !!(t.clientReviewToken||t.shareToken||t.clientSentBy);}
 // FONTE ÚNICA — fase canônica da tarefa. Determinística e ORDENADA (terminal → designer).
 function deriveCanonicalTaskState(t){
   if(!t)return {phase:TASK_PHASE.PLANNING,owner:'social',isCron:false};
@@ -7290,12 +7308,16 @@ function deriveCanonicalTaskState(t){
   // (aprovação de TEMAS NUNCA é conclusão — terminal só via flowCompletedSignal acima).
   if(flowThemesApprovedSignal(t))return {phase:TASK_PHASE.THEMES_APPROVED,owner:'social',isCron:true};
   if(flowThemesSentSignal(t))return {phase:TASK_PHASE.THEMES_SENT,owner:'client',isCron:true};
+  // F3.5.6A-H3 — link gerado / temas prontos SEM envio confirmado: dono continua a Social (nunca o cliente).
+  if(flowThemesReadySignal(t))return {phase:TASK_PHASE.THEMES_READY,owner:'social',isCron:true};
   return {phase:TASK_PHASE.PLANNING,owner:'social',isCron:true};
 }
 // Rótulos canônicos por (fase × papel): col(coluna do papel) · label · color · next. Texto/cor numa SÓ fonte.
 const FLOW_LABELS={
   planning:{social:{col:'afazer',label:'Em planejamento',color:'#9BA0AB',next:'Criar e enviar ao cliente'},designer:{col:'afazer',label:'A Fazer',color:'#9BA0AB',next:'Aguardando atribuição'},client:{col:'enviado',label:'Em preparação',color:'#6E7480',next:'Aguardar os temas'}},
   themes_sent:{social:{col:'andamento',label:'Temas enviados ao cliente',color:'#7C83FF',next:'Aguardar aprovação dos temas'},designer:{col:'afazer',label:'A Fazer',color:'#9BA0AB',next:'Aguardando atribuição'},client:{col:'analise',label:'Temas para sua aprovação',color:'#22D3EE',next:'Aprovar ou pedir ajuste dos temas'}},
+  // F3.5.6A-H3 — link gerado / temas prontos, aguardando CONFIRMAR o envio (não enviado; nunca "Responsável: Cliente").
+  themes_ready:{social:{col:'andamento',label:'Temas prontos — confirmar envio ao cliente',color:'#F59E0B',next:'Confirmar envio ao cliente'},designer:{col:'afazer',label:'A Fazer',color:'#9BA0AB',next:'Aguardando atribuição'},client:{col:'enviado',label:'Em preparação',color:'#6E7480',next:'Aguardar os temas'}},
   themes_approved:{social:{col:'andamento',label:'Temas aprovados — enviar ao designer',color:'#34D399',next:'Atribuir e enviar ao designer'},designer:{col:'afazer',label:'A Fazer',color:'#9BA0AB',next:'Aguardando atribuição'},client:{col:'analise',label:'Temas aprovados — produção em breve',color:'#22D3EE',next:'Aguardar a produção das artes'}},
   awaiting_designer:{social:{col:'afazer',label:'Aguardando designer iniciar',color:'#7C83FF',next:'Aguardar o designer iniciar'},designer:{col:'afazer',label:'A Fazer',color:'#9BA0AB',next:'Iniciar a produção'},client:{col:'analise',label:'Temas aprovados — produção será iniciada',color:'#22D3EE',next:'Equipe inicia a produção'}},
   designer_producing:{social:{col:'andamento',label:'Designer em produção',color:'#A78BFA',next:'Aguardar a entrega do designer'},designer:{col:'andamento',label:'Designer em produção',color:'#F59E0B',next:'Finalizar e entregar'},client:{col:'analise',label:'Equipe em produção',color:'#A78BFA',next:'Aguardar a produção das artes'}},
@@ -7397,7 +7419,7 @@ function wfExternalInfo(t,nowMs){
   if(active&&!decided&&sentAt>0){ followUp=(fv>0)?'VIEWED_PENDING':'SENT_NOT_VIEWED'; if(waitingMs>=24*60*60*1000)followUp='LONG_WAIT'; }
   return {active:active,type:type,roundKey:lr?lr.key:'',sentAt:sentAt,firstViewedAt:fv,viewed:fv>0,decided:decided,waitingMs:waitingMs,followUp:followUp,legacy:legacy};
 }
-function wfActivePhase(t){ var wp=String((t&&t.workflowPhase)||''); if(wp)return wp; try{ var d=deriveCanonicalTaskState(t); var map={planning:'themes_preparation',themes_sent:'themes_waiting_client',themes_approved:'assignment_pending',awaiting_designer:'assignment_pending',designer_producing:'design_production',designer_revising:'design_review',designer_delivered:'captions_preparation',awaiting_client_approval:'captions_waiting_client',client_requested_changes:'captions_adjustment',completed:'completed'}; return map[d&&d.phase]||'themes_preparation'; }catch(_){ return 'themes_preparation'; } }
+function wfActivePhase(t){ var wp=String((t&&t.workflowPhase)||''); if(wp)return wp; try{ var d=deriveCanonicalTaskState(t); var map={planning:'themes_preparation',themes_ready:'themes_preparation',themes_sent:'themes_waiting_client',themes_approved:'assignment_pending',awaiting_designer:'assignment_pending',designer_producing:'design_production',designer_revising:'design_review',designer_delivered:'captions_preparation',awaiting_client_approval:'captions_waiting_client',client_requested_changes:'captions_adjustment',completed:'completed'}; return map[d&&d.phase]||'themes_preparation'; }catch(_){ return 'themes_preparation'; } }
 function wfActiveRun(t){ var runs=wfRunsOf(t),bk='',best=null; for(var k in runs){ if(!Object.prototype.hasOwnProperty.call(runs,k))continue; var e=runs[k]; if(e&&e.status==='active'){ if(!best||Number(e.startedAt||0)>Number(best.startedAt||0)){best=e;bk=k;} } } return best?{key:bk,run:best}:null; }
 /* patch-builders (dot-path; usados nas escritas da EQUIPE — 1 update atômico por ação) */
 function wfCloseRunsPatch(patch,t,outcome,now){ var runs=wfRunsOf(t); for(var k in runs){ if(!Object.prototype.hasOwnProperty.call(runs,k))continue; var r=runs[k]; if(!r||r.status!=='active')continue; var due=Number(r.dueAt)||0; var delay=(due>0&&now>due)?(now-due):0; patch['phaseRuns.'+k+'.completedAt']=now; patch['phaseRuns.'+k+'.status']='done'; patch['phaseRuns.'+k+'.outcome']=outcome||(due>0?(delay>0?'late':'on_time'):'done'); patch['phaseRuns.'+k+'.delayMs']=delay; patch['phaseRuns.'+k+'.elapsedMs']=Math.max(0,now-(Number(r.startedAt)||now)); patch['phaseRuns.'+k+'.updatedAt']=now; } }

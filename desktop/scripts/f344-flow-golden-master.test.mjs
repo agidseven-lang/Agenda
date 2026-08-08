@@ -53,7 +53,7 @@ const SRC = [
   grabFn('pendingLegend'), grabFn('pendingFeed'), grabFn('pendingStory'), grabFn('pendingProduction'), grabFn('designerDelivered'),
   grabFn('clientApprovalPhaseOf'), grabFn('pendingClientItems'), grabFn('hasPendingItemRevision'), grabFn('isFullyComplete'),
   grabFn('flowCompletedSignal'), grabFn('flowSentToClientSignal'), grabFn('flowClientChangesSignal'),
-  grabFn('flowThemesApprovedSignal'), grabFn('flowThemesSentSignal'),
+  grabFn('flowThemesApprovedSignal'), grabFn('flowCanonicalSentSignal'), grabFn('flowThemesSentSignal'), grabFn('flowThemesReadySignal'),
   grabFn('deriveCanonicalTaskState'), grabFn('notifPhaseLabel'), grabFn('notifFlowEvent'), grabFn('notifLastActorId'),
 ].join('\n');
 const R = new Function(SRC + '\nreturn { derive: deriveCanonicalTaskState, label: notifPhaseLabel, flowEvent: notifFlowEvent, lastActor: notifLastActorId, LBL: NOTIF_PHASE_LABEL, PH: TASK_PHASE };')();

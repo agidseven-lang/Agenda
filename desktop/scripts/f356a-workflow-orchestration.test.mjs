@@ -62,11 +62,11 @@ function extractFn(src, marker) {
 
 /* ═══ A — IDENTIDADE ═══ */
 const pkg = JSON.parse(read(PKG));
-ok("A1 versão 1.0.231", pkg.version === "1.0.231", pkg.version);
+ok("A1 versão 1.0.232", pkg.version === "1.0.232", pkg.version);
 try {
   const lock = JSON.parse(read(LOCK));
-  ok("A2 lock 1.0.231 ×2", lock.version === "1.0.231" && lock.packages[""].version === "1.0.231");
-} catch (e) { ok("A2 lock 1.0.231 ×2", false, String(e.message)); }
+  ok("A2 lock 1.0.232 ×2", lock.version === "1.0.232" && lock.packages[""].version === "1.0.232");
+} catch (e) { ok("A2 lock 1.0.232 ×2", false, String(e.message)); }
 ok("A3 workflowEvents.js existe (motor puro)", fs.existsSync(WE_PATH));
 ok("A4 workflowNotifier compilado no dist", fs.existsSync(WN_DIST));
 

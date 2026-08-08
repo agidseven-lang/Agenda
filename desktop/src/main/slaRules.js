@@ -344,6 +344,7 @@ function nextBoundaryMs(task, nowMs, dtMsFn){
 var TASK_PHASE={
   PLANNING:'planning',
   THEMES_SENT:'themes_sent',
+  THEMES_READY:'themes_ready',   /* F3.5.6A-H3 — temas prontos / link gerado, aguardando CONFIRMAR envio (sem envio canônico) */
   THEMES_APPROVED:'themes_approved',
   AWAITING_DESIGNER:'awaiting_designer',
   DESIGNER_PRODUCING:'designer_producing',
@@ -403,7 +404,19 @@ function flowCompletedSignal(t){return isTaskCompleted(t);}
 function flowSentToClientSignal(t){var cs=(t&&t.cronStatus||'').toString();return cs==='ready_for_final_client_review'||cs==='reenviado_cliente'||(t&&t.clientApprovalPhase==='final');}
 function flowClientChangesSignal(t){var cr=(t&&t.clientReview&&t.clientReview.status||'').toString();return cr==='revisao'||(t&&t.clientFlowStatus==='revisao')||hasPendingItemRevision(t);}
 function flowThemesApprovedSignal(t){if(hasDesigner(t))return false;var cf=(t&&t.clientFlowStatus||'').toString();var cr=(t&&t.clientReview&&t.clientReview.status||'').toString();var ph=(t&&t.clientApprovalPhase||'').toString();return cf==='aprovado'||(cr==='aprovado'&&ph!=='final'&&ph!=='production');}
-function flowThemesSentSignal(t){if(hasDesigner(t))return false;var cf=(t&&t.clientFlowStatus||'').toString();var cs=(t&&t.cronStatus||'').toString();var ph=(t&&t.clientApprovalPhase||'').toString();if(ph==='final')return false;return cf==='enviado'||cf==='reenviado'||cs==='enviado_cliente'||!!(t&&(t.clientSentBy||t.clientReviewToken||t.shareToken));}
+/* F3.5.6A-H3 — FONTE ÚNICA de "enviado ao cliente" (espelho VERBATIM do renderer): ENVIO CONFIRMADO
+   server-side (workflowPhase de espera OU espelhos legados clientFlowStatus/cronStatus), NUNCA o token. */
+function flowCanonicalSentSignal(t){
+  if(!t)return false;
+  var wp=(t.workflowPhase||'').toString();
+  if(wp==='themes_waiting_client'||wp==='captions_waiting_client')return true;
+  var cf=(t.clientFlowStatus||'').toString();
+  var cs=(t.cronStatus||'').toString();
+  return cf==='enviado'||cf==='reenviado'||cs==='enviado_cliente';
+}
+function flowThemesSentSignal(t){if(hasDesigner(t))return false;var ph=(t&&t.clientApprovalPhase||'').toString();if(ph==='final')return false;return flowCanonicalSentSignal(t);}
+/* F3.5.6A-H3 — TEMAS PRONTOS: link gerado/marcados prontos SEM envio confirmado (só após flowThemesSentSignal). */
+function flowThemesReadySignal(t){if(!t||hasDesigner(t))return false;if(flowCanonicalSentSignal(t))return false;var ph=(t.clientApprovalPhase||'').toString();if(ph==='final')return false;return !!(t.clientReviewToken||t.shareToken||t.clientSentBy);}
 
 /* ---- Fase canônica da tarefa — index.html:5716-5742 (VERBATIM) ---- */
 function deriveCanonicalTaskState(t){
@@ -427,6 +440,7 @@ function deriveCanonicalTaskState(t){
   if(secOf(t.sector).key==='roteiro'&&flowThemesApprovedSignal(t))return {phase:TASK_PHASE.COMPLETED,owner:'social',isCron:true};
   if(flowThemesApprovedSignal(t))return {phase:TASK_PHASE.THEMES_APPROVED,owner:'social',isCron:true};
   if(flowThemesSentSignal(t))return {phase:TASK_PHASE.THEMES_SENT,owner:'client',isCron:true};
+  if(flowThemesReadySignal(t))return {phase:TASK_PHASE.THEMES_READY,owner:'social',isCron:true};   /* F3.5.6A-H3 — link gerado sem envio confirmado */
   return {phase:TASK_PHASE.PLANNING,owner:'social',isCron:true};
 }
 

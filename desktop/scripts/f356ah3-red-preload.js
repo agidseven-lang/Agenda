@@ -1,24 +1,21 @@
-/* F3.5.6A — PRELOAD de prova (offline, dirigido por SEMENTE; MESMO padrão aprovado da
- * F3.5.5A-H1/W-H1). Novidades desta fase:
- *   • RE-EMISSÃO AO VIVO: collection('tasks').onSnapshot registra o callback e
- *     window.__emitTasks(tasksArr) re-emite um snapshot NOVO (simula as escritas do Worker
- *     V64.61 — rodadas/ledger/fase — chegando em tempo real ao renderer de produção).
- *   • window.__CLIP captura clipboardWriteText (prova do COPIAR LEMBRETE sem envio).
- *   • fetch para .../team-action é interceptado: registra {url,{headers,body}} em
- *     window.__TEAM_POSTS e resolve {ok:true,...} — prova que CONFIRMAR ENVIO e o REGISTRO
- *     de decisão externa convergem no endpoint do servidor (renderer NUNCA grava sentAt).
- *   • wp_team_jwt sintético com exp futura (ensureTeamSession passa sem rede).
- *   • update(patch) segue registrando em window.__PATCHES (nunca aplica; otimismo é do
- *     código REAL). desktopAPI.version='1.0.229'. */
+/* F3.5.6A-H3 — PRELOAD do RED (offline, dirigido por SEMENTE; MESMO padrão aprovado da
+ * F3.5.6A-H2). Fornece ao renderer REAL do asar:
+ *   • Firestore stub com onSnapshot(tasks) + window.__emitTasks(arr) p/ re-emitir snapshots.
+ *   • window.__PATCHES capta .update(patch); window.__TEAM_POSTS capta POST /team-action;
+ *     confirmClientSend responde no MESMO contrato do Worker real
+ *     ({ok, roundKey, workflowPhase:'themes_waiting_client'}).
+ *   • wp_team_jwt sintético (ensureTeamSession passa sem rede).
+ *   • versão do desktopAPI vem da SEMENTE (RED em 1.0.231 / GREEN em 1.0.232). */
 const noop = function () {};
 function fnProxy() { return new Proxy(noop, { get: () => fnProxy(), apply: () => undefined }); }
 
-let SEED = { self: null, users: [], tasks: [], events: [] };
+let SEED = { self: null, users: [], tasks: [], events: [], version: '1.0.232' };
 try {
-  const _p = require('path').join(require('os').tmpdir(), 'f356ah2-seed.json');
+  const _p = require('path').join(require('os').tmpdir(), 'f356ah3-seed.json');
   SEED = JSON.parse(require('fs').readFileSync(_p, 'utf8')) || SEED;
 } catch (_) {}
 const SELF = SEED.self || { id: 'u-self', name: 'Admin', role: 'Administrador', admin: true };
+const VERSION = SEED.version || '1.0.232';
 const SEED_DOCS = { usersPublic: SEED.users || [], tasks: SEED.tasks || [], events: SEED.events || [] };
 
 function makeSnap(arr) {
@@ -77,7 +74,7 @@ window.__emitTasks = function (tasks) { try { const s = makeSnap(tasks || []); L
 function authSelf() { return Promise.resolve({ ok: true, self: Object.assign({}, SELF) }); }
 function diagLog(ev, payload) { try { window.__DIAG.push({ ev: ev, p: payload || {} }); } catch (_) {} }
 
-/* fetch interceptado (offline): team-action registrado e respondido; resto rejeita. */
+/* fetch interceptado (offline): team-action registrado e respondido no contrato do Worker. */
 (function () {
   const b64 = function (o) { return btoa(JSON.stringify(o)).replace(/=+$/, ''); };
   try { localStorage.setItem('wp_team_jwt', b64({ alg: 'HS256' }) + '.' + b64({ uid: SELF.id, exp: Math.floor(Date.now() / 1000) + 86400, aud: 'idseven-team' }) + '.sig'); } catch (_) {}
@@ -99,7 +96,6 @@ function diagLog(ev, payload) { try { window.__DIAG.push({ ev: ev, p: payload ||
   };
 })();
 
-/* copyToClipboard/wfCopyReminder usam navigator.clipboard.writeText — capturado p/ prova. */
 try {
   Object.defineProperty(navigator, 'clipboard', { configurable: true,
     value: { writeText: function (s) { try { window.__CLIP.push(String(s)); } catch (_) {} return Promise.resolve(); } } });
@@ -113,12 +109,12 @@ try {
     authSelf: authSelf,
     diagLog: diagLog,
     clipboardWriteText: function (s) { try { window.__CLIP.push(String(s)); } catch (_) {} return Promise.resolve(true); },
-    version: '1.0.232',
+    version: VERSION,
     authLogout: function () { return Promise.resolve({ ok: true }); },
     sessionLogin: noop,
     sessionLogout: noop
   };
   window.desktopAPI = new Proxy(desktopAPI, { get: function (t, k) { return (k in t ? t[k] : fnProxy()); } });
   window.api = window.desktopAPI;
-  window.__APP_VERSION = '1.0.232';
+  window.__APP_VERSION = VERSION;
 } catch (_) {}
