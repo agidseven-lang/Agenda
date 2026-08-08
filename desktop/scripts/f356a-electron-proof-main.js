@@ -369,10 +369,12 @@ app.whenReady().then(async () => {
         try{ var _r=document.getElementById('wfapRoot'); if(_r)_r.innerHTML=''; }catch(_){}
         var h=renderClientFlowBoard();
         var c=document.querySelector('.scr'); var host=c?c.parentNode:document.body; host.innerHTML=h;
-        // BARRA COMPACTA: título + total + "Ver aprovações"; SEM linhas/cliente; SEM títulos de categoria capitalizados.
-        var bar={ has: h.indexOf('Aprovações pendentes')>=0, ver: h.indexOf('Ver aprovações')>=0,
-          semCliente: h.indexOf('Hospital Visão')<0, semLembrete: h.indexOf('Lembrete')<0,
-          resumo: h.indexOf('não visualizadas')>=0 };
+        // BARRA COMPACTA: checa o ELEMENTO .wfap-bar (o board inteiro/Kanban legitimamente mostra
+        // nomes de cliente nos cards — a compactação é propriedade da BARRA, não do board).
+        var barEl=document.querySelector('.wfap-bar'); var barTxt=barEl?(barEl.textContent||''):'';
+        var bar={ has: barTxt.indexOf('Aprovações pendentes')>=0, ver: barTxt.indexOf('Ver aprovações')>=0,
+          semCliente: barTxt.indexOf('Hospital Visão')<0, semLembrete: barTxt.indexOf('Lembrete')<0,
+          resumo: barTxt.indexOf('não visualizadas')>=0 };
         // DRAWER sob demanda:
         wfApprovalsOpen();
         var root=document.getElementById('wfapRoot'); var d=root?root.innerHTML:'';
