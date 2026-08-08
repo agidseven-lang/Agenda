@@ -62,6 +62,11 @@
    *  N3 NORMAL  : em andamento · A Fazer · futura · sem prazo. */
   function resolvePriorityLevel(item) {
     var x = f(item);
+    /* F3.5.6A — AGUARDANDO CLIENTE: espera externa NUNCA vira 'você está atrasado'.
+     * A tarefa fica NORMAL e ganha seção própria (buildOccurrences kind 'awaiting_client');
+     * alertas/prazos internos DAQUELA fase não elevam o nível enquanto a bola está com o
+     * cliente. Fato injetado pelo renderer (externalWaitOf) — este módulo segue puro. */
+    if (x.awaitingClient) return LEVEL.NORMAL;
     if (x.alert === 'red' || x.deadlineKind === 'overdue') return LEVEL.CRITICAL;
     if (x.alert === 'amber' || x.deadlineKind === 'today' || x.changeRequestForMe || x.awaitingMyAction) return LEVEL.ATTENTION;
     return LEVEL.NORMAL;
@@ -72,6 +77,8 @@
    *  por um fato atual — e com texto honesto ("registrado"/"reportado"), nunca "ativo/não resolvido". */
   function resolvePriorityReasons(item) {
     var x = f(item), r = [];
+    /* F3.5.6A — espera externa: motivo honesto único, sem culpa interna. */
+    if (x.awaitingClient) { r.push('Aguardando cliente' + (x.awaitingClientText ? ' — ' + x.awaitingClientText : '')); return r; }
     if (x.alert === 'red') r.push('Alerta vermelho ativo' + (x.alertText ? ' — ' + x.alertText : ''));
     else if (x.alert === 'amber') r.push('Alerta amarelo ativo' + (x.alertText ? ' — ' + x.alertText : ''));
     if (x.deadlineKind === 'overdue') r.push('Prazo vencido' + (x.deadlineText ? ' — ' + x.deadlineText : ''));
@@ -166,6 +173,15 @@
     (Array.isArray(items) ? items : []).forEach(function (item) {
       var x = f(item);
       if (x.isGone) return;
+      /* F3.5.6A — seção AGUARDANDO CLIENTE (espera externa; sem bloqueio operacional). */
+      if (x.awaitingClient) {
+        var wk = 'awaitclient:' + item.taskId + ':' + String(x.awaitingClientType || '');
+        if (!dz[wk]) out.push({ kind: 'awaiting_client', key: wk, taskId: item.taskId, title: item.title, client: item.client,
+          sector: item.sector, atMs: num(x.awaitingClientSinceMs),
+          typeLabel: x.awaitingClientType === 'captions' ? 'Legendas' : 'Temas',
+          viewed: x.awaitingClientViewed === true,
+          text: 'Aguardando cliente' + (x.awaitingClientText ? ' — ' + x.awaitingClientText : '') });
+      }
       if (x.helpForMe) {
         var hk = 'help:' + item.taskId + ':' + num(x.helpForMe.atMs);
         if (!dz[hk]) out.push({ kind: 'help', key: hk, taskId: item.taskId, title: item.title, client: item.client,

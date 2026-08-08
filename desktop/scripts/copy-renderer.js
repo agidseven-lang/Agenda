@@ -12,7 +12,7 @@ try { fs.mkdirSync(outMain, { recursive: true }); } catch (_) {}
 // Módulos .js escritos à mão (não passam pelo tsc) que precisam ir p/ dist/main.
 // F3.5.3: notifEvents.js (evento canônico durável da Categoria A) é require()-ado por
 // dist/main/notifierA.js em runtime → mesmo contrato de presença do slaRules/cardsRules.
-const HANDWRITTEN_JS = ["slaRules.js", "cardsRules.js", "notifEvents.js", "actorProfile.js", "executionTracking.js"]; // F3.5.5A — planner puro require()-ado por dist/main/executionOrchestrator.js
+const HANDWRITTEN_JS = ["slaRules.js", "cardsRules.js", "notifEvents.js", "actorProfile.js", "executionTracking.js", "workflowEvents.js"]; // F3.5.5A planner puro · F3.5.6A workflowEvents.js (motor de orquestração) require()-ado por dist/main/workflowNotifier.js
 for (const name of HANDWRITTEN_JS) {
   const src = path.join(DESK, "src", "main", name);
   const dst = path.join(outMain, name);

@@ -14,6 +14,7 @@ import { ensureTray, recreateTray, getTrayState, destroyTray } from "./tray";
 import { isAutoStart, setAutoStart } from "./autostart";
 import { startNotifier } from "./notifier";
 import { startNotifierA } from "./notifierA"; // F3.5.3 — produtor DURÁVEL Categoria A (todos os usuários ativos; backlog/cursor/recibos)
+import { startWorkflowNotifier } from "./workflowNotifier"; // F3.5.6A — orquestração operacional (ledger→política→MESMO ingresso deliverNotification)
 import { createToastAckTracker } from "./toastAck"; // F3.5.3 — prova de render do toast (paridade com o ACK da bg-window)
 import { diag, diagPath } from "./diag"; // F3.3.10-DIAG (logger local; build instrumentada)
 import { attachEditContextMenu } from "./editContextMenu"; // F3.5.5D — menu de contexto nativo de edição (roles PT-BR; só campos editáveis)
@@ -51,6 +52,7 @@ let quitting = false;
 let sessionLocked = false;
 let pendingDeep: string | null = null;
 let notifierAHandle: { stop: () => void; reconcile: (reason?: string) => void } | null = null;
+let workflowNHandle: { stop: () => void; reconcile: (reason?: string) => void } | null = null; // F3.5.6A
 const notifTele = { lastAt: 0, lastChannel: "", lastEventType: "", lastFailAt: 0, lastFailReason: "" };
 // F3.5.4L — lembrete CENTRAL persistente de SLA (amarelo/vermelho). Controlador (fila/promoção/ack/
 // persistência/lock) + superfície Electron (janela central). Uma instância; o uid logado filtra a
@@ -888,6 +890,7 @@ async function persistIdleResponseViaRenderer(req: any): Promise<any> {
 // produtor. slaReminderCtl (re-exibição LOCAL, sem rede) NÃO passa por aqui: segue no powerMonitor.
 function reconcileAllProducers(reason: string): void {
   try { if (notifierAHandle) notifierAHandle.reconcile(reason); } catch { /* */ }
+  try { if (workflowNHandle) workflowNHandle.reconcile(reason); } catch { /* F3.5.6A */ }
   try { if (slaScheduler) slaScheduler.reconcile(reason); } catch { /* */ }
   // F3.5.4P — no RETORNO DE REDE, sincroniza decisões de SLA pendentes (fila offline) com a MESMA transação
   // (idempotente por decisionKey: já-decidida ⇒ superseded; sem duplicação). Não bloqueia (fire-and-forget).
@@ -906,10 +909,16 @@ function startUserListeners(uid: string): void {
   const _stopEventNew = startNotifier(() => mainWin, uid, deliverNotification, getAuthUser);
   const _notifierA = startNotifierA(uid, deliverNotification);
   notifierAHandle = _notifierA; // handle p/ reconcile (resume/unlock/reconexão) — recuperação única
+  // F3.5.6A — produtor de ORQUESTRAÇÃO: consome o ledger durável (tasks.workflowEvents),
+  // aplica a política (destinatário/severidade/som/agregação/próxima ação) no módulo PURO
+  // workflowEvents.js e entrega pelo MESMO ingresso aprovado (deliverNotification).
+  // Nenhum arquivo congelado é tocado; recibos/cursor próprios (idseven-workflow-cursor.json).
+  const _workflowN = startWorkflowNotifier(uid, deliverNotification, { now: slaNow, authUser: getAuthUser as any });
+  workflowNHandle = _workflowN;
   // stopNotifier COMPÕE os teardowns aprovados. _notifSeen.clear()/toastAck.clear() são POR SESSÃO DE
   // USUÁRIO (troca de usuário); num restart do MESMO usuário isso é inofensivo — a dedup REAL está nos
   // recibos persistentes (notifierA), no seen persistente (slaScheduler) e no gate sinceMs (eventos).
-  stopNotifier = () => { try { _stopEventNew(); } catch { /* */ } try { _notifierA.stop(); } catch { /* */ } notifierAHandle = null; try { toastAck.clear(); } catch { /* */ } try { _notifSeen.clear(); } catch { /* */ } try { if (taskIdleScheduler) { taskIdleScheduler.stop(); taskIdleScheduler = null; } } catch { /* */ } try { if (executionOrch) { executionOrch.stop(); executionOrch = null; } } catch { /* F3.5.5A */ } };
+  stopNotifier = () => { try { _stopEventNew(); } catch { /* */ } try { _notifierA.stop(); } catch { /* */ } notifierAHandle = null; try { _workflowN.stop(); } catch { /* */ } workflowNHandle = null; try { toastAck.clear(); } catch { /* */ } try { _notifSeen.clear(); } catch { /* */ } try { if (taskIdleScheduler) { taskIdleScheduler.stop(); taskIdleScheduler = null; } } catch { /* */ } try { if (executionOrch) { executionOrch.stop(); executionOrch = null; } } catch { /* F3.5.5A */ } };
   // F3.4.3/R4B — PRODUTOR AUTORITATIVO de SLA no MAIN (amarelo/vermelho/crítico), MESMO "agora" canônico
   // do renderer (slaNow → offset do clockSync), entrega pelo MESMO HUB (deliverNotification). authUser =
   // papel AUTENTICADO (só p/ o gate canSeeAll do operational_block). F3.5.4-C3 — seen POR USUÁRIO (opts.seen)
@@ -1094,12 +1103,12 @@ app.whenReady().then(() => {
   // desbloquear/retomar). suspend ⇒ só diagnóstico. Vários listeners coexistem (EventEmitter).
   try {
     powerMonitor.on("lock-screen", () => { sessionLocked = true; nlog("notify.session.locked", {}); try { if (slaReminderCtl) slaReminderCtl.onLockChange(true); } catch { /* */ } });
-    powerMonitor.on("unlock-screen", () => { sessionLocked = false; nlog("notify.session.unlocked", {}); try { if (notifierAHandle) notifierAHandle.reconcile("unlock"); } catch { /* */ } try { if (slaReminderCtl) slaReminderCtl.onLockChange(false); } catch { /* */ } try { if (taskIdleScheduler) taskIdleScheduler.reconcile("unlock"); } catch { /* */ } });
+    powerMonitor.on("unlock-screen", () => { sessionLocked = false; nlog("notify.session.unlocked", {}); try { if (notifierAHandle) notifierAHandle.reconcile("unlock"); } catch { /* */ } try { if (workflowNHandle) workflowNHandle.reconcile("unlock"); } catch { /* F3.5.6A */ } try { if (slaReminderCtl) slaReminderCtl.onLockChange(false); } catch { /* */ } try { if (taskIdleScheduler) taskIdleScheduler.reconcile("unlock"); } catch { /* */ } });
     // F3.5.4N — suspend PAUSA o timer de último recurso do watchdog (suspend NÃO é falha). O reconcile de
     // resume/unlock segue nos handlers aprovados (F3.4.3/F3.5.4K, acima/abaixo); o watchdog cobre a
     // recuperação por RETORNO DE REDE (setNetwork → reconcileAll) e o último recurso, sem 2º reconcile.
     powerMonitor.on("suspend", () => { diag("power.suspend"); try { if (listenerWatchdog) listenerWatchdog.onSuspend(); } catch { /* */ } });
-    powerMonitor.on("resume", () => { try { if (notifierAHandle) notifierAHandle.reconcile("resume"); } catch { /* */ } try { if (slaReminderCtl) slaReminderCtl.reconcile("resume"); } catch { /* */ } try { if (slaReminderCtl) void slaReminderCtl.syncPendingDecisions("resume"); } catch { /* */ } try { if (slaReminderCtl) void slaReminderCtl.syncPendingIdleResponses("resume"); } catch { /* */ } try { if (taskIdleScheduler) taskIdleScheduler.reconcile("resume"); } catch { /* */ } });
+    powerMonitor.on("resume", () => { try { if (notifierAHandle) notifierAHandle.reconcile("resume"); } catch { /* */ } try { if (workflowNHandle) workflowNHandle.reconcile("resume"); } catch { /* F3.5.6A */ } try { if (slaReminderCtl) slaReminderCtl.reconcile("resume"); } catch { /* */ } try { if (slaReminderCtl) void slaReminderCtl.syncPendingDecisions("resume"); } catch { /* */ } try { if (slaReminderCtl) void slaReminderCtl.syncPendingIdleResponses("resume"); } catch { /* */ } try { if (taskIdleScheduler) taskIdleScheduler.reconcile("resume"); } catch { /* */ } });
   } catch { /* powerMonitor pode não existir em todas as plataformas */ }
 
   // F3.5.4L — LEMBRETE CENTRAL PERSISTENTE DE SLA (amarelo/vermelho). Superfície do MAIN (sobrevive a

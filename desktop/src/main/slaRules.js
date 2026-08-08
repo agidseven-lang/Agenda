@@ -57,6 +57,35 @@ function slaPanelDelivered(t){
   var fs=(t&&t.designerFlowStatus)||'', st=(t&&t.status)||'';
   return fs==='entregue'||fs==='concluido'||fs==='cancelado'||st==='concluido'||st==='cancelado'||st==='removido';
 }
+/* ════ F3.5.6A — ESPERA EXTERNA (bola com o CLIENTE) ════
+ * Fonte de responsabilidade: fase persistida workflowPhase (Worker V64.61+/Desktop 1.0.229+)
+ * OU derivação legada pelos MESMOS sinais deliberados do fluxo aprovado (conteúdo enviado ao
+ * cliente, sem produção interna ativa e sem ajuste pendente). Precedência espelha o
+ * deriveCanonicalTaskState do renderer: designer ativo/ajuste pedido ⇒ responsabilidade
+ * INTERNA (nunca pausa). Consumida pelo display state abaixo p/ PAUSAR os alertas internos
+ * SOMENTE da tarefa em espera — tempo da equipe ≠ tempo do cliente (mandato F3.5.6A). */
+function externalWaitOf(t){
+  if(!t) return false;
+  try{
+    var wp=String(t.workflowPhase||'');
+    if(wp==='themes_waiting_client'||wp==='captions_waiting_client') return true;
+    if(wp) return false;
+    var sec=''; try{ sec=(typeof secOf==='function'?((secOf(t.sector)||{}).key||''):String(t.sector||'')); }catch(_e){ sec=String(t.sector||''); }
+    if(sec!=='cronograma'&&sec!=='roteiro') return false;
+    if(t.finalApprovalCompleted===true||t.clientFlowStatus==='concluido'||t.status==='concluido'||t.cronStatus==='aprovado_final') return false;
+    if(t.clientReview&&t.clientReview.status==='revisao') return false;
+    var cf=String(t.clientFlowStatus||'');
+    if(cf==='aprovado') return false;
+    var cs=String(t.cronStatus||'');
+    var sent=(cs==='enviado_cliente'||cs==='ready_for_final_client_review'||cf==='enviado'||cf==='reenviado');
+    if(!sent) return false;
+    var hasD=!!(t.designerAssignment&&t.designerAssignment.designerId);
+    var dfs=String(t.designerFlowStatus||'');
+    var delivered=(dfs==='entregue'||dfs==='concluido');
+    if(hasD&&!delivered) return false;
+    return true;
+  }catch(_){ return false; }
+}
 function resolveTaskDisplayState(t,now,dtMsFn){
   now=now||Date.now();
   var hasSla=!!(t&&t.designerSla);
@@ -68,6 +97,10 @@ function resolveTaskDisplayState(t,now,dtMsFn){
   // início registrado (_START=0), max(x,0)=x ⇒ comportamento aprovado BYTE-idêntico.
   var _START=0; try{ var _dsS=(t&&t.designerSla)||{}; _START=Number(_dsS.planStartAt)||0; if(!(_START>0)){ var _daS=(t&&t.designerAssignment)||{}; var _fS=dtMsFn||(typeof dtMs==='function'?dtMs:null); if(_daS.startDate&&typeof _fS==='function'){ _START=Number(_fS(_daS.startDate,_daS.startTime||'00:00'))||0; } } if(!(_START>0)) _START=0; }catch(_eS){ _START=0; }
   if(slaPanelDelivered(t)) return {sev:'verde',state:'completed',finishMs:finishMs,label:'Concluído',remainingMin:0,overdueMin:0,graceRemainingMin:0,remainingMs:0,overdueMs:0,graceRemainingMs:0,critical:false,hasSla:hasSla,inPanel:false};
+  // F3.5.6A — ESPERA EXTERNA pausa o SLA interno DESTA fase (inPanel:false ⇒ zero emissão/
+  // alerta/bloqueio); outras tarefas/ações internas vencidas do usuário seguem intactas —
+  // o gate é POR TAREFA, nunca global.
+  if(typeof externalWaitOf==='function'&&externalWaitOf(t)) return {sev:'neutro',state:'waiting_client',finishMs:finishMs,label:'Aguardando cliente',remainingMin:0,overdueMin:0,graceRemainingMin:0,remainingMs:0,overdueMs:0,graceRemainingMs:0,critical:false,hasSla:hasSla,inPanel:false};
   if(!hasSla||!finishMs)   return {sev:'neutro',state:'none',finishMs:finishMs,label:'',remainingMin:0,overdueMin:0,graceRemainingMin:0,remainingMs:0,overdueMs:0,graceRemainingMs:0,critical:false,hasSla:hasSla,inPanel:false};
   if(now>=finishMs){ var over=Math.max(1,Math.round((now-finishMs)/60000));
     var graceLeft=Math.max(0,Math.round((finishMs+_GRACE-now)/60000));
@@ -516,6 +549,7 @@ module.exports = {
   // panel-core
   SLA_PANEL_WARN_MS: SLA_PANEL_WARN_MS, SLA_PANEL_GRACE_MS: SLA_PANEL_GRACE_MS,
   slaPanelFinishMs: slaPanelFinishMs, slaPanelDelivered: slaPanelDelivered, resolveTaskDisplayState: resolveTaskDisplayState,
+  externalWaitOf: externalWaitOf,   // F3.5.6A — espera externa (fonte de responsabilidade)
   // config por setor
   SECTOR_SLA: SECTOR_SLA, slaCfgDefault: slaCfgDefault, slaCfgOf: slaCfgOf,
   // timeline canônica

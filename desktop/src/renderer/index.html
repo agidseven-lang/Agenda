@@ -3394,6 +3394,29 @@ function slaPanelDelivered(t){
  * detalhe=detailSla), garantindo status/prazo coerentes entre todas as telas. Puro/read-only.
  * Estados canônicos: completed(verde) · overdue(vermelho) · warning(laranja) · running(azul) · none(neutro).
  * Sempre por PRAZO FINAL (slaPanelFinishMs) — NUNCA por início (sem "Início atrasado"). */
+/* ════ F3.5.6A — ESPERA EXTERNA (bola com o CLIENTE) — espelho VERBATIM de slaRules.js ════ */
+function externalWaitOf(t){
+  if(!t) return false;
+  try{
+    var wp=String(t.workflowPhase||'');
+    if(wp==='themes_waiting_client'||wp==='captions_waiting_client') return true;
+    if(wp) return false;
+    var sec=''; try{ sec=(typeof secOf==='function'?((secOf(t.sector)||{}).key||''):String(t.sector||'')); }catch(_e){ sec=String(t.sector||''); }
+    if(sec!=='cronograma'&&sec!=='roteiro') return false;
+    if(t.finalApprovalCompleted===true||t.clientFlowStatus==='concluido'||t.status==='concluido'||t.cronStatus==='aprovado_final') return false;
+    if(t.clientReview&&t.clientReview.status==='revisao') return false;
+    var cf=String(t.clientFlowStatus||'');
+    if(cf==='aprovado') return false;
+    var cs=String(t.cronStatus||'');
+    var sent=(cs==='enviado_cliente'||cs==='ready_for_final_client_review'||cf==='enviado'||cf==='reenviado');
+    if(!sent) return false;
+    var hasD=!!(t.designerAssignment&&t.designerAssignment.designerId);
+    var dfs=String(t.designerFlowStatus||'');
+    var delivered=(dfs==='entregue'||dfs==='concluido');
+    if(hasD&&!delivered) return false;
+    return true;
+  }catch(_){ return false; }
+}
 function resolveTaskDisplayState(t,now,dtMsFn){
   now=now||Date.now();
   var hasSla=!!(t&&t.designerSla);
@@ -3407,6 +3430,10 @@ function resolveTaskDisplayState(t,now,dtMsFn){
   // início registrado (_START=0), max(x,0)=x ⇒ comportamento aprovado BYTE-idêntico.
   var _START=0; try{ var _dsS=(t&&t.designerSla)||{}; _START=Number(_dsS.planStartAt)||0; if(!(_START>0)){ var _daS=(t&&t.designerAssignment)||{}; var _fS=dtMsFn||(typeof dtMs==='function'?dtMs:null); if(_daS.startDate&&typeof _fS==='function'){ _START=Number(_fS(_daS.startDate,_daS.startTime||'00:00'))||0; } } if(!(_START>0)) _START=0; }catch(_eS){ _START=0; }
   if(slaPanelDelivered(t)) return {sev:'verde',state:'completed',finishMs:finishMs,label:'Concluído',remainingMin:0,overdueMin:0,graceRemainingMin:0,remainingMs:0,overdueMs:0,graceRemainingMs:0,critical:false,hasSla:hasSla,inPanel:false};
+  // F3.5.6A — ESPERA EXTERNA pausa o SLA interno DESTA fase (inPanel:false ⇒ zero emissão/
+  // alerta/bloqueio); outras tarefas/ações internas vencidas do usuário seguem intactas —
+  // o gate é POR TAREFA, nunca global.
+  if(typeof externalWaitOf==='function'&&externalWaitOf(t)) return {sev:'neutro',state:'waiting_client',finishMs:finishMs,label:'Aguardando cliente',remainingMin:0,overdueMin:0,graceRemainingMin:0,remainingMs:0,overdueMs:0,graceRemainingMs:0,critical:false,hasSla:hasSla,inPanel:false};
   if(!hasSla||!finishMs)   return {sev:'neutro',state:'none',finishMs:finishMs,label:'',remainingMin:0,overdueMin:0,graceRemainingMin:0,remainingMs:0,overdueMs:0,graceRemainingMs:0,critical:false,hasSla:hasSla,inPanel:false};
   if(now>=finishMs){ var over=Math.max(1,Math.round((now-finishMs)/60000));
     // F3.3.2 (regra operacional do owner): após o prazo final há uma JANELA DE TOLERÂNCIA de
@@ -5180,6 +5207,9 @@ function priBuildItems(tasks, me){
     var dl=priDeadlineFacts(t, now);
     var fl=priFlowFacts(t, me);
     var oc=priOccFacts(t, me);
+    /* F3.5.6A — espera externa: zera prazo/alerta DESTA tarefa (a bola é do cliente). */
+    var ew=null; try{ ew=wfExternalInfo(t, now); }catch(_){ ew=null; }
+    if(ew&&ew.active){ dl={deadlineMs:0, deadlineKind:'none', deadlineText:'', hasSla:dl.hasSla}; al={alert:null,alertText:''}; }
     var isResp = (String(designerOf(t)||'')===String(me)) || (String(socialOf(t)||'')===String(me)) || (String(t.assigneeId||'')===String(me));
     var linked = isResp || fl.awaitingMyAction || fl.changeRequestForMe || !!al.alert;
     var relevant = linked || !!oc.helpForMe || !!oc.blockedForMe;
@@ -5194,13 +5224,15 @@ function priBuildItems(tasks, me){
         alert:al.alert, alertText:al.alertText, deadlineMs:dl.deadlineMs, deadlineKind:dl.deadlineKind, deadlineText:dl.deadlineText, hasSla:dl.hasSla,
         changeRequestForMe:fl.changeRequestForMe, awaitingMyAction:fl.awaitingMyAction, awaitingText:fl.awaitingText,
         helpForMe:oc.helpForMe, blockedForMe:oc.blockedForMe,
+        awaitingClient:!!(ew&&ew.active), awaitingClientType:(ew&&ew.type)||'', awaitingClientViewed:!!(ew&&ew.viewed), awaitingClientSinceMs:(ew&&ew.sentAt)||0,
+        awaitingClientText:(ew&&ew.active)?((ew.type==='captions'?'Legendas':'Temas')+' · '+(ew.sentAt>0?((ew.viewed?'visualizado':'não visualizado')+(ew.waitingMs>0?(' · '+wfFmtDur(ew.waitingMs)):'')):'sem envio confirmado')):'',
         createdAtMs:Number(t.createdAt)||0, updatedAtMs:Number(t.updatedAt)||0 }
     });
   }
   return items;
 }
 var PRI_LVL_COLOR={1:'#EF4444',2:'#F2A93B',3:'#7C83FF'};
-var PRI_FILTERS=[['all','Todas'],['crit','Críticas'],['today','Para hoje'],['help','Pedidos de ajuda'],['blocked','Bloqueadas'],['andamento','Em andamento'],['afazer','A Fazer']];
+var PRI_FILTERS=[['all','Todas'],['crit','Críticas'],['today','Para hoje'],['help','Pedidos de ajuda'],['blocked','Bloqueadas'],['awaitclient','Aguardando cliente'],['andamento','Em andamento'],['afazer','A Fazer']];
 function priFilterMatch(fk, it){
   var x=it.facts||{};
   if(fk==='all') return true;
@@ -5208,6 +5240,7 @@ function priFilterMatch(fk, it){
   if(fk==='today') return x.deadlineKind==='today'||x.deadlineKind==='overdue';
   if(fk==='help') return !!x.helpForMe;
   if(fk==='blocked') return !!x.blockedForMe;
+  if(fk==='awaitclient') return !!x.awaitingClient;   // F3.5.6A
   if(fk==='andamento') return String(x.col)==='andamento';
   if(fk==='afazer') return String(x.col)==='afazer';
   return true;
@@ -5251,6 +5284,12 @@ function renderPrioridades(){
     for(var i=0;i<shown.length;i++){ h+=priCard(shown[i], i+1); }
     h+='</div>';
   }
+  // F3.5.6A — seção AGUARDANDO CLIENTE (espera externa; sem culpa interna, sem bloqueio)
+  var aw=occ.filter(function(o){return o.kind==='awaiting_client';});
+  occ=occ.filter(function(o){return o.kind!=='awaiting_client';});
+  h+='<div style="height:22px"></div><div class="lbl">Aguardando cliente</div>';
+  if(!aw.length){ h+='<div class="card" style="padding:14px"><div class="ss">Nenhuma tarefa aguardando decisão do cliente.</div></div>'; }
+  else { h+='<div class="pri-await" style="display:flex;flex-direction:column;gap:8px">'; for(var w=0;w<aw.length;w++){ h+=wfPriAwaitRow(aw[w]); } h+='</div>'; }
   // ocorrências recentes
   h+='<div style="height:22px"></div><div class="lbl">Ações e ocorrências recentes</div>';
   if(!occ.length){ h+='<div class="card" style="padding:14px"><div class="ss">Sem pedidos de ajuda ou bloqueios registrados para você.</div></div>'; }
@@ -6292,7 +6331,7 @@ function renderClientFlowBoard(){
     '<div class="scr-head"><div class="d-board-head">'+
     '<div class="d-bh-icon" style="background:'+withAlpha('#22D3B8',.18)+';color:#22D3B8">'+svg('eye')+'</div>'+
     '<div style="flex:1;min-width:0"><div class="d-bh-title">Cliente</div><div class="d-bh-sub">Fica visível até a aprovação final — mesmo enviado ao designer · '+list.length+' tarefa'+(list.length===1?'':'s')+'</div></div></div></div>'+
-    '<div class="scr" style="padding-top:0">'+boardToolbar()+
+    '<div class="scr" style="padding-top:0">'+wfApprovalsPendingHtml(list)+boardToolbar()+
     kbv2BoardHtml(CLIENT_COLS4.map((c,i)=>({label:c.label,color:c.color,key:c.key,tasks:byCol[i]})), t=>kbv2Card(t,'client'));
   return h+'</div>';
 }
@@ -7328,6 +7367,235 @@ function kbv2NextForStatus(st){
   if(st==='andamento')return 'Concluir e enviar para revisão';
   return 'Iniciar a produção';
 }
+/* ═══════════ F3.5.6A — ORQUESTRAÇÃO OPERACIONAL (helpers do renderer) ═══════════
+ * Fase persistida + phase runs + approval rounds + ledger — TUDO campo aditivo no doc
+ * da task (nenhuma coleção nova). Ações críticas do CLIENTE ficam no Worker (server-side);
+ * ações da EQUIPE gravam aqui com chaves idempotentes por ciclo e horário canônico
+ * (canonicalNowMs — relógio sincronizado com o servidor via clockSync). */
+var WF_PHASE_LABELS={themes_preparation:'Preparação dos temas',themes_waiting_client:'Aguardando cliente — temas',themes_adjustment:'Ajuste dos temas',assignment_pending:'Atribuir Designers',design_production:'Produção (Design)',design_review:'Revisão de design',captions_preparation:'Preparação das legendas',captions_waiting_client:'Aguardando cliente — legendas',captions_adjustment:'Ajuste das legendas',completed:'Concluída'};
+function wfNow(){ try{ return (typeof canonicalNowMs==='function')?canonicalNowMs():Date.now(); }catch(_){ return Date.now(); } }
+function wfRoundsOf(t){ return (t&&t.approvalRounds&&typeof t.approvalRounds==='object')?t.approvalRounds:{}; }
+function wfRunsOf(t){ return (t&&t.phaseRuns&&typeof t.phaseRuns==='object')?t.phaseRuns:{}; }
+function wfLatestRound(t,type){ var r=wfRoundsOf(t),best=null,bn=0,bk=''; for(var k in r){ if(!Object.prototype.hasOwnProperty.call(r,k))continue; if(k.indexOf('ar_'+type+'_r')!==0)continue; var m=/_r(\d+)$/.exec(k); var n=m?parseInt(m[1],10):0; if(n>bn){bn=n;best=r[k]||{};bk=k;} } return best?{key:bk,seq:bn,round:best}:null; }
+function wfCycleN(t){ var r=wfRoundsOf(t),n=0; for(var k in r){ if(!Object.prototype.hasOwnProperty.call(r,k))continue; if(k.indexOf('ar_themes_r')!==0)continue; var e=r[k]; if(e&&e.decision==='approved')n++; } return n; }
+/* Tipo da rodada corrente pela FASE do cliente (themes|production|final → themes|captions). */
+function wfRoundTypeNow(t){ var ph='themes'; try{ ph=(typeof clientApprovalPhaseOf==='function')?clientApprovalPhaseOf(t):'themes'; }catch(_){ ph='themes'; } return ph==='themes'?'themes':'captions'; }
+function wfFmtDur(ms){ ms=Number(ms)||0; if(ms<=0)return''; var m=Math.floor(ms/60000); if(m<60)return m+'min'; var h=Math.floor(m/60); if(h<48)return h+'h'; var d=Math.floor(h/24); return d+'d '+(h-d*24)+'h'; }
+/* Espera externa + follow-up (RECOMENDAÇÃO; nunca envia nada sozinho; nunca SLA da equipe). */
+function wfExternalInfo(t,nowMs){
+  nowMs=Number(nowMs)||wfNow();
+  var active=false; try{ active=externalWaitOf(t); }catch(_){ active=false; }
+  var type=wfRoundTypeNow(t);
+  var lr=wfLatestRound(t,type); var r=lr?lr.round:null;
+  var sentAt=r?(Number(r.sentAt)||0):0;
+  if(!(sentAt>0)&&active){ sentAt=Number(t&&t.clientSentAt)||0; }              // legado: registro antigo (não confirmado)
+  var legacy=!(r&&Number(r.sentAt)>0);
+  var fv=r?(Number(r.firstViewedAt)||0):0;
+  var decided=!!(r&&r.decision);
+  var waitingMs=(active&&sentAt>0&&nowMs>sentAt)?(nowMs-sentAt):0;
+  var followUp='';
+  if(active&&!decided&&sentAt>0){ followUp=(fv>0)?'VIEWED_PENDING':'SENT_NOT_VIEWED'; if(waitingMs>=24*60*60*1000)followUp='LONG_WAIT'; }
+  return {active:active,type:type,roundKey:lr?lr.key:'',sentAt:sentAt,firstViewedAt:fv,viewed:fv>0,decided:decided,waitingMs:waitingMs,followUp:followUp,legacy:legacy};
+}
+function wfActivePhase(t){ var wp=String((t&&t.workflowPhase)||''); if(wp)return wp; try{ var d=deriveCanonicalTaskState(t); var map={planning:'themes_preparation',themes_sent:'themes_waiting_client',themes_approved:'assignment_pending',awaiting_designer:'assignment_pending',designer_producing:'design_production',designer_revising:'design_review',designer_delivered:'captions_preparation',awaiting_client_approval:'captions_waiting_client',client_requested_changes:'captions_adjustment',completed:'completed'}; return map[d&&d.phase]||'themes_preparation'; }catch(_){ return 'themes_preparation'; } }
+function wfActiveRun(t){ var runs=wfRunsOf(t),bk='',best=null; for(var k in runs){ if(!Object.prototype.hasOwnProperty.call(runs,k))continue; var e=runs[k]; if(e&&e.status==='active'){ if(!best||Number(e.startedAt||0)>Number(best.startedAt||0)){best=e;bk=k;} } } return best?{key:bk,run:best}:null; }
+/* patch-builders (dot-path; usados nas escritas da EQUIPE — 1 update atômico por ação) */
+function wfCloseRunsPatch(patch,t,outcome,now){ var runs=wfRunsOf(t); for(var k in runs){ if(!Object.prototype.hasOwnProperty.call(runs,k))continue; var r=runs[k]; if(!r||r.status!=='active')continue; var due=Number(r.dueAt)||0; var delay=(due>0&&now>due)?(now-due):0; patch['phaseRuns.'+k+'.completedAt']=now; patch['phaseRuns.'+k+'.status']='done'; patch['phaseRuns.'+k+'.outcome']=outcome||(due>0?(delay>0?'late':'on_time'):'done'); patch['phaseRuns.'+k+'.delayMs']=delay; patch['phaseRuns.'+k+'.elapsedMs']=Math.max(0,now-(Number(r.startedAt)||now)); patch['phaseRuns.'+k+'.updatedAt']=now; } }
+function wfOpenRunPatch(patch,t,phase,respType,respUid,dueAt,now){ var runs=wfRunsOf(t),mx=0; for(var k in runs){ var m=/^pr(\d+)_/.exec(k); if(m)mx=Math.max(mx,parseInt(m[1],10)); } for(var pk in patch){ var m2=/^phaseRuns\.pr(\d+)_/.exec(pk); if(m2)mx=Math.max(mx,parseInt(m2[1],10)); } var seq=mx+1; var key='pr'+(seq<10?('0'+seq):String(seq))+'_'+phase; patch['phaseRuns.'+key]={phase:phase,responsibleType:respType,responsibleUid:respUid||'',startedAt:now,dueAt:Number(dueAt)||0,completedAt:0,status:'active',outcome:'',delayMs:0,elapsedMs:0,createdAt:now,updatedAt:now}; return key; }
+function wfMirrorPhasePatch(patch,phase,respType,respUid,now,extWait){ patch.workflowPhase=phase; patch.workflowPhaseAt=now; patch.workflowResponsibleType=respType; patch.workflowResponsibleUid=respUid||''; patch.externalWait=!!extWait; patch.externalWaitSince=extWait?now:0; }
+/* team-action genérico (Worker; JWT Social/Admin + Idempotency-Key) — mesma infra do contentSent. */
+async function wfTeamAction(taskId,action,extra){
+  var t=state.tasks.find(function(x){return x.id===taskId;})||{};
+  var token=(t.clientReviewToken||t.shareToken)||'';
+  if(!token){ flashToast('Link do cliente ainda não gerado — abra "Enviar ao cliente" primeiro.',6000); return {ok:false,error:'no_token'}; }
+  if(!(await ensureTeamSession())){ flashToast('Ação não registrada — sessão de equipe não renovada.',6000); return {ok:false,error:'no_session'}; }
+  var jwt=localStorage.getItem('wp_team_jwt')||'';
+  if(!jwt){ flashToast('Ação não registrada — sessão de equipe indisponível.',6000); return {ok:false,error:'no_jwt'}; }
+  var u=state.user||{};
+  var idem=(u.id||'')+'|'+action+'|'+taskId+'|'+Math.floor(Date.now()/10000);
+  try{
+    var res=await fetch(CLIENT_REVIEW_BASE+'/cliente/cronograma/'+encodeURIComponent(token)+'/team-action',{
+      method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':idem,'Authorization':'Bearer '+jwt},
+      body:JSON.stringify(Object.assign({action:action,byName:u.name||''},extra||{}))});
+    if(res.status===401){ localStorage.removeItem('wp_team_jwt'); flashToast('Sessão de equipe expirada — saia e entre novamente.',7000); return {ok:false,error:'unauthorized'}; }
+    var j=await res.json().catch(function(){return null;});
+    if(!j||j.ok!==true){ flashToast('Falha ao registrar no servidor: '+((j&&j.error)||('HTTP '+res.status)),7000); return j||{ok:false,error:'http_'+res.status}; }
+    return j;
+  }catch(e){ flashToast('Sem conexão com o servidor — tente novamente.',6000); return {ok:false,error:String(e&&e.message||e)}; }
+}
+/* CONFIRMAR ENVIO AO CLIENTE — ÚNICO registro de sentAt (server-side). COPIAR ≠ ENVIADO. */
+async function wfConfirmClientSend(taskId){
+  if(!taskId||taskId==='__form__'){ flashToast('Salve a tarefa antes de confirmar o envio.'); return; }
+  var r=await wfTeamAction(taskId,'confirmClientSend',{});
+  if(r&&r.ok){
+    if(r.alreadyDone){ flashToast('Envio já estava confirmado para esta rodada.'); }
+    else{ flashToast('Envio CONFIRMADO — espera externa iniciada (sentAt do servidor).'); }
+    var t=state.tasks.find(function(x){return x.id===taskId;});
+    if(t&&r.workflowPhase){ t.workflowPhase=r.workflowPhase; t.externalWait=true; }   // otimismo; snapshot corrige
+    render();
+  }
+}
+/* REGISTRAR DECISÃO EXTERNA (WhatsApp) — mesma decisão canônica do portal, source auditável. */
+async function wfRegisterExternalDecisionUI(kind){
+  var taskId=state.clientView; if(!taskId) return;
+  var ok=false; try{ ok=canSeeAll(state.user); }catch(_){ ok=false; }
+  if(!ok){ flashToast('Apenas Social/Admin podem registrar decisões externas.'); return; }
+  var t=state.tasks.find(function(x){return x.id===taskId;})||{};
+  var typeNow=wfRoundTypeNow(t);
+  var label=(typeNow==='captions'?'LEGENDAS':'TEMAS');
+  var note='';
+  if(kind==='adjustment'){ note=prompt('O que o cliente pediu para ajustar (registrado na rodada de '+label+')?')||''; if(!String(note).trim()){ flashToast('Registro cancelado — descreva o ajuste pedido.'); return; } }
+  else if(!confirm('Registrar APROVAÇÃO de '+label+' recebida pelo WhatsApp?\n\nIsso produz a MESMA decisão canônica do portal (source: whatsapp_group) e fica auditado no histórico.')) return;
+  var r=await wfTeamAction(taskId,'registerExternalDecision',{decision:(kind==='adjustment'?'adjustment':'approved'),roundType:typeNow,note:String(note||'').slice(0,1000)});
+  if(r&&r.ok){
+    if(r.convertedToFeedback){ flashToast('Havia ajustes pendentes na fase — registrado como FEEDBACK (não aprovação), igual ao portal.',8000); }
+    else{ flashToast(kind==='adjustment'?'Ajuste do cliente registrado (WhatsApp).':'Aprovação do cliente registrada (WhatsApp).'); }
+  }
+}
+/* Prazo da FASE ativa (dueAt configurável por tarefa/fase — nunca fixo). */
+async function wfSetPhaseDueUI(taskId){
+  var t=state.tasks.find(function(x){return x.id===taskId;}); if(!t) return;
+  var inp=document.getElementById('wfDueInp'); var v=inp?String(inp.value||''):'';
+  if(!v){ flashToast('Escolha data e hora do prazo da fase.'); return; }
+  var ms=0; try{ ms=new Date(v).getTime()||0; }catch(_){ ms=0; }
+  if(!(ms>0)){ flashToast('Prazo inválido.'); return; }
+  var ar=wfActiveRun(t); var now=wfNow(); var patch={};
+  if(ar){ patch['phaseRuns.'+ar.key+'.dueAt']=ms; patch['phaseRuns.'+ar.key+'.updatedAt']=now; }
+  else{ var ph=wfActivePhase(t); wfOpenRunPatch(patch,t,ph,(ph.indexOf('waiting_client')>=0?'client':(ph==='design_production'||ph==='design_review'?'designer':'social')),(t.socialOwnerId||t.by||''),ms,now); wfMirrorPhasePatch(patch,ph,(ph.indexOf('waiting_client')>=0?'client':'social'),(t.socialOwnerId||t.by||''),now,ph.indexOf('waiting_client')>=0); }
+  patch['workflowEvents.ev_due_'+wfActivePhase(t)+'_'+ms]={t:'PHASE_DUE_SET',ph:wfActivePhase(t),at:now,src:'team',by:(state.user&&state.user.id)||'',v:1};
+  try{ await db.collection('tasks').doc(taskId).update(patch); flashToast('Prazo da fase definido.'); }
+  catch(e){ console.warn('wfSetPhaseDue',e); flashToast('Falha ao salvar o prazo da fase.'); }
+}
+/* TEMAS/LEGENDAS PRONTOS — evento canônico idempotente por ciclo (notifica o responsável). */
+async function wfMarkReadyUI(taskId,kind){
+  var t=state.tasks.find(function(x){return x.id===taskId;}); if(!t) return;
+  var now=wfNow(); var cyc=wfCycleN(t)+1; var patch={};
+  var ev=(kind==='captions')?'CAPTIONS_READY':'THEMES_READY';
+  patch['workflowEvents.ev_'+(kind==='captions'?'cready':'tready')+'_r'+cyc]={t:ev,ph:wfActivePhase(t),at:now,src:'team',by:(state.user&&state.user.id)||'',v:1};
+  try{ await db.collection('tasks').doc(taskId).update(patch); flashToast(kind==='captions'?'Legendas marcadas como prontas — próxima ação: enviar para aprovação.':'Temas marcados como prontos — próxima ação: enviar para aprovação.'); }
+  catch(e){ console.warn('wfMarkReady',e); }
+}
+/* COPIAR LEMBRETE (follow-up manual; NUNCA envia sozinho). */
+function wfCopyReminder(taskId){
+  var t=state.tasks.find(function(x){return x.id===taskId;}); if(!t) return;
+  var ew=wfExternalInfo(t,wfNow()); var tipo=(ew.type==='captions'?'as legendas':'os temas');
+  var url=''; try{ url=buildShareClientUrl(t.clientReviewToken||t.shareToken); }catch(_){ url=''; }
+  var msg='Olá! Passando para lembrar que '+tipo+' de '+(t.client||'vocês')+' seguem aguardando aprovação. '+(url?('Link direto: '+url):'')+'\nQualquer ajuste, é só responder por aqui. Obrigado!';
+  copyToClipboard(msg); flashToast('Lembrete copiado — cole no grupo do WhatsApp quando quiser.');
+}
+/* Status POR ITEM do Designer (estado canônico dos itens; conclusão detectada pelos dados). */
+async function wfToggleItemDone(spec){
+  var parts=String(spec||'').split('|'); var taskId=parts[0]; var idx=parseInt(parts[1],10);
+  var t=state.tasks.find(function(x){return x.id===taskId;}); if(!t||!(idx>=0)) return;
+  var st=(t.designerItemStatus&&t.designerItemStatus['i'+idx])||null;
+  var done=!!(st&&st.st==='concluido');
+  var now=wfNow(); var u=state.user||{};
+  var total=Array.isArray(t.cronContents)?t.cronContents.length:0;
+  var patch={};
+  if(done){ patch['designerItemStatus.i'+idx]={st:'pendente',at:now,byId:u.id||null}; }
+  else{
+    patch['designerItemStatus.i'+idx]={st:'concluido',at:now,byId:u.id||null};
+    var doneCount=1; for(var i=0;i<total;i++){ if(i===idx)continue; var e=(t.designerItemStatus&&t.designerItemStatus['i'+i])||null; if(e&&e.st==='concluido')doneCount++; }
+    var cyc=wfCycleN(t);
+    patch['workflowEvents.ev_ditem_'+idx+'_c'+cyc]={t:'DESIGNER_ITEM_COMPLETED',ph:wfActivePhase(t),at:now,src:'team',by:u.id||'',ii:idx,n:doneCount,tot:total,v:1};
+  }
+  // otimismo local
+  t.designerItemStatus=Object.assign({},t.designerItemStatus||{}); t.designerItemStatus['i'+idx]=patch['designerItemStatus.i'+idx];
+  try{ await db.collection('tasks').doc(taskId).update(patch); }catch(e){ console.warn('wfToggleItemDone',e); }
+  // TODOS os itens obrigatórios concluídos ⇒ conclusão canônica do eixo do designer
+  if(!done){ var all=total>0; for(var j=0;j<total;j++){ var ej=(t.designerItemStatus&&t.designerItemStatus['i'+j])||null; if(!(ej&&ej.st==='concluido')){ all=false; break; } }
+    if(all){ flashToast('Todos os itens concluídos — registrando a entrega…'); try{ await moveStatus(taskId,'concluido'); }catch(_){ } return; } }
+  render();
+}
+/* Painel de FASE na Visão do cliente (FASE ATUAL/RESPONSÁVEL/INÍCIO/PRAZO/STATUS + ações). */
+function wfClientViewExtrasHtml(){
+  var t=state.tasks.find(function(x){return x.id===state.clientView;}); if(!t) return '';
+  var ok=false; try{ ok=canSeeAll(state.user); }catch(_){ ok=false; }
+  if(!ok) return '';
+  var now=wfNow(); var ph=wfActivePhase(t); var ar=wfActiveRun(t); var run=ar?ar.run:null;
+  var ew=wfExternalInfo(t,now);
+  var respName='—';
+  if(ew.active){ respName='Cliente'; }
+  else if(run&&run.responsibleUid){ var uu=(state.users||[]).find(function(x){return x.id===run.responsibleUid;}); respName=(uu&&uu.name)||'Equipe'; }
+  else{ var d=null; try{ d=deriveCanonicalTaskState(t); }catch(_){ d=null; } respName=(d&&d.owner==='designer')?'Designer':(d&&d.owner==='client'?'Cliente':'Social Media'); }
+  var started=run?(Number(run.startedAt)||0):0; var due=run?(Number(run.dueAt)||0):0;
+  var fmt=function(ms){ if(!(ms>0))return '—'; try{ var dd=new Date(ms); return pri2(dd.getDate())+'/'+pri2(dd.getMonth()+1)+' '+pri2(dd.getHours())+':'+pri2(dd.getMinutes()); }catch(_){ return '—'; } };
+  var stTxt=ew.active?('Aguardando cliente'+(ew.sentAt>0?(' · '+(ew.viewed?'visualizado':'não visualizado')+(ew.waitingMs>0?(' há '+wfFmtDur(ew.waitingMs)):'')):' · sem confirmação de envio')):(due>0&&now>due?'Fase atrasada':'Em andamento');
+  var h='<div class="card" style="padding:12px 14px;margin:0 0 10px;border-color:rgba(124,131,255,.35)">'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><div class="cfg-ic" style="width:26px;height:26px">'+svg('gauge')+'</div><div style="font-weight:800">Fluxo da tarefa</div></div>'
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;font-size:12.5px">'
+    +'<div><div class="ss">Fase atual</div><div class="sl">'+esc(WF_PHASE_LABELS[ph]||ph)+'</div></div>'
+    +'<div><div class="ss">Responsável</div><div class="sl">'+esc(respName)+'</div></div>'
+    +'<div><div class="ss">Início</div><div class="sl">'+fmt(started)+'</div></div>'
+    +'<div><div class="ss">Prazo da fase</div><div class="sl">'+fmt(due)+'</div></div>'
+    +'<div><div class="ss">Status</div><div class="sl">'+esc(stTxt)+'</div></div>'
+    +'</div>';
+  if(!ew.active&&ph!=='completed'){
+    h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">'
+      +'<input id="wfDueInp" type="datetime-local" class="inp" style="width:auto;padding:6px 8px;font-size:12px">'
+      +'<button class="chip" data-wfsetdue="'+esc(t.id)+'">Definir prazo da fase</button>'
+      +(ph==='themes_preparation'||ph==='themes_adjustment'?'<button class="chip" data-wfready="'+esc(t.id)+'|themes">Temas prontos</button>':'')
+      +(ph==='captions_preparation'||ph==='captions_adjustment'?'<button class="chip" data-wfready="'+esc(t.id)+'|captions">Legendas prontas</button>':'')
+      +'<button class="chip" data-wfconfirmsend="'+esc(t.id)+'" title="Só confirme DEPOIS de enviar a mensagem no grupo do WhatsApp">Confirmar envio ao cliente</button>'
+      +'</div>';
+  }
+  if(ew.active){
+    h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">'
+      +'<button class="chip" data-wfext="approved">Registrar APROVAÇÃO recebida pelo WhatsApp</button>'
+      +'<button class="chip" data-wfext="adjustment">Registrar AJUSTE pedido pelo WhatsApp</button>'
+      +(ew.followUp?'<button class="chip" data-wfcopyreminder="'+esc(t.id)+'">Copiar lembrete</button>':'')
+      +'</div>';
+    if(ew.followUp==='SENT_NOT_VIEWED') h+='<div class="ss" style="margin-top:6px">'+esc((t.client||'O cliente'))+' ainda não visualizou a aprovação.</div>';
+    else if(ew.followUp==='VIEWED_PENDING') h+='<div class="ss" style="margin-top:6px">O cliente visualizou'+(ew.firstViewedAt>0?(' há '+wfFmtDur(now-ew.firstViewedAt)):'')+' e ainda não respondeu.</div>';
+    else if(ew.followUp==='LONG_WAIT') h+='<div class="ss" style="margin-top:6px">Espera longa ('+wfFmtDur(ew.waitingMs)+') — considere um lembrete gentil.</div>';
+    if(ew.legacy&&ew.sentAt>0) h+='<div class="ss" style="margin-top:4px;color:var(--faint)">Registro de envio legado (antes da confirmação server-side) — sem rastreio de visualização.</div>';
+  }
+  h+='</div>';
+  return h;
+}
+/* Linha da seção AGUARDANDO CLIENTE em Minhas Prioridades. */
+function wfPriAwaitRow(o){
+  return '<div class="card" style="padding:10px 14px;display:flex;align-items:center;gap:10px">'
+    +'<div class="cfg-ic" style="width:28px;height:28px;background:rgba(34,211,238,.14);color:#22D3EE">'+svg('eye')+'</div>'
+    +'<div style="flex:1;min-width:0"><div class="sl" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(o.title||'Tarefa')+(o.client?(' — '+esc(o.client)):'')+'</div>'
+    +'<div class="ss">'+esc(o.text||'Aguardando cliente')+'</div></div>'
+    +'<button class="chip" data-wfcopyreminder="'+esc(o.taskId)+'">Copiar lembrete</button>'
+    +'<button class="chip" data-clientview="'+esc(o.taskId)+'">Abrir</button>'
+    +'</div>';
+}
+/* Central do Cliente — APROVAÇÕES PENDENTES (4 categorias; deriva de rounds + legado). */
+function wfApprovalsPendingHtml(list){
+  var now=wfNow(); var cats={nv:[],vs:[],aj:[],ap:[]};
+  (list||[]).forEach(function(t){
+    try{
+      var ew=wfExternalInfo(t,now);
+      if(ew.active&&!ew.decided){ if(ew.viewed)cats.vs.push({t:t,ew:ew}); else cats.nv.push({t:t,ew:ew}); return; }
+      if((t.clientReview&&t.clientReview.status==='revisao')||String(t.workflowPhase||'').indexOf('_adjustment')>0){ cats.aj.push({t:t,ew:ew}); return; }
+      var lr=wfLatestRound(t,ew.type)||wfLatestRound(t,ew.type==='themes'?'captions':'themes');
+      if(lr&&lr.round&&lr.round.decision==='approved'&&(now-(Number(lr.round.decisionAt)||0))<=72*3600*1000) cats.ap.push({t:t,ew:ew,rk:lr});
+      else if(!lr&&clientApproved(t)&&(now-(Number(t.clientReviewAt)||0))<=72*3600*1000) cats.ap.push({t:t,ew:ew});
+    }catch(_){}
+  });
+  var total=cats.nv.length+cats.vs.length+cats.aj.length+cats.ap.length;
+  var row=function(e,extra){ var t=e.t,ew=e.ew;
+    var resp=''; try{ var uu=(state.users||[]).find(function(x){return x.id===(t.socialOwnerId||t.by);}); resp=(uu&&uu.name)?uu.name.split(' ')[0]:''; }catch(_){ resp=''; }
+    return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--line)">'
+      +'<div style="flex:1;min-width:0"><div class="sl" style="font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(t.client||'Cliente')+' — '+esc(t.title||'Tarefa')+'</div>'
+      +'<div class="ss">'+esc((ew.type==='captions'?'Legendas':'Temas'))+(ew.sentAt>0?(' · enviado há '+wfFmtDur(now-ew.sentAt)):' · sem envio confirmado')+(ew.viewed?' · visualizado':'')+(resp?(' · resp.: '+esc(resp)):'')+(extra?(' · '+extra):'')+'</div></div>'
+      +'<button class="chip" data-wfcopyreminder="'+esc(t.id)+'">Lembrete</button>'
+      +'<button class="chip" data-clientview="'+esc(t.id)+'">Abrir</button></div>';
+  };
+  var sec=function(lbl,color,arr,extra){ if(!arr.length)return''; return '<div style="margin-top:8px"><div class="ss" style="font-weight:800;color:'+color+'">'+lbl+' ('+arr.length+')</div>'+arr.map(function(e){return row(e,extra||'');}).join('')+'</div>'; };
+  return '<div class="card" style="padding:12px 14px;margin:10px 0">'
+    +'<div style="display:flex;align-items:center;gap:8px"><div class="cfg-ic" style="width:26px;height:26px;background:rgba(34,211,184,.14);color:#22D3B8">'+svg('eye')+'</div>'
+    +'<div style="font-weight:800">Aprovações pendentes</div><div class="ss" style="margin-left:auto">'+total+' item'+(total===1?'':'s')+'</div></div>'
+    +(total?'':'<div class="ss" style="margin-top:6px">Nenhuma aprovação aguardando o cliente agora.</div>')
+    +sec('Não visualizadas','#F2A93B',cats.nv,'próxima ação: lembrete de visualização')
+    +sec('Visualizadas sem resposta','#22D3EE',cats.vs,'próxima ação: lembrete de decisão')
+    +sec('Ajustes solicitados','#EF4444',cats.aj,'próxima ação: revisar e reenviar')
+    +sec('Aprovadas recentemente','#2FCF8F',cats.ap,'')
+    +'</div>';
+}
 function opOwnerLabel(cs, persp, isFinal){
   if(isFinal) return 'Fluxo finalizado';
   var owner=cs&&cs.owner;
@@ -7353,6 +7621,11 @@ function deriveOperationalCardPresentation(t, persp){
     if(cs.phase===TASK_PHASE.AWAITING_CLIENT_APPROVAL) next='Revisar tema, legenda, feed e story';
     else if(cs.phase===TASK_PHASE.DESIGNER_PRODUCING||cs.phase===TASK_PHASE.DESIGNER_REVISING||cs.phase===TASK_PHASE.DESIGNER_DELIVERED) next='Aguardar o envio da versão final';
   }
+  // F3.5.6A — espera externa VISÍVEL e honesta no card interno: subtipo + visualização +
+  // tempo aguardando (rodada real quando existe); nunca 'ATRASADA' por culpa interna.
+  if(persp!=='client'){ try{ var _ew=wfExternalInfo(t, wfNow());
+    if(_ew&&_ew.active){ statusLabel='Aguardando cliente · '+(_ew.type==='captions'?'Legendas':'Temas')+(_ew.sentAt>0?(' · '+(_ew.viewed?'visualizado':'não visualizado')+(_ew.waitingMs>0?(' · '+wfFmtDur(_ew.waitingMs)):'')):'');
+      next=(_ew.followUp==='SENT_NOT_VIEWED'?'Cliente ainda não visualizou — considere um lembrete':(_ew.followUp?'Cliente visualizou e não respondeu — considere um lembrete':'Aguardar a decisão do cliente')); } }catch(_ewE){} }
   return {phase:cs.phase,statusLabel:statusLabel,tone:pp.color,nextAction:next,isFinal:isFinal,
           ownerLabel:opOwnerLabel(cs,persp,isFinal)};
 }
@@ -7618,7 +7891,19 @@ function openMove(taskId){
   const opts=isDesignerAxisMove(t)
     ? designerMoveOpts(t).map(o=>({key:o.key,label:o.label,desc:o.desc,color:stOf(o.key).color}))
     : STATUS.filter(st=>st.key!==(t.status||'afazer'));
-  document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1"><div class="sheet"><div class="grab"></div><div style="font-size:18px;font-weight:800">Mover tarefa</div><div style="font-size:13px;color:var(--soft);margin-bottom:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(t.title||t.client||'')+'</div>'+
+  /* F3.5.6A — status POR ITEM (Designer, cronograma): cada tema com seu próprio concluído.
+     Marcar o ÚLTIMO item conclui a entrega pelo caminho canônico (moveStatus 'concluido'). */
+  var wfItems='';
+  try{
+    if(isDesignerAxisMove(t)&&secOf(t.sector).key==='cronograma'&&Array.isArray(t.cronContents)&&t.cronContents.length){
+      wfItems='<div style="margin:2px 0 12px;border:1px solid var(--line);border-radius:12px;padding:10px 12px"><div class="ss" style="font-weight:800;margin-bottom:6px">Itens desta produção</div>'+
+        t.cronContents.map(function(c,i){ var st=(t.designerItemStatus&&t.designerItemStatus['i'+i])||null; var done=!!(st&&st.st==='concluido');
+          var nm=''; try{ nm=String((c&&(c.tema||c.t))||('Item '+(i+1))).replace(/<[^>]*>/g,'').slice(0,60); }catch(_){ nm='Item '+(i+1); }
+          return '<button class="chip'+(done?' on':'')+'" data-wfitemdone="'+esc(t.id)+'|'+i+'" style="margin:2px 4px 2px 0'+(done?';background:rgba(47,207,143,.18);border-color:rgba(47,207,143,.5)':'')+'">'+(done?'✓ ':'')+esc(nm)+'</button>';
+        }).join('')+'</div>';
+    }
+  }catch(_wfI){ wfItems=''; }
+  document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1"><div class="sheet"><div class="grab"></div><div style="font-size:18px;font-weight:800">Mover tarefa</div><div style="font-size:13px;color:var(--soft);margin-bottom:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(t.title||t.client||'')+'</div>'+wfItems+
     opts.map(st=>'<button class="moveopt" data-domove="'+t.id+'|'+st.key+'" style="background:'+withAlpha(st.color,.12)+'"><div class="icb" style="background:'+withAlpha(st.color,.18)+';color:'+st.color+'">'+svg('swap')+'</div><div><div style="font-size:14px;font-weight:800;color:'+st.color+'">'+st.label+'</div><div style="font-size:11.5px;color:var(--faint)">'+st.desc+'</div></div></button>').join('')+'</div></div>';
 }
 async function moveStatus(taskId,newStatus){
@@ -7673,6 +7958,19 @@ async function moveStatus(taskId,newStatus){
       if(newStatus==='andamento')patch.clientFlowStatus='producao';
       else if(newStatus==='revisao')patch.clientFlowStatus='producao';   // designer ajustando ainda é produção p/ o cliente
       else if(newStatus==='entregue'||newStatus==='concluido')patch.clientFlowStatus='reenviado'; // aguardando aprovação final
+      // F3.5.6A — PRODUÇÃO CONCLUÍDA (canônica, pelo ESTADO DOS ITENS — nunca pela UI):
+      // fase → captions_preparation (bola volta à Social) + ledger DESIGN_PRODUCTION_COMPLETED
+      // idempotente por ciclo + itens restantes carimbados concluídos.
+      if(newStatus==='entregue'||newStatus==='concluido'){
+        try{
+          var _cyc2=wfCycleN(t); var _tot2=(Array.isArray(t.cronContents)?t.cronContents.length:0);
+          wfCloseRunsPatch(patch, t, '', now);
+          wfOpenRunPatch(patch, t, 'captions_preparation', 'social', (t.socialOwnerId||t.by||''), 0, now);
+          wfMirrorPhasePatch(patch, 'captions_preparation', 'social', (t.socialOwnerId||t.by||''), now, false);
+          patch['workflowEvents.ev_dpc_c'+_cyc2]={t:'DESIGN_PRODUCTION_COMPLETED',ph:'captions_preparation',at:now,src:'team',by:(state.user&&state.user.id)||'',n:_tot2,tot:_tot2,v:1};
+          for(var _mi=0;_mi<_tot2;_mi++){ var _cur=(t.designerItemStatus&&t.designerItemStatus['i'+_mi])||null; if(!_cur||_cur.st!=='concluido') patch['designerItemStatus.i'+_mi]={st:'concluido',at:now,byId:(state.user&&state.user.id)||null}; }
+        }catch(_wfE2){}
+      }
     }else{
       // tarefas não-cronograma: refletir no status social para casar com renderBoard/socialCol não-cron
       if(newStatus==='andamento')patch.status='andamento';
@@ -8320,6 +8618,10 @@ function openDesignerModal(taskId){
 }
 async function sendToDesigner(taskId,designerId,dl){
   const t=state.tasks.find(x=>x.id===taskId);if(!t)return;
+  // F3.5.6A — GATE CANÔNICO na ESCRITA (não só no botão): atribuição de Designer SÓ após
+  // TEMAS APROVADOS (portal, aprovação externa registrada ou sinal legado equivalente).
+  // Auditoria não encontrou override administrativo existente — nenhum bypass é criado.
+  if(secOf(t.sector).key==='cronograma' && !clientApproved(t)){ flashToast('Atribuição bloqueada: os TEMAS ainda não foram aprovados pelo cliente.',6000); return; }
   const d=state.users.find(u=>u.id===designerId);if(!d)return;
   dl=dl||{};
   const now=Date.now();const u=state.user||{};
@@ -8374,6 +8676,20 @@ async function sendToDesigner(taskId,designerId,dl){
     delete patch.operationalStatus; delete patch.socialFlowStatus; delete patch.socialWorkflowStage;
     delete patch.pendingDesignerDelivery; delete patch.pendingSocialReview;
     delete patch.finalApprovalRequired; delete patch.finalApprovalCompleted;
+  }
+  // F3.5.6A — ORQUESTRAÇÃO (aditivo, cronograma): fase persistida design_production + run do
+  // Designer (dueAt = prazo real da atribuição) + ledger DESIGNER_ASSIGNED idempotente por
+  // ciclo (reatribuição do MESMO designer no MESMO ciclo não duplica notificação) + status
+  // POR ITEM inicializado (pendente) preservando conclusões anteriores.
+  if(secOf(t.sector).key==='cronograma'){
+    try{
+      var _cyc=wfCycleN(t); var _tot=(Array.isArray(t.cronContents)?t.cronContents.length:0);
+      wfCloseRunsPatch(patch, t, '', now);
+      wfOpenRunPatch(patch, t, 'design_production', 'designer', designerId, Number(planDueAt)||0, now);
+      wfMirrorPhasePatch(patch, 'design_production', 'designer', designerId, now, false);
+      patch['workflowEvents.ev_dassign_'+designerId+'_c'+_cyc]={t:'DESIGNER_ASSIGNED',ph:'design_production',at:now,src:'team',by:u.id||'',ru:designerId,n:_tot,tot:_tot,v:1};
+      if(_tot>0){ var _dis={}; for(var _di=0;_di<_tot;_di++){ var _pv=(t.designerItemStatus&&t.designerItemStatus['i'+_di])||null; _dis['i'+_di]=(_pv&&_pv.st)?_pv:{st:'pendente',at:now,byId:u.id||null}; } patch.designerItemStatus=_dis; }
+    }catch(_wfE){}
   }
   if(dl.obs&&String(dl.obs).trim())patch.desc=String(dl.obs).trim();
   // F3.5.4W-H1 (E5) — observações internas por tema: só grava quando a seção existiu (setor de cliente
@@ -8886,6 +9202,7 @@ async function openSendClientModal(taskOrForm){
       '<div class="gcs-secondary">'+
         '<button class="btn ghost" id="btnPrewarmRetry" style="display:none">Tentar novamente</button>'+
         '<button class="btn ghost" id="btnCopyGroupMsg">Copiar mensagem</button>'+
+        '<button class="btn" id="btnConfirmSend" disabled title="Habilita após copiar/abrir o WhatsApp. Só confirme DEPOIS de enviar no grupo.">'+svg('check')+'Confirmar envio ao cliente</button>'+
         '<button class="btn ghost" id="btnTestLink">Testar link</button>'+
       '</div>'+
     '</div>'+
@@ -9052,7 +9369,7 @@ async function _wireGroupSend(ctx, msg, cardFile){
     // pela Social e ele NÃO registrava o envio — sem persistClientSend não há contentSent
     // e o Notification Engine nunca recebe themes_sent_to_client. O registro roda em
     // segundo plano (não trava o WhatsApp); o dedup de 60s do engine cobre o duplo clique.
-    if(ctx&&ctx.id&&ctx.id!=='__form__')persistClientSend(ctx.id);
+    wfArmConfirmSend(ctx);   // F3.5.6A — COPIAR ≠ ENVIADO: habilita a confirmação explícita
   });
   /* ===== Secundários discretos ===== */
   on('btnCopyGroupMsg', function(){                                // copia só a mensagem (se útil), sem abrir o WhatsApp
@@ -9060,7 +9377,18 @@ async function _wireGroupSend(ctx, msg, cardFile){
     const b=$('btnCopyGroupMsg'); if(b){ b.classList.add('is-done'); b.innerHTML=svg('check')+'Mensagem copiada'; }
     flashToast('Mensagem copiada. Cole no grupo do WhatsApp Business do cliente.');
     // Copiar a mensagem É o passo de envio manual no grupo — registra igual.
-    if(ctx&&ctx.id&&ctx.id!=='__form__')persistClientSend(ctx.id);
+    wfArmConfirmSend(ctx);   // F3.5.6A — COPIAR ≠ ENVIADO: habilita a confirmação explícita
+  });
+  /* F3.5.6A — CONFIRMAR ENVIO AO CLIENTE: único registro de sentAt (server-side, via
+     Worker confirmClientSend). Copiar/abrir WhatsApp NÃO registra mais nada — apenas
+     habilita este botão. Sem sessão de equipe/rede: erro claro, sem fabricar sentAt. */
+  function wfArmConfirmSend(c){ var b=$('btnConfirmSend'); if(!b)return; if(!(c&&c.id&&c.id!=='__form__'))return; b.disabled=false; b.title='Confirme somente DEPOIS de enviar a mensagem no grupo do cliente.'; }
+  on('btnConfirmSend', async function(){
+    var b=$('btnConfirmSend'); if(!b||b.disabled)return;
+    if(!(ctx&&ctx.id&&ctx.id!=='__form__')){ flashToast('Salve a tarefa antes de confirmar o envio.'); return; }
+    b.disabled=true; var old=b.innerHTML; b.innerHTML=svg('send')+'Confirmando…';
+    await wfConfirmClientSend(ctx.id);
+    b.innerHTML=svg('check')+'Envio confirmado'; b.classList.add('is-done');
   });
   on('btnTestLink', function(){                                    // abre o LINK DE COMPARTILHAMENTO p/ conferir a prévia premium + portal
     let url=''; try{ url=buildShareClientUrl(ctx&&ctx.token); }catch(_){ flashToast('Link inválido — gere o cronograma novamente.'); return; }
@@ -9222,9 +9550,9 @@ function renderClientView(){
         '<button class="btn '+(isRev?'cvw-amber':'cvw-violet')+'" data-clientsubmit="'+state.clientAction+'">'+svg(isRev?'revise':'editnote')+(isRev?'Enviar revisão':'Enviar edição')+'</button>'+
       '</div></div>';
   } else if(ctx.status==='aprovado_cliente'){
-    actions='<div class="cvw-approved">'+svg('check')+'<span>Você aprovou este cronograma. A equipe foi notificada.</span></div>';
+    actions=wfClientViewExtrasHtml()+'<div class="cvw-approved">'+svg('check')+'<span>Você aprovou este cronograma. A equipe foi notificada.</span></div>';
   } else {
-    actions='<div class="cvw-actions">'+
+    actions=wfClientViewExtrasHtml()+'<div class="cvw-actions">'+
       '<button class="btn cvw-approve" data-clientact="aprovar">'+svg('check')+'Aprovar cronograma</button>'+
       '<button class="btn cvw-rev" data-clientact="revisao">'+svg('revise')+'Pedir revisão</button>'+
       '<button class="btn cvw-edit" data-clientact="editar">'+svg('editnote')+'Editar cronograma</button>'+
@@ -11109,6 +11437,15 @@ async function saveTask(){const f=state.form;
   }
   const u=f.assigneeId?state.users.find(x=>x.id===f.assigneeId):null;
   const data={title:f.title.trim(),client:f.client.trim(),sector:f.sector,desc:composedDesc(),status:f.status,assignee:u?u.name:'',assigneeId:f.assigneeId||null,link:f.link.trim(),priority:!!f.priority,startDate:f.startDate||'',startTime:f.startTime||'',endDate:f.endDate||'',endTime:f.endTime||'',dueDate:f.dueDate||'',dueTime:f.dueTime||'',due:f.dueDate||'',checklist:f.checklist.filter(c=>c.t.trim()),by:state.user.id,createdAt:Date.now(),src:'webpreview'};
+  // F3.5.6A — fase persistida DESDE O NASCIMENTO (setores de cliente): preparação dos temas
+  // com run inicial do responsável Social. Aditivo; marcadores legados intactos (compat 1.0.228).
+  if(isClientSector(secOf(f.sector).key)){
+    var _wfNow=wfNow();
+    data.workflowPhase='themes_preparation'; data.workflowPhaseAt=_wfNow;
+    data.workflowResponsibleType='social'; data.workflowResponsibleUid=(state.user&&state.user.id)||'';
+    data.externalWait=false; data.externalWaitSince=0;
+    data.phaseRuns={ pr01_themes_preparation:{ phase:'themes_preparation', responsibleType:'social', responsibleUid:(state.user&&state.user.id)||'', startedAt:_wfNow, dueAt:0, completedAt:0, status:'active', outcome:'', delayMs:0, elapsedMs:0, createdAt:_wfNow, updatedAt:_wfNow } };
+  }
   /* F3.5.4I — COMPACTA os temas: descarta buracos (array esparso ⇒ undefined) e vazios, mantém TODOS os
      PREENCHIDOS. Sem isso o Firestore rejeita o add() ("Unsupported field value: undefined (found in field
      cronContents.N)") e o catch genérico mascarava como "Verifique a conexão". */
@@ -11725,12 +12062,20 @@ document.addEventListener('click',async e=>{
     // NUNCA envia send?text= ao cliente. O usuário cola a mensagem no chat.
     const msg=buildClientMessage(ctx);
     copyToClipboard(msg);
-    if(id&&id!=='__form__')await persistClientSend(id);
+    /* F3.5.6A — COPIAR ≠ ENVIADO: este caminho NÃO registra mais envio. A confirmação
+       explícita (sentAt server-side) vive no botão 'Confirmar envio ao cliente' do modal
+       principal e no painel Fluxo da tarefa (Visão do cliente). */
     closeModal();
     openWhatsAppPlain();
     flashToast('Mensagem copiada — cole no WhatsApp. A prévia premium aparece pelo link.');
     return;
   }
+  if(el=g('[data-wfext]')){wfRegisterExternalDecisionUI(el.dataset.wfext);return;}
+  if(el=g('[data-wfconfirmsend]')){wfConfirmClientSend(el.dataset.wfconfirmsend);return;}
+  if(el=g('[data-wfsetdue]')){wfSetPhaseDueUI(el.dataset.wfsetdue);return;}
+  if(el=g('[data-wfready]')){var _wfr=String(el.dataset.wfready||'').split('|');wfMarkReadyUI(_wfr[0],_wfr[1]==='captions'?'captions':'themes');return;}
+  if(el=g('[data-wfcopyreminder]')){wfCopyReminder(el.dataset.wfcopyreminder);return;}
+  if(el=g('[data-wfitemdone]')){wfToggleItemDone(el.dataset.wfitemdone);return;}
   if(el=g('[data-sheet]')){openSheet(el.dataset.sheet);return;}
   if(el=g('[data-cfgnotiftest]')){try{window.desktopAPI&&window.desktopAPI.notifTest&&window.desktopAPI.notifTest();}catch(_){}flashToast('Notificação de teste disparada.');return;}
   if(el=g('[data-cfgnotifdiag]')){try{notifDiagFill();}catch(_){}flashToast('Diagnóstico de notificações atualizado.');return;}
