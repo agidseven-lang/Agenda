@@ -1,13 +1,13 @@
 {
-  "at": "2026-08-07T11:53:15.006Z",
-  "indexSha": "9adc666420933a7c7a2c5c5d647f2633cc28f4bfdb4587460fc6f08fa64c9c1d",
+  "at": "2026-08-08T13:14:23.304Z",
+  "indexSha": "f2ef1b137f2140f87c922c84f8506d9df631d64138f52f266b68ed64325f80f0",
   "bgSha": "a3818a009c4ace343c25152d0e54b235bb4fbeae47a5d73cb6bb0ac83a5a3d88",
   "results": [
     {
       "name": "BOOT app real do asar (semente aplicada)",
       "ok": true,
       "info": {
-        "indexSha": "9adc66642093",
+        "indexSha": "f2ef1b137f21",
         "user": true,
         "tasks": 4
       }
