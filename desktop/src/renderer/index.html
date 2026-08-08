@@ -7443,8 +7443,9 @@ async function wfRegisterExternalDecisionUI(kind){
   var t=state.tasks.find(function(x){return x.id===taskId;})||{};
   var typeNow=wfRoundTypeNow(t);
   var label=(typeNow==='captions'?'LEGENDAS':'TEMAS');
+  /* Electron NÃO suporta window.prompt — a nota do ajuste vem do input inline do painel. */
   var note='';
-  if(kind==='adjustment'){ note=prompt('O que o cliente pediu para ajustar (registrado na rodada de '+label+')?')||''; if(!String(note).trim()){ flashToast('Registro cancelado — descreva o ajuste pedido.'); return; } }
+  if(kind==='adjustment'){ var _ni=document.getElementById('wfExtNote'); note=(_ni&&_ni.value||'').trim(); if(!note){ flashToast('Descreva no campo acima o que o cliente pediu para ajustar.'); if(_ni)_ni.focus(); return; } }
   else if(!confirm('Registrar APROVAÇÃO de '+label+' recebida pelo WhatsApp?\n\nIsso produz a MESMA decisão canônica do portal (source: whatsapp_group) e fica auditado no histórico.')) return;
   var r=await wfTeamAction(taskId,'registerExternalDecision',{decision:(kind==='adjustment'?'adjustment':'approved'),roundType:typeNow,note:String(note||'').slice(0,1000)});
   if(r&&r.ok){
@@ -7540,7 +7541,9 @@ function wfClientViewExtrasHtml(){
       +'</div>';
   }
   if(ew.active){
-    h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">'
+    h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center">'
+      +'<input id="wfExtNote" class="inp" placeholder="Ajuste pedido pelo cliente (obrigatório p/ registrar ajuste)" style="flex:1;min-width:220px;padding:6px 8px;font-size:12px">'
+      +'</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">'
       +'<button class="chip" data-wfext="approved">Registrar APROVAÇÃO recebida pelo WhatsApp</button>'
       +'<button class="chip" data-wfext="adjustment">Registrar AJUSTE pedido pelo WhatsApp</button>'
       +(ew.followUp?'<button class="chip" data-wfcopyreminder="'+esc(t.id)+'">Copiar lembrete</button>':'')

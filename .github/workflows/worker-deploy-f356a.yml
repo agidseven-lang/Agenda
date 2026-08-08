@@ -1,0 +1,80 @@
+# F3.5.6A — Deploy do Worker `idseven-push` V64.61-f356a-workflow (rodadas de aprovação +
+# phase runs + ledger de eventos + confirmar envio + registro externo WhatsApp + /viewed).
+# - SOMENTE workflow_dispatch (nunca em push). Dispare A PARTIR do branch da fase — e o
+#   checkout abaixo AINDA assim pina o ref (lição F3.5.5C: NUNCA deployar do main, V64.4).
+# - `wrangler deploy` publica script + [vars] do wrangler.toml + cron. NÃO altera secrets
+#   do Worker (FCM_CLIENT_EMAIL, FCM_PRIVATE_KEY, IMAGEKIT_PRIVATE_KEY permanecem).
+# - Verificação de identidade por LEITURAS CONSECUTIVAS (recomendação 44b). SEM
+#   auto-rollback: falha só reporta — rollback é decisão humana (redeploy do commit base).
+name: "[dispatch] F3.5.6A — Worker V64.61 (workflow/rodadas/ledger) — Deploy idseven-push"
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: worker-deploy-idseven-push
+  cancel-in-progress: false
+
+env:
+  PHASE_BRANCH: "desktop/f356a-realtime-workflow-client-approval-1.0.229"
+  BASE_228_SHA: "3f0d0af192b4b6b32a8e8bbda4153dcf4df1bc6d"
+  WANT_VERSION: "V64.61-f356a-workflow"
+  WANT_BUILD: "f354wh1-approve-all+f355c-rich+f356a-workflow"
+
+jobs:
+  deploy:
+    name: "gates + wrangler deploy + identidade"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout (ref PINADO no branch da fase)
+        uses: actions/checkout@v4
+        with:
+          ref: "desktop/f356a-realtime-workflow-client-approval-1.0.229"
+          fetch-depth: 0
+
+      - name: "Gate FONTE — identidade V64.61 no código + wrangler.toml íntegro + ancestria 1.0.228"
+        run: |
+          set -euo pipefail
+          [ "$(git rev-parse --abbrev-ref HEAD || true)" = "$PHASE_BRANCH" ] || git checkout "$PHASE_BRANCH" >/dev/null 2>&1 || true
+          git merge-base --is-ancestor "$BASE_228_SHA" HEAD || { echo "::error::checkout não descende da 1.0.228 (base da fase)"; exit 1; }
+          grep -Fq "version: \"$WANT_VERSION\"" cloudflare-worker.js || { echo "::error::cloudflare-worker.js sem a identidade $WANT_VERSION"; exit 1; }
+          grep -Fq "const WORKER_BUILD = \"$WANT_BUILD\";" cloudflare-worker.js || { echo "::error::WORKER_BUILD divergente"; exit 1; }
+          grep -Eq '^name = "idseven-push"$' wrangler.toml || { echo "::error::wrangler.toml não aponta o worker idseven-push"; exit 1; }
+          grep -Eq '^main = "cloudflare-worker.js"$' wrangler.toml || { echo "::error::wrangler.toml main divergente"; exit 1; }
+          # (parse/comportamento do worker são provados pela suíte f356a seção H no build Desktop)
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Deploy Worker (wrangler)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy
+
+      - name: "Verificar IDENTIDADE (leituras consecutivas; SEM auto-rollback) + smoke compat"
+        run: |
+          set -euo pipefail
+          B="https://idseven-push.agidseven.workers.dev"
+          echo "== HEALTH: exigo 3 leituras consecutivas com version=$WANT_VERSION e build=$WANT_BUILD =="
+          OK=0
+          for i in $(seq 1 10); do
+            R="$(curl -sS --max-time 15 "$B/" || true)"; echo "[$i] $R"
+            if printf '%s' "$R" | grep -Fq "\"version\":\"$WANT_VERSION\"" && printf '%s' "$R" | grep -Fq "\"build\":\"$WANT_BUILD\""; then
+              OK=$((OK+1)); [ "$OK" -ge 3 ] && break
+            else
+              OK=0
+            fi
+            sleep 5
+          done
+          [ "$OK" -ge 3 ] || { echo "::error::identidade $WANT_VERSION NÃO confirmada em 3 leituras consecutivas — NENHUM rollback automático executado; produção deve ser inspecionada (redeploy humano do commit base se necessário)"; exit 1; }
+          echo "== SMOKE compat (rotas antigas seguem vivas; dryRun NÃO envia push) =="
+          curl -sS --max-time 15 -X POST "$B/notify-designer" -H "Content-Type: application/json" -d '{"id":"__dryrun_ci_f356a__","dryRun":true}' ; echo
+          echo "identidade confirmada: $WANT_VERSION ($WANT_BUILD)"

@@ -28,14 +28,16 @@ const here = path.dirname(url.fileURLToPath(import.meta.url));
 const D = (p) => path.resolve(here, "..", p);
 const ROOT = path.resolve(here, "..", "..");
 const ENV = process.env;
-const SRC = ENV.F356A_SRC || D("src/renderer/index.html");
-const MAIN_SRC = ENV.F356A_MAIN_SRC || D("src/main/main.ts");
-const SLARULES = ENV.F356A_SLARULES || D("src/main/slaRules.js");
-const WE_PATH = ENV.F356A_WE || D("src/main/workflowEvents.js");
-const WN_DIST = ENV.F356A_DIST_WN || D("dist/main/workflowNotifier.js");
-const WORKER = ENV.F356A_WORKER || path.join(ROOT, "cloudflare-worker.js");
-const PKG = ENV.F356A_PKG || D("package.json");
-const LOCK = ENV.F356A_LOCK || D("package-lock.json");
+/* Overrides do env viram ABSOLUTOS (require() rejeita relativo sem "./" — modo ASAR). */
+const E = (v) => (v ? path.resolve(v) : null);
+const SRC = E(ENV.F356A_SRC) || D("src/renderer/index.html");
+const MAIN_SRC = E(ENV.F356A_MAIN_SRC) || D("src/main/main.ts");
+const SLARULES = E(ENV.F356A_SLARULES) || D("src/main/slaRules.js");
+const WE_PATH = E(ENV.F356A_WE) || D("src/main/workflowEvents.js");
+const WN_DIST = E(ENV.F356A_DIST_WN) || D("dist/main/workflowNotifier.js");
+const WORKER = E(ENV.F356A_WORKER) || path.join(ROOT, "cloudflare-worker.js");
+const PKG = E(ENV.F356A_PKG) || D("package.json");
+const LOCK = E(ENV.F356A_LOCK) || D("package-lock.json");
 
 let okc = 0, fail = 0; const fails = [];
 function ok(name, cond, extra) {

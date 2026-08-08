@@ -1,0 +1,252 @@
+{
+  "meta": {
+    "stageIndexSha": "f2ef1b137f2140f87c922c84f8506d9df631d64138f52f266b68ed64325f80f0"
+  },
+  "results": [
+    {
+      "name": "P01 ciclo de temas: fase persistida + painel FASE/RESPONSÁVEL/INÍCIO/PRAZO/STATUS",
+      "ok": true,
+      "info": {
+        "r": {
+          "panel": true,
+          "fase": true,
+          "due": true,
+          "resp": true,
+          "phase": "themes_preparation",
+          "btnConfirm": true
+        },
+        "png": "p01-fluxo-fase-inicial.png"
+      }
+    },
+    {
+      "name": "P02 Kanban honesto: AGUARDANDO CLIENTE + subtipo + visualização + tempo",
+      "ok": true,
+      "info": {
+        "r": {
+          "label": "Aguardando cliente · Temas · não visualizado · 30h",
+          "next": "Cliente visualizou e não respondeu — considere um lembrete"
+        }
+      }
+    },
+    {
+      "name": "P03 espera externa: waiting_client fora do painel + Prioridades NORMAL + seção própria",
+      "ok": true,
+      "info": {
+        "r": {
+          "state": "waiting_client",
+          "inPanel": false,
+          "lvl": 3,
+          "NORMAL": 3,
+          "awn": 1,
+          "awText": "Aguardando cliente — Temas · não visualizado · 30h"
+        }
+      }
+    },
+    {
+      "name": "P03b Minhas Prioridades: seção AGUARDANDO CLIENTE com Copiar lembrete (sem culpa interna)",
+      "ok": true,
+      "info": {
+        "r": {
+          "sec": true,
+          "lembrete": true
+        },
+        "png": "p03-prioridades-aguardando-cliente.png"
+      }
+    },
+    {
+      "name": "P04 cliente visualizou: INFORMATIVA (info, SEM som) ao responsável — 1 única vez",
+      "ok": true,
+      "info": {
+        "got": 1,
+        "sev": "info"
+      }
+    },
+    {
+      "name": "P05 temas aprovados: AÇÃO NECESSÁRIA imediata ao responsável Social",
+      "ok": true,
+      "info": {
+        "title": "Temas aprovados"
+      }
+    },
+    {
+      "name": "P06 próxima ação no corpo (o que aconteceu + o que fazer agora)",
+      "ok": true,
+      "info": {
+        "body": "2 temas aprovados. Próxima ação: atribuir aos Designers."
+      }
+    },
+    {
+      "name": "P07 atribuição: BLOQUEADA sem temas aprovados; liberada grava fase+run+ledger+itens",
+      "ok": true,
+      "info": {
+        "r": {
+          "blocked": true,
+          "phase": "design_production",
+          "resp": "u-des-diego",
+          "itemsInit": true,
+          "evKey": "workflowEvents.ev_dassign_u-des-diego_c0",
+          "runOpen": true
+        }
+      }
+    },
+    {
+      "name": "P08 atribuição notifica SOMENTE o Designer do evento (imediata, com próxima ação)",
+      "ok": true,
+      "info": {
+        "d": 1,
+        "m": 0
+      }
+    },
+    {
+      "name": "P09 rajada agregada: nada antes da janela; depois 1 única ('4 cards concluídos — Diego… 4 de 12')",
+      "ok": true,
+      "info": {
+        "before": 0,
+        "title": "4 cards concluídos"
+      }
+    },
+    {
+      "name": "P10 produção concluída pelos DADOS: último item → entrega canônica + ev_dpc + fase captions_preparation",
+      "ok": true,
+      "info": {
+        "r": {
+          "itemP": true,
+          "moveP": true,
+          "dpc": true,
+          "capPrep": true,
+          "evItem": true
+        }
+      }
+    },
+    {
+      "name": "P10b notificação de produção concluída: AÇÃO NECESSÁRIA + próxima ação (legendas)",
+      "ok": true,
+      "info": {
+        "body": "Todos os 3 conteúdos foram finalizados. Próxima ação: preparar e enviar as legendas."
+      }
+    },
+    {
+      "name": "P11 legendas prontas: próxima ação = enviar para aprovação",
+      "ok": true,
+      "info": {
+        "body": "Próxima ação: enviar para aprovação do cliente."
+      }
+    },
+    {
+      "name": "P12 segunda aprovação (CAPTIONS) conduz ao fechamento — rodadas nunca confundidas",
+      "ok": true,
+      "info": {
+        "title": "Legendas aprovadas — fluxo concluído"
+      }
+    },
+    {
+      "name": "P13 ajuste de legendas: PRIORITÁRIA (warning+som) + próxima ação revisar/reenviar",
+      "ok": true,
+      "info": {
+        "sev": "warning"
+      }
+    },
+    {
+      "name": "P14 aprovação via WhatsApp: POST server-side (registerExternalDecision, rodada correta, JWT+Idempotency) — renderer NUNCA grava a decisão",
+      "ok": true,
+      "info": {
+        "r": {
+          "posts": 1,
+          "action": "registerExternalDecision",
+          "decision": "approved",
+          "roundType": "themes",
+          "hasAuth": true,
+          "hasIdem": true,
+          "url": true
+        },
+        "png": "p14-registro-whatsapp.png"
+      }
+    },
+    {
+      "name": "P15 follow-up: LONG_WAIT (30h) recomendado + lembrete COPIADO manualmente (nunca wa.me/envio automático)",
+      "ok": true,
+      "info": {
+        "r": {
+          "followUp": "LONG_WAIT",
+          "waitingH": 30,
+          "copied": true,
+          "hasLink": true,
+          "noWa": true,
+          "uiLong": true
+        }
+      }
+    },
+    {
+      "name": "P16 Central do Cliente: visão APROVAÇÕES PENDENTES (categorias + tarefa em espera + lembrete + abrir)",
+      "ok": true,
+      "info": {
+        "r": {
+          "has": true,
+          "nv": true,
+          "vs": false,
+          "aj": false,
+          "ap": false,
+          "rowB": true,
+          "lembrete": true
+        },
+        "png": "p16-central-cliente-aprovacoes-pendentes.png"
+      }
+    },
+    {
+      "name": "P17 histórico por fases: run interno fechado NO PRAZO + run externo ativo do CLIENTE (quem/quando preservados)",
+      "ok": true,
+      "info": {
+        "r": {
+          "n": 2,
+          "r1done": true,
+          "r1resp": true,
+          "r2active": true,
+          "ar": "pr02_themes_waiting_client"
+        }
+      }
+    },
+    {
+      "name": "P18 tempo da equipe ≠ tempo do cliente: wfB em espera (sem alerta) E wfC interna vencida SEGUE crítica",
+      "ok": true,
+      "info": {
+        "r": {
+          "b": "waiting_client",
+          "bPanel": false,
+          "c": "overdue",
+          "cPanel": true,
+          "cCrit": true,
+          "lB": 3,
+          "lC": 1,
+          "CRIT": 1,
+          "NORM": 3
+        }
+      }
+    },
+    {
+      "name": "P19 congelados intactos no pacote: bgNotify/notificationGrouping/bgnotify sem f356a; handoff + ingresso + produtor novo plugado NELE",
+      "ok": true,
+      "info": {
+        "bgLen": 14567,
+        "grLen": 12196
+      }
+    },
+    {
+      "name": "P20 ciclo completo concluído: 3 rodadas preservadas (incl. ajuste via WhatsApp), 6 phase runs, conclusão canônica, espera encerrada",
+      "ok": true,
+      "info": {
+        "r": {
+          "phase": "completed",
+          "rounds": 3,
+          "themesKept": true,
+          "adjKept": true,
+          "runs": 6,
+          "done": true,
+          "ew": false,
+          "faseUi": true
+        },
+        "png": "p20-ciclo-completo-concluido.png"
+      }
+    }
+  ],
+  "fatal": null
+}

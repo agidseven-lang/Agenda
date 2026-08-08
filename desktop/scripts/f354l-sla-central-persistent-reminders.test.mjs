@@ -312,7 +312,22 @@ function f354oIndexControlledDiff() {
 }
 ok(f354oIndexControlledDiff(), "49 index.html — DIFF CONTROLADO F3.5.4N+F3.5.4O (Inicialização/autocorreção + agrupamento das comuns aditivos; toast/Monitor SLA/sino/Cronograma intactos)");
 ok(bytesIdenticalVs201("src/main/slaScheduler.ts"), "50 slaScheduler.ts (tempos/boundaries) byte-idêntico a 1.0.201");
-ok(bytesIdenticalVs201("src/main/slaRules.js"), "51 slaRules.js (T-30/T-10/destinatários/dedup) byte-idêntico");
+// [RE-PINADO F3.5.6A] slaRules.js SAI do byte-congelado: recebe DIFF CONTROLADO **PURAMENTE
+// ADITIVO** — externalWaitOf (espera externa: bola com o CLIENTE) + branch waiting_client no
+// display state (inPanel:false pausa alertas SÓ da tarefa em espera) + export. ZERO linha
+// removida vs 1.0.201; T-30/T-10/destinatários/dedup/timeline seguem provados por PRESENÇA.
+function f356aSlaRulesControlledDiff() {
+  let d = "";
+  try { d = execSync("git -C " + JSON.stringify(DESK) + " diff 047261b7587951e0496d5f4eff0cda5998269161 HEAD -- src/main/slaRules.js", { encoding: "utf8" }); } catch { return false; }
+  const rm = d.split("\n").filter((l) => l.startsWith("-") && !l.startsWith("---"));
+  const additiveOnly = rm.length === 0;
+  const hasF356a = /function externalWaitOf\(/.test(d) && /state:'waiting_client'/.test(d) && /inPanel:false/.test(d);
+  let cur = "";
+  try { cur = fs.readFileSync(path.join(DESK, "src/main/slaRules.js"), "utf8"); } catch { return false; }
+  const anchorsPresent = /function resolveTaskDisplayState\(/.test(cur) && /function resolveCanonicalSlaTimeline\(/.test(cur) && /function resolveNotificationTargets\(/.test(cur) && /function slaEmissionsFor\(/.test(cur) && /function notifBuildPayload\(/.test(cur) && /warningMinutes:30/.test(cur) && /overdueGraceMinutes:10/.test(cur);
+  return additiveOnly && hasF356a && anchorsPresent;
+}
+ok(f356aSlaRulesControlledDiff(), "51 slaRules.js — DIFF CONTROLADO F3.5.6A (externalWaitOf ADITIVO-PURO; T-30/T-10/destinatários/dedup/timeline presentes; zero remoção)");
 ok(bytesIdenticalVs201("src/main/cardsRules.js"), "52 cardsRules.js (T-30/T-10 cards) byte-idêntico");
 // F3.5.4P — notifEvents.js SAIU dos byte-congelados: recebe a derivação ADITIVA de help_requested/blocked
 // (Categoria A/destinatários da 1.0.201 preservados; ZERO remoção). Passa a DIFF CONTROLADO.
