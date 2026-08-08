@@ -1,7 +1,7 @@
 {
   "feature": "F3.5.5B",
-  "asarSha256": "a1ed1180edc35c5e5394eb6b64d982a6e2be4594a715889d58519423bedb1595",
-  "packagedIndexSha256": "f2ef1b137f2140f87c922c84f8506d9df631d64138f52f266b68ed64325f80f0",
+  "asarSha256": "e21ce27b4ec10799bfffe322283ed51ce67b5d2deede1296ee4f9dd2474553b1",
+  "packagedIndexSha256": "8e87fd12ff284ddf7001fc7efb31543bae29efb9a14ef353c75b4b4b7047591c",
   "electron": "31.3.1",
   "proofs": 20,
   "failures": 0,
@@ -13,8 +13,8 @@
       "info": {
         "count": 7,
         "allDate": true,
-        "todayDd": "8",
-        "expDd": "8",
+        "todayDd": "4",
+        "expDd": "4",
         "firstTime": "09:00— 18:30",
         "sched": true,
         "prog": true,
@@ -28,15 +28,15 @@
       "ok": true,
       "info": {
         "hasDate": true,
-        "dd": "8",
-        "dw": "SÁB",
+        "dd": "4",
+        "dw": "TER",
         "dm": "AGO",
         "dy": "",
         "st": "Agendado",
         "time": "14:00— 16:00",
         "name": "Ana Beatriz Social Media",
         "ty": "Gravação",
-        "rail": "background:#22D3EE",
+        "rail": "background:#F87171",
         "ow": true,
         "metas": [
           "Dra. Daniella Félix",
@@ -54,15 +54,15 @@
       "ok": true,
       "info": {
         "hasDate": true,
-        "dd": "8",
-        "dw": "SÁB",
+        "dd": "4",
+        "dw": "TER",
         "dm": "AGO",
         "dy": "",
         "st": "Em andamento",
         "time": "09:00— 18:30",
         "name": "Diego Fernandes Designer",
         "ty": "Edição",
-        "rail": "background:#A78BFA",
+        "rail": "background:#F87171",
         "ow": true,
         "png": "f355b-P03-andamento.png"
       }
@@ -72,8 +72,8 @@
       "ok": true,
       "info": {
         "hasDate": true,
-        "dd": "8",
-        "dw": "SÁB",
+        "dd": "4",
+        "dw": "TER",
         "dm": "AGO",
         "dy": "",
         "st": "Finalizado",
@@ -149,8 +149,8 @@
       "info": {
         "opened": true,
         "xFocused": true,
-        "dow": "Sábado",
-        "dfull": "8 de agosto de 2026",
+        "dow": "Terça-feira",
+        "dfull": "4 de agosto de 2026",
         "time": "14:00— 16:00",
         "dur": "Duração: 2 horas",
         "noRaw": true,
@@ -193,11 +193,11 @@
       }
     },
     {
-      "name": "P12 data completa pt-BR no modal: 'Terça-feira' + '18 de agosto de 2026'; 15:30—16:00; 'Duração: 30 minutos'; nunca 2026-08-18",
+      "name": "P12 data completa pt-BR no modal: 'Sexta-feira' + '14 de agosto de 2026'; 15:30—16:00; 'Duração: 30 minutos'; nunca 2026-08-14",
       "ok": true,
       "info": {
-        "dow": "Terça-feira",
-        "dfull": "18 de agosto de 2026",
+        "dow": "Sexta-feira",
+        "dfull": "14 de agosto de 2026",
         "time": "15:30— 16:00",
         "dur": "Duração: 30 minutos",
         "noRaw": true,
@@ -246,7 +246,7 @@
         "cardOk": true,
         "modalFits": true,
         "priClickable": true,
-        "dfull": "8 de agosto de 2026",
+        "dfull": "4 de agosto de 2026",
         "png": "f355b-P15-escala125.png"
       }
     },
@@ -259,7 +259,7 @@
         "cardOk": true,
         "modalFits": true,
         "priClickable": true,
-        "dfull": "8 de agosto de 2026",
+        "dfull": "4 de agosto de 2026",
         "png": "f355b-P16-escala150.png"
       }
     },
@@ -305,7 +305,7 @@
       "ok": true,
       "info": {
         "stats": 3,
-        "urgent": 1,
+        "urgent": 2,
         "hasHojeSect": true,
         "hasTkSect": true,
         "hasFuSect": true,
