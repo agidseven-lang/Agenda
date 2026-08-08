@@ -1,0 +1,299 @@
+# =====================================================================
+# F3.5.6A-H3 — Publicacao da Desktop 1.0.232 no CANAL DO ATUALIZADOR INTERNO (Latest)
+# ---------------------------------------------------------------------
+# Publica a 1.0.232 (F3.5.6A-H3 — P0 FONTE UNICA do estado "enviado ao cliente").
+# Tarefa NOVA: so GERAR o link marcava o card como "Temas enviados ao cliente"
+# (Responsavel: Cliente) SEM envio confirmado, enquanto a Central (externalWaitOf) —
+# corretamente — NAO a listava. Causa-raiz PROVADA (RED empacotado, dois cenarios A/B
+# com Worker REAL): flowThemesSentSignal tratava clientReviewToken/shareToken (LINK)
+# como ENVIO. Correcao RENDERER (index.html) + espelho main (slaRules.js): "enviado" =
+# ENVIO CONFIRMADO server-side (workflowPhase de espera OU espelhos legados
+# clientFlowStatus/cronStatus que so o Worker grava no confirmClientSend) — MESMA regra
+# do card, da Central e do clientCol; token = LINK DISPONIVEL. Novo estado THEMES_READY
+# p/ "link gerado sem envio" -> "Temas prontos — confirmar envio ao cliente".
+# NATUREZA: mudanca de PRODUCAO em SO 2 arquivos vs 1.0.231 — desktop/src/renderer/index.html
+# + desktop/src/main/slaRules.js (espelho canonico; paridade golden master F3.4.4). Worker
+# V64.61 CORRETO e INALTERADO (RED provou; zero deploy). REGRA MAXIMA: infraestrutura de
+# notificacoes 1.0.228 byte-identica; Central compacta+drawer 1.0.231 e workflow H1 1.0.230
+# preservados.
+# BASE: 1.0.231 (F3.5.6A-H2) @ a378e5c1. BASELINE FISICA OFICIAL: 1.0.228 (FISICAMENTE APROVADA).
+# ROLLBACK IMEDIATO: v1.0.228. Adicional: v1.0.226. Fisico de seguranca: v1.0.223. NAO promover 1.0.231.
+# USA EXCLUSIVAMENTE os BYTES do run de build F3.5.6A-H3 31281629646 (gated, verde
+# nos 2 jobs; --publish never): NAO RECOMPILA — baixa os 2 artifacts e publica os
+# MESMOS bytes. TUDO PINADO: run id, digests dos artifacts, 5 hashes SHA-256, tag
+# v1.0.232 no head EXATO da branch.
+# 6 assets: EXE, MSI, latest.yml, blockmap, SHA256SUMS, VERSAO-DESKTOP.txt.
+# ESCRITAS (tag + release + Latest) SO via token temporario do GitHub App "Agenda ID Seven Release
+# Bot" (expira sozinho); GITHUB_TOKEN permanece somente leitura; sem RELEASE_PAT.
+# Roda NA PROPRIA branch de teste (main INTOCAVEL): dispara no push DESTE arquivo + workflow_dispatch.
+# A publicacao NAO significa aprovacao fisica — o owner repetira os DOIS cenarios da tela
+# Cliente (A: so gerar o link NAO marca "enviado" e NAO entra na Central; B: confirmar
+# envio marca "Temas enviados" e entra na Central em "Nao visualizadas" em tempo real).
+# A 1.0.228 permanece baseline fisica oficial ate GO fisico.
+# =====================================================================
+name: "F3.5.6A-H3 Desktop Release — 1.0.232 no canal do updater (fonte única do estado enviado ao cliente; sem build novo)"
+"on":
+  push:
+    branches:
+      - "desktop/f356ah3-single-source-sent-state-1.0.232"
+    paths:
+      - ".github/workflows/desktop-release-f356ah3.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: agidseven-lang/Agenda
+      # ── PINAGEM COMPLETA (F3.5.6A-H3; run de build 31281629646 verde nos 2 jobs) ──
+      RUN_ID: "31281629646"
+      STABLE_SHA: "42ebed67b3d196848ba2dc19f1c17e382534e10f"
+      TEST_BRANCH: "desktop/f356ah3-single-source-sent-state-1.0.232"
+      BASE_231_SHA: "a378e5c1f2f4217249252eae7e261e17580c2050"
+      BASE_230_SHA: "e89867de5120fe88e2f639effd59d24c3181f427"
+      BASE_228_SHA: "3f0d0af192b4b6b32a8e8bbda4153dcf4df1bc6d"
+      BASE_226_SHA: "267f8c8593e6724ad6460ed8bbb42201ade09d0b"
+      TAG: "v1.0.232"
+      TITLE: "Agenda ID Seven Desktop 1.0.232 — fonte única do estado enviado ao cliente (token = LINK, nunca ENVIO)"
+      ART_INST: "agenda-id-seven-desktop-1.0.232-installer"
+      ART_INST_DIGEST: "sha256:d6c2d1cd8785abec6e334ea636292c79b5fff078417d8497d5c4a1f5215123a6"
+      ART_META: "agenda-id-seven-desktop-1.0.232-updatemeta"
+      ART_META_DIGEST: "sha256:d012e1b657799b035c897071791a9589c8f45d89efeb92f825d68aac4d29d4b8"
+      EXE_NAME: "Agenda-ID-Seven-Desktop-1.0.232-x64.exe"
+      MSI_NAME: "Agenda-ID-Seven-Desktop-1.0.232-x64.msi"
+      BM_NAME: "Agenda-ID-Seven-Desktop-1.0.232-x64.exe.blockmap"
+      LY_NAME: "latest.yml"
+      EXP_EXE: "9337d0aa060731c466f09ee9850eb24455169dfbdf6199ee44fd70f589c230d3"
+      EXP_MSI: "55f8049d99addedf55c5032cdd6b1deb69f24f73516b1a5231e89be9e080c0a4"
+      EXP_LY: "f8b0c11947b43165c3ef5086c6d1f50158f065ed10d3fbeadb6bf8f8751b70fa"
+      EXP_BM: "3a8814694264fe80efcd6ddf1f7a1979d796366a4f239f22fa9082ff6c17676a"
+      EXP_SBOM: "4f0980187ab285bc47027892abaf9bdfec5c2fbfe0b36ec68079003171301399"
+      PREV_LATEST_TAG: "v1.0.231"
+      PRES_230_TAG: "v1.0.230"
+      PRES_228_TAG: "v1.0.228"
+      PRES_226_TAG: "v1.0.226"
+      PROD_ROLLBACK_TAG: "v1.0.223"
+    steps:
+      - name: "Gate 0 — contexto: branch de teste correta (publicacao autorizada F3.5.6A-H3)"
+        run: |
+          set -euo pipefail
+          [ "${{ github.ref_name }}" = "$TEST_BRANCH" ] || { echo "::error::ref '${{ github.ref_name }}' != $TEST_BRANCH — nada publicado"; exit 1; }
+          echo "OK: rodando na branch de teste autorizada"
+
+      - name: "Gate 0a — token temporario do Release Bot (GitHub App; expira sozinho)"
+        id: release_bot
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: Agenda
+          permission-contents: write
+          permission-workflows: write
+
+      - name: "Gate 0b — token do Release Bot ATIVO + escopo SO Agenda"
+        env:
+          BOT_TOKEN: ${{ steps.release_bot.outputs.token }}
+        run: |
+          set -euo pipefail
+          [ -n "$BOT_TOKEN" ] || { echo "::error::token do Release Bot vazio — NADA publicado."; exit 1; }
+          FN="$(GH_TOKEN="$BOT_TOKEN" gh api "repos/$REPO" --jq '.full_name' 2>/dev/null || true)"
+          [ "$FN" = "$REPO" ] || { echo "::error::Release Bot sem acesso a $REPO."; exit 1; }
+          J="$(GH_TOKEN="$BOT_TOKEN" gh api /installation/repositories)"
+          N="$(echo "$J" | jq -r '.total_count')"; R="$(echo "$J" | jq -r '.repositories[0].full_name')"
+          { [ "$N" = "1" ] && [ "$R" = "$REPO" ]; } || { echo "::error::escopo do Release Bot != {1 repo, $REPO} ($N,$R)."; exit 1; }
+          echo "OK: Release Bot ativo, escopo restrito a $REPO"
+
+      - name: "Gate 1 — run de build F3.5.6A-H3 completed/success e head EXATO"
+        run: |
+          set -euo pipefail
+          J="$(gh api "repos/$REPO/actions/runs/$RUN_ID")"
+          ST="$(echo "$J" | jq -r '.status + "|" + .conclusion')"
+          HS="$(echo "$J" | jq -r '.head_sha')"
+          BR="$(echo "$J" | jq -r '.head_branch')"
+          echo "run $RUN_ID: $ST head=$HS branch=$BR"
+          [ "$ST" = "completed|success" ] || { echo "::error::run de build invalido"; exit 1; }
+          [ "$HS" = "$STABLE_SHA" ] || { echo "::error::head do run != STABLE_SHA"; exit 1; }
+          [ "$BR" = "$TEST_BRANCH" ] || { echo "::error::branch do run != branch de teste"; exit 1; }
+
+      - name: "Gate 2 — STABLE_SHA na linhagem do tip; commits alem dele SO o workflow de release; insumos de build intactos; bases na linhagem"
+        run: |
+          set -euo pipefail
+          H="$(gh api "repos/$REPO/git/ref/heads/$TEST_BRANCH" --jq '.object.sha')"
+          CMP="$(gh api "repos/$REPO/compare/$STABLE_SHA...$H" --jq '.status')"
+          echo "compare $STABLE_SHA...$H: $CMP"
+          { [ "$CMP" = "identical" ] || [ "$CMP" = "ahead" ]; } || { echo "::error::STABLE_SHA fora da linhagem do tip ($CMP)"; exit 1; }
+          gh api "repos/$REPO/compare/$STABLE_SHA...$H" --jq '.files[].filename' | tee /tmp/extra.txt || true
+          if grep -vE '^\.github/workflows/desktop-release-f356ah3\.yml$' /tmp/extra.txt | grep -q .; then
+            echo "::error::commits pos-candidato tocam arquivos alem do workflow de release"; exit 1; fi
+          if grep -qE '^(desktop/src/|desktop/scripts/copy-renderer\.js|desktop/package\.json|desktop/package-lock\.json|desktop/tsconfig\.json|desktop/electron-builder)' /tmp/extra.txt; then
+            echo "::error::insumo de build alterado apos STABLE_SHA — bytes publicados nao corresponderiam ao build"; exit 1; fi
+          for B in "$BASE_231_SHA" "$BASE_230_SHA" "$BASE_228_SHA" "$BASE_226_SHA"; do
+            C="$(gh api "repos/$REPO/compare/$B...$STABLE_SHA" --jq '.status')"
+            { [ "$C" = "ahead" ] || [ "$C" = "identical" ]; } || { echo "::error::STABLE_SHA nao descende de $B ($C)"; exit 1; }
+          done
+          echo "OK: STABLE_SHA ancestral do tip; extras = so o workflow de release; bases 1.0.231/1.0.230/1.0.228/1.0.226 na linhagem"
+
+      - name: "Gate 3 — release v1.0.232 NAO existe; tag so pode preexistir apontando p/ STABLE_SHA"
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then echo "::error::release $TAG ja existe"; exit 1; fi
+          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            TS="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+            [ "$TS" = "$STABLE_SHA" ] || { echo "::error::tag $TAG aponta para outro sha ($TS)"; exit 1; }
+          fi
+          echo "OK: release/tag livres (ou tag ja em STABLE_SHA)"
+
+      - name: "Gate 4 — artifacts: ids+digests conferem (mesmos bytes do run verde)"
+        run: |
+          set -euo pipefail
+          json="$(gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts" --paginate)"
+          chk() { local d; d="$(echo "$json" | jq -r --arg n "$1" '.artifacts[]|select(.name==$n)|.digest')"; echo "$1: $d"; [ "$d" = "$2" ] || { echo "::error::digest $1 divergente"; exit 1; }; }
+          chk "$ART_INST" "$ART_INST_DIGEST"
+          chk "$ART_META" "$ART_META_DIGEST"
+
+      - name: "Baixar artifacts (installer + updatemeta) — SEM recompilar"
+        run: |
+          set -euo pipefail
+          gh run download "$RUN_ID" -R "$REPO" -n "$ART_INST" -D pacote
+          gh run download "$RUN_ID" -R "$REPO" -n "$ART_META" -D pacote
+          for f in "$EXE_NAME" "$MSI_NAME" "$LY_NAME" "$BM_NAME" SHA256SUMS SBOM-cyclonedx.json VERSAO-DESKTOP.txt; do
+            test -f "pacote/$f" || { echo "::error::arquivo ausente: $f"; exit 1; }
+          done
+          if [ -f pacote/canary.yml ]; then echo "::error::canary.yml presente — canal ambiguo"; exit 1; fi
+
+      - name: "Gate 5 — hashes SHA-256 + latest.yml (versao/EXE/sha512) + VERSAO-DESKTOP"
+        run: |
+          set -euo pipefail
+          declare -A EXP=( ["$EXE_NAME"]="$EXP_EXE" ["$MSI_NAME"]="$EXP_MSI" ["$LY_NAME"]="$EXP_LY" ["$BM_NAME"]="$EXP_BM" ["SBOM-cyclonedx.json"]="$EXP_SBOM" )
+          for f in "${!EXP[@]}"; do
+            H="$(sha256sum "pacote/$f" | awk '{print $1}')"; echo "$f=$H"
+            [ "$H" = "${EXP[$f]}" ] || { echo "::error::hash $f divergente"; exit 1; }
+          done
+          ( cd pacote && sha256sum -c SHA256SUMS ) || { echo "::error::SHA256SUMS nao confere"; exit 1; }
+          grep -q "version: 1.0.232" "pacote/$LY_NAME" || { echo "::error::latest.yml version != 1.0.232"; exit 1; }
+          grep -qE "^path: $EXE_NAME" "pacote/$LY_NAME" || { echo "::error::latest.yml path != EXE"; exit 1; }
+          META_SHA512=$(grep -E '^sha512:' "pacote/$LY_NAME" | head -1 | sed -E 's/^sha512:[[:space:]]*//' | tr -d '\r')
+          CALC_SHA512=$(openssl dgst -sha512 -binary "pacote/$EXE_NAME" | openssl base64 -A)
+          [ "$META_SHA512" = "$CALC_SHA512" ] || { echo "::error::sha512 do latest.yml != EXE (updater rejeitaria)"; exit 1; }
+          grep -q "versionName : 1.0.232" pacote/VERSAO-DESKTOP.txt || { echo "::error::VERSAO-DESKTOP sem 1.0.232"; exit 1; }
+          grep -q "1.0.232-f356ah3-single-source-sent-state" pacote/VERSAO-DESKTOP.txt || { echo "::error::rotulo da candidata ausente"; exit 1; }
+          echo "OK: 5 hashes + SHA256SUMS + latest.yml (1.0.232/EXE/sha512==EXE) + VERSAO-DESKTOP"
+
+      - name: "Release notes"
+        run: |
+          cat > notas.md <<'NOTAS'
+          Agenda ID Seven Desktop 1.0.232 — fonte única do estado "enviado ao cliente" (token = LINK, nunca ENVIO)
+
+          Atualização disponibilizada pelo ATUALIZADOR INTERNO do app (Configurações ->
+          Atualizações -> Verificar atualizações -> Baixar -> Instalar e reiniciar).
+          NENHUM download manual é necessário.
+
+          CONTEXTO (P0): numa tarefa NOVA, apenas GERAR o link do cliente já marcava o card
+          como "Temas enviados ao cliente" (Responsável: Cliente / Aguardar aprovação) SEM
+          que o envio tivesse sido confirmado; ao mesmo tempo a Central de Aprovações —
+          corretamente — NÃO listava essa tarefa. Ou seja: o card e a Central discordavam,
+          porque o card tratava a EXISTÊNCIA DO LINK como se fosse ENVIO.
+
+          CAUSA-RAIZ (PROVADA por RED empacotado, dois cenários A/B com o Worker REAL):
+          a derivação do card (flowThemesSentSignal) tratava clientReviewToken/shareToken
+          (o LINK) como "enviado", enquanto a Central exige envio CONFIRMADO server-side
+          (workflowPhase de espera + approvalRound + sentAt — que só o Worker grava no
+          confirmClientSend). O Worker estava CORRETO; o erro era só na leitura do Desktop.
+
+          O QUE MUDA vs 1.0.231 (correção cirúrgica em 2 arquivos de produção):
+          - FONTE ÚNICA do estado enviado: "enviado ao cliente" agora exige ENVIO
+            CONFIRMADO server-side (workflowPhase de espera OU os espelhos legados
+            clientFlowStatus/cronStatus que só o Worker grava no confirmClientSend) — a
+            MESMA regra usada pelo card, pela Central e pela coluna do Cliente. O token
+            passa a significar apenas LINK DISPONÍVEL, nunca ENVIO;
+          - novo estado THEMES_READY para "link gerado, envio ainda não confirmado":
+            o card mostra "Temas prontos — confirmar envio ao cliente" (dono: Social),
+            FORA da Central, sem sentAt/approvalRound;
+          - CENÁRIO A (só gerar o link): NÃO marca "Temas enviados", NÃO entra na Central,
+            NÃO cria espera do cliente;
+          - CENÁRIO B (confirmar envio): card -> "Temas enviados ao cliente" e a tarefa
+            entra na Central em "Não visualizadas" em TEMPO REAL. Se o servidor falhar, o
+            card NÃO é marcado como enviado e o estado anterior é preservado.
+
+          O QUE NÃO MUDA (preservado; garantido por gate):
+          - o Worker V64.61 em produção está CORRETO e INALTERADO (nenhum deploy);
+          - a Central compacta + drawer (1.0.231) e o motor do fluxo/handoff (1.0.230/H1);
+          - TODA a infraestrutura de notificações 1.0.228 FISICAMENTE APROVADA — bgNotify,
+            agrupamento, bgnotify.html, handoff, topmost, som, dedupe — byte-idêntica
+            (nem themes_sent nem themes_ready emitem notificação: neutralidade provada);
+          - a paridade renderer×main (golden master F3.4.4) — o espelho main/slaRules.js
+            recebeu a MESMA regra do renderer.
+          Delta de produção vs 1.0.231: SOMENTE desktop/src/renderer/index.html +
+          desktop/src/main/slaRules.js.
+
+          IMPORTANTE: esta versão DEPENDE DE VALIDAÇÃO FÍSICA do owner no Windows.
+          Teste decisivo (dois cenários):
+          A) Gerar o link SEM confirmar envio -> o card NÃO pode dizer "Temas enviados"
+             nem aparecer na Central; deve ficar "Temas prontos — confirmar envio".
+          B) Confirmar o envio -> o card vira "Temas enviados ao cliente" e a tarefa
+             aparece imediatamente na Central em "Não visualizadas".
+          A publicação não é aprovação física. Em caso de problema: ROLLBACK IMEDIATO
+          v1.0.228 (baseline física); adicional v1.0.226; físico de segurança v1.0.223;
+          NÃO promover 1.0.231; todas as versões anteriores permanecem publicadas.
+
+          Procedência: run de build F3.5.6A-H3 31281629646 (success; --publish never;
+          verify + Windows verdes: suíte da fase f356ah3 30/30 — rodada TAMBÉM contra o
+          app.asar; RED empacotado dos dois cenários A/B com o Worker REAL (RED em 1.0.231,
+          GREEN em 1.0.232); golden master F3.4.4 9/9 com paridade renderer×main incluindo
+          THEMES_READY; bateria herdada completa + provas Electron herdadas; isolamento:
+          delta de produção vs 1.0.231 SÓ em index.html + slaRules.js; infraestrutura de
+          notificações 1.0.228 byte-idêntica) @ commit
+          42ebed67b3d196848ba2dc19f1c17e382534e10f
+          (branch desktop/f356ah3-single-source-sent-state-1.0.232).
+          Mesmos bytes; sem recompilar. Confira SHA-256 em SHA256SUMS.
+          NOTAS
+
+      - name: "Criar tag v1.0.232 pinada em STABLE_SHA — ESCRITA via Release Bot"
+        env:
+          GH_TOKEN: ${{ steps.release_bot.outputs.token }}
+        run: |
+          set -euo pipefail
+          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            TS="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+            [ "$TS" = "$STABLE_SHA" ] || { echo "::error::tag $TAG aponta para outro sha ($TS)"; exit 1; }
+          else
+            gh api -X POST "repos/$REPO/git/refs" -f ref="refs/tags/$TAG" -f sha="$STABLE_SHA" >/dev/null
+            echo "tag $TAG criada em $STABLE_SHA"
+          fi
+
+      - name: "Publicar release no canal do updater (latest=true, prerelease=false) — 6 assets — via Release Bot"
+        env:
+          GH_TOKEN: ${{ steps.release_bot.outputs.token }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" -R "$REPO" \
+            --target "$STABLE_SHA" --latest=true \
+            --title "$TITLE" --notes-file notas.md \
+            "pacote/$EXE_NAME" "pacote/$MSI_NAME" "pacote/$LY_NAME" "pacote/$BM_NAME" "pacote/SHA256SUMS" "pacote/VERSAO-DESKTOP.txt"
+          echo "publicado: $TAG (canal do electron-updater: release Latest com latest.yml)"
+
+      - name: "Pos-verificacao (Latest=1.0.232; 1.0.231/1.0.230/1.0.228/1.0.226 preservadas; rollback 1.0.223 preservado)"
+        run: |
+          set -euo pipefail
+          FLAGS="$(gh release view "$TAG" -R "$REPO" --json isPrerelease,isDraft --jq '(.isPrerelease|tostring)+"|"+(.isDraft|tostring)')"
+          [ "$FLAGS" = "false|false" ] || { echo "::error::flags incorretas: $FLAGS"; exit 1; }
+          N="$(gh release view "$TAG" -R "$REPO" --json assets --jq '.assets|length')"
+          [ "$N" = "6" ] || { echo "::error::esperado 6 assets, encontrados $N"; exit 1; }
+          for a in "$EXE_NAME" "$MSI_NAME" "$LY_NAME" "$BM_NAME" SHA256SUMS VERSAO-DESKTOP.txt; do
+            gh release view "$TAG" -R "$REPO" --json assets --jq '.assets[].name' | grep -qx "$a" || { echo "::error::asset $a ausente"; exit 1; }
+          done
+          if gh release view "$TAG" -R "$REPO" --json assets --jq '.assets[].name' | grep -qx "app-update.yml"; then echo "::error::app-update.yml nao pode ser asset"; exit 1; fi
+          TAGSHA="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+          [ "$TAGSHA" = "$STABLE_SHA" ] || { echo "::error::tag != STABLE_SHA"; exit 1; }
+          LATEST_TAG="$(gh api "repos/$REPO/releases/latest" --jq '.tag_name')"
+          [ "$LATEST_TAG" = "$TAG" ] || { echo "::error::Latest do repo != $TAG (got $LATEST_TAG)"; exit 1; }
+          for t in "$PREV_LATEST_TAG" "$PRES_230_TAG" "$PRES_228_TAG" "$PRES_226_TAG" "$PROD_ROLLBACK_TAG"; do
+            gh release view "$t" -R "$REPO" --json tagName --jq '.tagName' | grep -qx "$t" || { echo "::error::$t (preservada/rollback) sumiu"; exit 1; }
+          done
+          echo "===== GO: 1.0.232 no canal do updater (Latest); ROLLBACK IMEDIATO 1.0.228 (baseline fisica); adicional 1.0.226; fisico de seguranca 1.0.223; 1.0.231/1.0.230/1.0.228/1.0.226 preservadas; NAO promover 1.0.231 ====="
