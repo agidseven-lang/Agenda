@@ -178,7 +178,13 @@ ok(/NÃO é listener de dados nem scheduler de SLA/.test(blob), "S17c tick de UI
 // S18 — GATE DE SINTAXE do <script> inline do renderer: um erro de sintaxe aqui aborta TODO o app.
 //        (o F3.5.4R adiciona muito JS inline; esta prova impede publicar um renderer que não carrega).
 (function(){
-  var sMark='\n<script>\n', open=idx.indexOf(sMark, idx.indexOf('priorityEngine.js'));
+  // RE-PINADO F3.5.6A — desde a 1.0.221 existe um bloco PRÓPRIO de guarda de boot (F3.5.5C-H1)
+  // entre a tag do priorityEngine e o script principal; o localizador antigo parava nele
+  // (1.2KB) e o gate de sintaxe deixava de cobrir o app. Âncora nova: o marcador REAL do
+  // script principal ('WEB PREVIEW'), com fallback para o comportamento antigo.
+  var sMark='\n<script>\n';
+  var _mainMark=idx.indexOf('/* WEB PREVIEW');
+  var open=(_mainMark>=0)?idx.lastIndexOf(sMark,_mainMark):idx.indexOf(sMark, idx.indexOf('priorityEngine.js'));
   var close=open>=0?idx.indexOf('\n</script>', open):-1;
   var inline=(open>=0&&close>open)?idx.slice(open+sMark.length, close):'';
   ok(inline.length>50000, "S18a <script> inline principal do renderer localizado");

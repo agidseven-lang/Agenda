@@ -55,9 +55,9 @@ function el(tag, type, extra) { const attrs = { type: type }; return Object.assi
 
 console.log('— A) VERSÃO 1.0.223 —');
 const pkg = JSON.parse(R('package.json'));
-ok('A1 package.json 1.0.228 + marcador custom-cronograma-quantity-universal-paste (RE-PINADO F3.5.5E-H4)', pkg.version === '1.0.228' && /custom-cronograma-quantity-universal-paste/.test(pkg.description || ''));
+ok('A1 package.json 1.0.229 + marcador custom-cronograma-quantity-universal-paste (RE-PINADO F3.5.6A)', pkg.version === '1.0.229' && /custom-cronograma-quantity-universal-paste/.test(pkg.description || ''));
 ok('A2 descrição preserva os 3 marcadores herdados', /stale-alert-terminal-task-hotfix/.test(pkg.description) && /session-restore-boot-hotfix/.test(pkg.description) && /custom-script-quantity-rich-editor/.test(pkg.description));
-ok('A3 package-lock 1.0.228 (raiz + packages[""] — RE-PINADO F3.5.5E-H4)', JSON.parse(R('package-lock.json')).version === '1.0.228' && JSON.parse(R('package-lock.json')).packages[''].version === '1.0.228');
+ok('A3 package-lock 1.0.229 (raiz + packages[""] — RE-PINADO F3.5.6A)', JSON.parse(R('package-lock.json')).version === '1.0.229' && JSON.parse(R('package-lock.json')).packages[''].version === '1.0.229');
 
 console.log('— B) QUANTIDADE DE TEMAS DO CRONOGRAMA (mandato 1–36) —');
 /* 1–8: quantidades reais geram N (fonte canônica = contagem que dirige contentCount) */
