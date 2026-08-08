@@ -6331,7 +6331,7 @@ function renderClientFlowBoard(){
     '<div class="scr-head"><div class="d-board-head">'+
     '<div class="d-bh-icon" style="background:'+withAlpha('#22D3B8',.18)+';color:#22D3B8">'+svg('eye')+'</div>'+
     '<div style="flex:1;min-width:0"><div class="d-bh-title">Cliente</div><div class="d-bh-sub">Fica visível até a aprovação final — mesmo enviado ao designer · '+list.length+' tarefa'+(list.length===1?'':'s')+'</div></div></div></div>'+
-    '<div class="scr" style="padding-top:0">'+wfApprovalsPendingHtml(list)+boardToolbar()+
+    '<div class="scr" style="padding-top:0">'+wfApprovalsBarHtml(list)+boardToolbar()+
     kbv2BoardHtml(CLIENT_COLS4.map((c,i)=>({label:c.label,color:c.color,key:c.key,tasks:byCol[i]})), t=>kbv2Card(t,'client'));
   return h+'</div>';
 }
@@ -7567,8 +7567,18 @@ function wfPriAwaitRow(o){
     +'</div>';
 }
 /* Central do Cliente — APROVAÇÕES PENDENTES (4 categorias; deriva de rounds + legado). */
-function wfApprovalsPendingHtml(list){
-  var now=wfNow(); var cats={nv:[],vs:[],aj:[],ap:[]};
+/* F3.5.6A-H2 — CENTRAL DE APROVAÇÕES COMPACTA + DRAWER LATERAL.
+   O owner reprovou a apresentação anterior (lista inteira permanentemente expandida acima do
+   Kanban, poluindo a tela Cliente). A FUNCIONALIDADE é preservada por completo — rastreamento,
+   categorias, contagens, tempo aguardando, cliente, responsável, próxima ação, lembrete, abrir e
+   atualização em tempo real — mudando SOMENTE a FORMA: por padrão uma barra compacta (recolhida);
+   a lista detalhada abre sob demanda num drawer lateral direito que NÃO empurra o Kanban.
+   Cores da espera do cliente são NEUTRAS/informativas (nunca alarme vermelho de atraso da equipe). */
+
+/* Categorização PURA (fonte única p/ a barra e o drawer — contagens sempre consistentes). */
+var WFAP_CAT = { nv:{label:'Não visualizadas',color:'#F2A93B'}, vs:{label:'Visualizadas sem resposta',color:'#22D3EE'}, aj:{label:'Ajustes solicitados',color:'#EF4444'}, ap:{label:'Aprovadas recentemente',color:'#2FCF8F'} };
+function wfApprovalsCats(list,now){
+  now=Number(now)||wfNow(); var cats={nv:[],vs:[],aj:[],ap:[]};
   (list||[]).forEach(function(t){
     try{
       var ew=wfExternalInfo(t,now);
@@ -7579,26 +7589,181 @@ function wfApprovalsPendingHtml(list){
       else if(!lr&&clientApproved(t)&&(now-(Number(t.clientReviewAt)||0))<=72*3600*1000) cats.ap.push({t:t,ew:ew});
     }catch(_){}
   });
-  var total=cats.nv.length+cats.vs.length+cats.aj.length+cats.ap.length;
-  var row=function(e,extra){ var t=e.t,ew=e.ew;
-    var resp=''; try{ var uu=(state.users||[]).find(function(x){return x.id===(t.socialOwnerId||t.by);}); resp=(uu&&uu.name)?uu.name.split(' ')[0]:''; }catch(_){ resp=''; }
-    return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--line)">'
-      +'<div style="flex:1;min-width:0"><div class="sl" style="font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(t.client||'Cliente')+' — '+esc(t.title||'Tarefa')+'</div>'
-      +'<div class="ss">'+esc((ew.type==='captions'?'Legendas':'Temas'))+(ew.sentAt>0?(' · enviado há '+wfFmtDur(now-ew.sentAt)):' · sem envio confirmado')+(ew.viewed?' · visualizado':'')+(resp?(' · resp.: '+esc(resp)):'')+(extra?(' · '+extra):'')+'</div></div>'
-      +'<button class="chip" data-wfcopyreminder="'+esc(t.id)+'">Lembrete</button>'
-      +'<button class="chip" data-clientview="'+esc(t.id)+'">Abrir</button></div>';
-  };
-  var sec=function(lbl,color,arr,extra){ if(!arr.length)return''; return '<div style="margin-top:8px"><div class="ss" style="font-weight:800;color:'+color+'">'+lbl+' ('+arr.length+')</div>'+arr.map(function(e){return row(e,extra||'');}).join('')+'</div>'; };
-  return '<div class="card" style="padding:12px 14px;margin:10px 0">'
-    +'<div style="display:flex;align-items:center;gap:8px"><div class="cfg-ic" style="width:26px;height:26px;background:rgba(34,211,184,.14);color:#22D3B8">'+svg('eye')+'</div>'
-    +'<div style="font-weight:800">Aprovações pendentes</div><div class="ss" style="margin-left:auto">'+total+' item'+(total===1?'':'s')+'</div></div>'
-    +(total?'':'<div class="ss" style="margin-top:6px">Nenhuma aprovação aguardando o cliente agora.</div>')
-    +sec('Não visualizadas','#F2A93B',cats.nv,'próxima ação: lembrete de visualização')
-    +sec('Visualizadas sem resposta','#22D3EE',cats.vs,'próxima ação: lembrete de decisão')
-    +sec('Ajustes solicitados','#EF4444',cats.aj,'próxima ação: revisar e reenviar')
-    +sec('Aprovadas recentemente','#2FCF8F',cats.ap,'')
-    +'</div>';
+  /* "pendências" = o que AGUARDA decisão do cliente (nv+vs+aj). "Aprovadas recentemente" é
+     categoria SECUNDÁRIA (não domina a Central; conta à parte). */
+  cats.total=cats.nv.length+cats.vs.length+cats.aj.length;
+  cats.recent=cats.ap.length;
+  return cats;
 }
+/* Espera longa (recomendação, nunca atraso da equipe): itens aguardando cliente há > 24h. */
+function wfApprovalsUrgent(cats){ var n=0; ['nv','vs'].forEach(function(k){ (cats[k]||[]).forEach(function(e){ if(e.ew&&e.ew.waitingMs>=24*3600*1000)n++; }); }); return n; }
+
+/* BARRA COMPACTA (estado padrão RECOLHIDO): título + total + resumo por categoria + urgência
+   opcional + "Ver aprovações". ~72–100px; NÃO lista tarefas; recomputada a cada render (tempo real). */
+function wfApprovalsBarHtml(list){
+  try{ wfApprovalsEnsureStyle(); }catch(_){}
+  var cats=wfApprovalsCats(list,wfNow()); var total=cats.total; var recent=cats.recent||0;
+  var dot=function(k){ var c=WFAP_CAT[k]; return '<span class="wfap-dot" style="background:'+c.color+'"></span>'; };
+  /* Vazio SÓ quando não há pendências NEM aprovadas recentes: uma linha, sem lista, sem botão. */
+  if(!total && !recent){
+    return '<div class="wfap-bar wfap-empty"><div class="wfap-ic">'+svg('eye')+'</div>'
+      +'<div class="wfap-bt"><div class="wfap-tt">Aprovações pendentes</div>'
+      +'<div class="wfap-sub">Nenhuma aprovação aguardando o cliente agora.</div></div>'
+      +'<div class="wfap-badge wfap-badge-zero">0</div></div>';
+  }
+  var urg=wfApprovalsUrgent(cats);
+  var seg=function(k){ return dot(k)+'<span class="wfap-seg">'+cats[k].length+' '+esc(WFAP_CAT[k].label.toLowerCase())+'</span>'; };
+  /* Resumo por categoria de PENDÊNCIA (nv/vs/aj). "Aprovadas recentemente" é secundária: só uma
+     nota discreta quando não domina — nunca infla o total do headline. */
+  var summary=total?(seg('nv')+seg('vs')+seg('aj')):('<span class="wfap-seg">'+recent+' aprovada'+(recent===1?'':'s')+' recentemente</span>');
+  return '<div class="wfap-bar"><div class="wfap-ic">'+svg('eye')+'</div>'
+    +'<div class="wfap-bt"><div class="wfap-row1"><span class="wfap-tt">Aprovações pendentes</span><span class="wfap-badge'+(total?'':' wfap-badge-zero')+'">'+total+'</span></div>'
+    +'<div class="wfap-summary">'+summary+'</div>'
+    +(urg?('<div class="wfap-urg">'+svg('clock')+'Atenção: '+urg+' aprova'+(urg===1?'ção aguarda':'ções aguardam')+' há mais de 24h</div>'):'')+'</div>'
+    +'<button class="wfap-open" data-wfapprovalsopen="1" aria-label="Ver aprovações pendentes">Ver aprovações<span class="wfap-arr" aria-hidden="true">→</span></button></div>';
+}
+
+/* ── DRAWER lateral direito (sob demanda; overlay próprio #wfapRoot, fora de #content e #modalRoot,
+   nunca empurra o Kanban). Fecha por X, por Esc e por clique no scrim. Estado EFÊMERO (nunca
+   persistido) ⇒ ao (re)entrar na tela Cliente inicia recolhido. ── */
+var wfDrawer = { open:false, filter:'all', scroll:0 };
+var WFAP_FILTERS = [['all','Todas'],['nv','Não visualizadas'],['vs','Visualizadas'],['aj','Ajustes'],['ap','Aprovadas']];
+function wfApprovalsEnsureStyle(){
+  if(document.getElementById('wfap-style'))return;
+  var st=document.createElement('style'); st.id='wfap-style';
+  st.textContent=
+    '.wfap-bar{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:11px 14px;margin:10px 0}'
+   +'.wfap-ic{flex:0 0 auto;width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:rgba(34,211,184,.14);color:#22D3B8}.wfap-ic svg{width:18px;height:18px}'
+   +'.wfap-bt{flex:1 1 auto;min-width:0}'
+   +'.wfap-row1{display:flex;align-items:center;gap:8px}'
+   +'.wfap-tt{font-weight:800;font-size:14px;color:var(--ink)}'
+   +'.wfap-badge{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:20px;padding:0 7px;border-radius:999px;background:#22D3B8;color:#06231F;font-size:12px;font-weight:800}'
+   +'.wfap-badge-zero{background:var(--surface2);color:var(--faint)}'
+   +'.wfap-summary{display:flex;flex-wrap:wrap;align-items:center;gap:5px 14px;margin-top:4px}'
+   +'.wfap-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:middle}'
+   +'.wfap-seg{color:var(--soft);font-size:12px}'
+   +'.wfap-sub{color:var(--faint);font-size:12px;margin-top:2px}'
+   +'.wfap-urg{display:flex;align-items:center;gap:6px;margin-top:5px;color:#C98A2E;font-size:11.5px;font-weight:600}.wfap-urg svg{width:13px;height:13px}'
+   +'.wfap-open{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--surface2);color:var(--ink);border-radius:10px;padding:9px 14px;font-size:12.5px;font-weight:700;cursor:pointer;transition:border-color .15s,background .15s}'
+   +'.wfap-open:hover{border-color:#22D3B8;background:var(--surface)}.wfap-open:focus-visible{outline:2px solid #22D3B8;outline-offset:2px}.wfap-arr{font-weight:800}'
+   +'.wfap-scrim{position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:70;opacity:0;transition:opacity .18s ease}.wfap-scrim.in{opacity:1}'
+   +'.wfap-panel{position:fixed;top:0;right:0;height:100vh;width:min(480px,96vw);max-width:96vw;background:var(--surface);border-left:1px solid var(--line);box-shadow:-24px 0 60px -30px rgba(0,0,0,.8);display:flex;flex-direction:column;transform:translateX(24px);opacity:.2;transition:transform .2s ease,opacity .2s ease}.wfap-scrim.in .wfap-panel{transform:translateX(0);opacity:1}'
+   +'.wfap-hd{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:16px 16px 12px}'
+   +'.wfap-hd-ic{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:rgba(34,211,184,.14);color:#22D3B8}.wfap-hd-ic svg{width:17px;height:17px}'
+   +'.wfap-hd-tt{flex:1 1 auto;min-width:0;font-weight:800;font-size:15px;color:var(--ink);letter-spacing:.2px}'
+   +'.wfap-x{flex:0 0 auto;width:32px;height:32px;border:0;border-radius:9px;background:transparent;color:var(--soft);font-size:20px;line-height:1;cursor:pointer}.wfap-x:hover{background:var(--surface2);color:var(--ink)}.wfap-x:focus-visible{outline:2px solid #22D3B8;outline-offset:1px}'
+   +'.wfap-filters{flex:0 0 auto;display:flex;gap:7px;flex-wrap:wrap;padding:0 16px 12px;border-bottom:1px solid var(--line)}'
+   +'.wfap-fchip{border:1px solid var(--line);background:var(--surface);color:var(--soft);border-radius:999px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}.wfap-fchip.on{background:#22D3B8;border-color:#22D3B8;color:#06231F}.wfap-fchip:focus-visible{outline:2px solid #22D3B8;outline-offset:1px}'
+   +'.wfap-list{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;padding:12px 16px 18px}'
+   +'.wfap-empty-list{color:var(--faint);font-size:13px;text-align:center;padding:34px 8px}'
+   +'.wfap-grp{margin-top:14px}.wfap-grp:first-child{margin-top:2px}'
+   +'.wfap-grp-h{font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;margin-bottom:8px}'
+   +'.wfap-card{border:1px solid var(--line);border-radius:12px;padding:11px 12px;margin-bottom:9px;background:var(--surface)}'
+   +'.wfap-eyebrow{font-size:10.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+   +'.wfap-type{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.6px;color:#22D3B8;margin-top:4px}'
+   +'.wfap-title{font-size:13.5px;font-weight:700;color:var(--ink);margin-top:1px}'
+   +'.wfap-status{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--soft);margin-top:6px}'
+   +'.wfap-sdot{flex:0 0 auto;width:7px;height:7px;border-radius:50%}'
+   +'.wfap-meta{font-size:11.5px;color:var(--faint);margin-top:4px}'
+   +'.wfap-next{font-size:11.5px;color:var(--soft);margin-top:4px}'
+   +'.wfap-acts{display:flex;gap:8px;margin-top:10px}'
+   +'.wfap-acts .chip{cursor:pointer}'
+   +'@media (prefers-reduced-motion: reduce){.wfap-scrim,.wfap-panel{transition:none}}';
+  document.head.appendChild(st);
+}
+function wfHM(ms){ try{ var d=new Date(Number(ms)||0); var p=function(n){return (n<10?'0':'')+n;}; return p(d.getHours())+':'+p(d.getMinutes()); }catch(_){ return ''; } }
+/* CARD compacto e HIERÁRQUICO por pendência (cliente → tipo → título → status → responsável →
+   próxima ação → ações). Reusa os handlers globais data-wfcopyreminder / data-clientview. */
+function wfApRow(e,kind,now){
+  var t=e.t,ew=e.ew;
+  var resp=''; try{ var uu=(state.users||[]).find(function(x){return x.id===(t.socialOwnerId||t.by);}); resp=(uu&&uu.name)?uu.name.split(' ')[0]:''; }catch(_){ resp=''; }
+  var typeLbl=(ew.type==='captions'?'LEGENDAS':'TEMAS');
+  var titleLbl='Aprovação d'+(ew.type==='captions'?'as legendas':'os temas');
+  var c=WFAP_CAT[kind].color;
+  var statusTxt='', metaTxt='', nextTxt='', acts='';
+  if(kind==='nv'){ statusTxt='Não visualizado'; metaTxt=(ew.sentAt>0?('Enviado há '+wfFmtDur(now-ew.sentAt)):'Sem envio confirmado');
+    acts='<button class="chip" data-wfcopyreminder="'+esc(t.id)+'">Lembrete</button><button class="chip" data-clientview="'+esc(t.id)+'">Abrir</button>'; }
+  else if(kind==='vs'){ statusTxt='Visualizado'+(ew.firstViewedAt>0?(' às '+wfHM(ew.firstViewedAt)):''); metaTxt=(ew.firstViewedAt>0?('Aguardando resposta há '+wfFmtDur(now-ew.firstViewedAt)):(ew.sentAt>0?('Enviado há '+wfFmtDur(now-ew.sentAt)):''));
+    acts='<button class="chip" data-wfcopyreminder="'+esc(t.id)+'">Lembrete</button><button class="chip" data-clientview="'+esc(t.id)+'">Abrir</button>'; }
+  else if(kind==='aj'){ statusTxt='Ajuste solicitado'; var aat=0; try{ var lr=wfLatestRound(t,ew.type)||wfLatestRound(t,ew.type==='themes'?'captions':'themes'); aat=(lr&&lr.round&&Number(lr.round.decisionAt))||Number(t.workflowPhaseAt)||0; }catch(_){ aat=0; }
+    metaTxt=(aat>0?('há '+wfFmtDur(now-aat)):''); nextTxt='Próxima ação · Revisar solicitação';
+    acts='<button class="chip" data-clientview="'+esc(t.id)+'">Abrir</button>'; }
+  else { statusTxt='Aprovado'; var dat=0; try{ var lr2=e.rk||wfLatestRound(t,ew.type)||wfLatestRound(t,ew.type==='themes'?'captions':'themes'); dat=(lr2&&lr2.round&&Number(lr2.round.decisionAt))||Number(t.clientReviewAt)||0; }catch(_){ dat=0; }
+    metaTxt=(dat>0?('há '+wfFmtDur(now-dat)):''); acts='<button class="chip" data-clientview="'+esc(t.id)+'">Abrir</button>'; }
+  return '<div class="wfap-card">'
+    +'<div class="wfap-eyebrow" title="'+esc(t.client||'Cliente')+'">'+esc(t.client||'Cliente')+'</div>'
+    +'<div class="wfap-type" style="color:'+c+'">'+typeLbl+'</div>'
+    +'<div class="wfap-title" title="'+esc(t.title||titleLbl)+'">'+esc(titleLbl)+'</div>'
+    +'<div class="wfap-status"><span class="wfap-sdot" style="background:'+c+'"></span>'+esc(statusTxt)+'</div>'
+    +(metaTxt?('<div class="wfap-meta">'+esc(metaTxt)+'</div>'):'')
+    +(resp?('<div class="wfap-meta">Responsável · '+esc(resp)+'</div>'):'')
+    +(nextTxt?('<div class="wfap-next">'+esc(nextTxt)+'</div>'):'')
+    +'<div class="wfap-acts">'+acts+'</div></div>';
+}
+/* Corpo do drawer (lista) segundo o filtro ativo — reconstruído sozinho ao vivo (tempo real). */
+function wfApprovalsListHtml(cats,filter,now){
+  var order=['nv','vs','aj','ap'];
+  var groups=(filter&&filter!=='all')?[filter]:order;
+  var html='';
+  groups.forEach(function(k){ var arr=cats[k]||[]; if(!arr.length)return;
+    html+='<div class="wfap-grp"><div class="wfap-grp-h" style="color:'+WFAP_CAT[k].color+'">'+esc(WFAP_CAT[k].label)+' ('+arr.length+')</div>'
+      +arr.map(function(e){return wfApRow(e,k,now);}).join('')+'</div>';
+  });
+  if(!html){ html='<div class="wfap-empty-list">'+((filter&&filter!=='all')?'Nenhuma aprovação nesta categoria.':'Nenhuma aprovação aguardando o cliente agora.')+'</div>'; }
+  return html;
+}
+function wfApprovalsDrawerHtml(cats,filter,now){
+  var chips=WFAP_FILTERS.map(function(f){ return '<button class="wfap-fchip'+(filter===f[0]?' on':'')+'" data-wfapprovalsfilter="'+f[0]+'">'+esc(f[1])+'</button>'; }).join('');
+  return '<div class="wfap-scrim" data-wfapprovalsscrim="1">'
+    +'<div class="wfap-panel" role="dialog" aria-modal="true" aria-label="Aprovações pendentes" tabindex="-1">'
+    +'<div class="wfap-hd"><div class="wfap-hd-ic">'+svg('eye')+'</div><div class="wfap-hd-tt">APROVAÇÕES PENDENTES</div>'
+    +'<button class="wfap-x" data-wfapprovalsclose="1" aria-label="Fechar" title="Fechar">×</button></div>'
+    +'<div class="wfap-filters">'+chips+'</div>'
+    +'<div class="wfap-list" id="wfapList">'+wfApprovalsListHtml(cats,filter,now)+'</div>'
+    +'</div></div>';
+}
+function wfApprovalsRoot(){ var r=document.getElementById('wfapRoot'); if(!r){ r=document.createElement('div'); r.id='wfapRoot'; document.body.appendChild(r); } return r; }
+function wfApprovalsCurrentList(){ try{ return (state.tasks||[]).filter(isClientFlow); }catch(_){ return []; } }
+function wfApprovalsOpen(){
+  try{ wfApprovalsEnsureStyle(); }catch(_){}
+  var now=wfNow(); var cats=wfApprovalsCats(wfApprovalsCurrentList(),now);
+  wfDrawer.open=true; wfDrawer.scroll=0;
+  var root=wfApprovalsRoot(); root.innerHTML=wfApprovalsDrawerHtml(cats,wfDrawer.filter,now);
+  var scrim=root.querySelector('.wfap-scrim');
+  try{ requestAnimationFrame(function(){ if(scrim)scrim.classList.add('in'); }); }catch(_){ if(scrim)scrim.classList.add('in'); }
+  var lst=root.querySelector('#wfapList'); if(lst)lst.addEventListener('scroll',function(){ wfDrawer.scroll=lst.scrollTop; });
+  try{ var pan=root.querySelector('.wfap-panel'); if(pan)pan.focus(); }catch(_){}
+  try{ if(typeof priObs==='function') priObs('client.approvals.drawer.open',{count:cats.total}); }catch(_){}
+}
+function wfApprovalsClose(){
+  wfDrawer.open=false; var root=document.getElementById('wfapRoot'); if(root)root.innerHTML='';
+  try{ var b=document.querySelector('.wfap-open'); if(b)b.focus(); }catch(_){}
+}
+function wfApprovalsSetFilter(f){
+  wfDrawer.filter=f||'all'; wfDrawer.scroll=0;
+  var root=document.getElementById('wfapRoot'); if(!root)return;
+  root.querySelectorAll('.wfap-fchip').forEach(function(c){ c.classList.toggle('on', c.getAttribute('data-wfapprovalsfilter')===wfDrawer.filter); });
+  var lst=root.querySelector('#wfapList'); if(lst){ lst.innerHTML=wfApprovalsListHtml(wfApprovalsCats(wfApprovalsCurrentList(),wfNow()),wfDrawer.filter,wfNow()); lst.scrollTop=0; }
+}
+/* Atualização em tempo real do drawer (chamada pós-render/pós-snapshot): reconstrói SÓ a lista,
+   preservando o filtro ativo e a posição de rolagem. */
+function wfApprovalsRefresh(){
+  var root=document.getElementById('wfapRoot'); if(!root)return; var lst=root.querySelector('#wfapList'); if(!lst){ wfDrawer.open=false; return; }
+  var sc=lst.scrollTop; lst.innerHTML=wfApprovalsListHtml(wfApprovalsCats(wfApprovalsCurrentList(),wfNow()),wfDrawer.filter,wfNow()); lst.scrollTop=sc;
+}
+/* Hook pós-render: fora da tela Cliente ⇒ fecha (garante "recolhido ao reentrar"); na tela Cliente
+   com drawer aberto ⇒ atualiza a lista ao vivo. O Kanban/barra já se recomputam no #content. */
+function wfApprovalsAfterRender(){
+  try{
+    var onClient=(state.tab==='tarefas' && state.flowView==='client' && !state.clientView && !state.form);
+    if(!onClient){ if(wfDrawer.open||document.getElementById('wfapRoot')&&document.getElementById('wfapRoot').innerHTML) wfApprovalsClose(); return; }
+    if(wfDrawer.open) wfApprovalsRefresh();
+  }catch(_){}
+}
+(function(){ try{
+  if(typeof render==='function'){ var _wfr=render; render=function(){ var x=_wfr.apply(this,arguments); try{ wfApprovalsAfterRender(); }catch(_){ } return x; }; try{ window.render=render; }catch(_){} }
+  document.addEventListener('keydown',function(e){ try{ if(e.key==='Escape'&&wfDrawer.open){ e.preventDefault(); wfApprovalsClose(); } }catch(_){} });
+}catch(_){}})();
 function opOwnerLabel(cs, persp, isFinal){
   if(isFinal) return 'Fluxo finalizado';
   var owner=cs&&cs.owner;
@@ -12078,6 +12243,11 @@ document.addEventListener('click',async e=>{
   if(el=g('[data-wfsetdue]')){wfSetPhaseDueUI(el.dataset.wfsetdue);return;}
   if(el=g('[data-wfready]')){var _wfr=String(el.dataset.wfready||'').split('|');wfMarkReadyUI(_wfr[0],_wfr[1]==='captions'?'captions':'themes');return;}
   if(el=g('[data-wfcopyreminder]')){wfCopyReminder(el.dataset.wfcopyreminder);return;}
+  /* F3.5.6A-H2 — central de aprovações compacta + drawer lateral (só UX; sem tocar workflow/notif). */
+  if(el=g('[data-wfapprovalsopen]')){wfApprovalsOpen();return;}
+  if(el=g('[data-wfapprovalsclose]')){wfApprovalsClose();return;}
+  if(el=g('[data-wfapprovalsfilter]')){wfApprovalsSetFilter(el.getAttribute('data-wfapprovalsfilter'));return;}
+  if(el=g('[data-wfapprovalsscrim]')&&!g('.wfap-panel')){wfApprovalsClose();return;}
   if(el=g('[data-wfitemdone]')){wfToggleItemDone(el.dataset.wfitemdone);return;}
   if(el=g('[data-sheet]')){openSheet(el.dataset.sheet);return;}
   if(el=g('[data-cfgnotiftest]')){try{window.desktopAPI&&window.desktopAPI.notifTest&&window.desktopAPI.notifTest();}catch(_){}flashToast('Notificação de teste disparada.');return;}
