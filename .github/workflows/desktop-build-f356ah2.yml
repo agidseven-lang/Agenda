@@ -1,0 +1,296 @@
+# F3.5.6A-H2 — Desktop 1.0.231 (P0 UX da tela Cliente: a Central de "Aprovações pendentes" deixa de
+# ficar permanentemente expandida acima do Kanban — vira BARRA COMPACTA recolhida por padrão +
+# DRAWER lateral direito sob demanda) — build GATED, --publish never.
+# Publicação SÓ no desktop-release-f356ah2.yml (mesmos bytes).
+# Base de código: 1.0.230 @ e89867de (F3.5.6A-H1, tip da linhagem publicada da 1.0.230).
+# BASELINE FÍSICA OFICIAL: 1.0.228 @ 3f0d0af1 (FISICAMENTE APROVADA). ROLLBACK IMEDIATO 1.0.228.
+# NATUREZA DA MUDANÇA: exclusivamente de RENDERER (desktop/src/renderer/index.html). Todo o backend
+# (desktop/src/main, desktop/src/preload), o Worker (cloudflare-worker.js), o motor F3.5.6A e a
+# correção H1 (workflowEvents.js/workflowNotifier.ts) são BYTE-IDÊNTICOS à 1.0.230 publicada; a
+# infraestrutura de notificações 1.0.228 (bgNotify/notificationGrouping/bgnotify.html/handoff/
+# preloads/sons) é BYTE-IDÊNTICA à 1.0.228 (REGRA MÁXIMA). A funcionalidade da Central é PRESERVADA
+# (rastreamento/categorias/contagens/tempo/cliente/responsável/próxima ação/lembrete/abrir/tempo
+# real); só a APRESENTAÇÃO muda: barra compacta (título + total + resumo por categoria + urgência) +
+# drawer (filtros Todas/Não visualizadas/Visualizadas/Ajustes/Aprovadas; cards hierárquicos; Copiar
+# lembrete + Abrir; fecha por X/Esc/scrim; scroll interno) que NÃO empurra o Kanban.
+name: "[push/manual] F3.5.6A-H2 — Desktop 1.0.231 (Central de aprovações compacta + drawer) — Desktop Build"
+"on":
+  push:
+    branches: ["desktop/f356ah2-client-approvals-compact-drawer-1.0.231"]
+    paths-ignore: [".github/workflows/desktop-release-f356ah2.yml"]
+  workflow_dispatch: {}
+permissions: { contents: read }
+env:
+  TEST_BRANCH: "desktop/f356ah2-client-approvals-compact-drawer-1.0.231"
+  BASE_230_SHA: "e89867de5120fe88e2f639effd59d24c3181f427"
+  BASE_229_SHA: "a322dc8d81acdb44bde9ea31ad686279a2adea0d"
+  BASE_228_SHA: "3f0d0af192b4b6b32a8e8bbda4153dcf4df1bc6d"
+  BASE_226_SHA: "267f8c8593e6724ad6460ed8bbb42201ade09d0b"
+  BASE_225_SHA: "24b76b51faf4d2778f025df79d6047563f089b48"
+  BASE_224_SHA: "0fcad3e56d39320b8853807861417a0a5eca1e78"
+  BASE_223_SHA: "217ed0622993acced1a20b72ba677e9d17ed2f03"
+  BASE_222_SHA: "1eac3672ab07a56bfd5d692e9ecb24688ac2ee83"
+  BASE_221_SHA: "98caad68e83230c2ada88ce1b35e709a0d62ab8c"
+  BASE_220_SHA: "2d003adaeeec00499e95a9eac5fe01f48859e4ed"
+  APP_DIR: desktop
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: "Gate REF + ANCESTRIA (descende da 1.0.230, 1.0.229, 1.0.228 baseline física, 1.0.226, 1.0.225, 1.0.224, 1.0.223, 1.0.222, 1.0.221, 1.0.220)"
+        run: |
+          set -euo pipefail
+          [ "${GITHUB_REF_NAME}" = "$TEST_BRANCH" ] || { echo "::error::branch errada"; exit 1; }
+          git merge-base --is-ancestor "$BASE_230_SHA" HEAD || { echo "::error::não descende da 1.0.230 (base desta fase)"; exit 1; }
+          git merge-base --is-ancestor "$BASE_229_SHA" HEAD || { echo "::error::não descende da 1.0.229"; exit 1; }
+          git merge-base --is-ancestor "$BASE_228_SHA" HEAD || { echo "::error::não descende da 1.0.228 (baseline física)"; exit 1; }
+          git merge-base --is-ancestor "$BASE_226_SHA" HEAD || { echo "::error::não descende da 1.0.226"; exit 1; }
+          git merge-base --is-ancestor "$BASE_225_SHA" HEAD || { echo "::error::não descende da 1.0.225"; exit 1; }
+          git merge-base --is-ancestor "$BASE_224_SHA" HEAD || { echo "::error::não descende da 1.0.224"; exit 1; }
+          git merge-base --is-ancestor "$BASE_223_SHA" HEAD || { echo "::error::não descende da 1.0.223"; exit 1; }
+          git merge-base --is-ancestor "$BASE_222_SHA" HEAD || { echo "::error::não descende da 1.0.222"; exit 1; }
+          git merge-base --is-ancestor "$BASE_221_SHA" HEAD || { echo "::error::não descende da 1.0.221"; exit 1; }
+          git merge-base --is-ancestor "$BASE_220_SHA" HEAD || { echo "::error::não descende da 1.0.220"; exit 1; }
+      - name: "Gate VERSAO 1.0.231 (package + lock x2 + description da fase H2 + cadeia de bases preservada)"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node -e "const p=require('./package.json'); if(p.version!=='1.0.231') process.exit(1); if(!/f356ah2-client-approvals-compact-drawer/.test(p.description||'')) process.exit(1); if(!/f356ah1-workflow-notification-receipt-collision/.test(p.description||'')) process.exit(1); if(!/f356a-realtime-workflow-client-approval/.test(p.description||'')) process.exit(1); if(!/grouped-notification-handoff/.test(p.description||'')) process.exit(1); if(!/FISICAMENTE APROVADA/.test(p.description||'')) process.exit(1); if(!/reference-notification/.test(p.description||'')) process.exit(1); if(!/f355eh1-ultra-premium-notifications/.test(p.description||'')) process.exit(1); if(!/retire-legacy-modules-premium-notifications/.test(p.description||'')) process.exit(1); if(!/custom-cronograma-quantity-universal-paste/.test(p.description||'')) process.exit(1); if(!/stale-alert-terminal-task-hotfix/.test(p.description||'')) process.exit(1); if(!/session-restore-boot-hotfix/.test(p.description||'')) process.exit(1); if(!/custom-script-quantity-rich-editor/.test(p.description||'')) process.exit(1);"
+          [ "$(grep -c '"version": "1.0.231"' package-lock.json)" -ge 2 ]
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: "npm ci + TypeScript + sintaxe dos renderers como SCRIPT CLÁSSICO (vm.Script — parser do browser) + worker"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          ./node_modules/.bin/tsc --noEmit -p tsconfig.json
+          node -e "const fs=require('fs'),vm=require('vm');const s=fs.readFileSync('src/renderer/bgnotify.html','utf8');const m=s.match(/<script>([\s\S]*?)<\/script>/);new vm.Script(m[1],{filename:'bgnotify-inline'});"
+          node -e "const fs=require('fs'),vm=require('vm');const s=fs.readFileSync('src/renderer/slareminder.html','utf8');const m=s.match(/<script>([\s\S]*?)<\/script>/);new vm.Script(m[1],{filename:'slareminder-inline'});"
+          node -e "const fs=require('fs'),vm=require('vm');const s=fs.readFileSync('src/renderer/index.html','utf8');const b=[...s.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(x=>x[1]);if(b.length<2){console.error('esperados >=2 blocos inline (guarda + principal)');process.exit(1);}b.forEach((x,i)=>new vm.Script(x,{filename:'index-inline-'+i}));console.log('blocos inline OK (Script clássico):',b.length);"
+          node --check ../cloudflare-worker.js
+      - name: "npm run build (tsc + copy-renderer) — necessário p/ dist e provas Electron"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          npm run build
+      - name: "Gate MARCADORES F3.5.6A-H2 — barra compacta + drawer no fonte (renderer) + wfApprovalsPendingHtml REMOVIDA"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          S=src/renderer/index.html
+          # BARRA COMPACTA (recolhida por padrão) ligada ao board do Cliente:
+          grep -q 'function wfApprovalsBarHtml' "$S"
+          grep -q 'function wfApprovalsCats' "$S"
+          grep -q 'wfApprovalsBarHtml(list)+boardToolbar()' "$S"
+          grep -q 'Ver aprovações' "$S"
+          grep -q 'data-wfapprovalsopen="1"' "$S"
+          # DRAWER lateral (sob demanda) + funções:
+          for FN in wfApprovalsOpen wfApprovalsClose wfApprovalsSetFilter wfApprovalsRefresh wfApprovalsAfterRender wfApprovalsDrawerHtml wfApprovalsListHtml wfApRow wfApprovalsRoot; do
+            grep -q "function $FN" "$S"
+          done
+          grep -q 'APROVAÇÕES PENDENTES' "$S"
+          grep -q 'role="dialog"' "$S"
+          grep -q 'aria-modal="true"' "$S"
+          grep -q "id=\"wfapRoot\"" "$S"
+          grep -q 'id="wfapList"' "$S"
+          grep -q 'data-wfapprovalsclose="1"' "$S"
+          grep -q 'data-wfapprovalsscrim="1"' "$S"
+          grep -q 'data-wfapprovalsfilter=' "$S"
+          # CSS do overlay que NÃO empurra o Kanban (painel fixo à direita 420–520 + scrim + lista rolável):
+          grep -q '.wfap-panel{position:fixed;top:0;right:0' "$S"
+          grep -q 'width:min(480px,96vw)' "$S"
+          grep -q '.wfap-scrim{position:fixed;inset:0' "$S"
+          grep -q '.wfap-bar{' "$S"
+          # estado efêmero + Esc + recolhido ao (re)entrar + hook pós-render (tempo real):
+          grep -q 'var wfDrawer' "$S"
+          grep -q "e.key==='Escape'&&wfDrawer.open" "$S"
+          grep -q 'wfApprovalsAfterRender()' "$S"
+          # A FORMA antiga (lista permanente expandida) foi REMOVIDA:
+          grep -q 'function wfApprovalsPendingHtml' "$S" && { echo "::error::wfApprovalsPendingHtml ainda presente (lista permanente não removida)"; exit 1; } || true
+          grep -q 'wfApprovalsPendingHtml(list)' "$S" && { echo "::error::board ainda chama wfApprovalsPendingHtml"; exit 1; } || true
+          echo "MARCADORES F3.5.6A-H2: VERIFIED."
+      - name: "Gate MARCADORES F3.5.6A-H1 herdado — id GLOBAL por tarefa + migração de recibos legados (fonte + dist) INTACTOS"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          grep -q "id: (tid ? (tid + ':') : '') + String(k), lk: String(k)" src/main/workflowEvents.js
+          grep -q 'const legacyCursor = store.cursorGet(uid);' src/main/workflowNotifier.ts
+          grep -q 'ev.at <= legacyCursor && ev.lk && store.receiptHas(uid, "wf:" + ev.lk)' src/main/workflowNotifier.ts
+          grep -q "id: (tid ? (tid + ':') : '') + String(k), lk: String(k)" dist/main/workflowEvents.js
+          grep -q 'legacyCursor' dist/main/workflowNotifier.js
+          echo "MARCADORES F3.5.6A-H1 (herdado): VERIFIED."
+      - name: "Gate SUÍTE DA FASE F3.5.6A-H2 — client-approvals compacta + drawer (identidade/barra/drawer/filtros/tempo real/cards/Kanban/congelados/handlers/isolamento) [fonte]"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          H2_BASE_228="$BASE_228_SHA" H2_BASE_230="$BASE_230_SHA" node scripts/f356ah2-client-approvals.test.mjs
+      - name: "Gate SUÍTES herdadas — motor F3.5.6A + notificações/handoff/visibilidade/referência + cadeia F3.5.5* [dist]"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f356a-workflow-orchestration.test.mjs
+          node scripts/f355eh4-grouped-notification-handoff.test.mjs
+          node scripts/f355eh3-global-notification-visibility.test.mjs
+          node scripts/f355eh2-reference-notification.test.mjs
+          node scripts/f355e-retire-modules-premium-notifications.test.mjs
+          node scripts/f355d-cron-quantity-universal-paste.test.mjs
+          node scripts/f353-paste-recovery.test.mjs
+          node scripts/f353-durable-notifications.test.mjs
+          node scripts/f355ch2-stale-alert.test.mjs
+      - name: "Gate central herdado — f354l + f354p + f354q + f354o + f354u + f354u-h1 [dist]"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f354l-sla-central-persistent-reminders.test.mjs
+          node scripts/f354p-sla-decision-actions.test.mjs
+          node scripts/f354q-task-idle-detection.test.mjs
+          node scripts/f354o-common-notification-grouping.test.mjs
+          node scripts/f354u-premium-common-notifications.test.mjs
+          node scripts/f354u-h1-notification-hotfix.test.mjs
+      - name: "Gate herdado — sessão/auth + rich editor + portal RTE + agenda + notas + planner/orquestrador/central/integração"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f355ch1-session-restore.test.mjs
+          node scripts/f3356-auth-core.test.mjs
+          node scripts/f355c-script-quantity-rich-editor.test.mjs
+          node scripts/f355b-agenda-premium.test.mjs
+          node scripts/f355ah1-internal-notes.test.mjs
+          node scripts/f355a-execution-planner.test.mjs
+          node scripts/f355a-orchestrator.test.mjs
+          node scripts/f355a-execution-central.test.mjs
+          node scripts/f355a-integration.test.mjs
+      - name: "Gate herdado (raiz) — validador RTE do PORTAL + paridade cruzada canônica"
+        run: |
+          set -euo pipefail
+          node scripts/worker-ops/f355c-rte-worker-validator.test.mjs
+          node scripts/worker-ops/f355c-canon-crossparity.mjs
+      - name: "Gate REGRESSÃO canônica — som 37 + detalhes 74 + cards 53 + sessão 40"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f354wh2-immediate-notification-sound.test.mjs
+          node scripts/f354wh1-details-status-notes.test.mjs
+          node scripts/f354w-compact-cards-details.test.mjs
+          node scripts/f354vh1-session-persistence.test.mjs
+      - name: "Gate PROVAS REAIS Electron F3.5.6A-H2 — 27 provas (barra compacta recolhida por padrão; drawer sob demanda que NÃO empurra o Kanban; filtros; 5 categorias; tempo real na barra E no drawer; Lembrete/Abrir; cliente longo; 20/100 pendências; 125%/150%; regressão; congelados no pacote) — xvfb"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y >/dev/null 2>&1 || true
+          sudo apt-get install -y xvfb >/dev/null 2>&1 || true
+          timeout -k 15 780 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f356ah2-electron-proof-main.js
+      - name: "Gate PROVAS REAIS Electron herdadas F3.5.6A — motor + barra compacta (P16 re-pinado H2) no asar real — xvfb"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          timeout -k 15 780 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f356a-electron-proof-main.js
+      - name: "Gate PROVA DE SUPERFÍCIE F3.5.6A-H1 herdada — cadeia REAL Worker→workflowNotifier(dist)→deliverNotification(dist)→bgnotify/toast REAIS do asar (cliente aprova temas; a correção da colisão SOBREVIVE à mudança de renderer H2) — xvfb"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f356ah1-dump-docs.mjs
+          timeout -k 15 600 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f356ah1-surface-proof-main.js
+      - name: "Gate PROVAS REAIS Electron herdadas F3.5.5E-H4 — handoff transacional de grupos (REGRA MÁXIMA: infra de notificações 1.0.228 intacta sob o wrap de render da H2; 21 cenas) — xvfb"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          timeout -k 15 780 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f355eh4-electron-proof-main.js
+      - uses: actions/upload-artifact@v4
+        with: { name: f356ah2-provas-qa, path: "docs/f356ah2-qa/**", if-no-files-found: error, retention-days: 30 }
+      - uses: actions/upload-artifact@v4
+        with: { name: f356ah2-provas-herdadas-qa, path: "docs/f356a-qa/**\ndocs/f356ah1-qa/**\ndocs/f355eh4-qa/**", if-no-files-found: error, retention-days: 30 }
+      - name: "Gate ISOLAMENTO — H2 é mudança de RENDERER PURA: delta vs 1.0.230 só nos arquivos autorizados; backend/Worker/motor/H1 byte-idênticos à 1.0.230; infra de notificações 1.0.228 byte-idêntica"
+        run: |
+          set -euo pipefail
+          git diff --name-only "$BASE_230_SHA"..HEAD > /tmp/delta.txt; echo "== DELTA vs 1.0.230 =="; cat /tmp/delta.txt
+          # allowlist H2: SÓ o renderer index.html (produção) + versão + suíte/prova/preload/docs da fase
+          # + re-pins ROTULADOS das suítes herdadas (versão 1.0.230→1.0.231; G11 do motor F3.5.6A
+          # ajustado para a barra+drawer) + os dois workflows f356ah2. Nada mais.
+          BAD=$(grep -vE '^(\.github/workflows/desktop-(build|release)-f356ah2\.yml$|desktop/src/renderer/index\.html$|desktop/package(-lock)?\.json$|desktop/scripts/f356ah2-|desktop/scripts/f356a-electron-proof-main\.js$|desktop/scripts/f356a-workflow-orchestration\.test\.mjs$|desktop/scripts/f356ah1-surface-proof-main\.js$|desktop/scripts/f354p-sla-decision-actions\.test\.mjs$|desktop/scripts/f354vh1-session-persistence\.test\.mjs$|desktop/scripts/f354wh2-immediate-notification-sound\.test\.mjs$|desktop/scripts/f355a-integration\.test\.mjs$|desktop/scripts/f355ah1-internal-notes\.test\.mjs$|desktop/scripts/f355b-agenda-premium\.test\.mjs$|desktop/scripts/f355c-script-quantity-rich-editor\.test\.mjs$|desktop/scripts/f355d-cron-quantity-universal-paste\.test\.mjs$|desktop/scripts/f355e-retire-modules-premium-notifications\.test\.mjs$|desktop/scripts/f355eh2-reference-notification\.test\.mjs$|desktop/scripts/f355eh3-global-notification-visibility\.test\.mjs$|desktop/scripts/f355eh4-grouped-notification-handoff\.test\.mjs$|docs/f356ah2(-qa)?/)' /tmp/delta.txt || true)
+          [ -z "$BAD" ] || { echo "::error::fora da allowlist H2: $BAD"; exit 1; }
+          # B) NATUREZA RENDERER-PURA: todo o backend + Worker + motor F3.5.6A + correção H1 + demais
+          #    renderers (bgnotify/slareminder/bgcall/priorityEngine) BYTE-IDÊNTICOS à 1.0.230.
+          git diff --quiet "$BASE_230_SHA"..HEAD -- desktop/src/main desktop/src/preload cloudflare-worker.js desktop/scripts/copy-renderer.js desktop/electron-builder.yml desktop/tsconfig.json functions android-native android-native-beta desktop/src/renderer/priorityEngine.js desktop/src/renderer/bgnotify.html desktop/src/renderer/slareminder.html desktop/src/renderer/bgcall.html desktop/src/renderer/sounds || { echo "::error::mudança fora do renderer index.html — a fase H2 é RENDERER-PURA e deve manter backend/Worker/motor/H1/superfícies byte-idênticos à 1.0.230"; exit 1; }
+          # C) REGRA MÁXIMA — infraestrutura de notificações 1.0.228 byte-idêntica à baseline física.
+          git diff --quiet "$BASE_228_SHA"..HEAD -- desktop/src/main/bgNotify.ts desktop/src/main/notificationGrouping.ts desktop/src/renderer/bgnotify.html desktop/src/renderer/slareminder.html desktop/src/renderer/bgcall.html desktop/src/renderer/sounds desktop/src/preload/bgnotify-preload.ts desktop/src/preload/slareminder-preload.ts desktop/src/preload/preload.ts desktop/electron-builder.yml desktop/tsconfig.json || { echo "::error::congelado alterado (infra de notificações 1.0.228 deve ser byte-idêntica à baseline física 3f0d0af)"; exit 1; }
+          echo "ISOLAMENTO H2: VERIFIED (renderer index.html é o único arquivo de produção alterado vs 1.0.230)."
+  build:
+    needs: verify
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: npm ci + build + electron-builder (--publish never)
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm run build
+          npx electron-builder --win nsis msi --publish never
+      - name: "Gate EMPACOTADO — versão 1.0.231 + BARRA/DRAWER H2 + correção H1 + infra congelada no app.asar (suítes contra o pacote)"
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          ASAR="dist-installer/win-unpacked/resources/app.asar"; test -f "$ASAR"
+          npx --yes @electron/asar extract "$ASAR" asar-x
+          node -e "const p=require('./asar-x/package.json'); if(p.version!=='1.0.231') process.exit(1);"
+          I=asar-x/src/renderer/index.html
+          # H2 — barra compacta + drawer nos BYTES do pacote:
+          grep -q 'function wfApprovalsBarHtml' "$I"
+          grep -q 'function wfApprovalsCats' "$I"
+          grep -q 'wfApprovalsBarHtml(list)+boardToolbar()' "$I"
+          grep -q 'function wfApprovalsDrawerHtml' "$I"
+          grep -q 'function wfApRow' "$I"
+          grep -q 'APROVAÇÕES PENDENTES' "$I"
+          grep -q '.wfap-panel{position:fixed;top:0;right:0' "$I"
+          grep -q 'data-wfapprovalsopen="1"' "$I"
+          grep -q 'id="wfapRoot"' "$I"
+          grep -q 'function wfApprovalsPendingHtml' "$I" && { echo "::error::wfApprovalsPendingHtml no pacote"; exit 1; } || true
+          # H1 — correção da colisão nos BYTES do pacote (main compilado):
+          grep -q "id: (tid ? (tid + ':') : '') + String(k), lk: String(k)" asar-x/dist/main/workflowEvents.js
+          grep -q 'legacyCursor' asar-x/dist/main/workflowNotifier.js
+          # F3.5.6A — motor no pacote:
+          grep -q 'externalWaitOf' asar-x/dist/main/slaRules.js
+          # REGRA MÁXIMA — infra de notificações 1.0.228 no pacote (2 superfícies + main compilado):
+          grep -q 'function premiumEvtIcon' asar-x/src/renderer/index.html
+          grep -q 'function premiumEvtIcon' asar-x/src/renderer/bgnotify.html
+          grep -q 'activeToastGroups' asar-x/dist/main/main.js
+          grep -q 'HANDOFF_ACCEPT_MS = 4600' asar-x/dist/main/main.js
+          grep -q 'function reassert' asar-x/dist/main/bgNotify.js
+          grep -q 'screen-saver' asar-x/dist/main/bgNotify.js
+          # SUÍTE DA FASE H2 contra os BYTES EMPACOTADOS (renderer + package do asar; lock da fonte):
+          H2_SRC=asar-x/src/renderer/index.html H2_PKG=asar-x/package.json H2_LOCK=package-lock.json node scripts/f356ah2-client-approvals.test.mjs
+          # MOTOR F3.5.6A contra o pacote (G11 = barra+drawer):
+          F356A_SRC=asar-x/src/renderer/index.html F356A_SLARULES=asar-x/dist/main/slaRules.js F356A_WE=asar-x/dist/main/workflowEvents.js F356A_DIST_WN=asar-x/dist/main/workflowNotifier.js F356A_PKG=asar-x/package.json node scripts/f356a-workflow-orchestration.test.mjs
+          # infra de notificações (handoff/visibilidade/referência) contra o pacote:
+          ASAR_MODE=1 SRC=asar-x/src/renderer/index.html BG_SRC=asar-x/src/renderer/bgnotify.html PKG_SRC=asar-x/package.json DIST_MAIN=asar-x/dist/main/main.js DIST_BG=asar-x/dist/main/bgNotify.js DIST_PRE=asar-x/dist/preload/preload.js DIST_GROUP=asar-x/dist/main/notificationGrouping.js node scripts/f355eh4-grouped-notification-handoff.test.mjs
+          ASAR_MODE=1 SRC=asar-x/src/renderer/index.html BG_SRC=asar-x/src/renderer/bgnotify.html PKG_SRC=asar-x/package.json DIST_MAIN=asar-x/dist/main/main.js DIST_BG=asar-x/dist/main/bgNotify.js node scripts/f355eh3-global-notification-visibility.test.mjs
+          SRC=asar-x/src/renderer/index.html BG_SRC=asar-x/src/renderer/bgnotify.html PKG_SRC=asar-x/package.json node scripts/f355eh2-reference-notification.test.mjs
+          echo "GATE F3.5.6A-H2 EMPACOTADO: VERIFIED."
+      - name: Empacotar bundle + SHA256SUMS + VERSAO-DESKTOP
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes @cyclonedx/cyclonedx-npm --omit dev --output-format JSON --output-file "$RUNNER_TEMP/sbom.json" || echo '{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}' > "$RUNNER_TEMP/sbom.json"
+          OUT="$GITHUB_WORKSPACE/dist-pkg"; mkdir -p "$OUT"
+          EXE=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe | head -1); MSI=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.msi | head -1); BM=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap | head -1)
+          cp "$EXE" "$MSI" "$BM" dist-installer/latest.yml "$OUT/"; cp "$RUNNER_TEMP/sbom.json" "$OUT/SBOM-cyclonedx.json"
+          EXE_NAME=$(basename "$EXE"); MSI_NAME=$(basename "$MSI"); BM_NAME=$(basename "$BM")
+          ( cd "$OUT" && sha256sum "$EXE_NAME" "$MSI_NAME" latest.yml "$BM_NAME" SBOM-cyclonedx.json > SHA256SUMS )
+          { echo "productName : Agenda ID Seven Desktop"; echo "versionName : 1.0.231"; echo "rotulo      : 1.0.231-f356ah2-client-approvals-compact-drawer (CANDIDATA — Central de aprovações compacta + drawer)"; echo "channel     : latest (NADA publicado neste build)"; echo "appId       : br.com.idseven.agenda.desktop"; echo "instalador  : $EXE_NAME"; echo "SHA-256 exe : $(sha256sum "$OUT/$EXE_NAME" | awk '{print $1}')"; echo "instalador2 : $MSI_NAME"; echo "SHA-256 msi : $(sha256sum "$OUT/$MSI_NAME" | awk '{print $1}')"; echo "commit      : $GITHUB_SHA (branch $GITHUB_REF_NAME)"; echo "base-codigo : Desktop 1.0.230 (commit e89867de; F3.5.6A-H1). BASELINE FISICA OFICIAL: 1.0.228 (3f0d0af1; FISICAMENTE APROVADA)"; echo "rollback    : imediato 1.0.228 (877795ef stable — baseline física); adicional 1.0.226 (267f8c85)"; echo "origem      : F3.5.6A-H2 — P0 UX da tela Cliente. A secao Aprovacoes Pendentes deixava de ficar permanentemente EXPANDIDA acima do Kanban (poluicao visual; Kanban empurrado; perda de hierarquia; aparencia de relatorio). Transformada em BARRA COMPACTA recolhida por padrao (titulo + total + resumo por categoria + urgencia se houver + Ver aprovacoes) + DRAWER lateral direito sob demanda que NAO empurra o Kanban (filtros Todas/Nao visualizadas/Visualizadas/Ajustes/Aprovadas; cards hierarquicos; Copiar lembrete + Abrir; fecha por X/Esc/scrim; scroll interno). Contagens e lista atualizam em tempo real; recolhido ao (re)entrar (estado efemero). FUNCIONALIDADE preservada; SO UX/UI. MUDANCA RENDERER-PURA: desktop/src/renderer/index.html e o UNICO arquivo de producao alterado vs 1.0.230; backend/Worker/motor F3.5.6A/correcao H1 byte-identicos a 1.0.230; infra de notificacoes 1.0.228 byte-identica (REGRA MAXIMA). PROVAS: suite da fase 58/58; 27 provas reais no Electron empacotado (barra recolhida por padrao; drawer nao empurra o Kanban; filtros; 5 categorias; tempo real na barra e no drawer; Lembrete/Abrir; cliente longo; 20/100 pendencias; 125%/150%; regressao; congelados no pacote); prova de superficie H1 herdada (a notificacao de aprovacao do cliente SOBREVIVE ao wrap de render da H2); handoff transacional de grupos herdado; bateria herdada completa. Worker V64.61 INALTERADO (zero deploy)."; echo "distribuicao: CANDIDATA — publicação no Latest ocorre no workflow desktop-release-f356ah2.yml (mesmos bytes)"; } > "$OUT/VERSAO-DESKTOP.txt"
+          echo "== SHA256SUMS =="; cat "$OUT/SHA256SUMS"
+      - uses: actions/upload-artifact@v4
+        with: { name: agenda-id-seven-desktop-1.0.231-installer, path: "dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe\ndist-pkg/Agenda-ID-Seven-Desktop-*-x64.msi", if-no-files-found: error, retention-days: 30 }
+      - uses: actions/upload-artifact@v4
+        with: { name: agenda-id-seven-desktop-1.0.231-updatemeta, path: "dist-pkg/latest.yml\ndist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap\ndist-pkg/SHA256SUMS\ndist-pkg/SBOM-cyclonedx.json\ndist-pkg/VERSAO-DESKTOP.txt", if-no-files-found: error, retention-days: 30 }
