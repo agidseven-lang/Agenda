@@ -1,0 +1,532 @@
+{
+  "results": [
+    {
+      "name": "R00 corpos REAIS extraídos do dist 1.0.230 (deliver/handoff/bring/windowActive/collect/aceite) + classify real",
+      "ok": true,
+      "info": {
+        "d": true,
+        "h": true,
+        "b": true,
+        "w": true,
+        "c": true,
+        "a": true,
+        "cls": "function"
+      }
+    },
+    {
+      "name": "R01 renderer REAL do asar bootado (Social logada, 2 tarefas, canais de notificação vivos)",
+      "ok": true,
+      "info": {
+        "user": true,
+        "tasks": 2,
+        "api": true
+      }
+    },
+    {
+      "name": "S0 boot: THEMES_READY/APPROVAL_REQUESTED da própria Social NÃO notificam (zero ingresso)",
+      "ok": true,
+      "info": {
+        "ingresso": 0
+      }
+    },
+    {
+      "name": "S1 desfocado: cliente VISUALIZOU → 1 ingresso info + CARD REAL na janela premium (sem som)",
+      "ok": true,
+      "info": {
+        "foco": {
+          "agendaFocused": false,
+          "otherFocused": true
+        },
+        "ingresso": [
+          {
+            "eventType": "wf_client_themes_first_viewed",
+            "dedupKey": "wf:task-cron-fisico:ev_view_ar_themes_r1"
+          },
+          {
+            "eventType": "wf_client_themes_approved",
+            "dedupKey": "wf:task-cron-fisico:ev_dec_ar_themes_r1"
+          },
+          {
+            "eventType": "wf_client_themes_first_viewed",
+            "dedupKey": "wf:task-cron-fisico-2:ev_view_ar_themes_r1"
+          },
+          {
+            "eventType": "wf_client_themes_approved",
+            "dedupKey": "wf:task-cron-fisico-2:ev_dec_ar_themes_r1"
+          }
+        ],
+        "bg": {
+          "n": 1,
+          "txt": " CCliente visualizou os temas18:02Cronograma testePrimeira visualização do link de aprovação.AMResponsável: Ana Beatriz Social MediaCliente Físico LTDAAbrir tarefai× (function(){ \"use strict\"; var stack=document.getElementById('stack'); var seen=Object.create(null); function esc(s){return String(s=="
+        },
+        "ack": {
+          "dedupKey": "wf:task-cron-fisico:ev_view_ar_themes_r1",
+          "severity": "info",
+          "eventType": "wf_client_themes_first_viewed",
+          "isAttr": false,
+          "count": 1,
+          "sound": "suppressed_by_payload"
+        },
+        "shot": "s1-premium-visualizou.png"
+      }
+    },
+    {
+      "name": "S2 [PROVA-CHAVE] desfocado: cliente APROVOU → 1 ingresso + CARD REAL 'Temas aprovados' na premium + ACK de render + som de política (success, NÃO suprimido)",
+      "ok": true,
+      "info": {
+        "ingresso": [
+          {
+            "eventType": "wf_client_themes_first_viewed",
+            "dedupKey": "wf:task-cron-fisico:ev_view_ar_themes_r1"
+          },
+          {
+            "eventType": "wf_client_themes_approved",
+            "dedupKey": "wf:task-cron-fisico:ev_dec_ar_themes_r1"
+          },
+          {
+            "eventType": "wf_client_themes_first_viewed",
+            "dedupKey": "wf:task-cron-fisico-2:ev_view_ar_themes_r1"
+          },
+          {
+            "eventType": "wf_client_themes_approved",
+            "dedupKey": "wf:task-cron-fisico-2:ev_dec_ar_themes_r1"
+          }
+        ],
+        "bg": {
+          "n": 2,
+          "aprovado": true,
+          "atribuir": true,
+          "tarefa": true,
+          "cliente": true,
+          "txt": " CCliente visualizou os temas18:02Cronograma testePrimeira visualização do link de aprovação.AMResponsável: Ana Beatriz Social MediaCliente Físico LTDAAbrir tarefai×CTemas aprovados18:02Cronograma teste3 temas aprovados. Próxima ação: atribuir aos Designers.AMResponsável: Ana Beatriz Social MediaCliente Físico LTDAAbrir tarefa✓× (function(){ \"use strict\"; var stack=document.getElementById('stack')"
+        },
+        "ack": {
+          "dedupKey": "wf:task-cron-fisico:ev_dec_ar_themes_r1",
+          "severity": "success",
+          "eventType": "wf_client_themes_approved",
+          "isAttr": false,
+          "count": 2,
+          "sound": "played"
+        },
+        "shot": "s2-premium-temas-aprovados.png"
+      }
+    },
+    {
+      "name": "S3 zero duplicação: re-snapshots não geram novo ingresso nem novo card (recibo + dedupe)",
+      "ok": true,
+      "info": {
+        "ingresso": 2,
+        "acks": 2,
+        "bgCards": 2
+      }
+    },
+    {
+      "name": "S4 focado: aprovação da 2ª tarefa → TOAST REAL no renderer ('Temas aprovados' + tarefa), som 1× no toast, SEM fallback pós-watchdog",
+      "ok": true,
+      "info": {
+        "toast": {
+          "n": 2,
+          "aprovado": true,
+          "tarefa2": true,
+          "txt": "CCliente visualizou os temas18:02Cliente · Cronograma teste 2Primeira visualização do link de aprovação.ABResponsável: Ana Beatriz Social MediaCliente Físico Dois ME×CTemas aprovados18:02Cliente · Cronograma teste 23 temas aprovados. Próxima ação: atribuir aos Designers.ABResponsável: Ana Beatriz So"
+        },
+        "somToast": 1,
+        "viewIngressos": 2,
+        "shot": "s4-toast-focado-aprovado.png"
+      }
+    },
+    {
+      "name": "S5 nativa 0× (toda entrega provou render na premium ou no toast)",
+      "ok": true,
+      "info": {
+        "nativeCalls": []
+      }
+    }
+  ],
+  "ingress": [
+    {
+      "eventType": "wf_client_themes_first_viewed",
+      "dedupKey": "wf:task-cron-fisico:ev_view_ar_themes_r1"
+    },
+    {
+      "eventType": "wf_client_themes_approved",
+      "dedupKey": "wf:task-cron-fisico:ev_dec_ar_themes_r1"
+    },
+    {
+      "eventType": "wf_client_themes_first_viewed",
+      "dedupKey": "wf:task-cron-fisico-2:ev_view_ar_themes_r1"
+    },
+    {
+      "eventType": "wf_client_themes_approved",
+      "dedupKey": "wf:task-cron-fisico-2:ev_dec_ar_themes_r1"
+    }
+  ],
+  "renderedAcks": [
+    {
+      "dedupKey": "wf:task-cron-fisico:ev_view_ar_themes_r1",
+      "severity": "info",
+      "eventType": "wf_client_themes_first_viewed",
+      "isAttr": false,
+      "count": 1,
+      "sound": "suppressed_by_payload"
+    },
+    {
+      "dedupKey": "wf:task-cron-fisico:ev_dec_ar_themes_r1",
+      "severity": "success",
+      "eventType": "wf_client_themes_approved",
+      "isAttr": false,
+      "count": 2,
+      "sound": "played"
+    }
+  ],
+  "nativeCalls": [],
+  "slaEnqueues": 0,
+  "logs": [
+    [
+      "wfnotif.start",
+      {
+        "uid": "uid-ana-social",
+        "deviceId": "44e543c7",
+        "cursorAt": 0,
+        "retentionMs": 2592000000,
+        "aggWindowMs": 15000
+      }
+    ],
+    [
+      "wfnotif.drain.begin",
+      {
+        "reason": "snapshot",
+        "pending": 1,
+        "cursorAt": 0
+      }
+    ],
+    [
+      "deliver.begin",
+      {
+        "eventType": "wf_client_themes_first_viewed",
+        "taskId": "task-cron-fisico",
+        "targetUserId": "uid-ana-social",
+        "actorId": "",
+        "responsibleId": "uid-ana-social",
+        "dedupKey": "wf:task-cron-fisico:ev_view_ar_themes_r1",
+        "windowActive": false,
+        "visible": true,
+        "minimized": false
+      }
+    ],
+    [
+      "notification.group.skipped.unknown",
+      {
+        "eventType": "wf_client_themes_first_viewed",
+        "taskId": "task…co"
+      }
+    ],
+    [
+      "notify.event.detected",
+      {
+        "eventType": "wf_client_themes_first_viewed",
+        "taskId": "task…",
+        "recipientUid": "uid-…"
+      }
+    ],
+    [
+      "notify.main.received",
+      {
+        "eventType": "wf_client_themes_first_viewed",
+        "taskId": "task…",
+        "recipientUid": "uid-…",
+        "dedupKey": "wf:task-cron-fisico:ev_view_ar_themes_r1"
+      }
+    ],
+    [
+      "notify.delivery.policy",
+      {
+        "policy": "premium-overlay",
+        "dedupKey": "wf:task-cron-fisico:ev_view_ar_themes_r1",
+        "taskId": "task…"
+      }
+    ],
+    [
+      "notify.premium.shown",
+      {
+        "dedupKey": "wf:task-cron-fisico:ev_view_ar_themes_r1",
+        "taskId": "task…"
+      }
+    ],
+    [
+      "deliver.bg",
+      {
+        "dedupKey": "wf:task-cron-fisico:ev_view_ar_themes_r1",
+        "deep": "detail/task-cron-fisico",
+        "taskId": "task-cron-fisico",
+        "title": "Cliente visualizou os temas",
+        "channel": "bg-window",
+        "fallbackNative": false
+      }
+    ],
+    [
+      "wfnotif.emit",
+      {
+        "id": "task-cron-fisico:ev_view_ar_themes_r1",
+        "type": "CLIENT_THEMES_FIRST_VIEWED",
+        "taskId": "task-cron-fisico",
+        "at": 1786211708432
+      }
+    ],
+    [
+      "wfnotif.drain.end",
+      {
+        "reason": "snapshot",
+        "delivered": 1,
+        "cursorAt": 1786211708432
+      }
+    ],
+    [
+      "wfnotif.drain.begin",
+      {
+        "reason": "snapshot",
+        "pending": 1,
+        "cursorAt": 1786211708432
+      }
+    ],
+    [
+      "deliver.begin",
+      {
+        "eventType": "wf_client_themes_approved",
+        "taskId": "task-cron-fisico",
+        "targetUserId": "uid-ana-social",
+        "actorId": "",
+        "responsibleId": "uid-ana-social",
+        "dedupKey": "wf:task-cron-fisico:ev_dec_ar_themes_r1",
+        "windowActive": false,
+        "visible": true,
+        "minimized": false
+      }
+    ],
+    [
+      "notification.group.skipped.unknown",
+      {
+        "eventType": "wf_client_themes_approved",
+        "taskId": "task…co"
+      }
+    ],
+    [
+      "notify.event.detected",
+      {
+        "eventType": "wf_client_themes_approved",
+        "taskId": "task…",
+        "recipientUid": "uid-…"
+      }
+    ],
+    [
+      "notify.main.received",
+      {
+        "eventType": "wf_client_themes_approved",
+        "taskId": "task…",
+        "recipientUid": "uid-…",
+        "dedupKey": "wf:task-cron-fisico:ev_dec_ar_themes_r1"
+      }
+    ],
+    [
+      "notify.delivery.policy",
+      {
+        "policy": "premium-overlay",
+        "dedupKey": "wf:task-cron-fisico:ev_dec_ar_themes_r1",
+        "taskId": "task…"
+      }
+    ],
+    [
+      "notify.premium.shown",
+      {
+        "dedupKey": "wf:task-cron-fisico:ev_dec_ar_themes_r1",
+        "taskId": "task…"
+      }
+    ],
+    [
+      "deliver.bg",
+      {
+        "dedupKey": "wf:task-cron-fisico:ev_dec_ar_themes_r1",
+        "deep": "detail/task-cron-fisico",
+        "taskId": "task-cron-fisico",
+        "title": "Temas aprovados",
+        "channel": "bg-window",
+        "fallbackNative": false
+      }
+    ],
+    [
+      "wfnotif.emit",
+      {
+        "id": "task-cron-fisico:ev_dec_ar_themes_r1",
+        "type": "CLIENT_THEMES_APPROVED",
+        "taskId": "task-cron-fisico",
+        "at": 1786211768432
+      }
+    ],
+    [
+      "wfnotif.drain.end",
+      {
+        "reason": "snapshot",
+        "delivered": 1,
+        "cursorAt": 1786211768432
+      }
+    ],
+    [
+      "wfnotif.drain.begin",
+      {
+        "reason": "snapshot",
+        "pending": 2,
+        "cursorAt": 1786211768432
+      }
+    ],
+    [
+      "deliver.begin",
+      {
+        "eventType": "wf_client_themes_first_viewed",
+        "taskId": "task-cron-fisico-2",
+        "targetUserId": "uid-ana-social",
+        "actorId": "",
+        "responsibleId": "uid-ana-social",
+        "dedupKey": "wf:task-cron-fisico-2:ev_view_ar_themes_r1",
+        "windowActive": true,
+        "visible": true,
+        "minimized": false
+      }
+    ],
+    [
+      "notification.group.skipped.unknown",
+      {
+        "eventType": "wf_client_themes_first_viewed",
+        "taskId": "task…-2"
+      }
+    ],
+    [
+      "notify.event.detected",
+      {
+        "eventType": "wf_client_themes_first_viewed",
+        "taskId": "task…",
+        "recipientUid": "uid-…"
+      }
+    ],
+    [
+      "notify.main.received",
+      {
+        "eventType": "wf_client_themes_first_viewed",
+        "taskId": "task…",
+        "recipientUid": "uid-…",
+        "dedupKey": "wf:task-cron-fisico-2:ev_view_ar_themes_r1"
+      }
+    ],
+    [
+      "notify.delivery.policy",
+      {
+        "policy": "toast-focused",
+        "dedupKey": "wf:task-cron-fisico-2:ev_view_ar_themes_r1",
+        "taskId": "task…"
+      }
+    ],
+    [
+      "deliver.toast",
+      {
+        "dedupKey": "wf:task-cron-fisico-2:ev_view_ar_themes_r1",
+        "taskId": "task-cron-fisico-2"
+      }
+    ],
+    [
+      "wfnotif.emit",
+      {
+        "id": "task-cron-fisico-2:ev_view_ar_themes_r1",
+        "type": "CLIENT_THEMES_FIRST_VIEWED",
+        "taskId": "task-cron-fisico-2",
+        "at": 1786211768432
+      }
+    ],
+    [
+      "deliver.begin",
+      {
+        "eventType": "wf_client_themes_approved",
+        "taskId": "task-cron-fisico-2",
+        "targetUserId": "uid-ana-social",
+        "actorId": "",
+        "responsibleId": "uid-ana-social",
+        "dedupKey": "wf:task-cron-fisico-2:ev_dec_ar_themes_r1",
+        "windowActive": true,
+        "visible": true,
+        "minimized": false
+      }
+    ],
+    [
+      "notification.group.skipped.unknown",
+      {
+        "eventType": "wf_client_themes_approved",
+        "taskId": "task…-2"
+      }
+    ],
+    [
+      "notify.event.detected",
+      {
+        "eventType": "wf_client_themes_approved",
+        "taskId": "task…",
+        "recipientUid": "uid-…"
+      }
+    ],
+    [
+      "notify.main.received",
+      {
+        "eventType": "wf_client_themes_approved",
+        "taskId": "task…",
+        "recipientUid": "uid-…",
+        "dedupKey": "wf:task-cron-fisico-2:ev_dec_ar_themes_r1"
+      }
+    ],
+    [
+      "notify.delivery.policy",
+      {
+        "policy": "toast-focused",
+        "dedupKey": "wf:task-cron-fisico-2:ev_dec_ar_themes_r1",
+        "taskId": "task…"
+      }
+    ],
+    [
+      "deliver.toast",
+      {
+        "dedupKey": "wf:task-cron-fisico-2:ev_dec_ar_themes_r1",
+        "taskId": "task-cron-fisico-2"
+      }
+    ],
+    [
+      "wfnotif.emit",
+      {
+        "id": "task-cron-fisico-2:ev_dec_ar_themes_r1",
+        "type": "CLIENT_THEMES_APPROVED",
+        "taskId": "task-cron-fisico-2",
+        "at": 1786211828432
+      }
+    ],
+    [
+      "wfnotif.drain.end",
+      {
+        "reason": "snapshot",
+        "delivered": 2,
+        "cursorAt": 1786211828432
+      }
+    ],
+    [
+      "toast.ack.ok",
+      {
+        "dedupKey": "wf:task-cron-fisico-2:ev_view_ar_themes_r1"
+      }
+    ],
+    [
+      "toast.ack.ok",
+      {
+        "dedupKey": "wf:task-cron-fisico-2:ev_dec_ar_themes_r1"
+      }
+    ],
+    [
+      "wfnotif.stop",
+      {
+        "uid": "uid-ana-social"
+      }
+    ]
+  ]
+}

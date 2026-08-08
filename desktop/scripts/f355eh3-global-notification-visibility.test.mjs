@@ -57,7 +57,7 @@ const dBg = fs.existsSync(P.distBg) ? R(P.distBg) : "";
 const srcMode = process.env.ASAR_MODE === "1" ? false : !!mainTs;
 
 // ───────────────────────── A. IDENTIDADE ─────────────────────────
-ok("A1 versão 1.0.229 (RE-PINADO F3.5.6A)", pkg.version === "1.0.229", pkg.version);
+ok("A1 versão 1.0.230 (RE-PINADO F3.5.6A-H1)", pkg.version === "1.0.230", pkg.version);
 ok("A2 description: fase f355eh4 sobre a f355eh3 + base 1.0.226 FISICAMENTE APROVADA + cadeia (RE-PINADO F3.5.5E-H4)",
   /1\.0\.228-f355eh4-grouped-notification-handoff/.test(pkg.description)
   && /1\.0\.227-f355eh3-global-notification-visibility/.test(pkg.description)
@@ -67,7 +67,7 @@ ok("A2 description: fase f355eh4 sobre a f355eh3 + base 1.0.226 FISICAMENTE APRO
   && /1\.0\.223-f355d-custom-cronograma-quantity-universal-paste/.test(pkg.description));
 if (fs.existsSync(P.lock)) {
   const lock = JSON.parse(R(P.lock));
-  ok("A3 lock 1.0.229 ×2 (RE-PINADO F3.5.6A)", lock.version === "1.0.229" && lock.packages[""].version === "1.0.229");
+  ok("A3 lock 1.0.230 ×2 (RE-PINADO F3.5.6A-H1)", lock.version === "1.0.230" && lock.packages[""].version === "1.0.230");
 } else { ok("A3 lock (ausente no pacote — ok)", true); }
 
 // ───────────────────────── B. bgNotify.ts (fonte) ─────────────────────────

@@ -30,9 +30,9 @@ const disp = seg("// F3.5.5B — menu \"Mais opções\" (⋯) do detalhe do comp
 
 console.log('— A) versão 1.0.220 —');
 const pkg = JSON.parse(R('package.json'));
-ok('A1 package.json 1.0.229 (RE-PINADO F3.5.6A; base traz a Agenda Premium)', pkg.version === '1.0.229' && /custom-script-quantity-rich-editor/.test(pkg.description || ''));
-ok('A2 package-lock 1.0.229 (RE-PINADO F3.5.6A)', JSON.parse(R('package-lock.json')).version === '1.0.229');
-ok('A3 lock packages[""] 1.0.229 (RE-PINADO F3.5.6A)', JSON.parse(R('package-lock.json')).packages[''].version === '1.0.229');
+ok('A1 package.json 1.0.230 (RE-PINADO F3.5.6A-H1; base traz a Agenda Premium)', pkg.version === '1.0.230' && /custom-script-quantity-rich-editor/.test(pkg.description || ''));
+ok('A2 package-lock 1.0.230 (RE-PINADO F3.5.6A-H1)', JSON.parse(R('package-lock.json')).version === '1.0.230');
+ok('A3 lock packages[""] 1.0.230 (RE-PINADO F3.5.6A-H1)', JSON.parse(R('package-lock.json')).packages[''].version === '1.0.230');
 
 console.log('— B) CARDS (30 obrigatórios) —');
 ok('B1 agendado: chip de status renderizado p/ TODO estado (evStatusMeta sem gate parcial no card)', has(card, 'const st=evStatus(e);const sm=evStatusMeta(st);') && has(card, '"evc2-st"') && !has(card, "st==='in_progress'||st==='completed'"));

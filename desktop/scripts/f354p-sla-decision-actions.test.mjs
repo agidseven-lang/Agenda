@@ -525,7 +525,7 @@ function read(p) { return fs.readFileSync(path.join(DESK, p), "utf8"); }
   const grp = read("src/main/notificationGrouping.ts");
   ok(/help_requested/.test(grp) && /blocked/.test(grp), "X17 notificationGrouping: denylist reforçada");
   const pkg = JSON.parse(read("package.json"));
-  eq(pkg.version, "1.0.229", "X18 versão 1.0.229 (RE-PINADO F3.5.6A)");
+  eq(pkg.version, "1.0.230", "X18 versão 1.0.230 (RE-PINADO F3.5.6A-H1)");
   // PRESERVAÇÃO: não altera tempos/dedupKeys dos produtores congelados
   const sla = read("src/main/slaRules.js");
   ok(/sla_warning/.test(sla) && /sla_overdue/.test(sla), "X19 slaRules preservado (tags de dedup intactas)");

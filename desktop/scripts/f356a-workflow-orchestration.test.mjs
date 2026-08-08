@@ -1,4 +1,4 @@
-/* F3.5.6A — ORQUESTRAÇÃO OPERACIONAL, SLA POR RESPONSABILIDADE E APROVAÇÕES (Desktop 1.0.229)
+/* F3.5.6A — ORQUESTRAÇÃO OPERACIONAL, SLA POR RESPONSABILIDADE E APROVAÇÕES (Desktop 1.0.229; H1 = 1.0.230, colisão de recibos corrigida)
  * =====================================================================================
  * Suíte da fase. Cobre:
  *  A  identidade (1.0.229) + arquivos novos
@@ -62,11 +62,11 @@ function extractFn(src, marker) {
 
 /* ═══ A — IDENTIDADE ═══ */
 const pkg = JSON.parse(read(PKG));
-ok("A1 versão 1.0.229", pkg.version === "1.0.229", pkg.version);
+ok("A1 versão 1.0.230", pkg.version === "1.0.230", pkg.version);
 try {
   const lock = JSON.parse(read(LOCK));
-  ok("A2 lock 1.0.229 ×2", lock.version === "1.0.229" && lock.packages[""].version === "1.0.229");
-} catch (e) { ok("A2 lock 1.0.229 ×2", false, String(e.message)); }
+  ok("A2 lock 1.0.230 ×2", lock.version === "1.0.230" && lock.packages[""].version === "1.0.230");
+} catch (e) { ok("A2 lock 1.0.230 ×2", false, String(e.message)); }
 ok("A3 workflowEvents.js existe (motor puro)", fs.existsSync(WE_PATH));
 ok("A4 workflowNotifier compilado no dist", fs.existsSync(WN_DIST));
 
@@ -108,7 +108,10 @@ function mkLedger(entries) { const m = {}; entries.forEach((e, i) => { m[e.k || 
       { k: "ev_bad", v: { t: "", at: NOW } }, { k: "ev_bad2", v: null },
     ]) };
   const evs = WE.deriveLedgerEvents(t, { nowMs: NOW });
-  ok("C1 deriva do ledger em ordem asc (at)", evs.length === 2 && evs[0].id === "ev_a" && evs[1].id === "ev_b");
+  /* F3.5.6A-H1 — id GLOBAL (taskId:ledgerKey): a chave do ledger sozinha se repete em toda tarefa
+     (rodada 1) e colidia recibo/dedupe entre tarefas; lk preserva a chave crua p/ migração. */
+  ok("C1 deriva do ledger em ordem asc (at) com id GLOBAL por tarefa", evs.length === 2
+    && evs[0].id === "T1:ev_a" && evs[1].id === "T1:ev_b" && evs[0].lk === "ev_a" && evs[1].lk === "ev_b");
   ok("C2 retenção 30d + malformados tolerados", !evs.some((e) => e.id === "ev_old" || e.id === "ev_bad" || e.id === "ev_bad2"));
   ok("C3 campos derivados (type/phase/roundKey/by)", evs[1].type === "CLIENT_THEMES_APPROVED" && evs[1].phase === "assignment_pending" && evs[1].roundKey === "ar_themes_r1" && evs[1].by === "client");
 }
@@ -159,7 +162,7 @@ function mkLedger(entries) { const m = {}; entries.forEach((e, i) => { m[e.k || 
   const pApr = WE.buildWorkflowPayload(mk("CLIENT_THEMES_APPROVED"), t, ctxOf("sm1"), null);
   ok("C18 payload aprovado: AÇÃO NECESSÁRIA (success+som) + PRÓXIMA AÇÃO", pApr.severity === "success" && pApr.sound === true
     && /Próxima ação: atribuir aos Designers/.test(pApr.body) && pApr.title === "Temas aprovados");
-  ok("C19 payload dedupKey determinístico (wf:<ledgerKey>)", pApr.dedupKey === "wf:e1" && pApr.eventId === pApr.dedupKey);
+  ok("C19 payload dedupKey determinístico (wf:<id global do evento>)", pApr.dedupKey === "wf:e1" && pApr.eventId === pApr.dedupKey);
   const pAdj = WE.buildWorkflowPayload(mk("CLIENT_CAPTIONS_ADJUSTMENT_REQUESTED"), t, ctxOf("sm1"), null);
   ok("C20 ajuste: PRIORITÁRIA (warning+som) + próxima ação", pAdj.severity === "warning" && pAdj.sound === true && /reenviar/.test(pAdj.body));
   const pView = WE.buildWorkflowPayload(mk("CLIENT_THEMES_FIRST_VIEWED"), t, ctxOf("sm1"), null);
@@ -199,7 +202,7 @@ function fakeListenFactory() {
     } }]);
   ok("D1 entrega em ordem SÓ o que a política manda (view+decisão; REQUESTED não)",
     delivered.length === 2 && /first_viewed/.test(delivered[0].eventType) && /themes_approved/.test(delivered[1].eventType));
-  ok("D2 recibos + cursor só após aceite", st._rec.has("wf:ev_dec_ar_themes_r1") && st.cursorGet() === NOW - 3000);
+  ok("D2 recibos + cursor só após aceite", st._rec.has("wf:T1:ev_dec_ar_themes_r1") && st.cursorGet() === NOW - 3000);
   const n0 = delivered.length;
   fl.push("tasks", [{ id: "T1", title: "Cron", client: "HV", socialOwnerId: "sm1", cronContents: [{}, {}],
     workflowEvents: { ev_dec_ar_themes_r1: { t: "CLIENT_THEMES_APPROVED", at: NOW - 3000, rd: "ar_themes_r1", by: "client" } } }]);
@@ -215,10 +218,10 @@ function fakeListenFactory() {
       onLog: () => { }, setTimer: setT, clearTimer: clrT });
   fl.push("tasks", [{ id: "T2", socialOwnerId: "sm1", cronContents: [{}],
     workflowEvents: { ev_tready_r1: { t: "THEMES_READY", at: NOW - 100, by: "u2" } } }]);
-  ok("D4 entrega recusada ⇒ SEM recibo, fila preservada", delivered.length === 0 && !st._rec.has("wf:ev_tready_r1"));
+  ok("D4 entrega recusada ⇒ SEM recibo, fila preservada", delivered.length === 0 && !st._rec.has("wf:T2:ev_tready_r1"));
   rejectNext = false;
   h.reconcile("retry");
-  ok("D5 retry entrega e fecha recibo", delivered.length === 1 && st._rec.has("wf:ev_tready_r1"));
+  ok("D5 retry entrega e fecha recibo", delivered.length === 1 && st._rec.has("wf:T2:ev_tready_r1"));
   h.stop();
 }
 {
@@ -236,7 +239,50 @@ function fakeListenFactory() {
   ok("D7 janela de coalescência armada (15s)", !!aggTimer);
   aggTimer.fn();
   ok("D8 1 notificação agregada p/ 4 conclusões", delivered.length === 1 && delivered[0].title === "4 cards concluídos" && /Felipe concluiu 4 de 12/.test(delivered[0].body));
-  ok("D9 recibos de TODOS os eventos coalescidos", [0, 1, 2, 3].every((i) => st._rec.has("wf:ev_ditem_" + i + "_c1")));
+  ok("D9 recibos de TODOS os eventos coalescidos", [0, 1, 2, 3].every((i) => st._rec.has("wf:T3:ev_ditem_" + i + "_c1")));
+  h.stop();
+}
+/* F3.5.6A-H1 — COLISÃO DE RECIBOS ENTRE TAREFAS (causa provada da falha física da 1.0.229):
+   a chave do ledger ('ev_dec_ar_themes_r1') se repete em TODA tarefa (rodada 1); com o recibo
+   'wf:'+chave, a 1ª tarefa aprovada silenciava PARA SEMPRE a aprovação de todas as seguintes
+   (a tarefa mudava em tempo real; a notificação nunca nascia). RED na 1.0.229 → GREEN com o
+   id global (taskId:chave). */
+{
+  const st = memStore(); const fl = fakeListenFactory(); const delivered = [];
+  const timers = []; const setT = (fn, ms) => { timers.push({ fn, ms }); return timers.length; }; const clrT = () => { };
+  const h = WN.startWorkflowNotifier("sm1", (p) => { delivered.push(p); return { ok: true }; },
+    { listen: fl.listen, store: st, now: () => NOW, authUser: () => ({ id: "sm1", role: "social", admin: false }),
+      onLog: () => { }, setTimer: setT, clearTimer: clrT });
+  const dec = (at) => ({ t: "CLIENT_THEMES_APPROVED", at, rd: "ar_themes_r1", by: "client" });
+  fl.push("tasks", [{ id: "TA", title: "Cron A", socialOwnerId: "sm1", cronContents: [{}], workflowEvents: { ev_dec_ar_themes_r1: dec(NOW - 9000) } }]);
+  fl.push("tasks", [{ id: "TB", title: "Cron B", socialOwnerId: "sm1", cronContents: [{}], workflowEvents: { ev_dec_ar_themes_r1: dec(NOW - 3000) } }]);
+  const aps = delivered.filter((p) => p.eventType === "wf_client_themes_approved");
+  ok("D10 [H1] duas tarefas na MESMA rodada ⇒ DUAS notificações (na 1.0.229 a 2ª era silenciada)",
+    aps.length === 2 && aps[0].taskId === "TA" && aps[1].taskId === "TB");
+  ok("D11 [H1] dedupKey carrega o taskId (HUB e superfícies isoladas por tarefa)",
+    aps[0].dedupKey === "wf:TA:ev_dec_ar_themes_r1" && aps[1].dedupKey === "wf:TB:ev_dec_ar_themes_r1");
+  ok("D12 [H1] recibos persistentes isolados por tarefa",
+    st._rec.has("wf:TA:ev_dec_ar_themes_r1") && st._rec.has("wf:TB:ev_dec_ar_themes_r1"));
+  h.stop();
+}
+{
+  /* migração 1.0.229→1.0.230: recibo LEGADO (sem taskId) vale SÓ p/ eventos que a 1.0.229 já
+     processou (at ≤ cursor no start) — nada re-entrega no upgrade; eventos NOVOS nunca casam
+     com recibo legado (a colisão morre). */
+  const st = memStore(); const fl = fakeListenFactory(); const delivered = [];
+  st._rec.add("wf:ev_dec_ar_themes_r1");   // recibo gravado pela 1.0.229 (formato colidente)
+  st.cursorSet("sm1", NOW - 5000);         // cursor herdado da 1.0.229
+  const timers = []; const setT = (fn, ms) => { timers.push({ fn, ms }); return timers.length; }; const clrT = () => { };
+  const h = WN.startWorkflowNotifier("sm1", (p) => { delivered.push(p); return { ok: true }; },
+    { listen: fl.listen, store: st, now: () => NOW, authUser: () => ({ id: "sm1", role: "social", admin: false }),
+      onLog: () => { }, setTimer: setT, clearTimer: clrT });
+  fl.push("tasks", [{ id: "TC", title: "Cron C", socialOwnerId: "sm1", cronContents: [{}],
+    workflowEvents: { ev_dec_ar_themes_r1: { t: "CLIENT_THEMES_APPROVED", at: NOW - 6000, rd: "ar_themes_r1", by: "client" } } }]);
+  ok("D13 [H1] upgrade NÃO re-entrega histórico já notificado (recibo legado + at ≤ cursor do start)", delivered.length === 0);
+  fl.push("tasks", [{ id: "TD", title: "Cron D", socialOwnerId: "sm1", cronContents: [{}],
+    workflowEvents: { ev_dec_ar_themes_r1: { t: "CLIENT_THEMES_APPROVED", at: NOW - 1000, rd: "ar_themes_r1", by: "client" } } }]);
+  ok("D14 [H1] evento NOVO entrega mesmo com recibo legado colidente no store",
+    delivered.length === 1 && delivered[0].dedupKey === "wf:TD:ev_dec_ar_themes_r1");
   h.stop();
 }
 
