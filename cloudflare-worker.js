@@ -130,7 +130,7 @@ const PREMIUM_TYPES = {
 // (nunca token/dado de cliente). Distingue inequivocamente ESTE worker no host que o
 // serviu — a string de VERSÃO é idêntica entre QA e produção, então versão sozinha não
 // prova qual runtime respondeu. Presença de build=j3c => é a candidata J3C.
-const WORKER_BUILD = "f354wh1-approve-all+f355c-rich";
+const WORKER_BUILD = "f354wh1-approve-all+f355c-rich+f356a-workflow";
 function premiumTypeOf(task) {
   const sec = (task && typeof task.sector === "string") ? task.sector.trim().toLowerCase() : "";
   return sec === "roteiro" ? PREMIUM_TYPES.roteiro : PREMIUM_TYPES.cronograma;
@@ -465,6 +465,14 @@ export default {
       if (progressMatch && request.method === "GET") {
         return handleClientCronogramaProgress(progressMatch[1], env);
       }
+      // F3.5.6A — VISUALIZAÇÃO HUMANA por rodada: o portal (página renderizada + JS vivo +
+      // aba visível + permanência) faz POST idempotente; crawler NUNCA conta (UA allowlist
+      // aqui + desvio da rota GET + /share sem JS). Grava firstViewedAt/lastViewedAt/viewCount
+      // da rodada ABERTA — nunca de rodada decidida; sem rodada (legado) não fabrica nada.
+      const viewedMatch = url.pathname.match(/^\/cliente\/cronograma\/([A-Za-z0-9_-]{4,128})\/viewed\/?$/);
+      if (viewedMatch && request.method === "POST") {
+        return handleClientRoundViewed(viewedMatch[1], request, env);
+      }
       // V64.42 — TEAM ACTION: equipe (Social/Admin) sinaliza correcao de item para o Worker
       // limpar `clientItems[iX].cs` (destrancar o card preso em "Ajuste solicitado") e disparar
       // a notificacao premium ao cliente (Web Push, quando habilitado). Gated por env.TEAM_API_KEY
@@ -525,7 +533,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.60-f355c-rich-render", build: WORKER_BUILD }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.61-f356a-workflow", build: WORKER_BUILD }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -1904,8 +1912,8 @@ async function handleClientCronogramaTeamAction(token, request, env) {
   // final_content_sent_to_client conforme a fase) SEM escrever no Firestore — o Desktop já
   // gravou o envio. Com subscription → Web Push imediato; sem → fallback whatsapp_premium
   // sinalizado e logado. Mesma autenticação forte de adjustedItem.
-  if (action !== "adjustedItem" && action !== "contentSent") {
-    return json({ ok: false, error: "acao inválida (apenas adjustedItem ou contentSent)" }, 400, env);
+  if (action !== "adjustedItem" && action !== "contentSent" && action !== "confirmClientSend" && action !== "registerExternalDecision") {
+    return json({ ok: false, error: "acao inválida (adjustedItem|contentSent|confirmClientSend|registerExternalDecision)" }, 400, env);
   }
   // contentIndexes[] (vários itens) ou contentIndex (um) — exigido só em adjustedItem.
   const idxs = [];
@@ -1924,6 +1932,7 @@ async function handleClientCronogramaTeamAction(token, request, env) {
 
   // ── AUTENTICAÇÃO FORTE (antes de QUALQUER efeito, inclusive replay de idempotência) ──
   let byName = (payload && typeof payload.byName === "string") ? payload.byName.slice(0, 80) : "";
+  let wfActorUid = "";   // F3.5.6A — uid AUTENTICADO (teamSessionJwt) p/ requestedBy/recordedBy
   const suppliedKey = request.headers.get("X-Team-Key") || "";
   // comparação em tempo constante (hardening V64.46) — só server-to-server.
   const keyOk = !!(env.TEAM_API_KEY && await timingSafeEqualStr(suppliedKey, env.TEAM_API_KEY));
@@ -1946,6 +1955,7 @@ async function handleClientCronogramaTeamAction(token, request, env) {
       return json({ ok: false, error: "forbidden: usuário não é mais Social/Admin ativo" }, 403, env);
     }
     if (!byName) byName = teamUser.name || v.name || "Equipe";
+    wfActorUid = String((teamUser && teamUser.uid) || v.uid || "");
     console.log(`[TEAM-ACTION] autorizado por teamSessionJwt uid=${maskUid(teamUser.uid)} role=${teamUser.role}${teamUser.admin ? "(admin)" : ""}`);
   }
   if (!byName) byName = "Equipe";
@@ -1985,6 +1995,68 @@ async function handleClientCronogramaTeamAction(token, request, env) {
       } catch (_) { /* sem persistir replay */ }
     }
     return json(outSent, 200, env);
+  }
+
+  // F3.5.6A — CONFIRMAR ENVIO AO CLIENTE: sentAt SERVER-SIDE por rodada (COPIAR ≠ ENVIADO).
+  // Cria/atualiza a approval round + abre a espera externa (fase *_waiting_client) + espelhos
+  // legados byte-compatíveis (clientSentAt/clientFlowStatus/cronStatus/clientApprovalPhase)
+  // num único commit atômico. Idempotente: rodada já enviada e sem decisão ⇒ alreadyDone.
+  if (action === "confirmClientSend") {
+    const nowS = Date.now();
+    const phaseInS = clientPhase(task);
+    let r = { ok: false, error: "err" };
+    try { r = await wfApplyConfirmSend(env, accessToken, task, { at: nowS, phase: phaseInS, byName, uid: wfActorUid, token }); }
+    catch (e) { r = { ok: false, error: "erro: " + (e && e.message) }; }
+    if (!r.ok) return json({ ok: false, error: r.error || "commit_failed" }, 500, env);
+    let pushS = { sent: 0 };
+    if (!r.alreadyDone) {
+      try {
+        const evS = phaseInS === "final" ? "final_content_sent_to_client" : "themes_sent_to_client";
+        pushS = await notifyWorkflowEvent(env, task, evS, { token });
+      } catch (e) { pushS = { sent: 0, error: e && e.message }; }
+    }
+    console.log(`[TEAM-ACTION] confirmClientSend task=${task.id} round=${r.roundKey || ""} already=${r.alreadyDone === true} by=${byName}`);
+    const outS = { ok: true, action, taskId: task.id, roundKey: r.roundKey || null, workflowPhase: r.phaseTo || null, alreadyDone: r.alreadyDone === true, push: pushS };
+    if (idemUrl) { try { await caches.default.put(new Request(idemUrl), new Response(JSON.stringify(outS), { status: 200, headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=300" } })); } catch (_) { /* sem replay */ } }
+    return json(outS, 200, env);
+  }
+
+  // F3.5.6A — REGISTRAR DECISÃO EXTERNA (WhatsApp): converge na MESMA função canônica do
+  // portal (writeClientGranular ≡ applyApprovalDecision) com source auditável
+  // 'whatsapp_group' + recordedBy (uid autenticado). Permissão idêntica (JWT Social/Admin
+  // revalidado no Firestore); rodada correta garantida por phase_mismatch; nunca duplica
+  // lógica de aprovação. NÃO automatiza WhatsApp — apenas REGISTRA o que o cliente já disse.
+  if (action === "registerExternalDecision") {
+    const decisionX = (payload && typeof payload.decision === "string") ? payload.decision.trim() : "";
+    if (decisionX !== "approved" && decisionX !== "adjustment") {
+      return json({ ok: false, error: "decision inválida (approved|adjustment)" }, 400, env);
+    }
+    const phaseInR = clientPhase(task);
+    const typeR = wfRoundType(phaseInR);
+    const roundTypeIn = (payload && typeof payload.roundType === "string") ? payload.roundType.trim() : "";
+    if (roundTypeIn && roundTypeIn !== typeR) {
+      return json({ ok: false, error: "phase_mismatch", expected: typeR, phase: phaseInR }, 409, env);
+    }
+    if (task.finalApprovalCompleted === true || task.clientFlowStatus === "concluido") {
+      return json({ ok: false, error: "already_completed" }, 409, env);
+    }
+    const noteR = (payload && typeof payload.note === "string") ? payload.note.slice(0, 1000) : "";
+    const nowR = Date.now();
+    const gR = await writeClientGranular(env, accessToken, task, {
+      type: decisionX === "approved" ? "approveAll" : "revision",
+      contentIndex: null, note: noteR, value: "", at: nowR,
+      wfSource: "whatsapp_group", wfRecordedBy: wfActorUid || byName,
+    });
+    try {
+      if (gR && gR.client === "concluido") await notifyWorkflowEvent(env, task, "final_approved_by_client", { token });
+      else if (gR && gR.client === "aprovado") await notifyWorkflowEvent(env, task, "themes_approved_by_client", { token });
+    } catch (_) { /* best-effort */ }
+    console.log(`[TEAM-ACTION] registerExternalDecision task=${task.id} decision=${decisionX} roundType=${typeR} by=${maskUid(wfActorUid || "")} result=${(gR && gR.client) || ""}`);
+    const outR = { ok: true, action, taskId: task.id, decision: decisionX, roundType: typeR, phase: phaseInR,
+      clientFlowStatus: (gR && gR.client) || null,
+      convertedToFeedback: (decisionX === "approved" && !!gR && gR.client === "revisao") };
+    if (idemUrl) { try { await caches.default.put(new Request(idemUrl), new Response(JSON.stringify(outR), { status: 200, headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=300" } })); } catch (_) { /* sem replay */ } }
+    return json(outR, 200, env);
   }
 
   const now = Date.now();
@@ -2433,7 +2505,7 @@ async function handleClientCronogramaState(token, env) {
     for (let i = 0; i < out.length; i++) { const it = ci["i" + i]; if (!(it && it.cs === "aprovado" && it.phase === ph)) { allApproved = false; break; } }
     const pendingRevision = !allApproved && (itemPending || (task.clientReview && task.clientReview.status === "revisao"));
     const finalDone = task.finalApprovalCompleted === true || task.clientFlowStatus === "concluido";
-    return json({ ok: true, phase: ph, pendingRevision, phaseApproved: allApproved, finalDone, updatedAt: task.updatedAt || 0, items: out }, 200, env);
+    return json({ ok: true, phase: ph, pendingRevision, phaseApproved: allApproved, finalDone, ack: (clientAckedPhase(task) || null), updatedAt: task.updatedAt || 0, items: out }, 200, env);
   } catch (e) {
     return json({ ok: false, error: "err" }, 200, env);
   }
@@ -2777,6 +2849,261 @@ function clientProgressSectionParts(task, env) {
      - clientActions.a<at> : map  log granular {type, at, contentIndex, field, newValue, note}
      - clientItems.i<idx>  : map  estado do item p/ o cliente {cs, theme, legenda, note, at}
    A Desktop lê clientItems/clientActions para mostrar exatamente o que o cliente mexeu. */
+/* ============================= F3.5.6A WORKFLOW (INICIO) =============================
+   ORQUESTRAÇÃO OPERACIONAL — fase persistida (workflowPhase) + PHASE RUNS (SLA por
+   responsabilidade) + APPROVAL ROUNDS (THEMES ≠ CAPTIONS) + EVENT LEDGER idempotente.
+   100% ADITIVO sobre o doc da task (nenhuma coleção nova; Rules intocadas).
+   CONTRATOS:
+   - Campos legados (status/cronStatus/clientFlowStatus/finalApprovalCompleted/…) seguem
+     sendo escritos EXATAMENTE como antes — Desktop 1.0.228 e anteriores continuam íntegros.
+   - Rodada antiga NUNCA é sobrescrita: cada rodada é chave nova ar_<tipo>_r<N>; decisão
+     marca a rodada aberta mais recente; fluxo legado sem rodada ⇒ cria rodada `legacy:true`
+     no ato da decisão SEM fabricar sentAt.
+   - Ledger idempotente por chave semântica determinística (ev_dec_<rodada>, ev_sent_<rodada>,
+     ev_view_<rodada>, ev_wfdone_<rodada>) — retry/replay produz a MESMA entrada, nunca duas.
+   - Tempo: Date.now() DESTE runtime (autoridade do servidor), nunca relógio do cliente.
+   - Metadata mínima no ledger: NUNCA token, senha, conteúdo de tema/legenda ou dado pessoal. */
+const WF_PHASE = {
+  THEMES_PREPARATION: "themes_preparation",
+  THEMES_WAITING_CLIENT: "themes_waiting_client",
+  THEMES_ADJUSTMENT: "themes_adjustment",
+  ASSIGNMENT_PENDING: "assignment_pending",
+  DESIGN_PRODUCTION: "design_production",
+  DESIGN_REVIEW: "design_review",
+  CAPTIONS_PREPARATION: "captions_preparation",
+  CAPTIONS_WAITING_CLIENT: "captions_waiting_client",
+  CAPTIONS_ADJUSTMENT: "captions_adjustment",
+  COMPLETED: "completed",
+};
+function wfRoundType(phaseIn) { return phaseIn === "themes" ? "themes" : "captions"; }
+function wfWaitPhase(type) { return type === "themes" ? WF_PHASE.THEMES_WAITING_CLIENT : WF_PHASE.CAPTIONS_WAITING_CLIENT; }
+function wfAdjustPhase(type) { return type === "themes" ? WF_PHASE.THEMES_ADJUSTMENT : WF_PHASE.CAPTIONS_ADJUSTMENT; }
+function wfRounds(task) { return (task && task.approvalRounds && typeof task.approvalRounds === "object") ? task.approvalRounds : {}; }
+function wfRuns(task) { return (task && task.phaseRuns && typeof task.phaseRuns === "object") ? task.phaseRuns : {}; }
+function wfRoundSeq(key) { const m = /_r(\d+)$/.exec(key || ""); return m ? parseInt(m[1], 10) : 0; }
+function wfLatestRoundKey(rounds, type) {
+  let best = null, bestN = 0;
+  for (const k of Object.keys(rounds)) {
+    if (k.indexOf("ar_" + type + "_r") !== 0) continue;
+    const n = wfRoundSeq(k); if (n > bestN) { bestN = n; best = k; }
+  }
+  return best;
+}
+function wfNextRoundKey(rounds, type) {
+  let maxN = 0;
+  for (const k of Object.keys(rounds)) { if (k.indexOf("ar_" + type + "_r") === 0) maxN = Math.max(maxN, wfRoundSeq(k)); }
+  return "ar_" + type + "_r" + (maxN + 1);
+}
+function wfNextRunKey(runs, phase) {
+  let maxN = 0;
+  for (const k of Object.keys(runs)) { const m = /^pr(\d+)_/.exec(k); if (m) maxN = Math.max(maxN, parseInt(m[1], 10)); }
+  const seq = maxN + 1;
+  return "pr" + (seq < 10 ? "0" + seq : String(seq)) + "_" + phase;
+}
+function wfActiveRunKeys(runs) { return Object.keys(runs).filter((k) => runs[k] && runs[k].status === "active"); }
+function wfSocialUid(task) { return String((task && (task.socialOwnerId || task.by)) || ""); }
+/* emissores de valores tipados (Firestore REST) */
+function wfS(v) { return { stringValue: String(v == null ? "" : v) }; }
+function wfI(v) { return { integerValue: String(Math.round(Number(v) || 0)) }; }
+function wfB(v) { return { booleanValue: v === true }; }
+function wfMap(obj) { return { mapValue: { fields: obj } }; }
+function wfFieldsSet(fields, top, key, submap) {
+  if (!fields[top]) fields[top] = { mapValue: { fields: {} } };
+  fields[top].mapValue.fields[key] = submap;
+}
+function wfLedger(fields, mask, evKey, entry) {
+  wfFieldsSet(fields, "workflowEvents", evKey, wfMap(entry));
+  mask.push("workflowEvents." + evKey);
+}
+function wfMirrors(fields, mask, at, phase, respType, respUid, externalWait) {
+  fields.workflowPhase = wfS(phase); mask.push("workflowPhase");
+  fields.workflowPhaseAt = wfI(at); mask.push("workflowPhaseAt");
+  fields.workflowResponsibleType = wfS(respType); mask.push("workflowResponsibleType");
+  fields.workflowResponsibleUid = wfS(respUid || ""); mask.push("workflowResponsibleUid");
+  fields.externalWait = wfB(!!externalWait); mask.push("externalWait");
+  fields.externalWaitSince = wfI(externalWait ? at : 0); mask.push("externalWaitSince");
+}
+function wfCloseActiveRuns(task, fields, mask, at, outcome) {
+  const runs = wfRuns(task);
+  for (const k of wfActiveRunKeys(runs)) {
+    const r = runs[k] || {};
+    const started = Number(r.startedAt) || at;
+    const due = Number(r.dueAt) || 0;
+    const delay = (due > 0 && at > due) ? (at - due) : 0;
+    wfFieldsSet(fields, "phaseRuns", k, wfMap({
+      completedAt: wfI(at), status: wfS("done"),
+      outcome: wfS(outcome || (due > 0 ? (delay > 0 ? "late" : "on_time") : "done")),
+      delayMs: wfI(delay), elapsedMs: wfI(Math.max(0, at - started)), updatedAt: wfI(at),
+    }));
+    /* máscara GRANULAR: preserva phase/responsible/startedAt/dueAt originais do run */
+    mask.push("phaseRuns." + k + ".completedAt", "phaseRuns." + k + ".status",
+      "phaseRuns." + k + ".outcome", "phaseRuns." + k + ".delayMs",
+      "phaseRuns." + k + ".elapsedMs", "phaseRuns." + k + ".updatedAt");
+  }
+}
+function wfOpenRun(task, fields, mask, at, phase, respType, respUid, dueAt) {
+  const key = wfNextRunKey(wfRuns(task), phase);
+  wfFieldsSet(fields, "phaseRuns", key, wfMap({
+    phase: wfS(phase), responsibleType: wfS(respType), responsibleUid: wfS(respUid || ""),
+    startedAt: wfI(at), dueAt: wfI(dueAt || 0), completedAt: wfI(0), status: wfS("active"),
+    outcome: wfS(""), delayMs: wfI(0), elapsedMs: wfI(0), createdAt: wfI(at), updatedAt: wfI(at),
+  }));
+  mask.push("phaseRuns." + key);
+  return key;
+}
+/* Decisão do cliente (portal OU registrada via WhatsApp) — MESMA função p/ as duas fontes.
+   Chamado DENTRO do commit canônico de writeClientGranular/writeClientBatchApprove. */
+function wfAugmentClientDecision(task, ctx, fields, mask) {
+  const g = ctx.g; if (!g || !g.client) return;                          /* noteItem/approveItem: sem transição de fase */
+  const at = ctx.at, src = ctx.source || "portal", by = ctx.recordedBy || "";
+  const type = wfRoundType(ctx.phaseIn);
+  const rounds = wfRounds(task);
+  let rk = wfLatestRoundKey(rounds, type);
+  const cur = rk ? (rounds[rk] || {}) : null;
+  const decision = (g.client === "revisao") ? "adjustment" : "approved";
+  if (rk && cur && cur.decision === decision) return;                    /* replay: rodada já decidida igual — nada a mudar */
+  const isNew = !rk || !!(cur && cur.decision);                          /* decisão nova sobre rodada já decidida ⇒ NOVA rodada (antiga preservada) */
+  if (isNew) rk = wfNextRoundKey(rounds, type);
+  if (isNew) {
+    wfFieldsSet(fields, "approvalRounds", rk, wfMap({
+      type: wfS(type), createdAt: wfI(at), legacy: wfB(true),
+      decision: wfS(decision), decisionAt: wfI(at), source: wfS(src), recordedBy: wfS(by), status: wfS("decided"),
+    }));
+    mask.push("approvalRounds." + rk);
+  } else {
+    wfFieldsSet(fields, "approvalRounds", rk, wfMap({
+      decision: wfS(decision), decisionAt: wfI(at), source: wfS(src), recordedBy: wfS(by), status: wfS("decided"),
+    }));
+    mask.push("approvalRounds." + rk + ".decision", "approvalRounds." + rk + ".decisionAt",
+      "approvalRounds." + rk + ".source", "approvalRounds." + rk + ".recordedBy", "approvalRounds." + rk + ".status");
+  }
+  const socialUid = wfSocialUid(task);
+  if (g.client === "concluido") {
+    wfCloseActiveRuns(task, fields, mask, at, "approved");
+    wfMirrors(fields, mask, at, WF_PHASE.COMPLETED, "none", "", false);
+    wfLedger(fields, mask, "ev_dec_" + rk, { t: wfS(type === "themes" ? "CLIENT_THEMES_APPROVED" : "CLIENT_CAPTIONS_APPROVED"), ph: wfS(WF_PHASE.COMPLETED), rd: wfS(rk), at: wfI(at), src: wfS(src), by: wfS(by || "client"), v: wfI(1) });
+    wfLedger(fields, mask, "ev_wfdone_" + rk, { t: wfS("WORKFLOW_COMPLETED"), ph: wfS(WF_PHASE.COMPLETED), rd: wfS(rk), at: wfI(at), src: wfS(src), by: wfS(by || "client"), v: wfI(1) });
+  } else if (g.client === "aprovado") {
+    /* TEMAS aprovados NÃO conclui a tarefa: próxima responsabilidade = Social (atribuir Designers) */
+    wfCloseActiveRuns(task, fields, mask, at, "approved");
+    const next = (type === "themes") ? WF_PHASE.ASSIGNMENT_PENDING : WF_PHASE.CAPTIONS_PREPARATION;
+    wfOpenRun(task, fields, mask, at, next, "social", socialUid, 0);
+    wfMirrors(fields, mask, at, next, "social", socialUid, false);
+    wfLedger(fields, mask, "ev_dec_" + rk, { t: wfS(type === "themes" ? "CLIENT_THEMES_APPROVED" : "CLIENT_CAPTIONS_APPROVED"), ph: wfS(next), rd: wfS(rk), at: wfI(at), src: wfS(src), by: wfS(by || "client"), v: wfI(1) });
+  } else if (g.client === "revisao") {
+    wfCloseActiveRuns(task, fields, mask, at, "adjustment");
+    const next = wfAdjustPhase(type);
+    wfOpenRun(task, fields, mask, at, next, "social", socialUid, 0);
+    wfMirrors(fields, mask, at, next, "social", socialUid, false);
+    wfLedger(fields, mask, "ev_dec_" + rk, { t: wfS(type === "themes" ? "CLIENT_THEMES_ADJUSTMENT_REQUESTED" : "CLIENT_CAPTIONS_ADJUSTMENT_REQUESTED"), ph: wfS(next), rd: wfS(rk), at: wfI(at), src: wfS(src), by: wfS(by || "client"), v: wfI(1) });
+  }
+}
+/* CONFIRMAR ENVIO AO CLIENTE — sentAt SERVER-SIDE por rodada (COPIAR ≠ ENVIADO).
+   Único produtor de sentAt. Espelha os campos legados que o Desktop gravava no
+   persistClientSend (byte-compatível p/ 1.0.228) no MESMO commit atômico. */
+async function wfApplyConfirmSend(env, accessToken, task, ctx) {
+  const at = ctx.at;
+  const type = wfRoundType(ctx.phase);
+  const rounds = wfRounds(task);
+  let rk = wfLatestRoundKey(rounds, type);
+  const cur = rk ? (rounds[rk] || {}) : null;
+  if (rk && cur && Number(cur.sentAt) > 0 && !cur.decision) {
+    return { ok: true, alreadyDone: true, roundKey: rk, phaseTo: wfWaitPhase(type) };   /* duplo clique/replay: 1 envio */
+  }
+  const fields = { updatedAt: wfI(at) };
+  const mask = ["updatedAt"];
+  const isNew = !rk || !!(cur && (cur.decision || Number(cur.sentAt) > 0));
+  if (isNew) rk = wfNextRoundKey(rounds, type);
+  const link = "/share/cronograma/" + (ctx.token || "");
+  if (isNew) {
+    wfFieldsSet(fields, "approvalRounds", rk, wfMap({
+      type: wfS(type), createdAt: wfI(at), sentAt: wfI(at), status: wfS("sent"),
+      requestedBy: wfS(ctx.uid || ""), link: wfS(link),
+      firstViewedAt: wfI(0), lastViewedAt: wfI(0), viewCount: wfI(0),
+    }));
+    mask.push("approvalRounds." + rk);
+  } else {
+    /* rodada aberta sem envio: carimba o envio SEM tocar createdAt/visualizações */
+    wfFieldsSet(fields, "approvalRounds", rk, wfMap({
+      sentAt: wfI(at), status: wfS("sent"), requestedBy: wfS(ctx.uid || ""), link: wfS(link),
+    }));
+    mask.push("approvalRounds." + rk + ".sentAt", "approvalRounds." + rk + ".status",
+      "approvalRounds." + rk + ".requestedBy", "approvalRounds." + rk + ".link");
+  }
+  wfCloseActiveRuns(task, fields, mask, at, "");
+  const wait = wfWaitPhase(type);
+  wfOpenRun(task, fields, mask, at, wait, "client", "", 0);
+  wfMirrors(fields, mask, at, wait, "client", "", true);
+  wfLedger(fields, mask, "ev_sent_" + rk, { t: wfS(type === "themes" ? "CLIENT_THEMES_APPROVAL_REQUESTED" : "CLIENT_CAPTIONS_APPROVAL_REQUESTED"), ph: wfS(wait), rd: wfS(rk), at: wfI(at), src: wfS("team"), by: wfS(ctx.uid || ctx.byName || ""), v: wfI(1) });
+  /* espelhos LEGADOS — exatamente o que o Desktop 1.0.228 gravava no persistClientSend */
+  const prev = String(task.clientFlowStatus || "");
+  const cflow = (prev === "revisao" || prev === "producao" || prev === "reenviado" || prev === "aprovado") ? "reenviado" : "enviado";
+  fields.clientFlowStatus = wfS(cflow); mask.push("clientFlowStatus");
+  fields.clientWorkflowStage = wfS(cflow); mask.push("clientWorkflowStage");
+  fields.clientSentAt = wfI(at); mask.push("clientSentAt");
+  if (ctx.uid) { fields.clientSentBy = wfS(ctx.uid); mask.push("clientSentBy"); }
+  fields.clientApprovalPhase = wfS(ctx.phase); mask.push("clientApprovalPhase");
+  fields.cronStatus = wfS("enviado_cliente"); mask.push("cronStatus");
+  const histFields = {
+    type: wfS("cronograma_enviado_cliente"),
+    label: wfS(type === "themes" ? "Cronograma enviado ao cliente (aprovação de TEMAS)" : "Reenviado ao cliente (aprovação de legendas/artes)"),
+    at: wfI(at), by: wfS(ctx.byName || "Equipe"), channel: wfS("team_confirmed_send"), phase: wfS(ctx.phase),
+  };
+  const docName = `projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/tasks/${task.id}`;
+  const body = { writes: [{ update: { name: docName, fields }, updateMask: { fieldPaths: mask }, updateTransforms: [{ fieldPath: "history", appendMissingElements: { values: [{ mapValue: { fields: histFields } }] } }] }] };
+  const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents:commit`;
+  const res = await fetch(url, { method: "POST", headers: { "Authorization": "Bearer " + accessToken, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!res.ok) {
+    const t = (await res.text()).slice(0, 240);
+    console.warn("[WF-CONFIRM-SEND] commit falhou:", res.status, t);
+    return { ok: false, error: "commit_failed" };
+  }
+  console.log(`[WF-CONFIRM-SEND] task=${task.id} round=${rk} phase=${wait} by=${maskUid(ctx.uid || "")}`);
+  return { ok: true, roundKey: rk, phaseTo: wait };
+}
+/* VISUALIZAÇÃO HUMANA por rodada — POST idempotente disparado pelo portal SÓ depois de
+   página renderizada + JS vivo + aba visível + permanência de 3s. Crawler NUNCA conta:
+   UA allowlist é desviada na rota GET e este endpoint também a rejeita; /share não roda JS.
+   Sem fingerprint: nenhum dado do dispositivo é coletado. */
+async function handleClientRoundViewed(token, request, env) {
+  try {
+    if (isCrawlerUA(request.headers.get("user-agent"))) return jsonNoStore({ ok: true, ignored: "crawler" }, 200, env);
+    let accessToken;
+    try { accessToken = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE); }
+    catch (e) { return jsonNoStore({ ok: false, error: "auth" }, 200, env); }
+    const task = await queryTaskByToken(env, accessToken, token);
+    if (!task) return jsonNoStore({ ok: false, error: "not_found" }, 200, env);
+    /* rajada (refresh repetido/duas abas): 1 write por task/30s */
+    const rlUrl = "https://wf-viewed.local/" + encodeURIComponent(String(task.id));
+    try { const hit = await caches.default.match(new Request(rlUrl)); if (hit) return jsonNoStore({ ok: true, deduped: true }, 200, env); } catch (_) { /* segue */ }
+    const at = Date.now();
+    const type = wfRoundType(clientPhase(task));
+    const rounds = wfRounds(task);
+    const rk = wfLatestRoundKey(rounds, type);
+    if (!rk) return jsonNoStore({ ok: true, noRound: true }, 200, env);            /* fluxo legado sem rodada: NÃO fabrica registro */
+    const cur = rounds[rk] || {};
+    if (cur.decision) return jsonNoStore({ ok: true, decided: true }, 200, env);   /* rodada encerrada: visita não conta */
+    const first = !(Number(cur.firstViewedAt) > 0);
+    const fields = {}; const mask = [];
+    const sub = { lastViewedAt: wfI(at) };
+    mask.push("approvalRounds." + rk + ".lastViewedAt");
+    if (first) { sub.firstViewedAt = wfI(at); mask.push("approvalRounds." + rk + ".firstViewedAt"); }
+    wfFieldsSet(fields, "approvalRounds", rk, wfMap(sub));
+    if (first) {
+      wfLedger(fields, mask, "ev_view_" + rk, { t: wfS(type === "themes" ? "CLIENT_THEMES_FIRST_VIEWED" : "CLIENT_CAPTIONS_FIRST_VIEWED"), ph: wfS(String(task.workflowPhase || wfWaitPhase(type))), rd: wfS(rk), at: wfI(at), src: wfS("portal"), by: wfS("client"), v: wfI(1) });
+    }
+    const docName = `projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/tasks/${task.id}`;
+    const body = { writes: [{ update: { name: docName, fields }, updateMask: { fieldPaths: mask }, updateTransforms: [{ fieldPath: "approvalRounds." + rk + ".viewCount", increment: { integerValue: "1" } }] }] };
+    const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents:commit`;
+    const res = await fetch(url, { method: "POST", headers: { "Authorization": "Bearer " + accessToken, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!res.ok) { console.warn("[WF-VIEWED] commit falhou:", res.status, (await res.text()).slice(0, 200)); return jsonNoStore({ ok: false, error: "commit_failed" }, 200, env); }
+    try { await caches.default.put(new Request(rlUrl), new Response("1", { status: 200, headers: { "Cache-Control": "public, max-age=30" } })); } catch (_) { /* sem dedup persistido */ }
+    console.log(`[WF-VIEWED] task=${task.id} round=${rk} first=${first}`);
+    return jsonNoStore({ ok: true, first }, 200, env);
+  } catch (e) { return jsonNoStore({ ok: false, error: "err" }, 200, env); }
+}
+/* ============================= F3.5.6A WORKFLOW (FIM) ============================= */
+
 async function writeClientGranular(env, accessToken, task, e) {
   const taskId = task.id;
   const at = e.at;
@@ -2787,6 +3114,9 @@ async function writeClientGranular(env, accessToken, task, e) {
   const actFields = { type: { stringValue: e.type }, at: { integerValue: String(at) } };
   if (e.contentIndex != null) actFields.contentIndex = { integerValue: String(e.contentIndex) };
   if (e.note) actFields.note = { stringValue: e.note };
+  // F3.5.6A — fonte auditável da decisão (portal = ausente; whatsapp_group = registrada pela equipe)
+  if (e.wfSource) actFields.source = { stringValue: String(e.wfSource) };
+  if (e.wfRecordedBy) actFields.recordedBy = { stringValue: String(e.wfRecordedBy) };
   if (e.type === "editTheme") { actFields.field = { stringValue: "tema" }; actFields.newValue = { stringValue: e.value }; }
   if (e.type === "editLegenda") { actFields.field = { stringValue: "legenda" }; actFields.newValue = { stringValue: e.value }; }
 
@@ -2932,7 +3262,9 @@ async function writeClientGranular(env, accessToken, task, e) {
     label: { stringValue: g.label },
     at: { integerValue: String(at) },
     by: { stringValue: "Cliente" },
-    channel: { stringValue: "client_public" },
+    // F3.5.6A — decisão REGISTRADA pela equipe (WhatsApp) fica auditável no histórico:
+    // canal distinto do clique direto do cliente no portal (client_public).
+    channel: { stringValue: (e.wfSource === "whatsapp_group" ? "team_registered_whatsapp" : "client_public") },
     client: { stringValue: (task.client || "") },
     note: { stringValue: e.note || "" },
   };
@@ -2940,6 +3272,11 @@ async function writeClientGranular(env, accessToken, task, e) {
   if (g.col && g.col !== statusFrom) { histFields.statusFrom = { stringValue: statusFrom }; histFields.statusTo = { stringValue: g.col }; }
   if (g.client && g.client !== clientFrom) { histFields.clientFrom = { stringValue: clientFrom }; histFields.clientTo = { stringValue: g.client }; }
   const histValue = { mapValue: { fields: histFields } };
+
+  // F3.5.6A — ORQUESTRAÇÃO (aditivo): rodada + fase persistida + phase runs + ledger no
+  // MESMO commit atômico. Campos legados acima permanecem byte-idênticos; falha aqui
+  // não pode bloquear o fluxo canônico aprovado.
+  try { wfAugmentClientDecision(task, { g, at, phaseIn, source: e.wfSource || "portal", recordedBy: e.wfRecordedBy || "" }, fields, mask); } catch (_) { /* aditivo */ }
 
   const docName = `projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/tasks/${taskId}`;
   const body = {
@@ -3101,6 +3438,9 @@ async function writeClientBatchApprove(env, accessToken, task, e) {
   const clientFrom = (task.clientFlowStatus || "");
   if (complete && g.col && g.col !== statusFrom) { histFields.statusFrom = { stringValue: statusFrom }; histFields.statusTo = { stringValue: g.col }; }
   if (complete && g.client && g.client !== clientFrom) { histFields.clientFrom = { stringValue: clientFrom }; histFields.clientTo = { stringValue: g.client }; }
+
+  // F3.5.6A — ORQUESTRAÇÃO (aditivo): fase/rodada/runs/ledger no MESMO commit atômico do lote.
+  if (complete) { try { wfAugmentClientDecision(task, { g, at, phaseIn, source: "portal", recordedBy: "" }, fields, mask); } catch (_) { /* aditivo */ } }
 
   const docName = `projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/tasks/${taskId}`;
   const body = {
@@ -3921,6 +4261,10 @@ function pollState(){
     return;
   }
   if(j.finalDone){clientSuccess();return;}
+  /* F3.5.6A — rodada encerrada por outra via (ex.: aprovacao registrada via WhatsApp):
+     o MESMO link recarrega sozinho e mostra a tela de confirmacao da fase. */
+  if(typeof window.__WF_ACK0==='undefined'){window.__WF_ACK0=(j.ack||null);}
+  else if((j.ack||null)!==window.__WF_ACK0){location.reload();return;}
   if(LAST_SIG===null){LAST_SIG=sig;return;}                 // baseline (página já renderizada)
   if(sig===LAST_SIG)return;
   var prev=JSON.parse(LAST_SIG),mediaChanged=false,changed=[];
@@ -3933,6 +4277,25 @@ function pollState(){
   toast(changed.length?('Tema atualizado pela equipe — revise o Conteúdo '+(changed[0]+1)):'Atualizado pela equipe.','ok');
 }).catch(function(){liveTick(false);});}
 setInterval(pollState,6000);
+
+/* F3.5.6A — VISUALIZACAO HUMANA: pagina renderizada + JS vivo + aba visivel + permanencia
+   de 3s continuos => UM POST idempotente por carga. Crawler nao executa JS e /share nem
+   carrega este script. Nenhum fingerprint: apenas o token que ja esta na URL. */
+var __WF_VIEW_SENT=false,__WF_VIEW_T0=null;
+function wfViewArm(){
+  if(__WF_VIEW_SENT)return;
+  if(document.visibilityState!=='visible')return;
+  var t0=Date.now();__WF_VIEW_T0=t0;
+  setTimeout(function(){
+    if(__WF_VIEW_SENT)return;
+    if(document.visibilityState!=='visible')return;
+    if(__WF_VIEW_T0!==t0)return;
+    __WF_VIEW_SENT=true;
+    try{fetch('/cliente/cronograma/'+encodeURIComponent(TOKEN)+'/viewed',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':'vw-'+Date.now()+'-'+Math.random().toString(36).slice(2,8)},body:JSON.stringify({d:3000,v:1})}).catch(function(){});}catch(e){}
+  },3000);
+}
+document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')wfViewArm();else __WF_VIEW_T0=null;});
+wfViewArm();
 
 /* V64.42 — PWA Web Push: opt-in do cliente (browser pede permissao -> gera PushSubscription).
    So roda quando ENABLE_PUSH=true E VAPID_PUBLIC_KEY presente. Sem secrets configurados,
