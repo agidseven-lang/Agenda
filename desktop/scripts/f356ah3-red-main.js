@@ -1,6 +1,6 @@
 /* F3.5.6A-H3 — RED EMPACOTADO (P0): a tarefa NOVA "confirma envio" no card mas NÃO entra na Central.
  * Cadeia 100% REAL:
- *   • RENDERER real do asar (index.html 1.0.231/1.0.232) — card, Central e derivações canônicas.
+ *   • RENDERER real do asar (index.html 1.0.231/1.0.233) — card, Central e derivações canônicas.
  *   • WORKER real (cloudflare-worker.js) — wfApplyConfirmSend rodando em vm com captura do commit
  *     Firestore (fetch stub); o commit REAL é decodificado e aplicado ao doc → afterConfirm.
  *
@@ -136,7 +136,7 @@ app.whenReady().then(async () => {
   const WATCHDOG = setTimeout(() => { try { process.stdout.write("PROOF_DONE proofs=" + results.length + " redFindings=" + redFindings + " invariantFailures=999 FATAL=watchdog\n"); } catch (_) {} app.exit(1); }, 6 * 60 * 1000);
   try { session.defaultSession.webRequest.onBeforeRequest((d, cb) => { cb({ cancel: /^https?:/i.test(d.url) }); }); } catch (_) {}
 
-  const VERSION = process.env.H3_VERSION || "1.0.232";
+  const VERSION = process.env.H3_VERSION || "1.0.233";
   const ANA = "uid-ana-social";
   const NOW = Date.now();
   const T0 = NOW - 6 * 60000;

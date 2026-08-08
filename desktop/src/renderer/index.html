@@ -7260,7 +7260,11 @@ const TASK_PHASE={
 };
 // Sinais canônicos (lêem só campos já existentes; nenhuma escrita).
 function flowCompletedSignal(t){return isTaskCompleted(t);}  /* F3.3.4 item A — FONTE ÚNICA (idêntico ao inline anterior) */
-function flowSentToClientSignal(t){const cs=(t&&t.cronStatus||'').toString();return cs==='ready_for_final_client_review'||cs==='reenviado_cliente'||(t&&t.clientApprovalPhase==='final');}
+/* F3.5.6A-H4 — FONTE ÚNICA (espelho EXATO da Central/externalWaitOf): envio FINAL ao cliente = fase de
+   espera server-side; se HÁ workflowPhase (tarefa nova) o espelho legado NÃO conta — produzir/reenviar
+   sem CONFIRMAR jamais marca enviado. Fallback legado (cronStatus/clientApprovalPhase) SÓ p/ registro
+   genuinamente antigo (sem workflowPhase). */
+function flowSentToClientSignal(t){if(!t)return false;const wp=(t.workflowPhase||'').toString();if(wp==='captions_waiting_client')return true;if(wp)return false;const cs=(t.cronStatus||'').toString();return cs==='ready_for_final_client_review'||cs==='reenviado_cliente'||t.clientApprovalPhase==='final';}
 function flowClientChangesSignal(t){const cr=(t&&t.clientReview&&t.clientReview.status||'').toString();return cr==='revisao'||(t&&t.clientFlowStatus==='revisao')||hasPendingItemRevision(t);}
 /* F3.3.17-R5/C1 — sub-jornada de TEMAS (só ANTES de haver designer; lê campos já existentes). */
 function flowThemesApprovedSignal(t){if(hasDesigner(t))return false;const cf=(t&&t.clientFlowStatus||'').toString();const cr=(t&&t.clientReview&&t.clientReview.status||'').toString();const ph=(t&&t.clientApprovalPhase||'').toString();return cf==='aprovado'||(cr==='aprovado'&&ph!=='final'&&ph!=='production');}
@@ -7273,15 +7277,16 @@ function flowCanonicalSentSignal(t){
   if(!t)return false;
   const wp=(t.workflowPhase||'').toString();
   if(wp==='themes_waiting_client'||wp==='captions_waiting_client')return true;
+  if(wp)return false; // F3.5.6A-H4: fase de workflow presente (tarefa NOVA) ⇒ espelho legado NÃO conta (paridade EXATA com a Central/externalWaitOf). Criar tarefa / gerar link jamais marca "enviado" — só o Worker (confirmClientSend) grava a fase de espera.
   const cf=(t.clientFlowStatus||'').toString();
   const cs=(t.cronStatus||'').toString();
-  return cf==='enviado'||cf==='reenviado'||cs==='enviado_cliente';
+  return cf==='enviado'||cf==='reenviado'||cs==='enviado_cliente'; // fallback SÓ p/ registro genuinamente legado (sem QUALQUER workflowPhase — pré-1.0.229)
 }
 function flowThemesSentSignal(t){if(hasDesigner(t))return false;const ph=(t&&t.clientApprovalPhase||'').toString();if(ph==='final')return false;return flowCanonicalSentSignal(t);}
 /* F3.5.6A-H3 — TEMAS PRONTOS: link gerado (ou marcados prontos) SEM envio confirmado. Estado
    intermediário honesto — "confirmar envio ao cliente". NUNCA vira Responsável Cliente, NUNCA
    entra na Central, NUNCA cria sentAt/approvalRound. Só é avaliado DEPOIS de flowThemesSentSignal. */
-function flowThemesReadySignal(t){if(!t||hasDesigner(t))return false;if(flowCanonicalSentSignal(t))return false;const ph=(t.clientApprovalPhase||'').toString();if(ph==='final')return false;return !!(t.clientReviewToken||t.shareToken||t.clientSentBy);}
+function flowThemesReadySignal(t){if(!t||hasDesigner(t))return false;if(flowCanonicalSentSignal(t))return false;const ph=(t.clientApprovalPhase||'').toString();if(ph==='final')return false;const cs=(t.cronStatus||'').toString();return cs==='pronto_cliente'||!!(t.clientReviewToken||t.shareToken||t.clientSentBy);}
 // FONTE ÚNICA — fase canônica da tarefa. Determinística e ORDENADA (terminal → designer).
 function deriveCanonicalTaskState(t){
   if(!t)return {phase:TASK_PHASE.PLANNING,owner:'social',isCron:false};
@@ -11665,7 +11670,11 @@ async function saveTask(){const f=state.form;
   }
   // Aditivo: cronograma inicia em 'rascunho_social' (ou 'pronto_cliente' se chamada do botao Enviar)
   if(isClientSector(secOf(f.sector).key)){data.cronStatus=sendAfter?'pronto_cliente':'rascunho_social';if(f.subtype)data.cronSub=f.subtype;
-    data.clientFlowStatus=sendAfter?'enviado':'afazer';data.clientWorkflowStage=data.clientFlowStatus;}
+    // F3.5.6A-H4 — a CRIAÇÃO nunca marca envio confirmado. "Enviar para o cliente" só deixa PRONTO
+    // (cronStatus='pronto_cliente' ⇒ card "Temas prontos — confirmar envio"); o "enviado" canônico é
+    // gravado EXCLUSIVAMENTE pelo Worker (wfConfirmClientSend → workflowPhase=themes_waiting_client) ao
+    // CONFIRMAR. clientFlowStatus nasce 'afazer' — NUNCA 'enviado' — evitando falso envio na criação.
+    data.clientFlowStatus='afazer';data.clientWorkflowStage='afazer';}
   // ══ F3.5.4I — validação → saneamento → escrita IDEMPOTENTE → read-back → erro REAL classificado ══
   const _isClientSend=isClientSector(secOf(f.sector).key);
   cronDiag('cron.send.start',{stage:'start',sector:f.sector,client:!!data.client,temas:(data.cronContents||[]).length,sendAfter:sendAfter});

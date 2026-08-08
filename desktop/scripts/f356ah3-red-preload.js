@@ -5,17 +5,17 @@
  *     confirmClientSend responde no MESMO contrato do Worker real
  *     ({ok, roundKey, workflowPhase:'themes_waiting_client'}).
  *   • wp_team_jwt sintético (ensureTeamSession passa sem rede).
- *   • versão do desktopAPI vem da SEMENTE (RED em 1.0.231 / GREEN em 1.0.232). */
+ *   • versão do desktopAPI vem da SEMENTE (RED em 1.0.231 / GREEN em 1.0.233). */
 const noop = function () {};
 function fnProxy() { return new Proxy(noop, { get: () => fnProxy(), apply: () => undefined }); }
 
-let SEED = { self: null, users: [], tasks: [], events: [], version: '1.0.232' };
+let SEED = { self: null, users: [], tasks: [], events: [], version: '1.0.233' };
 try {
   const _p = require('path').join(require('os').tmpdir(), 'f356ah3-seed.json');
   SEED = JSON.parse(require('fs').readFileSync(_p, 'utf8')) || SEED;
 } catch (_) {}
 const SELF = SEED.self || { id: 'u-self', name: 'Admin', role: 'Administrador', admin: true };
-const VERSION = SEED.version || '1.0.232';
+const VERSION = SEED.version || '1.0.233';
 const SEED_DOCS = { usersPublic: SEED.users || [], tasks: SEED.tasks || [], events: SEED.events || [] };
 
 function makeSnap(arr) {

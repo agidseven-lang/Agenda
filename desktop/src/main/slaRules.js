@@ -401,7 +401,10 @@ function isFullyComplete(t){
 }
 /* index.html:5709-5714 */
 function flowCompletedSignal(t){return isTaskCompleted(t);}
-function flowSentToClientSignal(t){var cs=(t&&t.cronStatus||'').toString();return cs==='ready_for_final_client_review'||cs==='reenviado_cliente'||(t&&t.clientApprovalPhase==='final');}
+/* F3.5.6A-H4 — FONTE ÚNICA (espelho EXATO da Central/externalWaitOf): envio FINAL = fase de espera
+   server-side; workflowPhase presente (tarefa nova) ⇒ espelho legado NÃO conta. Fallback legado SÓ
+   p/ registro genuinamente antigo (sem workflowPhase). */
+function flowSentToClientSignal(t){if(!t)return false;var wp=(t.workflowPhase||'').toString();if(wp==='captions_waiting_client')return true;if(wp)return false;var cs=(t.cronStatus||'').toString();return cs==='ready_for_final_client_review'||cs==='reenviado_cliente'||t.clientApprovalPhase==='final';}
 function flowClientChangesSignal(t){var cr=(t&&t.clientReview&&t.clientReview.status||'').toString();return cr==='revisao'||(t&&t.clientFlowStatus==='revisao')||hasPendingItemRevision(t);}
 function flowThemesApprovedSignal(t){if(hasDesigner(t))return false;var cf=(t&&t.clientFlowStatus||'').toString();var cr=(t&&t.clientReview&&t.clientReview.status||'').toString();var ph=(t&&t.clientApprovalPhase||'').toString();return cf==='aprovado'||(cr==='aprovado'&&ph!=='final'&&ph!=='production');}
 /* F3.5.6A-H3 — FONTE ÚNICA de "enviado ao cliente" (espelho VERBATIM do renderer): ENVIO CONFIRMADO
@@ -410,13 +413,14 @@ function flowCanonicalSentSignal(t){
   if(!t)return false;
   var wp=(t.workflowPhase||'').toString();
   if(wp==='themes_waiting_client'||wp==='captions_waiting_client')return true;
+  if(wp)return false; // F3.5.6A-H4: fase de workflow presente (tarefa NOVA) ⇒ espelho legado NÃO conta (paridade EXATA com a Central/externalWaitOf). Criar tarefa / gerar link jamais marca "enviado".
   var cf=(t.clientFlowStatus||'').toString();
   var cs=(t.cronStatus||'').toString();
-  return cf==='enviado'||cf==='reenviado'||cs==='enviado_cliente';
+  return cf==='enviado'||cf==='reenviado'||cs==='enviado_cliente'; // fallback SÓ p/ registro genuinamente legado (sem QUALQUER workflowPhase — pré-1.0.229)
 }
 function flowThemesSentSignal(t){if(hasDesigner(t))return false;var ph=(t&&t.clientApprovalPhase||'').toString();if(ph==='final')return false;return flowCanonicalSentSignal(t);}
 /* F3.5.6A-H3 — TEMAS PRONTOS: link gerado/marcados prontos SEM envio confirmado (só após flowThemesSentSignal). */
-function flowThemesReadySignal(t){if(!t||hasDesigner(t))return false;if(flowCanonicalSentSignal(t))return false;var ph=(t.clientApprovalPhase||'').toString();if(ph==='final')return false;return !!(t.clientReviewToken||t.shareToken||t.clientSentBy);}
+function flowThemesReadySignal(t){if(!t||hasDesigner(t))return false;if(flowCanonicalSentSignal(t))return false;var ph=(t.clientApprovalPhase||'').toString();if(ph==='final')return false;var cs=(t.cronStatus||'').toString();return cs==='pronto_cliente'||!!(t.clientReviewToken||t.shareToken||t.clientSentBy);}
 
 /* ---- Fase canônica da tarefa — index.html:5716-5742 (VERBATIM) ---- */
 function deriveCanonicalTaskState(t){

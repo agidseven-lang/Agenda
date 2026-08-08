@@ -113,12 +113,12 @@ try {
     authSelf: authSelf,
     diagLog: diagLog,
     clipboardWriteText: function (s) { try { window.__CLIP.push(String(s)); } catch (_) {} return Promise.resolve(true); },
-    version: '1.0.232',
+    version: '1.0.233',
     authLogout: function () { return Promise.resolve({ ok: true }); },
     sessionLogin: noop,
     sessionLogout: noop
   };
   window.desktopAPI = new Proxy(desktopAPI, { get: function (t, k) { return (k in t ? t[k] : fnProxy()); } });
   window.api = window.desktopAPI;
-  window.__APP_VERSION = '1.0.232';
+  window.__APP_VERSION = '1.0.233';
 } catch (_) {}
