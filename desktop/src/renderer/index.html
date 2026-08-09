@@ -7452,7 +7452,7 @@ async function wfTeamAction(taskId,action,extra){
 }
 /* CONFIRMAR ENVIO AO CLIENTE — ÚNICO registro de sentAt (server-side). COPIAR ≠ ENVIADO. */
 async function wfConfirmClientSend(taskId){
-  if(!taskId||taskId==='__form__'){ flashToast('Salve a tarefa antes de confirmar o envio.'); return; }
+  if(!taskId||taskId==='__form__'){ flashToast('Salve a tarefa antes de confirmar o envio.'); return {ok:false,error:'no_task'}; }
   var r=await wfTeamAction(taskId,'confirmClientSend',{});
   if(r&&r.ok){
     if(r.alreadyDone){ flashToast('Envio já estava confirmado para esta rodada.'); }
@@ -7461,6 +7461,7 @@ async function wfConfirmClientSend(taskId){
     if(t&&r.workflowPhase){ t.workflowPhase=r.workflowPhase; t.externalWait=true; }   // otimismo; snapshot corrige
     render();
   }
+  return r;   // F3.5.6A-H5: devolve o resultado ao chamador (modal ramifica sucesso/falha; chip ignora)
 }
 /* REGISTRAR DECISÃO EXTERNA (WhatsApp) — mesma decisão canônica do portal, source auditável. */
 async function wfRegisterExternalDecisionUI(kind){
@@ -9397,7 +9398,7 @@ async function openSendClientModal(taskOrForm){
       '<div class="gcs-secondary">'+
         '<button class="btn ghost" id="btnPrewarmRetry" style="display:none">Tentar novamente</button>'+
         '<button class="btn ghost" id="btnCopyGroupMsg">Copiar mensagem</button>'+
-        '<button class="btn" id="btnConfirmSend" disabled title="Habilita após copiar/abrir o WhatsApp. Só confirme DEPOIS de enviar no grupo.">'+svg('check')+'Confirmar envio ao cliente</button>'+
+        '<button class="btn" id="btnConfirmSend" title="Só confirme DEPOIS de enviar a mensagem no grupo do cliente.">'+svg('check')+'Confirmar envio ao cliente</button>'+
         '<button class="btn ghost" id="btnTestLink">Testar link</button>'+
       '</div>'+
     '</div>'+
@@ -9579,11 +9580,18 @@ async function _wireGroupSend(ctx, msg, cardFile){
      habilita este botão. Sem sessão de equipe/rede: erro claro, sem fabricar sentAt. */
   function wfArmConfirmSend(c){ var b=$('btnConfirmSend'); if(!b)return; if(!(c&&c.id&&c.id!=='__form__'))return; b.disabled=false; b.title='Confirme somente DEPOIS de enviar a mensagem no grupo do cliente.'; }
   on('btnConfirmSend', async function(){
+    // F3.5.6A-H5: o botão NASCE habilitado (o clique É a confirmação explícita; gerar link ≠ envio).
+    // `disabled` aqui só é verdadeiro DURANTE um request em voo (trava anti-duplo-clique), nunca mais gate de armamento.
     var b=$('btnConfirmSend'); if(!b||b.disabled)return;
     if(!(ctx&&ctx.id&&ctx.id!=='__form__')){ flashToast('Salve a tarefa antes de confirmar o envio.'); return; }
-    b.disabled=true; var old=b.innerHTML; b.innerHTML=svg('send')+'Confirmando…';
-    await wfConfirmClientSend(ctx.id);
-    b.innerHTML=svg('check')+'Envio confirmado'; b.classList.add('is-done');
+    b.disabled=true; var old=b.innerHTML; b.innerHTML=svg('send')+'Confirmando…';   // loading + idempotência (bloqueia 2º clique)
+    var r=null; try{ r=await wfConfirmClientSend(ctx.id); }catch(e){ r={ok:false,error:String((e&&e.message)||e)}; }
+    if(r&&r.ok){
+      b.innerHTML=svg('check')+'Envio confirmado ao cliente'; b.classList.add('is-done');   // sucesso server-side: permanece desabilitado (concluído)
+    }else{
+      b.disabled=false; b.innerHTML=old;   // F3.5.6A-H5: FALHA (sessão/token/rede/Worker/HTTP) — reabilita + restaura rótulo (NUNCA falso "confirmado")
+      flashToast('Não foi possível confirmar o envio ao cliente. Tente novamente.',7000);   // erro SEMPRE visível — nunca silenciado
+    }
   });
   on('btnTestLink', function(){                                    // abre o LINK DE COMPARTILHAMENTO p/ conferir a prévia premium + portal
     let url=''; try{ url=buildShareClientUrl(ctx&&ctx.token); }catch(_){ flashToast('Link inválido — gere o cronograma novamente.'); return; }

@@ -1,0 +1,257 @@
+# F3.5.6A-H5 — Desktop 1.0.234 (P0 FÍSICO: 1.0.233 REPROVADA no Cenário B). No modal "Enviar no grupo
+# do cliente", o botão "Confirmar envio ao cliente" estava VISÍVEL mas INERTE: nascia `disabled`
+# (armado SÓ por "Abrir WhatsApp"/"Copiar" via wfArmConfirmSend) e o handler abortava em
+# if(b.disabled)return — no fluxo REAL (criar→Enviar→Confirmar direto) o clique não fazia nada
+# (defeito latente exposto pela H4). Segundo defeito: o handler ignorava o resultado de
+# wfConfirmClientSend e marcava "Envio confirmado" mesmo em FALHA, sem reabilitar. Correção SÓ no
+# renderer (index.html): o botão NASCE habilitado (o clique É a confirmação explícita; gerar link ≠
+# envio; NÃO marca automaticamente); o handler ramifica no RESULTADO real (sucesso → "Envio confirmado
+# ao cliente"; falha → reabilita + rótulo restaurado + toast de erro; tarefa segue "Temas prontos");
+# wfConfirmClientSend passa a RETORNAR o resultado. Idempotência (trava durante request). "enviado"
+# canônico continua EXCLUSIVO do Worker. Worker V64.61 INALTERADO (zero deploy). REGRA MÁXIMA: correção
+# H4 1.0.233 PRESERVADA; Central 1.0.231, workflow 1.0.230/1.0.229, infra de notificações 1.0.228
+# INTOCADAS; paridade renderer×main (golden master F3.4.4) mantida — slaRules.js INALTERADO. build
+# GATED, --publish never. Publicação só no desktop-release-f356ah5.yml (mesmos bytes). Base técnica
+# 1.0.233 @ b176e41. BASELINE FÍSICA OFICIAL 1.0.228. ROLLBACK IMEDIATO 1.0.228. NÃO promover 1.0.229..1.0.233.
+name: "[push/manual] F3.5.6A-H5 — Desktop 1.0.234 (botão Confirmar envio ao cliente) — Desktop Build"
+"on":
+  push:
+    branches: ["desktop/f356ah5-confirm-send-button-1.0.234"]
+    paths-ignore: [".github/workflows/desktop-release-f356ah5.yml"]
+  workflow_dispatch: {}
+permissions: { contents: read }
+env:
+  TEST_BRANCH: "desktop/f356ah5-confirm-send-button-1.0.234"
+  BASE_233_SHA: "b176e41c8be801f7d5d63fc8d2a9b9be42c643f3"
+  BASE_232_SHA: "2ce29a7db056a99b1722c11287e0919dd0ce2c43"
+  BASE_231_SHA: "a378e5c1f2f4217249252eae7e261e17580c2050"
+  BASE_230_SHA: "e89867de5120fe88e2f639effd59d24c3181f427"
+  BASE_228_SHA: "3f0d0af192b4b6b32a8e8bbda4153dcf4df1bc6d"
+  APP_DIR: desktop
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: "Gate REF + ANCESTRIA (descende da 1.0.233 base técnica, 1.0.232, 1.0.231, 1.0.230, 1.0.228 baseline física)"
+        run: |
+          set -euo pipefail
+          [ "${GITHUB_REF_NAME}" = "$TEST_BRANCH" ] || { echo "::error::branch errada"; exit 1; }
+          for B in "$BASE_233_SHA" "$BASE_232_SHA" "$BASE_231_SHA" "$BASE_230_SHA" "$BASE_228_SHA"; do
+            git merge-base --is-ancestor "$B" HEAD || { echo "::error::não descende de $B"; exit 1; }
+          done
+      - name: "Gate VERSAO 1.0.234 (package + lock x2 + description da fase H5 + cadeia de bases)"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node -e "const p=require('./package.json'); if(p.version!=='1.0.234') process.exit(1); for(const m of ['confirm-send-button','single-source-real-path','single-source-sent-state','client-approvals-compact-drawer','workflow-notification-receipt-collision','realtime-workflow-client-approval','FISICAMENTE APROVADA']){ if(!(p.description||'').includes(m)){ console.error('marcador ausente:',m); process.exit(1);} }"
+          [ "$(grep -c '"version": "1.0.234"' package-lock.json)" -ge 2 ]
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: "npm ci + TypeScript + sintaxe dos renderers como SCRIPT CLÁSSICO (vm.Script) + worker"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          ./node_modules/.bin/tsc --noEmit -p tsconfig.json
+          node -e "const fs=require('fs'),vm=require('vm');const s=fs.readFileSync('src/renderer/bgnotify.html','utf8');const m=s.match(/<script>([\s\S]*?)<\/script>/);new vm.Script(m[1],{filename:'bgnotify-inline'});"
+          node -e "const fs=require('fs'),vm=require('vm');const s=fs.readFileSync('src/renderer/slareminder.html','utf8');const m=s.match(/<script>([\s\S]*?)<\/script>/);new vm.Script(m[1],{filename:'slareminder-inline'});"
+          node -e "const fs=require('fs'),vm=require('vm');const s=fs.readFileSync('src/renderer/index.html','utf8');const b=[...s.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(x=>x[1]);if(b.length<2){console.error('esperados >=2 blocos inline');process.exit(1);}b.forEach((x,i)=>new vm.Script(x,{filename:'index-inline-'+i}));console.log('blocos inline OK:',b.length);"
+          node --check ../cloudflare-worker.js
+      - name: "npm run build (tsc + copy-renderer) — necessário p/ dist e provas Electron"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          npm run build
+      - name: "Gate MARCADORES F3.5.6A-H5 — botão Confirmar NASCE habilitado + handler ramifica no resultado + wfConfirmClientSend retorna (renderer index.html)"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          S=src/renderer/index.html
+          # botão nasce habilitado (sem `disabled`) — o produtor do bug foi eliminado:
+          grep -q 'id="btnConfirmSend" title=' "$S"
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/renderer/index.html','utf8');if(/id=\"btnConfirmSend\" disabled/.test(s)){console.error('botão ainda nasce disabled');process.exit(1);}"
+          # handler ramifica no resultado (sucesso + falha visível) — erro nunca silenciado:
+          grep -q 'Envio confirmado ao cliente' "$S"
+          grep -q 'Não foi possível confirmar o envio ao cliente' "$S"
+          # wfConfirmClientSend retorna o resultado (modal ramifica):
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/renderer/index.html','utf8');const i=s.indexOf('async function wfConfirmClientSend(');const j=s.indexOf('async function ',i+10);const body=s.slice(i,j>0?j:s.length);if(!/return r;/.test(body)){console.error('wfConfirmClientSend não retorna o resultado');process.exit(1);}"
+          # armamento por copiar/abrir preservado (não removido; apenas deixou de ser o gate):
+          grep -q 'function wfArmConfirmSend' "$S"
+          echo "MARCADORES F3.5.6A-H5: VERIFIED."
+      - name: "Gate MARCADORES herdados H4 (writer/reader) + H3 (THEMES_READY) + H2/H1 intactos (renderer + slaRules)"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          S=src/renderer/index.html
+          M=src/main/slaRules.js
+          # H4 — writer nunca 'enviado' na criação + reader com guard da Central:
+          grep -q "data.clientFlowStatus='afazer';data.clientWorkflowStage='afazer';" "$S"
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/renderer/index.html','utf8');const i=s.indexOf('function flowCanonicalSentSignal(');const j=s.indexOf('}',s.indexOf('return ',i));if(!/if\(wp\)return false;/.test(s.slice(i,j+1))){console.error('renderer flowCanonicalSentSignal SEM guard');process.exit(1);}"
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/main/slaRules.js','utf8');const i=s.indexOf('function flowCanonicalSentSignal(');const j=s.indexOf('}',s.indexOf('return ',i));if(!/if\(wp\)return false;/.test(s.slice(i,j+1))){console.error('slaRules flowCanonicalSentSignal SEM guard');process.exit(1);}"
+          # H3 — THEMES_READY + token≠envio:
+          grep -q "THEMES_READY:'themes_ready'" "$S"
+          grep -q 'Temas prontos — confirmar envio ao cliente' "$S"
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/renderer/index.html','utf8');const i=s.indexOf('function flowThemesSentSignal(');const j=s.indexOf('}',i);if(/clientReviewToken|shareToken|clientSentBy/.test(s.slice(i,j+1))){console.error('flowThemesSentSignal trata token como envio');process.exit(1);}"
+          # H2/H1:
+          grep -q 'wfApprovalsBarHtml(list)+boardToolbar()' "$S"
+          grep -q "getElementById('wfapRoot')" "$S"
+          grep -q "id: (tid ? (tid + ':') : '') + String(k), lk: String(k)" src/main/workflowEvents.js
+          grep -q 'legacyCursor' dist/main/workflowNotifier.js
+          echo "MARCADORES herdados H4+H3+H2+H1: VERIFIED."
+      - name: "Gate SUÍTE PIN F3.5.6A (renderer) — G3 botão habilitado + wiring confirmClientSend + herdados"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f356a-workflow-orchestration.test.mjs
+      - name: "Gate SUÍTES da linhagem F3.5.6A — H4 (caminho real) + H3 (token≠envio) + paridade golden master F3.4.4 + H2 [dist]"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f356ah4-single-source-real-path.test.mjs
+          node scripts/f356ah3-single-source-sent-state.test.mjs
+          node scripts/f344-flow-golden-master.test.mjs
+          H2_BASE_228="$BASE_228_SHA" H2_BASE_230="$BASE_230_SHA" node scripts/f356ah2-client-approvals.test.mjs
+      - name: "Gate SUÍTES herdadas — notificações/handoff/visibilidade/referência + cadeia F3.5.5* [dist]"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f355eh4-grouped-notification-handoff.test.mjs
+          node scripts/f355eh3-global-notification-visibility.test.mjs
+          node scripts/f355eh2-reference-notification.test.mjs
+          node scripts/f355e-retire-modules-premium-notifications.test.mjs
+          node scripts/f355d-cron-quantity-universal-paste.test.mjs
+          node scripts/f353-paste-recovery.test.mjs
+          node scripts/f353-durable-notifications.test.mjs
+          node scripts/f355ch2-stale-alert.test.mjs
+      - name: "Gate central herdado — f354l + f354p + f354q + f354o + f354u + f354u-h1 [dist]"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f354l-sla-central-persistent-reminders.test.mjs
+          node scripts/f354p-sla-decision-actions.test.mjs
+          node scripts/f354q-task-idle-detection.test.mjs
+          node scripts/f354o-common-notification-grouping.test.mjs
+          node scripts/f354u-premium-common-notifications.test.mjs
+          node scripts/f354u-h1-notification-hotfix.test.mjs
+      - name: "Gate herdado — sessão/auth + rich editor + agenda + notas + planner/orquestrador/central/integração"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f355ch1-session-restore.test.mjs
+          node scripts/f3356-auth-core.test.mjs
+          node scripts/f355c-script-quantity-rich-editor.test.mjs
+          node scripts/f355b-agenda-premium.test.mjs
+          node scripts/f355ah1-internal-notes.test.mjs
+          node scripts/f355a-execution-planner.test.mjs
+          node scripts/f355a-orchestrator.test.mjs
+          node scripts/f355a-execution-central.test.mjs
+          node scripts/f355a-integration.test.mjs
+      - name: "Gate REGRESSÃO canônica — som 37 + detalhes 74 + cards 53 + sessão 40"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f354wh2-immediate-notification-sound.test.mjs
+          node scripts/f354wh1-details-status-notes.test.mjs
+          node scripts/f354w-compact-cards-details.test.mjs
+          node scripts/f354vh1-session-persistence.test.mjs
+      - name: "Gate RED EMPACOTADO F3.5.6A-H5 — CLIQUE REAL no botão: 1.0.233 inerte; 1.0.234 funciona + falha/retry + idempotência — xvfb"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y >/dev/null 2>&1 || true
+          sudo apt-get install -y xvfb >/dev/null 2>&1 || true
+          H5_VERSION=1.0.234 timeout -k 15 600 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f356ah5-red-main.js
+      - name: "Gate RED EMPACOTADO herdado — H4 (caminho real de criação) + H3 (token≠envio) GREEN em 1.0.234 — xvfb"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          H4_VERSION=1.0.234 timeout -k 15 600 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f356ah4-red-main.js
+          H3_VERSION=1.0.234 timeout -k 15 600 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f356ah3-red-main.js
+      - uses: actions/upload-artifact@v4
+        with: { name: f356ah5-provas-qa, path: "docs/f356ah5-qa/**\ndocs/f356ah4-qa/**\ndocs/f356ah3-qa/**", if-no-files-found: warn, retention-days: 30 }
+      - name: "Gate ISOLAMENTO — produção = SOMENTE index.html vs 1.0.233 (slaRules INALTERADO); resto byte-idêntico; REGRA MÁXIMA 1.0.228"
+        run: |
+          set -euo pipefail
+          git diff --name-only "$BASE_233_SHA"..HEAD > /tmp/delta.txt; echo "== DELTA vs 1.0.233 =="; cat /tmp/delta.txt
+          # allowlist H5: renderer index.html (ÚNICO de produção) + versão + suítes/preload da fase H5
+          # + f356a-workflow-orchestration (G3 atualizado) + re-pins ROTULADOS (1.0.233→1.0.234) + workflows f356ah5.
+          BAD=$(grep -vE '^(\.github/workflows/desktop-(build|release)-f356ah5\.yml$|desktop/src/renderer/index\.html$|desktop/package(-lock)?\.json$|desktop/scripts/f356ah5-red-(main|preload)\.js$|desktop/scripts/f356a-workflow-orchestration\.test\.mjs$|desktop/scripts/f354p-sla-decision-actions\.test\.mjs$|desktop/scripts/f354vh1-session-persistence\.test\.mjs$|desktop/scripts/f354wh2-immediate-notification-sound\.test\.mjs$|desktop/scripts/f355a-integration\.test\.mjs$|desktop/scripts/f355ah1-internal-notes\.test\.mjs$|desktop/scripts/f355b-agenda-premium\.test\.mjs$|desktop/scripts/f355c-script-quantity-rich-editor\.test\.mjs$|desktop/scripts/f355d-cron-quantity-universal-paste\.test\.mjs$|desktop/scripts/f355e-retire-modules-premium-notifications\.test\.mjs$|desktop/scripts/f355eh2-reference-notification\.test\.mjs$|desktop/scripts/f355eh3-global-notification-visibility\.test\.mjs$|desktop/scripts/f355eh4-grouped-notification-handoff\.test\.mjs$|desktop/scripts/f356ah2-client-approvals\.test\.mjs$|desktop/scripts/f356ah3-single-source-sent-state\.test\.mjs$|docs/f356ah5(-qa)?/)' /tmp/delta.txt || true)
+          [ -z "$BAD" ] || { echo "::error::fora da allowlist H5: $BAD"; exit 1; }
+          # B) NENHUMA mudança em src/main (slaRules INALTERADO) vs 1.0.233:
+          CHG_MAIN=$(git diff --name-only "$BASE_233_SHA"..HEAD -- desktop/src/main || true)
+          [ -z "$CHG_MAIN" ] || { echo "::error::src/main alterado (H5 não toca main): $CHG_MAIN"; exit 1; }
+          # demais superfícies de produção byte-idênticas à 1.0.233 (index.html é o ÚNICO delta de produção):
+          git diff --quiet "$BASE_233_SHA"..HEAD -- desktop/src/main desktop/src/preload cloudflare-worker.js desktop/scripts/copy-renderer.js desktop/electron-builder.yml desktop/tsconfig.json functions android-native android-native-beta desktop/src/renderer/priorityEngine.js desktop/src/renderer/bgnotify.html desktop/src/renderer/slareminder.html desktop/src/renderer/bgcall.html desktop/src/renderer/sounds || { echo "::error::mudança fora de index.html — H5 altera SOMENTE o renderer index.html"; exit 1; }
+          # C) REGRA MÁXIMA — infraestrutura de notificações 1.0.228 byte-idêntica à baseline física.
+          git diff --quiet "$BASE_228_SHA"..HEAD -- desktop/src/main/bgNotify.ts desktop/src/main/notificationGrouping.ts desktop/src/renderer/bgnotify.html desktop/src/renderer/slareminder.html desktop/src/renderer/bgcall.html desktop/src/renderer/sounds desktop/src/preload/bgnotify-preload.ts desktop/src/preload/slareminder-preload.ts desktop/src/preload/preload.ts desktop/electron-builder.yml desktop/tsconfig.json || { echo "::error::congelado alterado (infra de notificações 1.0.228 deve ser byte-idêntica)"; exit 1; }
+          echo "ISOLAMENTO H5: VERIFIED (index.html é o ÚNICO arquivo de produção alterado vs 1.0.233; slaRules INALTERADO)."
+  build:
+    needs: verify
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: npm ci + build + electron-builder (--publish never)
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm run build
+          npx electron-builder --win nsis msi --publish never
+      - name: "Gate EMPACOTADO — versão 1.0.234 + botão habilitado + handler ramificado no app.asar + H4/H3/H2/H1/infra congelada (suítes contra o pacote)"
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          ASAR="dist-installer/win-unpacked/resources/app.asar"; test -f "$ASAR"
+          npx --yes @electron/asar extract "$ASAR" asar-x
+          node -e "const p=require('./asar-x/package.json'); if(p.version!=='1.0.234') process.exit(1);"
+          I=asar-x/src/renderer/index.html
+          # H5 nos BYTES do pacote:
+          grep -q 'id="btnConfirmSend" title=' "$I"
+          node -e "const fs=require('fs');const s=fs.readFileSync('asar-x/src/renderer/index.html','utf8');if(/id=\"btnConfirmSend\" disabled/.test(s)){console.error('pacote: botão ainda nasce disabled');process.exit(1);}"
+          grep -q 'Envio confirmado ao cliente' "$I"
+          grep -q 'Não foi possível confirmar o envio ao cliente' "$I"
+          node -e "const fs=require('fs');const s=fs.readFileSync('asar-x/src/renderer/index.html','utf8');const i=s.indexOf('async function wfConfirmClientSend(');const j=s.indexOf('async function ',i+10);if(!/return r;/.test(s.slice(i,j>0?j:s.length))){console.error('pacote: wfConfirmClientSend não retorna');process.exit(1);}"
+          # H4/H3 nos bytes:
+          grep -q "data.clientFlowStatus='afazer';data.clientWorkflowStage='afazer';" "$I"
+          grep -q "THEMES_READY:'themes_ready'" "$I"
+          node -e "const fs=require('fs');const s=fs.readFileSync('asar-x/src/renderer/index.html','utf8');const i=s.indexOf('function flowCanonicalSentSignal(');const j=s.indexOf('}',s.indexOf('return ',i));if(!/if\(wp\)return false;/.test(s.slice(i,j+1))){console.error('pacote: flowCanonicalSentSignal SEM guard');process.exit(1);}"
+          grep -q 'function flowCanonicalSentSignal' asar-x/dist/main/slaRules.js
+          grep -q "THEMES_READY:'themes_ready'" asar-x/dist/main/slaRules.js
+          # H2/H1/infra congelada:
+          grep -q 'wfApprovalsBarHtml(list)+boardToolbar()' "$I"
+          grep -q "id: (tid ? (tid + ':') : '') + String(k), lk: String(k)" asar-x/dist/main/workflowEvents.js
+          grep -q 'legacyCursor' asar-x/dist/main/workflowNotifier.js
+          grep -q 'function premiumEvtIcon' asar-x/src/renderer/index.html
+          grep -q 'function premiumEvtIcon' asar-x/src/renderer/bgnotify.html
+          grep -q 'activeToastGroups' asar-x/dist/main/main.js
+          grep -q 'function reassert' asar-x/dist/main/bgNotify.js
+          # SUÍTES herdadas contra os BYTES EMPACOTADOS:
+          F356AH4_SRC=asar-x/src/renderer/index.html F356AH4_SLARULES=asar-x/dist/main/slaRules.js node scripts/f356ah4-single-source-real-path.test.mjs
+          F356AH3_SRC=asar-x/src/renderer/index.html F356AH3_SLARULES=asar-x/dist/main/slaRules.js F356AH3_PKG=asar-x/package.json node scripts/f356ah3-single-source-sent-state.test.mjs
+          echo "GATE F3.5.6A-H5 EMPACOTADO: VERIFIED."
+      - name: Empacotar bundle + SHA256SUMS + VERSAO-DESKTOP
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes @cyclonedx/cyclonedx-npm --omit dev --output-format JSON --output-file "$RUNNER_TEMP/sbom.json" || echo '{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}' > "$RUNNER_TEMP/sbom.json"
+          OUT="$GITHUB_WORKSPACE/dist-pkg"; mkdir -p "$OUT"
+          EXE=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe | head -1); MSI=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.msi | head -1); BM=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap | head -1)
+          cp "$EXE" "$MSI" "$BM" dist-installer/latest.yml "$OUT/"; cp "$RUNNER_TEMP/sbom.json" "$OUT/SBOM-cyclonedx.json"
+          EXE_NAME=$(basename "$EXE"); MSI_NAME=$(basename "$MSI"); BM_NAME=$(basename "$BM")
+          ( cd "$OUT" && sha256sum "$EXE_NAME" "$MSI_NAME" latest.yml "$BM_NAME" SBOM-cyclonedx.json > SHA256SUMS )
+          { echo "productName : Agenda ID Seven Desktop"; echo "versionName : 1.0.234"; echo "rotulo      : 1.0.234-f356ah5-confirm-send-button (CANDIDATA — botão Confirmar envio ao cliente funcional)"; echo "channel     : latest (NADA publicado neste build)"; echo "appId       : br.com.idseven.agenda.desktop"; echo "instalador  : $EXE_NAME"; echo "SHA-256 exe : $(sha256sum "$OUT/$EXE_NAME" | awk '{print $1}')"; echo "instalador2 : $MSI_NAME"; echo "SHA-256 msi : $(sha256sum "$OUT/$MSI_NAME" | awk '{print $1}')"; echo "commit      : $GITHUB_SHA (branch $GITHUB_REF_NAME)"; echo "base-codigo : Desktop 1.0.233 (commit b176e41; F3.5.6A-H4). BASELINE FISICA OFICIAL: 1.0.228 (3f0d0af1; FISICAMENTE APROVADA)"; echo "rollback    : imediato 1.0.228 (877795ef stable — baseline física). NAO promover 1.0.229..1.0.233."; echo "origem      : F3.5.6A-H5 — P0 FISICO. 1.0.233 REPROVADA no Cenario B: no modal 'Enviar no grupo do cliente' o botao 'Confirmar envio ao cliente' estava VISIVEL mas INERTE (nascia disabled; so armado por copiar/abrir; handler abortava em if(b.disabled)return). Correcao SO no renderer index.html: botao NASCE habilitado (clique = confirmacao explicita; gerar link != envio; nao marca automaticamente); handler ramifica no RESULTADO real (sucesso -> 'Envio confirmado ao cliente'; falha -> reabilita + rotulo restaurado + toast de erro; tarefa segue 'Temas prontos'); wfConfirmClientSend RETORNA o resultado; idempotencia (trava durante request). 'enviado' canonico continua EXCLUSIVO do Worker. Worker V64.61 INALTERADO (zero deploy). REGRA MAXIMA: correcao H4 1.0.233 preservada; Central 1.0.231, workflow 1.0.230/1.0.229 e infra de notificacoes 1.0.228 INTOCADAS; paridade renderer×main (golden master F3.4.4) mantida (slaRules.js INALTERADO). MUDANCA de producao: SOMENTE desktop/src/renderer/index.html. PROVAS: RED empacotado que CLICA o botao REAL (1.0.233 inerte; 1.0.234 funciona + falha/retry + idempotencia); suites herdadas H4/H3 + golden master F3.4.4 9/9; bateria herdada completa."; echo "distribuicao: CANDIDATA — publicação no Latest ocorre no workflow desktop-release-f356ah5.yml (mesmos bytes)"; } > "$OUT/VERSAO-DESKTOP.txt"
+          echo "== SHA256SUMS =="; cat "$OUT/SHA256SUMS"
+      - uses: actions/upload-artifact@v4
+        with: { name: agenda-id-seven-desktop-1.0.234-installer, path: "dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe\ndist-pkg/Agenda-ID-Seven-Desktop-*-x64.msi", if-no-files-found: error, retention-days: 30 }
+      - uses: actions/upload-artifact@v4
+        with: { name: agenda-id-seven-desktop-1.0.234-updatemeta, path: "dist-pkg/latest.yml\ndist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap\ndist-pkg/SHA256SUMS\ndist-pkg/SBOM-cyclonedx.json\ndist-pkg/VERSAO-DESKTOP.txt", if-no-files-found: error, retention-days: 30 }

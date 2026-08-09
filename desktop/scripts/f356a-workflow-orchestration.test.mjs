@@ -62,11 +62,11 @@ function extractFn(src, marker) {
 
 /* ═══ A — IDENTIDADE ═══ */
 const pkg = JSON.parse(read(PKG));
-ok("A1 versão 1.0.233", pkg.version === "1.0.233", pkg.version);
+ok("A1 versão 1.0.234", pkg.version === "1.0.234", pkg.version);
 try {
   const lock = JSON.parse(read(LOCK));
-  ok("A2 lock 1.0.233 ×2", lock.version === "1.0.233" && lock.packages[""].version === "1.0.233");
-} catch (e) { ok("A2 lock 1.0.233 ×2", false, String(e.message)); }
+  ok("A2 lock 1.0.234 ×2", lock.version === "1.0.234" && lock.packages[""].version === "1.0.234");
+} catch (e) { ok("A2 lock 1.0.234 ×2", false, String(e.message)); }
 ok("A3 workflowEvents.js existe (motor puro)", fs.existsSync(WE_PATH));
 ok("A4 workflowNotifier compilado no dist", fs.existsSync(WN_DIST));
 
@@ -349,7 +349,8 @@ const SLA = require2(SLARULES);
   ok("G1 COPIAR ≠ ENVIADO: nenhum registro no copiar/abrir (persistClientSend fora dos botões)",
     !idx.includes("persistClientSend(ctx.id);") && (idx.match(/wfArmConfirmSend\(ctx\);/g) || []).length === 2);
   ok("G2 caminho secundário também sem registro no copiar", !idx.includes("await persistClientSend(id);"));
-  ok("G3 botão CONFIRMAR ENVIO no modal (desabilitado até copiar)", idx.includes('id="btnConfirmSend" disabled'));
+  ok("G3 botão CONFIRMAR ENVIO no modal NASCE habilitado (F3.5.6A-H5: clique = confirmação explícita; nunca mais inerte) + handler ramifica no resultado (sucesso/falha visível)",
+    idx.includes('id="btnConfirmSend" title=') && !idx.includes('id="btnConfirmSend" disabled') && idx.includes('Envio confirmado ao cliente') && idx.includes('Não foi possível confirmar o envio ao cliente'));
   ok("G4 confirmação chama o Worker (sentAt server-side)", /wfConfirmClientSend\(taskId\)[\s\S]{0,400}wfTeamAction\(taskId,'confirmClientSend'/.test(idx.replace(/\n/g, " ")) || (idx.includes("wfTeamAction(taskId,'confirmClientSend'") && idx.includes("async function wfConfirmClientSend(")));
   ok("G5 registro WhatsApp converge no team-action canônico (source carimbado no SERVIDOR)", idx.includes("wfTeamAction(taskId,'registerExternalDecision'") && idx.includes("roundType:typeNow") && !idx.includes("wfSource:'whatsapp_group'"));
   ok("G6 dispatcher com as 6 ações novas", ["data-wfext", "data-wfconfirmsend", "data-wfsetdue", "data-wfready", "data-wfcopyreminder", "data-wfitemdone"].every((a) => idx.includes("[" + a + "]")));
