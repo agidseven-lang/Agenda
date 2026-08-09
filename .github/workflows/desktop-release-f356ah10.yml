@@ -1,0 +1,269 @@
+# =====================================================================
+# F3.5.6A-H10 — Publicacao da Desktop 1.0.237 no CANAL DO ATUALIZADOR INTERNO (Latest)
+# ---------------------------------------------------------------------
+# 1.0.237 corrige o fluxo "Confirmar envio ao cliente" que ficou SEM GO na 1.0.236 (GO fisico
+# PARCIAL): o diagnostico durvel capturou stage=no_session (team JWT so por senha; boot nao minta).
+# CORRECAO renderer-only: ensureTeamSession = camada de autenticacao CONTEXTUAL e NAO-destrutiva
+# (#tsAuthRoot em document.body; preserva o modal "Enviar no grupo do cliente"); senha correta ->
+# novo team JWT -> a MESMA confirmClientSend RETOMA 1x (sem novo clique) apos PROVAR teamJwtValid()
+# -> POST. Cancelar/Esc/backdrop -> 0 POST, tarefa intacta. Senha errada -> permanece, 0 POST.
+# Idempotencia: 1 acao -> 1 renovacao -> <=1 POST. Distribuida EXCLUSIVAMENTE pelo updater interno.
+# USA os BYTES do run de build F3.5.6A-H10 31332292160 (gated, verde nos 2 jobs; --publish never):
+# NAO RECOMPILA — baixa os 2 artifacts e publica os MESMOS bytes. TUDO PINADO: run id, digests,
+# 5 hashes SHA-256, tag v1.0.237 no head EXATO. ESCRITAS so via GitHub App "Agenda ID Seven Release Bot".
+# Worker V64.61 INALTERADO. slaRules.js byte-identico. baseline fisica 1.0.228; ROLLBACK IMEDIATO 1.0.228.
+# =====================================================================
+name: "F3.5.6A-H10 Desktop Release — 1.0.237 no canal do updater (recuperacao contextual da team session; sem build novo)"
+"on":
+  push:
+    branches:
+      - "desktop/f356ah10-team-session-recovery-1.0.237"
+    paths:
+      - ".github/workflows/desktop-release-f356ah10.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: agidseven-lang/Agenda
+      # ── PINAGEM COMPLETA (F3.5.6A-H10; preenchida apos o run de build verde) ──
+      RUN_ID: "31332292160"
+      STABLE_SHA: "7b8d22864ea9f4565de7311b2cb6db9bbe283027"
+      TEST_BRANCH: "desktop/f356ah10-team-session-recovery-1.0.237"
+      BASE_236_SHA: "b7cf531afdf77ba9f94a7bcca495c3fe5254686a"
+      BASE_235_SHA: "d20db3710e7368ffdc5307a5e98d509e4930890b"
+      BASE_228_SHA: "3f0d0af192b4b6b32a8e8bbda4153dcf4df1bc6d"
+      TAG: "v1.0.237"
+      TITLE: "Agenda ID Seven Desktop 1.0.237 — recuperacao contextual da team session (pelo updater)"
+      ART_INST: "agenda-id-seven-desktop-1.0.237-installer"
+      ART_INST_DIGEST: "sha256:4c27c1e096f5a34ca658627946fc17d6ba021db5434ae1a09ead1032c6f65fa8"
+      ART_META: "agenda-id-seven-desktop-1.0.237-updatemeta"
+      ART_META_DIGEST: "sha256:92b961286b374880fb55e08f831d66b38c022ad6e94a932c91684bee6fef2cd2"
+      EXE_NAME: "Agenda-ID-Seven-Desktop-1.0.237-x64.exe"
+      MSI_NAME: "Agenda-ID-Seven-Desktop-1.0.237-x64.msi"
+      BM_NAME: "Agenda-ID-Seven-Desktop-1.0.237-x64.exe.blockmap"
+      LY_NAME: "latest.yml"
+      EXP_EXE: "6e7100063a509a8f7406ebfd519828373fbb42fb0234fe0b007a1fcd74a4c75d"
+      EXP_MSI: "aebdbe3f85e512af06dabf74ce625cf1b40fcb825679a22f89ae54c16d81b2f1"
+      EXP_LY: "74922b2c49dd722166b720da8decc208ade5e50a9ad72ea60bc89e6ed946d480"
+      EXP_BM: "eae21d3af84f1f5c2755ce01d300927dbfd6518bacca89c287a7be42c4dfb684"
+      EXP_SBOM: "eac4630ce37db52548a7b96987266f7f53983f37b6cdefe23e58a89fffe32991"
+      PREV_LATEST_TAG: "v1.0.236"
+      PRES_235_TAG: "v1.0.235"
+      PRES_234_TAG: "v1.0.234"
+      PRES_232_TAG: "v1.0.232"
+      PRES_231_TAG: "v1.0.231"
+      PRES_230_TAG: "v1.0.230"
+      PRES_228_TAG: "v1.0.228"
+      PROD_ROLLBACK_TAG: "v1.0.223"
+    steps:
+      - name: "Gate 0 — contexto: branch de teste correta (publicacao autorizada F3.5.6A-H10)"
+        run: |
+          set -euo pipefail
+          [ "${{ github.ref_name }}" = "$TEST_BRANCH" ] || { echo "::error::ref '${{ github.ref_name }}' != $TEST_BRANCH — nada publicado"; exit 1; }
+          echo "OK: rodando na branch de teste autorizada"
+
+      - name: "Gate 0a — token temporario do Release Bot (GitHub App; expira sozinho)"
+        id: release_bot
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: Agenda
+          permission-contents: write
+          permission-workflows: write
+
+      - name: "Gate 0b — token do Release Bot ATIVO + escopo SO Agenda"
+        env:
+          BOT_TOKEN: ${{ steps.release_bot.outputs.token }}
+        run: |
+          set -euo pipefail
+          [ -n "$BOT_TOKEN" ] || { echo "::error::token do Release Bot vazio — NADA publicado."; exit 1; }
+          FN="$(GH_TOKEN="$BOT_TOKEN" gh api "repos/$REPO" --jq '.full_name' 2>/dev/null || true)"
+          [ "$FN" = "$REPO" ] || { echo "::error::Release Bot sem acesso a $REPO."; exit 1; }
+          J="$(GH_TOKEN="$BOT_TOKEN" gh api /installation/repositories)"
+          N="$(echo "$J" | jq -r '.total_count')"; R="$(echo "$J" | jq -r '.repositories[0].full_name')"
+          { [ "$N" = "1" ] && [ "$R" = "$REPO" ]; } || { echo "::error::escopo do Release Bot != {1 repo, $REPO} ($N,$R)."; exit 1; }
+          echo "OK: Release Bot ativo, escopo restrito a $REPO"
+
+      - name: "Gate 1 — run de build F3.5.6A-H10 completed/success e head EXATO"
+        run: |
+          set -euo pipefail
+          J="$(gh api "repos/$REPO/actions/runs/$RUN_ID")"
+          ST="$(echo "$J" | jq -r '.status + "|" + .conclusion')"
+          HS="$(echo "$J" | jq -r '.head_sha')"
+          BR="$(echo "$J" | jq -r '.head_branch')"
+          echo "run $RUN_ID: $ST head=$HS branch=$BR"
+          [ "$ST" = "completed|success" ] || { echo "::error::run de build invalido"; exit 1; }
+          [ "$HS" = "$STABLE_SHA" ] || { echo "::error::head do run != STABLE_SHA"; exit 1; }
+          [ "$BR" = "$TEST_BRANCH" ] || { echo "::error::branch do run != branch de teste"; exit 1; }
+
+      - name: "Gate 2 — STABLE_SHA na linhagem do tip; commits alem dele SO o workflow de release; insumos de build intactos; bases na linhagem"
+        run: |
+          set -euo pipefail
+          H="$(gh api "repos/$REPO/git/ref/heads/$TEST_BRANCH" --jq '.object.sha')"
+          CMP="$(gh api "repos/$REPO/compare/$STABLE_SHA...$H" --jq '.status')"
+          echo "compare $STABLE_SHA...$H: $CMP"
+          { [ "$CMP" = "identical" ] || [ "$CMP" = "ahead" ]; } || { echo "::error::STABLE_SHA fora da linhagem do tip ($CMP)"; exit 1; }
+          gh api "repos/$REPO/compare/$STABLE_SHA...$H" --jq '.files[].filename' | tee /tmp/extra.txt || true
+          if grep -vE '^\.github/workflows/desktop-release-f356ah10\.yml$' /tmp/extra.txt | grep -q .; then
+            echo "::error::commits pos-candidato tocam arquivos alem do workflow de release"; exit 1; fi
+          if grep -qE '^(desktop/src/|desktop/scripts/copy-renderer\.js|desktop/package\.json|desktop/package-lock\.json|desktop/tsconfig\.json|desktop/electron-builder)' /tmp/extra.txt; then
+            echo "::error::insumo de build alterado apos STABLE_SHA — bytes publicados nao corresponderiam ao build"; exit 1; fi
+          for B in "$BASE_236_SHA" "$BASE_235_SHA" "$BASE_228_SHA"; do
+            C="$(gh api "repos/$REPO/compare/$B...$STABLE_SHA" --jq '.status')"
+            { [ "$C" = "ahead" ] || [ "$C" = "identical" ]; } || { echo "::error::STABLE_SHA nao descende de $B ($C)"; exit 1; }
+          done
+          echo "OK: STABLE_SHA ancestral do tip; extras = so o workflow de release; bases 1.0.236/1.0.235/1.0.228 na linhagem"
+
+      - name: "Gate 3 — release v1.0.237 NAO existe; tag so pode preexistir apontando p/ STABLE_SHA"
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then echo "::error::release $TAG ja existe"; exit 1; fi
+          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            TS="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+            [ "$TS" = "$STABLE_SHA" ] || { echo "::error::tag $TAG aponta para outro sha ($TS)"; exit 1; }
+          fi
+          echo "OK: release/tag livres (ou tag ja em STABLE_SHA)"
+
+      - name: "Gate 4 — artifacts: ids+digests conferem (mesmos bytes do run verde)"
+        run: |
+          set -euo pipefail
+          json="$(gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts" --paginate)"
+          chk() { local d; d="$(echo "$json" | jq -r --arg n "$1" '.artifacts[]|select(.name==$n)|.digest')"; echo "$1: $d"; [ "$d" = "$2" ] || { echo "::error::digest $1 divergente"; exit 1; }; }
+          chk "$ART_INST" "$ART_INST_DIGEST"
+          chk "$ART_META" "$ART_META_DIGEST"
+
+      - name: "Baixar artifacts (installer + updatemeta) — SEM recompilar"
+        run: |
+          set -euo pipefail
+          gh run download "$RUN_ID" -R "$REPO" -n "$ART_INST" -D pacote
+          gh run download "$RUN_ID" -R "$REPO" -n "$ART_META" -D pacote
+          for f in "$EXE_NAME" "$MSI_NAME" "$LY_NAME" "$BM_NAME" SHA256SUMS SBOM-cyclonedx.json VERSAO-DESKTOP.txt; do
+            test -f "pacote/$f" || { echo "::error::arquivo ausente: $f"; exit 1; }
+          done
+          if [ -f pacote/canary.yml ]; then echo "::error::canary.yml presente — canal ambiguo"; exit 1; fi
+
+      - name: "Gate 5 — hashes SHA-256 + latest.yml (versao/EXE/sha512) + VERSAO-DESKTOP"
+        run: |
+          set -euo pipefail
+          declare -A EXP=( ["$EXE_NAME"]="$EXP_EXE" ["$MSI_NAME"]="$EXP_MSI" ["$LY_NAME"]="$EXP_LY" ["$BM_NAME"]="$EXP_BM" ["SBOM-cyclonedx.json"]="$EXP_SBOM" )
+          for f in "${!EXP[@]}"; do
+            H="$(sha256sum "pacote/$f" | awk '{print $1}')"; echo "$f=$H"
+            [ "$H" = "${EXP[$f]}" ] || { echo "::error::hash $f divergente"; exit 1; }
+          done
+          ( cd pacote && sha256sum -c SHA256SUMS ) || { echo "::error::SHA256SUMS nao confere"; exit 1; }
+          grep -q "version: 1.0.237" "pacote/$LY_NAME" || { echo "::error::latest.yml version != 1.0.237"; exit 1; }
+          grep -qE "^path: $EXE_NAME" "pacote/$LY_NAME" || { echo "::error::latest.yml path != EXE"; exit 1; }
+          META_SHA512=$(grep -E '^sha512:' "pacote/$LY_NAME" | head -1 | sed -E 's/^sha512:[[:space:]]*//' | tr -d '\r')
+          CALC_SHA512=$(openssl dgst -sha512 -binary "pacote/$EXE_NAME" | openssl base64 -A)
+          [ "$META_SHA512" = "$CALC_SHA512" ] || { echo "::error::sha512 do latest.yml != EXE (updater rejeitaria)"; exit 1; }
+          grep -q "versionName : 1.0.237" pacote/VERSAO-DESKTOP.txt || { echo "::error::VERSAO-DESKTOP sem 1.0.237"; exit 1; }
+          grep -q "1.0.237-f356ah10-team-session-recovery" pacote/VERSAO-DESKTOP.txt || { echo "::error::rotulo da candidata ausente"; exit 1; }
+          echo "OK: 5 hashes + SHA256SUMS + latest.yml (1.0.237/EXE/sha512==EXE) + VERSAO-DESKTOP"
+
+      - name: "Release notes"
+        run: |
+          cat > notas.md <<'NOTAS'
+          Agenda ID Seven Desktop 1.0.237 — recuperação contextual da team session (pelo atualizador interno)
+
+          Atualização disponibilizada pelo ATUALIZADOR INTERNO do app (Configurações ->
+          Atualizações -> Verificar atualizações -> Baixar -> Instalar e reiniciar).
+
+          Corrige o fluxo "Confirmar envio ao cliente" que ficou SEM GO na 1.0.236 (que foi GO físico
+          PARCIAL: a timeline honesta e o diagnóstico durável foram APROVADOS). O diagnóstico durável
+          da 1.0.236 capturou a causa exata: stage=no_session (a sessão de EQUIPE — team JWT, validade
+          12h — só era emitida com senha; a restauração de sessão no boot NUNCA a recriava), então a
+          confirmação nem chegava ao servidor (requestStarted=false).
+
+          O QUE MUDA vs 1.0.236 (aditivo/cirúrgico; SÓ o renderer index.html):
+          - Ao confirmar o envio SEM sessão de equipe válida, em vez de falhar em silêncio, aparece uma
+            CAMADA DE AUTENTICAÇÃO contextual (empilhada, sem destruir o modal "Enviar no grupo do
+            cliente"): "Sua sessão de segurança expirou. Para confirmar este envio, autentique-se
+            novamente." + campo de senha + "Continuar envio" / "Cancelar".
+          - Senha correta -> nova sessão de equipe -> a MESMA confirmação é RETOMADA automaticamente
+            (uma vez, sem novo clique) e só então segue para o servidor ("Confirmando…").
+          - "Cancelar" (ou Esc / clicar fora): NENHUM envio é feito, a tarefa fica intacta e aparece
+            "Envio não confirmado. A autenticação foi cancelada." — não é falha do envio.
+          - Senha incorreta: "Senha incorreta. Tente novamente.", a camada permanece, nenhum envio é
+            feito e o diagnóstico é preservado.
+          - Idempotência: uma ação = uma renovação = no máximo um envio (duplo-clique / Enter+clique
+            não geram dois).
+
+          O QUE NÃO MUDA (preservado; garantido por gate):
+          - a timeline honesta e o diagnóstico durável da 1.0.236 continuam intactos (o diagnóstico
+            agora vai capturar a próxima cadeia REAL — ex. stage=success / httpStatus=200);
+          - nenhum erro real do servidor é ocultado (401/403/404/500 seguem visíveis);
+          - SEGURANÇA sem atalho: a senha vai SÓ ao /team/session (uid+senha, HTTPS) e NUNCA é salva
+            (localStorage/sessionStorage/logs/diagnóstico/área de transferência); /team-action continua
+            exigindo Bearer JWT; o boot NÃO recria a sessão de equipe sem credencial;
+          - "enviado" canônico continua EXCLUSIVO do Worker; Worker V64.61 INALTERADO (nenhum deploy);
+          - slaRules.js byte-idêntico (paridade golden master F3.4.4); infra de notificações 1.0.228,
+            H8 (diagnóstico durável + timeline honesta), H5/H4/H3, Central 1.0.231 e workflow
+            1.0.230/1.0.229 preservados.
+          Delta de produção vs 1.0.236: SOMENTE desktop/src/renderer/index.html.
+
+          COMO VALIDAR (reutilize o Cronograma Teste 5): abra a tarefa -> Enviar ao cliente ->
+          Confirmar envio ao cliente -> na camada de autenticação digite sua senha -> "Continuar envio".
+          Sucesso: "Envio confirmado ao cliente". Se falhar, clique "Copiar diagnóstico da confirmação"
+          e envie o texto à equipe ID Seven. Em caso de problema: ROLLBACK IMEDIATO v1.0.228.
+
+          Procedência: run de build F3.5.6A-H10 31332292160 (success; --publish never; verify + Windows
+          verdes: marcadores H10 (camada contextual não-destrutiva + retomada + idempotência + senha
+          não persistida) + H8 (A+B) + H6B/H5/H4/H3 preservados; suíte f356ah10 68/68; golden master
+          F3.4.4; isolamento: delta de produção vs 1.0.236 SÓ em index.html; slaRules.js e infra 1.0.228
+          byte-idênticos) @ commit 7b8d22864ea9f4565de7311b2cb6db9bbe283027
+          (branch desktop/f356ah10-team-session-recovery-1.0.237). Mesmos bytes; sem recompilar.
+          Confira SHA-256 em SHA256SUMS.
+          NOTAS
+
+      - name: "Criar tag v1.0.237 pinada em STABLE_SHA — ESCRITA via Release Bot"
+        env:
+          GH_TOKEN: ${{ steps.release_bot.outputs.token }}
+        run: |
+          set -euo pipefail
+          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            TS="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+            [ "$TS" = "$STABLE_SHA" ] || { echo "::error::tag $TAG aponta para outro sha ($TS)"; exit 1; }
+          else
+            gh api -X POST "repos/$REPO/git/refs" -f ref="refs/tags/$TAG" -f sha="$STABLE_SHA" >/dev/null
+            echo "tag $TAG criada em $STABLE_SHA"
+          fi
+
+      - name: "Publicar release no canal do updater (latest=true, prerelease=false) — 6 assets — via Release Bot"
+        env:
+          GH_TOKEN: ${{ steps.release_bot.outputs.token }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" -R "$REPO" \
+            --target "$STABLE_SHA" --latest=true \
+            --title "$TITLE" --notes-file notas.md \
+            "pacote/$EXE_NAME" "pacote/$MSI_NAME" "pacote/$LY_NAME" "pacote/$BM_NAME" "pacote/SHA256SUMS" "pacote/VERSAO-DESKTOP.txt"
+          echo "publicado: $TAG (canal do electron-updater: release Latest com latest.yml)"
+
+      - name: "Pos-verificacao (Latest=1.0.237; 1.0.236/1.0.235/1.0.234/1.0.232/1.0.231/1.0.230/1.0.228 preservadas; rollback 1.0.223 preservado)"
+        run: |
+          set -euo pipefail
+          FLAGS="$(gh release view "$TAG" -R "$REPO" --json isPrerelease,isDraft --jq '(.isPrerelease|tostring)+"|"+(.isDraft|tostring)')"
+          [ "$FLAGS" = "false|false" ] || { echo "::error::flags incorretas: $FLAGS"; exit 1; }
+          N="$(gh release view "$TAG" -R "$REPO" --json assets --jq '.assets|length')"
+          [ "$N" = "6" ] || { echo "::error::esperado 6 assets, encontrados $N"; exit 1; }
+          for a in "$EXE_NAME" "$MSI_NAME" "$LY_NAME" "$BM_NAME" SHA256SUMS VERSAO-DESKTOP.txt; do
+            gh release view "$TAG" -R "$REPO" --json assets --jq '.assets[].name' | grep -qx "$a" || { echo "::error::asset $a ausente"; exit 1; }
+          done
+          if gh release view "$TAG" -R "$REPO" --json assets --jq '.assets[].name' | grep -qx "app-update.yml"; then echo "::error::app-update.yml nao pode ser asset"; exit 1; fi
+          TAGSHA="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+          [ "$TAGSHA" = "$STABLE_SHA" ] || { echo "::error::tag != STABLE_SHA"; exit 1; }
+          LATEST_TAG="$(gh api "repos/$REPO/releases/latest" --jq '.tag_name')"
+          [ "$LATEST_TAG" = "$TAG" ] || { echo "::error::Latest do repo != $TAG (got $LATEST_TAG)"; exit 1; }
+          for t in "$PREV_LATEST_TAG" "$PRES_235_TAG" "$PRES_234_TAG" "$PRES_232_TAG" "$PRES_231_TAG" "$PRES_230_TAG" "$PRES_228_TAG" "$PROD_ROLLBACK_TAG"; do
+            gh release view "$t" -R "$REPO" --json tagName --jq '.tagName' | grep -qx "$t" || { echo "::error::$t (preservada/rollback) sumiu"; exit 1; }
+          done
+          echo "===== GO: 1.0.237 (recuperacao contextual da team session) no canal do updater (Latest); ROLLBACK IMEDIATO 1.0.228; 1.0.236/1.0.235/1.0.234/1.0.232/1.0.231/1.0.230/1.0.228 preservadas ====="
