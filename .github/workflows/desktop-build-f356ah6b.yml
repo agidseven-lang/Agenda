@@ -1,0 +1,145 @@
+# F3.5.6A-H6B — BUILD DIAGNÓSTICA (NÃO É RELEASE). A 1.0.234 (rodando fisicamente) responde ao botão
+# "Confirmar envio ao cliente" mas devolve "Não foi possível confirmar o envio ao cliente" — a falha é
+# SERVER-SIDE (cadeia wfConfirmClientSend→wfTeamAction→fetch→Worker V64.61). Este build instrumenta o
+# renderer com um diagnóstico SANITIZADO (stage/requestStarted/responseReceived/httpStatus/workerCode/
+# hasSession/hasJwt/hasTask/hasToken), vinculado DINAMICAMENTE ao taskId da tentativa, + botão "Copiar
+# diagnóstico da confirmação". NUNCA registra token/JWT/conteúdo. Comportamento do envio IDÊNTICO à 1.0.234
+# (puramente aditivo). MUDANÇA de produção = SOMENTE desktop/src/renderer/index.html. build --publish never.
+# NÃO publicar no Latest. Base técnica 1.0.234 (3285a45). Baseline física 1.0.228. Rollback imediato 1.0.228.
+name: "[push/manual] F3.5.6A-H6B — Desktop 1.0.235-diag.1 (diagnóstico da confirmação) — Desktop Build"
+"on":
+  push:
+    branches: ["desktop/f356ah6b-confirm-diag-1.0.235-diag1"]
+  workflow_dispatch: {}
+permissions: { contents: read }
+env:
+  TEST_BRANCH: "desktop/f356ah6b-confirm-diag-1.0.235-diag1"
+  BASE_234_SHA: "3285a45ff40c4bcfb1b28c53819455d515af912a"
+  BASE_228_SHA: "3f0d0af192b4b6b32a8e8bbda4153dcf4df1bc6d"
+  APP_DIR: desktop
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: "Gate REF + ANCESTRIA (descende da 1.0.234 base técnica e da 1.0.228 baseline física)"
+        run: |
+          set -euo pipefail
+          [ "${GITHUB_REF_NAME}" = "$TEST_BRANCH" ] || { echo "::error::branch errada"; exit 1; }
+          for B in "$BASE_234_SHA" "$BASE_228_SHA"; do
+            git merge-base --is-ancestor "$B" HEAD || { echo "::error::não descende de $B"; exit 1; }
+          done
+      - name: "Gate VERSÃO 1.0.235-diag.1 (package + lock x2 + marcador DIAGNOSTICA)"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node -e "const p=require('./package.json'); if(p.version!=='1.0.235-diag.1'){console.error('versão',p.version);process.exit(1);} if(!(p.description||'').includes('BUILD DIAGNOSTICA')){console.error('marcador DIAGNOSTICA ausente');process.exit(1);}"
+          [ "$(grep -c '"version": "1.0.235-diag.1"' package-lock.json)" -ge 2 ]
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: "npm ci + TypeScript + sintaxe dos renderers (vm.Script) + worker"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          ./node_modules/.bin/tsc --noEmit -p tsconfig.json
+          node -e "const fs=require('fs'),vm=require('vm');const s=fs.readFileSync('src/renderer/index.html','utf8');const b=[...s.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(x=>x[1]);if(b.length<2){console.error('esperados >=2 blocos inline');process.exit(1);}b.forEach((x,i)=>new vm.Script(x,{filename:'index-inline-'+i}));console.log('blocos inline OK:',b.length);"
+          node -e "const fs=require('fs'),vm=require('vm');const s=fs.readFileSync('src/renderer/bgnotify.html','utf8');const m=s.match(/<script>([\s\S]*?)<\/script>/);new vm.Script(m[1],{filename:'bgnotify-inline'});"
+          node --check ../cloudflare-worker.js
+      - name: "npm run build (tsc + copy-renderer)"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          npm run build
+      - name: "Gate MARCADORES DIAGNÓSTICOS H6B (instrumento sanitizado + botão de cópia no renderer)"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          S=src/renderer/index.html
+          grep -q 'function __csDiagInit' "$S"
+          grep -q 'function __csDiagSet' "$S"
+          grep -q 'id="btnCopyConfirmDiag"' "$S"
+          grep -q 'Copiar diagnóstico da confirmação' "$S"
+          # captura dos estágios-chave e dos campos sanitizados exigidos:
+          for k in "stage:'request_started'" "stage:'http_error'" "stage:'http_401'" "stage:'network_error'" "stage:'success'" "httpStatus" "workerCode" "hasSession" "hasJwt" "hasTask" "hasToken"; do
+            grep -qF "$k" "$S" || { echo "::error::marcador diagnóstico ausente: $k"; exit 1; }
+          done
+          # SANITIZAÇÃO: o diag NÃO deve serializar token/JWT bruto. Prova estática: o objeto criado por
+          # __csDiagInit não contém as chaves 'token','jwt','authorization' (só presença booleana has*).
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/renderer/index.html','utf8');const i=s.indexOf('function __csDiagInit(');const j=s.indexOf('}catch(_){}}',i);const body=s.slice(i,j);if(/(:\s*(jwt|token)\b)|clientReviewToken|shareToken|Authorization|wp_team_jwt/.test(body)){console.error('diag pode vazar dado sensível');process.exit(1);}console.log('diag sanitizado OK');"
+          echo "MARCADORES DIAGNÓSTICOS H6B: VERIFIED."
+      - name: "Gate COMPORTAMENTO PRESERVADO (H5 intacto: botão nasce habilitado + handler ramifica + wfConfirmClientSend retorna + H4 + paridade slaRules)"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          S=src/renderer/index.html
+          grep -q 'id="btnConfirmSend" title=' "$S"
+          node -e "const s=require('fs').readFileSync('src/renderer/index.html','utf8');if(/id=\"btnConfirmSend\" disabled/.test(s)){console.error('regressão: botão nasce disabled');process.exit(1);}"
+          grep -q 'Envio confirmado ao cliente' "$S"
+          grep -q 'Não foi possível confirmar o envio ao cliente' "$S"
+          node -e "const s=require('fs').readFileSync('src/renderer/index.html','utf8');const i=s.indexOf('async function wfConfirmClientSend(');const j=s.indexOf('async function ',i+10);if(!/return r;/.test(s.slice(i,j>0?j:s.length))){console.error('wfConfirmClientSend não retorna');process.exit(1);}"
+          grep -q "data.clientFlowStatus='afazer';data.clientWorkflowStage='afazer';" "$S"
+          grep -q "THEMES_READY:'themes_ready'" "$S"
+          # slaRules INALTERADO vs 1.0.234 (paridade golden master F3.4.4):
+          git diff --quiet "$BASE_234_SHA"..HEAD -- src/main/slaRules.js || { echo "::error::slaRules.js alterado (H6B não toca main)"; exit 1; }
+          echo "COMPORTAMENTO PRESERVADO: VERIFIED."
+      - name: "Gate ISOLAMENTO — produção = SOMENTE index.html vs 1.0.234 (3285a45); src/main INALTERADO; infra 1.0.228 congelada"
+        run: |
+          set -euo pipefail
+          git diff --name-only "$BASE_234_SHA"..HEAD > /tmp/delta.txt; echo "== DELTA vs 1.0.234 =="; cat /tmp/delta.txt
+          BAD=$(grep -vE '^(\.github/workflows/desktop-build-f356ah6b\.yml$|desktop/src/renderer/index\.html$|desktop/package(-lock)?\.json$)' /tmp/delta.txt || true)
+          [ -z "$BAD" ] || { echo "::error::fora da allowlist H6B: $BAD"; exit 1; }
+          CHG_MAIN=$(git diff --name-only "$BASE_234_SHA"..HEAD -- desktop/src/main || true)
+          [ -z "$CHG_MAIN" ] || { echo "::error::src/main alterado: $CHG_MAIN"; exit 1; }
+          git diff --quiet "$BASE_234_SHA"..HEAD -- desktop/src/main desktop/src/preload cloudflare-worker.js desktop/scripts/copy-renderer.js desktop/electron-builder.yml desktop/tsconfig.json desktop/src/renderer/priorityEngine.js desktop/src/renderer/bgnotify.html desktop/src/renderer/slareminder.html desktop/src/renderer/bgcall.html desktop/src/renderer/sounds || { echo "::error::mudança fora de index.html"; exit 1; }
+          git diff --quiet "$BASE_228_SHA"..HEAD -- desktop/src/main/bgNotify.ts desktop/src/main/notificationGrouping.ts desktop/src/renderer/bgnotify.html desktop/src/renderer/slareminder.html desktop/src/renderer/sounds desktop/src/preload/bgnotify-preload.ts desktop/src/preload/slareminder-preload.ts desktop/src/preload/preload.ts desktop/electron-builder.yml || { echo "::error::congelado 1.0.228 alterado"; exit 1; }
+          echo "ISOLAMENTO H6B: VERIFIED (index.html é o ÚNICO arquivo de produção alterado vs 1.0.234)."
+  build:
+    needs: verify
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: npm ci + build + electron-builder (--publish never)
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm run build
+          npx electron-builder --win nsis msi --publish never
+      - name: "Gate EMPACOTADO — versão 1.0.235-diag.1 + marcadores diagnósticos + H5 preservado no app.asar"
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          ASAR="dist-installer/win-unpacked/resources/app.asar"; test -f "$ASAR"
+          npx --yes @electron/asar extract "$ASAR" asar-x
+          node -e "const p=require('./asar-x/package.json'); if(p.version!=='1.0.235-diag.1') process.exit(1);"
+          I=asar-x/src/renderer/index.html
+          grep -q 'function __csDiagInit' "$I"
+          grep -q 'id="btnCopyConfirmDiag"' "$I"
+          grep -q 'Copiar diagnóstico da confirmação' "$I"
+          grep -q 'id="btnConfirmSend" title=' "$I"
+          node -e "const s=require('fs').readFileSync('asar-x/src/renderer/index.html','utf8');if(/id=\"btnConfirmSend\" disabled/.test(s)){console.error('pacote: botão nasce disabled');process.exit(1);}"
+          grep -q 'Não foi possível confirmar o envio ao cliente' "$I"
+          echo "GATE EMPACOTADO H6B: VERIFIED."
+      - name: Empacotar bundle + SHA256SUMS + VERSAO-DESKTOP
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="$GITHUB_WORKSPACE/dist-pkg"; mkdir -p "$OUT"
+          EXE=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe | head -1); MSI=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.msi | head -1)
+          cp "$EXE" "$MSI" "$OUT/"
+          EXE_NAME=$(basename "$EXE"); MSI_NAME=$(basename "$MSI")
+          ( cd "$OUT" && sha256sum "$EXE_NAME" "$MSI_NAME" > SHA256SUMS )
+          { echo "productName : Agenda ID Seven Desktop"; echo "versionName : 1.0.235-diag.1"; echo "rotulo      : 1.0.235-diag.1-f356ah6b-confirm-send-diagnostics (BUILD DIAGNOSTICA — NAO E RELEASE; NAO promover)"; echo "appId       : br.com.idseven.agenda.desktop"; echo "instalador  : $EXE_NAME"; echo "SHA-256 exe : $(sha256sum "$OUT/$EXE_NAME" | awk '{print $1}')"; echo "instalador2 : $MSI_NAME"; echo "SHA-256 msi : $(sha256sum "$OUT/$MSI_NAME" | awk '{print $1}')"; echo "commit      : $GITHUB_SHA (branch $GITHUB_REF_NAME)"; echo "base-codigo : Desktop 1.0.234 (3285a45). BASELINE FISICA 1.0.228 (3f0d0af1). ROLLBACK imediato 1.0.228."; echo "origem      : F3.5.6A-H6B — instrumento SANITIZADO p/ capturar o estagio EXATO da falha server-side da confirmacao (stage/httpStatus/workerCode/hasSession/hasJwt/hasTask/hasToken), vinculado DINAMICAMENTE ao taskId; botao 'Copiar diagnostico da confirmacao'. Comportamento IDENTICO a 1.0.234 (aditivo). MUDANCA: SOMENTE index.html. Worker V64.61 INALTERADO. NAO publicar no Latest."; } > "$OUT/VERSAO-DESKTOP.txt"
+          echo "== SHA256SUMS =="; cat "$OUT/SHA256SUMS"
+      - uses: actions/upload-artifact@v4
+        with: { name: agenda-id-seven-desktop-1.0.235-diag.1-installer, path: "dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe\ndist-pkg/Agenda-ID-Seven-Desktop-*-x64.msi\ndist-pkg/SHA256SUMS\ndist-pkg/VERSAO-DESKTOP.txt", if-no-files-found: error, retention-days: 30 }

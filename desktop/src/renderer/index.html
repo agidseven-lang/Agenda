@@ -7430,30 +7430,47 @@ function wfActiveRun(t){ var runs=wfRunsOf(t),bk='',best=null; for(var k in runs
 function wfCloseRunsPatch(patch,t,outcome,now){ var runs=wfRunsOf(t); for(var k in runs){ if(!Object.prototype.hasOwnProperty.call(runs,k))continue; var r=runs[k]; if(!r||r.status!=='active')continue; var due=Number(r.dueAt)||0; var delay=(due>0&&now>due)?(now-due):0; patch['phaseRuns.'+k+'.completedAt']=now; patch['phaseRuns.'+k+'.status']='done'; patch['phaseRuns.'+k+'.outcome']=outcome||(due>0?(delay>0?'late':'on_time'):'done'); patch['phaseRuns.'+k+'.delayMs']=delay; patch['phaseRuns.'+k+'.elapsedMs']=Math.max(0,now-(Number(r.startedAt)||now)); patch['phaseRuns.'+k+'.updatedAt']=now; } }
 function wfOpenRunPatch(patch,t,phase,respType,respUid,dueAt,now){ var runs=wfRunsOf(t),mx=0; for(var k in runs){ var m=/^pr(\d+)_/.exec(k); if(m)mx=Math.max(mx,parseInt(m[1],10)); } for(var pk in patch){ var m2=/^phaseRuns\.pr(\d+)_/.exec(pk); if(m2)mx=Math.max(mx,parseInt(m2[1],10)); } var seq=mx+1; var key='pr'+(seq<10?('0'+seq):String(seq))+'_'+phase; patch['phaseRuns.'+key]={phase:phase,responsibleType:respType,responsibleUid:respUid||'',startedAt:now,dueAt:Number(dueAt)||0,completedAt:0,status:'active',outcome:'',delayMs:0,elapsedMs:0,createdAt:now,updatedAt:now}; return key; }
 function wfMirrorPhasePatch(patch,phase,respType,respUid,now,extWait){ patch.workflowPhase=phase; patch.workflowPhaseAt=now; patch.workflowResponsibleType=respType; patch.workflowResponsibleUid=respUid||''; patch.externalWait=!!extWait; patch.externalWaitSince=extWait?now:0; }
+/* F3.5.6A-H6B — DIAGNÓSTICO SANITIZADO da confirmação (build diagnóstica; NÃO é release).
+   Captura o ESTÁGIO EXATO onde a confirmação falha, vinculado DINAMICAMENTE ao taskId real
+   da tentativa em curso. NUNCA registra token/JWT/conteúdo/dados sensíveis — só presença (bool),
+   estágio, httpStatus e o código de erro público devolvido pelo Worker. Puramente ADITIVO:
+   não altera nenhum retorno, toast ou fluxo do envio (comportamento idêntico à 1.0.234). */
+function __csDiagInit(taskId){ try{ window.__confirmSendDiag={ stage:'start', requestStarted:false, responseReceived:false, httpStatus:null, workerCode:null, hasSession:false, hasJwt:false, hasTask:false, hasToken:false, taskRef:(String(taskId||'').slice(0,6)||'?'), appVersion:(typeof DESK_VER!=='undefined'?DESK_VER:'?'), at:Date.now() }; }catch(_){}}
+function __csDiagSet(p){ try{ if(!window.__confirmSendDiag)__csDiagInit(''); Object.assign(window.__confirmSendDiag,p||{}); }catch(_){}}
 /* team-action genérico (Worker; JWT Social/Admin + Idempotency-Key) — mesma infra do contentSent. */
 async function wfTeamAction(taskId,action,extra){
+  var _diag=(action==='confirmClientSend');   // F3.5.6A-H6B: capturar SÓ na confirmação (diag já iniciado por wfConfirmClientSend)
   var t=state.tasks.find(function(x){return x.id===taskId;})||{};
+  if(_diag)__csDiagSet({hasTask:!!(t&&t.id)});
   var token=(t.clientReviewToken||t.shareToken)||'';
-  if(!token){ flashToast('Link do cliente ainda não gerado — abra "Enviar ao cliente" primeiro.',6000); return {ok:false,error:'no_token'}; }
-  if(!(await ensureTeamSession())){ flashToast('Ação não registrada — sessão de equipe não renovada.',6000); return {ok:false,error:'no_session'}; }
+  if(_diag)__csDiagSet({hasToken:!!token});
+  if(!token){ if(_diag)__csDiagSet({stage:'no_token'}); flashToast('Link do cliente ainda não gerado — abra "Enviar ao cliente" primeiro.',6000); return {ok:false,error:'no_token'}; }
+  if(_diag)__csDiagSet({stage:'ensure_session',hasSession:(typeof teamJwtValid==='function'?!!teamJwtValid():false)});
+  if(!(await ensureTeamSession())){ if(_diag)__csDiagSet({stage:'no_session'}); flashToast('Ação não registrada — sessão de equipe não renovada.',6000); return {ok:false,error:'no_session'}; }
   var jwt=localStorage.getItem('wp_team_jwt')||'';
-  if(!jwt){ flashToast('Ação não registrada — sessão de equipe indisponível.',6000); return {ok:false,error:'no_jwt'}; }
+  if(_diag)__csDiagSet({hasJwt:!!jwt,hasSession:(typeof teamJwtValid==='function'?!!teamJwtValid():false)});
+  if(!jwt){ if(_diag)__csDiagSet({stage:'no_jwt'}); flashToast('Ação não registrada — sessão de equipe indisponível.',6000); return {ok:false,error:'no_jwt'}; }
   var u=state.user||{};
   var idem=(u.id||'')+'|'+action+'|'+taskId+'|'+Math.floor(Date.now()/10000);
   try{
+    if(_diag)__csDiagSet({stage:'request_started',requestStarted:true});
     var res=await fetch(CLIENT_REVIEW_BASE+'/cliente/cronograma/'+encodeURIComponent(token)+'/team-action',{
       method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':idem,'Authorization':'Bearer '+jwt},
       body:JSON.stringify(Object.assign({action:action,byName:u.name||''},extra||{}))});
-    if(res.status===401){ localStorage.removeItem('wp_team_jwt'); flashToast('Sessão de equipe expirada — saia e entre novamente.',7000); return {ok:false,error:'unauthorized'}; }
+    if(_diag)__csDiagSet({responseReceived:true,httpStatus:(res&&res.status)||null});
+    if(res.status===401){ if(_diag)__csDiagSet({stage:'http_401',workerCode:'unauthorized'}); localStorage.removeItem('wp_team_jwt'); flashToast('Sessão de equipe expirada — saia e entre novamente.',7000); return {ok:false,error:'unauthorized'}; }
     var j=await res.json().catch(function(){return null;});
-    if(!j||j.ok!==true){ flashToast('Falha ao registrar no servidor: '+((j&&j.error)||('HTTP '+res.status)),7000); return j||{ok:false,error:'http_'+res.status}; }
+    if(!j||j.ok!==true){ if(_diag)__csDiagSet({stage:'http_error',workerCode:String((j&&j.error)||('http_'+((res&&res.status)||'?'))).slice(0,120)}); flashToast('Falha ao registrar no servidor: '+((j&&j.error)||('HTTP '+res.status)),7000); return j||{ok:false,error:'http_'+res.status}; }
+    if(_diag)__csDiagSet({stage:'success',workerCode:null});
     return j;
-  }catch(e){ flashToast('Sem conexão com o servidor — tente novamente.',6000); return {ok:false,error:String(e&&e.message||e)}; }
+  }catch(e){ if(_diag)__csDiagSet({stage:'network_error',workerCode:String((e&&e.message)||e).slice(0,120)}); flashToast('Sem conexão com o servidor — tente novamente.',6000); return {ok:false,error:String(e&&e.message||e)}; }
 }
 /* CONFIRMAR ENVIO AO CLIENTE — ÚNICO registro de sentAt (server-side). COPIAR ≠ ENVIADO. */
 async function wfConfirmClientSend(taskId){
-  if(!taskId||taskId==='__form__'){ flashToast('Salve a tarefa antes de confirmar o envio.'); return {ok:false,error:'no_task'}; }
+  __csDiagInit(taskId); __csDiagSet({stage:'confirm_start'});   // F3.5.6A-H6B: diag vinculado DINAMICAMENTE à tarefa atual
+  if(!taskId||taskId==='__form__'){ __csDiagSet({stage:'no_task_local'}); flashToast('Salve a tarefa antes de confirmar o envio.'); return {ok:false,error:'no_task'}; }
   var r=await wfTeamAction(taskId,'confirmClientSend',{});
+  __csDiagSet({resultOk:!!(r&&r.ok)});   // F3.5.6A-H6B: resultado final (bool; sem dados sensíveis)
   if(r&&r.ok){
     if(r.alreadyDone){ flashToast('Envio já estava confirmado para esta rodada.'); }
     else{ flashToast('Envio CONFIRMADO — espera externa iniciada (sentAt do servidor).'); }
@@ -9400,6 +9417,8 @@ async function openSendClientModal(taskOrForm){
         '<button class="btn ghost" id="btnCopyGroupMsg">Copiar mensagem</button>'+
         '<button class="btn" id="btnConfirmSend" title="Só confirme DEPOIS de enviar a mensagem no grupo do cliente.">'+svg('check')+'Confirmar envio ao cliente</button>'+
         '<button class="btn ghost" id="btnTestLink">Testar link</button>'+
+        /* F3.5.6A-H6B (build DIAGNÓSTICA) — copia o diagnóstico SANITIZADO da última confirmação (sem token/JWT/conteúdo). */
+        '<button class="btn ghost" id="btnCopyConfirmDiag" title="Diagnóstico sanitizado da última tentativa de confirmar envio (estágio, httpStatus, workerCode; sem token/JWT/conteúdo).">'+svg('copy')+'Copiar diagnóstico da confirmação</button>'+
       '</div>'+
     '</div>'+
     /* ===== Ação primária discreta ===== */
@@ -9597,6 +9616,16 @@ async function _wireGroupSend(ctx, msg, cardFile){
     let url=''; try{ url=buildShareClientUrl(ctx&&ctx.token); }catch(_){ flashToast('Link inválido — gere o cronograma novamente.'); return; }
     const ext=api.openExternal; if(ext){ try{ ext(url); }catch(_){ try{window.open(url,'_blank');}catch(__){} } } else { try{window.open(url,'_blank');}catch(_){} }
     flashToast('Abrindo o link de compartilhamento (prévia premium + portal) para teste.');
+  });
+  /* F3.5.6A-H6B (build DIAGNÓSTICA) — "Copiar diagnóstico da confirmação": copia o objeto sanitizado
+     window.__confirmSendDiag (preenchido na última tentativa de "Confirmar envio ao cliente"). Só
+     presença/estágio/httpStatus/workerCode — NUNCA token/JWT/conteúdo. */
+  on('btnCopyConfirmDiag', async function(){
+    var d=window.__confirmSendDiag;
+    if(!d){ flashToast('Clique em "Confirmar envio ao cliente" primeiro e depois copie o diagnóstico.',6000); return; }
+    var txt='F3.5.6A-H6B diagnóstico da confirmação\n'+JSON.stringify(d,null,2);
+    var ok=false; try{ ok=await detClipWrite(txt); }catch(_){ ok=false; }
+    flashToast(ok?'Diagnóstico da confirmação copiado — cole aqui no chat.':'Não consegui copiar; tire um print desta janela.',7000);
   });
   /* ===== F3.3.73I6C18C — PREPARAÇÃO DETERMINÍSTICA DO CARD PREMIUM =====
      Fluxo obrigatório: Gerar link → Preparar Card Premium → Validar OG →
