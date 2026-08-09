@@ -7435,7 +7435,7 @@ function wfMirrorPhasePatch(patch,phase,respType,respUid,now,extWait){ patch.wor
    da tentativa em curso. NUNCA registra token/JWT/conteúdo/dados sensíveis — só presença (bool),
    estágio, httpStatus e o código de erro público devolvido pelo Worker. Puramente ADITIVO:
    não altera nenhum retorno, toast ou fluxo do envio (comportamento idêntico à 1.0.234). */
-function __csDiagInit(taskId){ try{ window.__confirmSendDiag={ stage:'start', requestStarted:false, responseReceived:false, httpStatus:null, workerCode:null, hasSession:false, hasJwt:false, hasTask:false, hasToken:false, taskRef:(String(taskId||'').slice(0,6)||'?'), appVersion:(typeof DESK_VER!=='undefined'?DESK_VER:'?'), at:Date.now() }; }catch(_){}}
+function __csDiagInit(taskId){ try{ window.__confirmSendDiag={ stage:'start', requestStarted:false, responseReceived:false, httpStatus:null, workerCode:null, hasSession:false, hasJwt:false, hasTask:false, hasToken:false, appVersion:(typeof DESK_VER!=='undefined'?DESK_VER:'?') }; }catch(_){}}
 function __csDiagSet(p){ try{ if(!window.__confirmSendDiag)__csDiagInit(''); Object.assign(window.__confirmSendDiag,p||{}); }catch(_){}}
 /* team-action genérico (Worker; JWT Social/Admin + Idempotency-Key) — mesma infra do contentSent. */
 async function wfTeamAction(taskId,action,extra){
@@ -9418,7 +9418,7 @@ async function openSendClientModal(taskOrForm){
         '<button class="btn" id="btnConfirmSend" title="Só confirme DEPOIS de enviar a mensagem no grupo do cliente.">'+svg('check')+'Confirmar envio ao cliente</button>'+
         '<button class="btn ghost" id="btnTestLink">Testar link</button>'+
         /* F3.5.6A-H6B (build DIAGNÓSTICA) — copia o diagnóstico SANITIZADO da última confirmação (sem token/JWT/conteúdo). */
-        '<button class="btn ghost" id="btnCopyConfirmDiag" title="Diagnóstico sanitizado da última tentativa de confirmar envio (estágio, httpStatus, workerCode; sem token/JWT/conteúdo).">'+svg('copy')+'Copiar diagnóstico da confirmação</button>'+
+        '<button class="btn ghost" id="btnCopyConfirmDiag" style="display:none" title="Diagnóstico sanitizado da última tentativa de confirmar envio (estágio, httpStatus, workerCode; sem token/JWT/conteúdo).">'+svg('copy')+'Copiar diagnóstico da confirmação</button>'+
       '</div>'+
     '</div>'+
     /* ===== Ação primária discreta ===== */
@@ -9605,6 +9605,7 @@ async function _wireGroupSend(ctx, msg, cardFile){
     if(!(ctx&&ctx.id&&ctx.id!=='__form__')){ flashToast('Salve a tarefa antes de confirmar o envio.'); return; }
     b.disabled=true; var old=b.innerHTML; b.innerHTML=svg('send')+'Confirmando…';   // loading + idempotência (bloqueia 2º clique)
     var r=null; try{ r=await wfConfirmClientSend(ctx.id); }catch(e){ r={ok:false,error:String((e&&e.message)||e)}; }
+    try{ var _cd=$('btnCopyConfirmDiag'); if(_cd&&window.__confirmSendDiag)_cd.style.display=''; }catch(_){}   // F3.5.6A-H6B: revela "Copiar diagnóstico da confirmação" SÓ após uma tentativa
     if(r&&r.ok){
       b.innerHTML=svg('check')+'Envio confirmado ao cliente'; b.classList.add('is-done');   // sucesso server-side: permanece desabilitado (concluído)
     }else{
