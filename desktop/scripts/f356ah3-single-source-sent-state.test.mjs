@@ -13,7 +13,7 @@
  * envio" → "Temas prontos — confirmar envio ao cliente" (dono Social, fora da Central).
  *
  * Esta suíte PROVA o contrato (RED→GREEN): teria FALHADO em 1.0.231 (card falsamente enviado)
- * e passa em 1.0.235; mantém a PARIDADE renderer×main (slaRules) e a NEUTRALIDADE da camada de
+ * e passa em 1.0.236; mantém a PARIDADE renderer×main (slaRules) e a NEUTRALIDADE da camada de
  * notificações (nem themes_sent nem themes_ready emitem em notifFlowEvent — REGRA MÁXIMA).
  *
  * Rodar: node desktop/scripts/f356ah3-single-source-sent-state.test.mjs
@@ -56,8 +56,8 @@ function grabDecl(SRC, marker) {
 }
 
 /* ---------- A. IDENTIDADE / VERSÃO ---------- */
-ok('A1 package.json 1.0.235', PKG.version === '1.0.235');
-ok('A2 package-lock 1.0.235 (raiz + packages[""])', LOCK.version === '1.0.235' && LOCK.packages[''].version === '1.0.235');
+ok('A1 package.json 1.0.236', PKG.version === '1.0.236');
+ok('A2 package-lock 1.0.236 (raiz + packages[""])', LOCK.version === '1.0.236' && LOCK.packages[''].version === '1.0.236');
 ok('A3 description marca a sub-causa H3 (single-source-sent-state)', /single-source-sent-state|fonte-unica-envio|source-of-truth-sent/i.test(PKG.description || ''));
 
 /* ---------- B. ESTRUTURA DA CORREÇÃO (renderer + espelho main) ---------- */

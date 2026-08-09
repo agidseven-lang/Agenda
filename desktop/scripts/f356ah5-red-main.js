@@ -13,7 +13,7 @@
  * DUAS BUILDS no mesmo harness:
  *   • BASE (1.0.233) — reconstruída revertendo o único delta necessário (botão volta a nascer `disabled`),
  *     reversão VALIDADA. Contrato do BUG: clique → NENHUM POST confirmClientSend; botão inalterado.
- *   • FIX (1.0.235) — worktree. Clique → 1 POST confirmClientSend (com Authorization) → botão "Envio
+ *   • FIX (1.0.236) — worktree. Clique → 1 POST confirmClientSend (com Authorization) → botão "Envio
  *     confirmado ao cliente" (is-done). Falha de servidor → botão REABILITA + rótulo restaurado + toast
  *     de erro visível (zero falso confirmado). Idempotência: duplo-clique → 1 POST. Sem overlay
  *     (elementFromPoint = o próprio botão) e pointer-events != none. Teclado: button nativo habilitado.
@@ -161,7 +161,7 @@ app.whenReady().then(async () => {
   const WATCHDOG = setTimeout(() => { try { process.stdout.write("PROOF_DONE baseRed=" + baseRed + " fixViolations=" + fixViolations + " invariantFailures=999 FATAL=watchdog\n"); } catch (_) {} app.exit(1); }, 8 * 60 * 1000);
   try { session.defaultSession.webRequest.onBeforeRequest((d, cb) => { cb({ cancel: /^https?:/i.test(d.url) }); }); } catch (_) {}
 
-  const VERSION = process.env.H5_VERSION || "1.0.235";
+  const VERSION = process.env.H5_VERSION || "1.0.236";
   const ANA = "uid-ana-social";
   const seed = {
     self: { id: ANA, name: "Ana Beatriz Social Media", role: "Social Media", admin: false, status: "ativo" },
@@ -180,9 +180,9 @@ app.whenReady().then(async () => {
   const fixAsar = await packAsar(fixHtml, "fix");
   const baseAsar = base.html ? await packAsar(base.html, "base") : null;
 
-  /* ══════════════════════ FIX (1.0.235) — CLIQUE REAL no botão ══════════════════════ */
+  /* ══════════════════════ FIX (1.0.236) — CLIQUE REAL no botão ══════════════════════ */
   const F = await bootAsar(fixAsar, "fix");
-  recInv("R00 renderer FIX (1.0.235) bootado (Social logada; saveTask/openSendClientModal/wfConfirmClientSend vivos)",
+  recInv("R00 renderer FIX (1.0.236) bootado (Social logada; saveTask/openSendClientModal/wfConfirmClientSend vivos)",
     !!(F.boot && F.boot.user && F.boot.fns), F.boot);
 
   /* ---- GREEN: sucesso ---- */

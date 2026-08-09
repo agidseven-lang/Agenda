@@ -6778,7 +6778,11 @@ function taskTimeline(t){
   const designerStarted=hasD&&(designerCol(t)==='andamento'||designerCol(t)==='revisao'||delivered);
   // MESMAS expressões do opPanelBlock (não-regressão de estado):
   const themesOk=(cf==='aprovado'||cf==='producao'||cf==='revisao'||cf==='reenviado'||cf==='concluido'||(t.clientReview&&t.clientReview.status==='aprovado'));
-  const sent=(cf!=='afazer')||!!(t.clientSentBy||t.clientReviewToken||t.shareToken);
+  // F3.5.6A-H8 — TIMELINE HONESTA: o marco "Enviado ao cliente" usa a MESMA verdade canônica das outras
+  // 3 superfícies (card/detalhe/Central): ENVIO CONFIRMADO server-side (flowCanonicalSentSignal) OU a
+  // coluna canônica do cliente já além de "a fazer" (clientCol — que desde a H3 NÃO trata token/link como
+  // envio). REMOVIDO clientReviewToken/shareToken/clientSentBy como prova de envio — GERAR LINK ≠ ENVIAR.
+  const sent=flowCanonicalSentSignal(t)||(cf!=='afazer');
   const prodOk=!pendingProduction(t);
   const resent=(cf==='reenviado'||cf==='concluido');
   const finalOk=!!(t.finalApprovalCompleted||cf==='concluido'||operationalCol(t)==='concluido');
@@ -7437,6 +7441,22 @@ function wfMirrorPhasePatch(patch,phase,respType,respUid,now,extWait){ patch.wor
    não altera nenhum retorno, toast ou fluxo do envio (comportamento idêntico à 1.0.234). */
 function __csDiagInit(taskId){ try{ window.__confirmSendDiag={ stage:'start', requestStarted:false, responseReceived:false, httpStatus:null, workerCode:null, hasSession:false, hasJwt:false, hasTask:false, hasToken:false, appVersion:(typeof DESK_VER!=='undefined'?DESK_VER:'?') }; }catch(_){}}
 function __csDiagSet(p){ try{ if(!window.__confirmSendDiag)__csDiagInit(''); Object.assign(window.__confirmSendDiag,p||{}); }catch(_){}}
+/* F3.5.6A-H8 — PERSISTÊNCIA DURÁVEL e SANITIZADA do diagnóstico da confirmação. Corrige o lifecycle da
+   1.0.235 (o botão só era revelado no DOM da instância atual e sumia ao reabrir/reiniciar). Guarda SÓ os
+   10 campos permitidos, por CHAVE = hash NÃO-reversível do taskId (o id bruto NUNCA é gravado nem copiado),
+   com TTL de 24h e limpeza automática. NUNCA persiste/copia token/JWT/Authorization/clientReviewToken/
+   shareToken/senha/telefone/cliente/título/tema/conteúdo/legenda/URL/mensagem/dados pessoais. */
+var __CS_DIAG_LS_KEY='ag_confirm_send_diag_v1';
+var __CS_DIAG_TTL_MS=24*60*60*1000;   // 24h
+var __CS_DIAG_FIELDS=['stage','requestStarted','responseReceived','httpStatus','workerCode','hasSession','hasJwt','hasTask','hasToken','appVersion'];
+function __csDiagHashKey(taskId){ var s=String(taskId||''); var h=0x811c9dc5>>>0; for(var i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,0x01000193)>>>0; } return 'k'+('0000000'+h.toString(16)).slice(-8); }
+function __csDiagSanitize(d){ var o={}; if(d&&typeof d==='object'){ for(var i=0;i<__CS_DIAG_FIELDS.length;i++){ var f=__CS_DIAG_FIELDS[i]; if(d[f]!==undefined&&d[f]!==null) o[f]=d[f]; } } return o; }
+function __csDiagStoreRead(){ try{ var raw=localStorage.getItem(__CS_DIAG_LS_KEY); if(!raw)return {}; var o=JSON.parse(raw); return (o&&typeof o==='object')?o:{}; }catch(_){ return {}; } }
+function __csDiagStoreWrite(store){ try{ localStorage.setItem(__CS_DIAG_LS_KEY, JSON.stringify(store||{})); }catch(_){} }
+function __csDiagPrune(store){ var now=Date.now(), changed=false; try{ Object.keys(store||{}).forEach(function(k){ var e=store[k]; if(!e||!e.at||(now-Number(e.at))>__CS_DIAG_TTL_MS){ delete store[k]; changed=true; } }); }catch(_){} return changed; }
+function __csDiagPersist(taskId){ try{ if(!taskId||taskId==='__form__')return; var store=__csDiagStoreRead(); __csDiagPrune(store); store[__csDiagHashKey(taskId)]={ diag:__csDiagSanitize(window.__confirmSendDiag), at:Date.now() }; __csDiagStoreWrite(store); }catch(_){} }
+function __csDiagLoad(taskId){ try{ if(!taskId||taskId==='__form__')return null; var store=__csDiagStoreRead(); if(__csDiagPrune(store))__csDiagStoreWrite(store); var e=store[__csDiagHashKey(taskId)]; if(!e||!e.diag)return null; if(e.at&&(Date.now()-Number(e.at))>__CS_DIAG_TTL_MS)return null; var s=__csDiagSanitize(e.diag); return Object.keys(s).length?s:null; }catch(_){ return null; } }
+function __csDiagFormat(d){ d=d||{}; var lines=['CONFIRM_CLIENT_SEND']; for(var i=0;i<__CS_DIAG_FIELDS.length;i++){ var f=__CS_DIAG_FIELDS[i]; var v=d[f]; lines.push(f+'='+((v===undefined||v===null)?'':String(v))); } return lines.join('\n'); }
 /* team-action genérico (Worker; JWT Social/Admin + Idempotency-Key) — mesma infra do contentSent. */
 async function wfTeamAction(taskId,action,extra){
   var _diag=(action==='confirmClientSend');   // F3.5.6A-H6B: capturar SÓ na confirmação (diag já iniciado por wfConfirmClientSend)
@@ -9605,7 +9625,7 @@ async function _wireGroupSend(ctx, msg, cardFile){
     if(!(ctx&&ctx.id&&ctx.id!=='__form__')){ flashToast('Salve a tarefa antes de confirmar o envio.'); return; }
     b.disabled=true; var old=b.innerHTML; b.innerHTML=svg('send')+'Confirmando…';   // loading + idempotência (bloqueia 2º clique)
     var r=null; try{ r=await wfConfirmClientSend(ctx.id); }catch(e){ r={ok:false,error:String((e&&e.message)||e)}; }
-    try{ var _cd=$('btnCopyConfirmDiag'); if(_cd&&window.__confirmSendDiag)_cd.style.display=''; }catch(_){}   // F3.5.6A-H6B: revela "Copiar diagnóstico da confirmação" SÓ após uma tentativa
+    try{ __csDiagPersist(ctx&&ctx.id); var _cd=$('btnCopyConfirmDiag'); if(_cd)_cd.style.display=''; }catch(_){}   // F3.5.6A-H8: PERSISTE (durável, sanitizado) + revela "Copiar diagnóstico da confirmação" após a tentativa
     if(r&&r.ok){
       b.innerHTML=svg('check')+'Envio confirmado ao cliente'; b.classList.add('is-done');   // sucesso server-side: permanece desabilitado (concluído)
     }else{
@@ -9622,12 +9642,19 @@ async function _wireGroupSend(ctx, msg, cardFile){
      window.__confirmSendDiag (preenchido na última tentativa de "Confirmar envio ao cliente"). Só
      presença/estágio/httpStatus/workerCode — NUNCA token/JWT/conteúdo. */
   on('btnCopyConfirmDiag', async function(){
-    var d=window.__confirmSendDiag;
-    if(!d){ flashToast('Clique em "Confirmar envio ao cliente" primeiro e depois copie o diagnóstico.',6000); return; }
-    var txt='F3.5.6A-H6B diagnóstico da confirmação\n'+JSON.stringify(d,null,2);
+    // F3.5.6A-H8: prioriza o diagnóstico DURÁVEL desta tarefa (localStorage, sanitizado). Só cai no
+    // objeto em memória p/ FORM não salvo (que não é persistido) — nunca mistura diagnóstico entre tarefas.
+    var d=__csDiagLoad(ctx&&ctx.id);
+    if(!d){ var _cid=(ctx&&ctx.id)||''; if((!_cid||_cid==='__form__')&&window.__confirmSendDiag) d=__csDiagSanitize(window.__confirmSendDiag); }
+    if(!d||!Object.keys(d).length){ flashToast('Clique em "Confirmar envio ao cliente" primeiro e depois copie o diagnóstico.',6000); return; }
+    var txt=__csDiagFormat(d);   // F3.5.6A-H8: SÓ os 10 campos (CONFIRM_CLIENT_SEND\nstage=...); sem taskId/token/JWT/conteúdo
     var ok=false; try{ ok=await detClipWrite(txt); }catch(_){ ok=false; }
     flashToast(ok?'Diagnóstico da confirmação copiado — cole aqui no chat.':'Não consegui copiar; tire um print desta janela.',7000);
   });
+  /* F3.5.6A-H8 — na ABERTURA do modal, revela "Copiar diagnóstico da confirmação" SE houver diagnóstico
+     DURÁVEL p/ ESTA tarefa (sem depender de nova tentativa nem do handler do clique). Tarefas sem
+     diagnóstico persistido: o botão permanece oculto. */
+  try{ if(__csDiagLoad(ctx&&ctx.id)){ var _cdOpen=$('btnCopyConfirmDiag'); if(_cdOpen)_cdOpen.style.display=''; } }catch(_){}
   /* ===== F3.3.73I6C18C — PREPARAÇÃO DETERMINÍSTICA DO CARD PREMIUM =====
      Fluxo obrigatório: Gerar link → Preparar Card Premium → Validar OG →
      Confirmar cache → só então liberar o WhatsApp. O GET real acontece no

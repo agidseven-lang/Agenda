@@ -47,7 +47,7 @@ const bgh = R(P.bgh);
 const mSrc = srcMode ? mainTs : dMain;
 
 /* ───────────── A. IDENTIDADE ───────────── */
-ok("A1 versão 1.0.235 (RE-PINADO F3.5.6A-H2)", pkg.version === "1.0.235", pkg.version);
+ok("A1 versão 1.0.236 (RE-PINADO F3.5.6A-H2)", pkg.version === "1.0.236", pkg.version);
 ok("A2 description: fase f355eh4 sobre a f355eh3 + baseline física 1.0.226 + cadeia",
   /1\.0\.228-f355eh4-grouped-notification-handoff/.test(pkg.description)
   && /1\.0\.227-f355eh3-global-notification-visibility/.test(pkg.description)
@@ -55,7 +55,7 @@ ok("A2 description: fase f355eh4 sobre a f355eh3 + baseline física 1.0.226 + ca
   && /1\.0\.223-f355d-custom-cronograma-quantity-universal-paste/.test(pkg.description));
 if (fs.existsSync(P.lock)) {
   const lock = JSON.parse(R(P.lock));
-  ok("A3 lock 1.0.235 ×2 (RE-PINADO F3.5.6A-H2)", lock.version === "1.0.235" && lock.packages[""].version === "1.0.235");
+  ok("A3 lock 1.0.236 ×2 (RE-PINADO F3.5.6A-H2)", lock.version === "1.0.236" && lock.packages[""].version === "1.0.236");
 } else { ok("A3 lock (ausente no pacote — ok)", true); }
 
 /* ───────────── B. main.ts — ESPELHO DE GRUPOS DO HANDOFF ───────────── */
