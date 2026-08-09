@@ -29,15 +29,15 @@ function extract(src, name) {
   return src.slice(i, j);
 }
 
-/* ============ A. IDENTIDADE (RE-PINADO F3.5.6A-H2: candidata 1.0.236; contrato VISUAL da referência CONGELADO) ============ */
+/* ============ A. IDENTIDADE (RE-PINADO F3.5.6A-H2: candidata 1.0.237; contrato VISUAL da referência CONGELADO) ============ */
 console.log('— A) identidade da candidata —');
-ok('A1 package.json 1.0.236 (RE-PINADO F3.5.6A-H2)', /"version":\s*"1\.0\.236"/.test(PKG));
+ok('A1 package.json 1.0.237 (RE-PINADO F3.5.6A-H2)', /"version":\s*"1\.0\.237"/.test(PKG));
 ok('A2 description: marcador da fase + cadeia de bases preservada',
   PKG.indexOf('1.0.226-f355eh2-reference-notification') >= 0 &&
   PKG.indexOf('base 1.0.225-f355eh1-ultra-premium-notifications') >= 0 &&
   PKG.indexOf('base 1.0.224-f355e-retire-legacy-modules-premium-notifications') >= 0 &&
   PKG.indexOf('base 1.0.223-f355d-custom-cronograma-quantity-universal-paste') >= 0);
-ok('A3 package-lock 1.0.236 (2x — RE-PINADO F3.5.6A-H2)', (LOCK.match(/"version":\s*"1\.0\.236"/g) || []).length >= 2);
+ok('A3 package-lock 1.0.237 (2x — RE-PINADO F3.5.6A-H2)', (LOCK.match(/"version":\s*"1\.0\.237"/g) || []).length >= 2);
 
 /* ============ B. CONTRATO CSS DA REFERÊNCIA (2 superfícies) ============ */
 console.log('— B) contrato CSS da referência —');

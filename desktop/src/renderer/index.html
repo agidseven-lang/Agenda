@@ -382,6 +382,9 @@
 
   .modal-back{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:60;display:flex;align-items:flex-end;justify-content:center}
   @media(min-width:700px){.modal-back{align-items:center}}
+  /* F3.5.6A-H10 — camada de autenticação CONTEXTUAL da team session: empilhada (z acima dos modais),
+     NÃO destrutiva (container próprio em document.body; preserva o modal "Enviar no grupo do cliente"). */
+  .ts-auth-back{position:fixed;inset:0;background:rgba(6,7,11,.72);backdrop-filter:blur(3px);z-index:90;display:flex;align-items:center;justify-content:center;padding:16px}
   .sheet{background:var(--surface);width:100%;max-width:var(--maxw);border-radius:22px 22px 0 0;padding:20px;max-height:88vh;overflow:auto}
   @media(min-width:700px){.sheet{border-radius:22px;max-width:560px}}
   .sheet .grab{width:40px;height:4px;border-radius:2px;background:var(--line);margin:0 auto 14px}
@@ -2974,29 +2977,50 @@ function teamJwtValid(){
 }
 function ensureTeamSession(){
   if(teamJwtValid())return Promise.resolve(true);
+  /* F3.5.6A-H10 — recuperação CONTEXTUAL e NÃO-destrutiva da team session. A camada de autenticação é
+     EMPILHADA num container PRÓPRIO em document.body (NUNCA reutiliza #modalRoot), preservando o modal
+     "Enviar no grupo do cliente" e todo o seu contexto (tarefa, mensagem, prévia, diagnóstico, botão).
+     Senha correta -> novo team JWT -> wfTeamAction RETOMA a MESMA ação automaticamente (1x, sem novo clique).
+     Cancelar/backdrop/Esc -> resolve(false) (0 POST; tarefa intacta). A senha vai SÓ a /team/session (HTTPS);
+     nunca é persistida/logada/diagnosticada/colada. Idempotência: 'busy'+'settled' garantem UMA renovação
+     (duplo clique / Enter+click nunca geram 2). Sucesso só após PROVAR teamJwtValid()=true. */
   return new Promise(resolve=>{
-    const u=state.user||{};
-    document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg-keep="1"><div class="sheet" style="max-width:420px">'+
-      '<div class="grab"></div><div style="font-size:17px;font-weight:800;margin-bottom:6px">Renovar sessão de equipe</div>'+
-      '<div style="font-size:13px;color:var(--soft);line-height:1.5;margin-bottom:12px">Para avisar o cliente em tempo real, confirme sua senha. Ela é usada apenas nesta confirmação e não fica salva.</div>'+
+    var u=state.user||{};
+    try{ var _old=document.getElementById('tsAuthRoot'); if(_old&&_old.parentNode)_old.parentNode.removeChild(_old); }catch(_){}
+    var root=document.createElement('div');
+    root.id='tsAuthRoot'; root.className='ts-auth-back';
+    root.setAttribute('role','dialog'); root.setAttribute('aria-modal','true'); root.setAttribute('aria-label','Autenticação de segurança');
+    root.innerHTML='<div class="sheet" style="max-width:420px">'+
+      '<div class="grab"></div>'+
+      '<div style="font-size:17px;font-weight:800;margin-bottom:6px">Sua sessão de segurança expirou</div>'+
+      '<div style="font-size:13px;color:var(--soft);line-height:1.5;margin-bottom:12px">Para confirmar este envio, autentique-se novamente. A senha é usada apenas nesta confirmação e não fica salva.</div>'+
       '<input class="inp" id="tsPw" type="password" autocomplete="current-password" placeholder="Sua senha de acesso">'+
       '<div id="tsErr" style="font-size:12.5px;color:var(--red);min-height:18px;margin-top:6px"></div>'+
       '<div class="row" style="gap:10px;margin-top:8px">'+
-        '<button class="btn ghost" id="tsCancel" style="flex:1">Agora não</button>'+
-        '<button class="btn" id="tsGo" style="flex:1.4">Renovar e avisar</button>'+
-      '</div></div></div>';
-    const done=ok=>{closeModal();resolve(ok);};
-    document.getElementById('tsCancel').addEventListener('click',()=>done(false));
-    document.getElementById('tsGo').addEventListener('click',async()=>{
-      const pw=(document.getElementById('tsPw')||{}).value||'';
-      const err=document.getElementById('tsErr');
-      if(!pw){if(err)err.textContent='Digite a senha.';return;}
-      if(err)err.textContent='';
-      const ok=await acquireTeamSession((state.user&&state.user.id)||u.id,pw);
-      if(ok){flashToast('Sessão de equipe renovada.');done(true);}
-      else if(err)err.textContent='Senha incorreta ou serviço indisponível. Tente novamente.';
-    });
-    const inp=document.getElementById('tsPw');if(inp)inp.focus();
+        '<button class="btn ghost" id="tsCancel" style="flex:1">Cancelar</button>'+
+        '<button class="btn" id="tsGo" style="flex:1.4">Continuar envio</button>'+
+      '</div></div>';
+    document.body.appendChild(root);
+    var settled=false, busy=false;
+    function esc(e){ if(e&&e.key==='Escape'){ try{e.preventDefault();e.stopPropagation();}catch(_){} finish(false); } }
+    function finish(ok){ if(settled)return; settled=true; try{document.removeEventListener('keydown',esc,true);}catch(_){} try{ if(root&&root.parentNode)root.parentNode.removeChild(root); }catch(_){} resolve(!!ok); }
+    async function submit(){
+      if(busy||settled)return;                                   // idempotência: UMA renovação
+      var pw=(document.getElementById('tsPw')||{}).value||'';
+      var err=document.getElementById('tsErr');
+      if(!pw){ if(err)err.textContent='Digite a senha.'; return; }
+      busy=true; if(err)err.textContent=''; var go=document.getElementById('tsGo'); if(go){go.disabled=true;go.textContent='Autenticando…';}
+      var ok=false; try{ ok=await acquireTeamSession((state.user&&state.user.id)||u.id,pw); }catch(_){ ok=false; }
+      if(ok&&teamJwtValid()){ finish(true); return; }            // PROVA teamJwtValid()=true antes de retomar
+      busy=false; if(go){go.disabled=false;go.textContent='Continuar envio';}
+      if(err)err.textContent='Senha incorreta. Tente novamente.';
+      var p=document.getElementById('tsPw'); if(p){p.value='';p.focus();}
+    }
+    root.addEventListener('click',function(e){ if(e.target===root)finish(false); });   // backdrop = cancelar explícito (0 POST)
+    var cb=document.getElementById('tsCancel'); if(cb)cb.addEventListener('click',function(){finish(false);});
+    var gb=document.getElementById('tsGo'); if(gb)gb.addEventListener('click',submit);
+    var pwEl=document.getElementById('tsPw'); if(pwEl){ pwEl.addEventListener('keydown',function(e){ if(e&&e.key==='Enter'){ try{e.preventDefault();}catch(_){} submit(); } }); pwEl.focus(); }
+    document.addEventListener('keydown',esc,true);
   });
 }
 async function doRegister(){
@@ -7466,7 +7490,7 @@ async function wfTeamAction(taskId,action,extra){
   if(_diag)__csDiagSet({hasToken:!!token});
   if(!token){ if(_diag)__csDiagSet({stage:'no_token'}); flashToast('Link do cliente ainda não gerado — abra "Enviar ao cliente" primeiro.',6000); return {ok:false,error:'no_token'}; }
   if(_diag)__csDiagSet({stage:'ensure_session',hasSession:(typeof teamJwtValid==='function'?!!teamJwtValid():false)});
-  if(!(await ensureTeamSession())){ if(_diag)__csDiagSet({stage:'no_session'}); flashToast('Ação não registrada — sessão de equipe não renovada.',6000); return {ok:false,error:'no_session'}; }
+  if(!(await ensureTeamSession())){ if(_diag)__csDiagSet({stage:'no_session'}); return {ok:false,error:'no_session'}; }   // F3.5.6A-H10: SILENCIOSO — o chamador dá a mensagem contextual (confirmação: "A autenticação foi cancelada")
   var jwt=localStorage.getItem('wp_team_jwt')||'';
   if(_diag)__csDiagSet({hasJwt:!!jwt,hasSession:(typeof teamJwtValid==='function'?!!teamJwtValid():false)});
   if(!jwt){ if(_diag)__csDiagSet({stage:'no_jwt'}); flashToast('Ação não registrada — sessão de equipe indisponível.',6000); return {ok:false,error:'no_jwt'}; }
@@ -7517,6 +7541,7 @@ async function wfRegisterExternalDecisionUI(kind){
     if(r.convertedToFeedback){ flashToast('Havia ajustes pendentes na fase — registrado como FEEDBACK (não aprovação), igual ao portal.',8000); }
     else{ flashToast(kind==='adjustment'?'Ajuste do cliente registrado (WhatsApp).':'Aprovação do cliente registrada (WhatsApp).'); }
   }
+  else if(r&&r.error==='no_session'){ flashToast('Registro não efetuado — autenticação cancelada.'); }   // F3.5.6A-H10: wfTeamAction agora é silencioso no cancelamento; a mensagem contextual é do chamador
 }
 /* Prazo da FASE ativa (dueAt configurável por tarefa/fase — nunca fixo). */
 async function wfSetPhaseDueUI(taskId){
@@ -9630,7 +9655,8 @@ async function _wireGroupSend(ctx, msg, cardFile){
       b.innerHTML=svg('check')+'Envio confirmado ao cliente'; b.classList.add('is-done');   // sucesso server-side: permanece desabilitado (concluído)
     }else{
       b.disabled=false; b.innerHTML=old;   // F3.5.6A-H5: FALHA (sessão/token/rede/Worker/HTTP) — reabilita + restaura rótulo (NUNCA falso "confirmado")
-      flashToast('Não foi possível confirmar o envio ao cliente. Tente novamente.',7000);   // erro SEMPRE visível — nunca silenciado
+      if(r&&r.error==='no_session'){ flashToast('Envio não confirmado. A autenticação foi cancelada.',7000); }   // F3.5.6A-H10: cancelamento EXPLÍCITO da autenticação (0 POST; tarefa intacta) — NÃO é falha do envio
+      else{ flashToast('Não foi possível confirmar o envio ao cliente. Tente novamente.',7000); }   // erro real SEMPRE visível — nunca silenciado
     }
   });
   on('btnTestLink', function(){                                    // abre o LINK DE COMPARTILHAMENTO p/ conferir a prévia premium + portal

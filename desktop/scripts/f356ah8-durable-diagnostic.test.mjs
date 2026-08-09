@@ -40,7 +40,7 @@ function grabDecl(SRC, marker) {
 }
 
 /* ---------- A0. IDENTIDADE + ESTRUTURA ---------- */
-ok('A0.1 package.json 1.0.236', PKG.version === '1.0.236');
+ok('A0.1 package.json 1.0.237', PKG.version === '1.0.237');
 ok('A0.2 description marca H8 durable-diag', /durable-diag-honest-timeline/i.test(PKG.description || ''));
 ok('A0.3 _wireGroupSend revela na ABERTURA via __csDiagLoad', /if\(__csDiagLoad\(ctx&&ctx\.id\)\)\{[^}]*btnCopyConfirmDiag/.test(HTML));
 ok('A0.4 handler btnConfirmSend PERSISTE após a tentativa', /__csDiagPersist\(ctx&&ctx\.id\)/.test(HTML));
@@ -55,7 +55,7 @@ const SRC = [
 ].join('\n');
 const RET = 'return {init:__csDiagInit,set:__csDiagSet,persist:__csDiagPersist,load:__csDiagLoad,format:__csDiagFormat,sanitize:__csDiagSanitize,hash:__csDiagHashKey,KEY:__CS_DIAG_LS_KEY,TTL:__CS_DIAG_TTL_MS,FIELDS:__CS_DIAG_FIELDS};';
 function makeLS() { const m = new Map(); return { getItem: k => m.has(k) ? m.get(k) : null, setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k), raw: () => (m.has('ag_confirm_send_diag_v1') ? m.get('ag_confirm_send_diag_v1') : '') }; }
-function boot(ls, clock) { const win = {}; const DateShim = { now: () => clock.t }; const api = new Function('window', 'localStorage', 'Date', 'DESK_VER', SRC + '\n' + RET)(win, ls, DateShim, '1.0.236'); return { api, win }; }
+function boot(ls, clock) { const win = {}; const DateShim = { now: () => clock.t }; const api = new Function('window', 'localStorage', 'Date', 'DESK_VER', SRC + '\n' + RET)(win, ls, DateShim, '1.0.237'); return { api, win }; }
 // simula uma tentativa de confirmação que FALHA server-side (o cenário físico do owner)
 function simulateAttempt(env, taskId) {
   env.api.init(taskId);
@@ -87,7 +87,7 @@ ok('A4 reabrir modal da MESMA tarefa: diagnóstico continua (sem nova tentativa)
 /* ---------- A5. Copiar: SOMENTE os 10 campos, formato CONFIRM_CLIENT_SEND, sem taskId ---------- */
 const txt = env.api.format(env.api.load(TASK));
 ok('A5.1 texto começa com CONFIRM_CLIENT_SEND', txt.split('\n')[0] === 'CONFIRM_CLIENT_SEND');
-ok('A5.2 contém os campos-chave da falha', /stage=http_error/.test(txt) && /httpStatus=500/.test(txt) && /workerCode=commit_failed/.test(txt) && /appVersion=1\.0\.236/.test(txt));
+ok('A5.2 contém os campos-chave da falha', /stage=http_error/.test(txt) && /httpStatus=500/.test(txt) && /workerCode=commit_failed/.test(txt) && /appVersion=1\.0\.237/.test(txt));
 ok('A5.3 tem EXATAMENTE 11 linhas (cabeçalho + 10 campos)', txt.split('\n').length === 11);
 ok('A5.4 NÃO contém o taskId bruto', txt.indexOf(TASK) === -1);
 ok('A5.5 cada linha é um dos 10 campos autorizados', txt.split('\n').slice(1).every(l => env.api.FIELDS.some(f => l.indexOf(f + '=') === 0)));
