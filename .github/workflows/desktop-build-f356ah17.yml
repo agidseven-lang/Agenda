@@ -1,0 +1,240 @@
+# F3.5.6A-H17 — Desktop 1.0.243 (fechamento pos-conclusao: ATOR final + SLA read-only + bloqueio de MOVE).
+# Residuos 1.0.242 (Cronograma Teste 6, tela Detalhes, tarefa CONCLUIDA): (1) marco final da timeline tinha
+# 15:43 mas SEM "por Cliente" (recordedBy/clientFinalApprovedBy vazios; unico ator populado era
+# clientReview.byName); (2) botao "Editar prazo" ainda presente e FUNCIONAL (slaEditPrazoCommit escrevia
+# designerSla.* + scheduleRevision++); (3) "Mover status" ainda presente e o write (moveStatus) ocorria.
+# CORRECAO 1.0.243 (RENDERER-only, index.html): C1 ATOR do marco final aceita clientReview SOMENTE com
+# identidade temporal (status 'aprovado' && at===FINAL_AT); NAO aceita so 'aprovado' (poderia ser TEMAS).
+# C2 SLA pos-conclusao SOMENTE LEITURA: botao "Editar prazo" oculto quando isTaskCompleted + guardas em
+# slaEditPrazoOpen E slaEditPrazoCommit (ZERO escrita). C3 MOVER pos-conclusao BLOQUEADO: "Mover"/"Mover
+# status" ocultos + guardas em openMove E moveStatus (ZERO escrita/evento). C4 REMOVER PERMANECE (canDelTask
+# + "digite EXCLUIR"; deleteTask INALTERADO). isTaskCompleted/isFullyComplete INALTERADOS; guardas so agem
+# quando isTaskCompleted(t)===true (apos aprovacao final; a conclusao de PRODUCAO do designer roda antes e
+# NAO e bloqueada). MUDANCA de producao = SOMENTE desktop/src/renderer/index.html.
+# build GATED, --publish never. Publicacao no Latest so no desktop-release-f356ah17.yml (mesmos bytes).
+# Base tecnica 1.0.242 (dcc07e6 / 1e18d4c). BASELINE FISICA 1.0.228. ROLLBACK IMEDIATO 1.0.228. slaRules.js
+# byte-identico; Worker V64.61 INALTERADO.
+name: "[push/manual] F3.5.6A-H17 — Desktop 1.0.243 (ator final + SLA read-only + bloqueio de move) — Desktop Build"
+"on":
+  push:
+    branches: ["desktop/f356ah17-post-completion-write-guards-1.0.243"]
+    paths-ignore: [".github/workflows/desktop-release-f356ah17.yml"]
+  workflow_dispatch: {}
+permissions: { contents: read }
+env:
+  TEST_BRANCH: "desktop/f356ah17-post-completion-write-guards-1.0.243"
+  BASE_242_SHA: "dcc07e68452e2a9c78fb8fdc90d2c41edb93e414"
+  BASE_242_CODE_SHA: "1e18d4c7bab034563fa4cf3cb958fc3c2149bb45"
+  BASE_228_SHA: "3f0d0af192b4b6b32a8e8bbda4153dcf4df1bc6d"
+  APP_DIR: desktop
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: "Gate REF + ANCESTRIA (descende da 1.0.242 base técnica e da 1.0.228 baseline física)"
+        run: |
+          set -euo pipefail
+          [ "${GITHUB_REF_NAME}" = "$TEST_BRANCH" ] || { echo "::error::branch errada"; exit 1; }
+          for B in "$BASE_242_SHA" "$BASE_242_CODE_SHA" "$BASE_228_SHA"; do
+            git merge-base --is-ancestor "$B" HEAD || { echo "::error::não descende de $B"; exit 1; }
+          done
+      - name: "Gate VERSÃO 1.0.243 (package + lock x2 + marcador H17 + cadeia herdada H16..H12)"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node -e "const p=require('./package.json'); if(p.version!=='1.0.243'){console.error('versão',p.version);process.exit(1);} for(const m of ['postcompletion-write-guards','final-completed-precedence','nextaction-final-wait-text','timeline-step7-final-wait','timeline-honest-preenvio','final-state-premature-fix']){ if(!(p.description||'').includes(m)){console.error('marcador ausente:',m);process.exit(1);} }"
+          [ "$(grep -c '"version": "1.0.243"' package-lock.json)" -ge 2 ]
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: "npm ci + TypeScript + sintaxe dos renderers (vm.Script) + worker"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          ./node_modules/.bin/tsc --noEmit -p tsconfig.json
+          node -e "const fs=require('fs'),vm=require('vm');const s=fs.readFileSync('src/renderer/bgnotify.html','utf8');const m=s.match(/<script>([\s\S]*?)<\/script>/);new vm.Script(m[1],{filename:'bgnotify-inline'});"
+          node -e "const fs=require('fs'),vm=require('vm');const s=fs.readFileSync('src/renderer/slareminder.html','utf8');const m=s.match(/<script>([\s\S]*?)<\/script>/);new vm.Script(m[1],{filename:'slareminder-inline'});"
+          node -e "const fs=require('fs'),vm=require('vm');const s=fs.readFileSync('src/renderer/index.html','utf8');const b=[...s.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(x=>x[1]);if(b.length<2){console.error('esperados >=2 blocos inline');process.exit(1);}b.forEach((x,i)=>new vm.Script(x,{filename:'index-inline-'+i}));console.log('blocos inline OK:',b.length);"
+          node --check ../cloudflare-worker.js
+      - name: "npm run build (tsc + copy-renderer)"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          npm run build
+      - name: "Gate MARCADORES H17 (C1..C4 presentes; ordem das guardas de escrita) no renderer"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          S=src/renderer/index.html
+          # contagem de marcadores H17 (9 sítios) — trava adição/remoção acidental
+          C=$(grep -c 'F3.5.6A-H17' "$S"); [ "$C" -eq 9 ] || { echo "::error::esperados 9 marcadores H17, achei $C"; exit 1; }
+          # C1 ATOR do marco final: fallback clientReview guardado por identidade temporal com FINAL_AT
+          grep -qF "if(_fat>0 && !_fby && t.clientReview && t.clientReview.status==='aprovado' && Number(t.clientReview.at)===Number(_fat)){" "$S"
+          grep -qF "_fby=t.clientReview.byName||t.clientReview.by||null;" "$S"
+          # C2 SLA read-only: guarda em slaEditPrazoOpen (toast leitura) + guarda defensiva em commit (ANTES de DOM/update)
+          grep -qF "flashToast('Esta tarefa já foi concluída. O prazo está disponível apenas para consulta.'); return; }" "$S"
+          grep -qF "var _tg=(state.tasks||[]).find(function(x){return x.id===taskId;});" "$S"
+          # C2 render gate "Editar prazo" (canSeeAll SEGUE presente + !isTaskCompleted)
+          grep -qF "canSeeAll(state.user)&&!(typeof isTaskCompleted==='function'&&isTaskCompleted(t)))" "$S"
+          # C3 MOVE: guarda openMove (comentario) + guarda defensiva moveStatus (write-path) + toast
+          grep -qF "MOVER pós-conclusão BLOQUEADO" "$S"
+          grep -qF "GUARDA DEFENSIVA (write-path do MOVE)" "$S"
+          grep -qF "flashToast('Esta tarefa já foi concluída e não pode ser movimentada.'); return; }" "$S"
+          # C3 render gates "Mover"/"Mover status" ocultos em 3 superfícies (tcv4/kbv2/detalhe)
+          MG=$(grep -cF "((typeof isTaskCompleted==='function'&&isTaskCompleted(t))?'':'<button" "$S"); [ "$MG" -eq 3 ] || { echo "::error::esperados 3 render-gates de Mover, achei $MG"; exit 1; }
+          # C4 REMOVER PERMANECE (canDelTask -> data-del Remover, SEM gate isTaskCompleted)
+          grep -qF "+svg('trash')+'Remover</button>':'')" "$S"
+          # ORDEM: guarda isTaskCompleted precede o db.update em slaEditPrazoCommit e em moveStatus
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/renderer/index.html','utf8');const c=s.indexOf('async function slaEditPrazoCommit');const g=s.indexOf('isTaskCompleted(_tg)',c);const u=s.indexOf('.update(patch)',c);if(!(c>=0&&g>c&&u>g)){console.error('C2 commit: guarda nao precede update — g='+g+' u='+u);process.exit(1);}console.log('C2 ordem OK');"
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/renderer/index.html','utf8');const c=s.indexOf('async function moveStatus');const g=s.indexOf('isTaskCompleted(t)',c);const u=s.indexOf('.update(',c);if(!(c>=0&&g>c&&u>g)){console.error('C3 move: guarda nao precede update — g='+g+' u='+u);process.exit(1);}console.log('C3 ordem OK');"
+          echo "MARCADORES H17 (C1..C4): VERIFIED."
+      - name: "Gate H16 PRESERVADO (E1..E6 intactos) + isTaskCompleted/isFullyComplete INALTERADOS"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          S=src/renderer/index.html
+          # H16 E1..E6 ainda presentes (não-regressão)
+          grep -qF "if(isTaskCompleted(t))return 'concluido';                             // F3.5.6A-H16: conclusão final tem PRECEDÊNCIA" "$S"
+          grep -qF "if(isTaskCompleted(t))return {key:'concluido',color:'#34D399',label:'Concluído final'," "$S"
+          grep -qF "next:'Nenhuma pendência.'," "$S"
+          grep -qF "if(isTaskCompleted(t)){flashToast('Esta tarefa já foi concluída e não pode ser reenviada.');return;} // F3.5.6A-H16: BLOQUEIO FUNCIONAL pós-conclusão — ZERO write" "$S"
+          grep -qF "const phUi=isTaskCompleted(t)?{l:'Concluída',c:'#10B981'}:" "$S"
+          grep -qF "carimbo do marco FINAL a partir da FONTE REAL" "$S"
+          # isTaskCompleted / isFullyComplete NÃO tocados por H17 (guardas duras intactas)
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/renderer/index.html','utf8');const a=s.indexOf('function isTaskCompleted(t){');const b=s.indexOf('}',a);const body=s.slice(a,b+1);if(body.includes('F3.5.6A-H17')){console.error('isTaskCompleted mutado por H17 — proibido');process.exit(1);}console.log('isTaskCompleted INALTERADO');"
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/renderer/index.html','utf8');const a=s.indexOf('function isFullyComplete(t){');const b=s.indexOf('}',s.indexOf('return !!(t.finalApprovalCompleted',a));const body=s.slice(a,b+1);if(!/if\(pendingProduction\(t\)\)return false;/.test(body)||!/if\(pendingStory\(t\)\)return false;/.test(body)){console.error('isFullyComplete: guardas duras ausentes');process.exit(1);}if(body.includes('F3.5.6A-H17')){console.error('isFullyComplete mutado por H17 — proibido');process.exit(1);}console.log('isFullyComplete INALTERADO');"
+          # deleteTask INALTERADO (Remover administrativo preservado)
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/renderer/index.html','utf8');const a=s.indexOf('async function deleteTask(taskId){');const b=s.indexOf('\n}\n',a);const body=s.slice(a,b);if(body.includes('F3.5.6A-H17')){console.error('deleteTask mutado por H17 — proibido');process.exit(1);}console.log('deleteTask INALTERADO');"
+          echo "H16 E1..E6 + isTaskCompleted/isFullyComplete/deleteTask: PRESERVED."
+      - name: "Gate SUÍTES H17 (nova RED→GREEN) + H16 + H15..H12 + F3.5.5* + central [dist]"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f356ah17-postcompletion-write-guards.test.mjs
+          node scripts/f356ah16-final-completed-precedence.test.mjs
+          node scripts/f356ah15-nextaction-final-text.test.mjs
+          node scripts/f356ah14-timeline-step7-final-wait.test.mjs
+          node scripts/f356ah13-timeline-preenvio.test.mjs
+          node scripts/f356ah12-final-state-premature.test.mjs
+          node scripts/f356ah10-team-session-recovery.test.mjs
+          node scripts/f356ah8-durable-diagnostic.test.mjs
+          node scripts/f356ah8-honest-timeline.test.mjs
+          node scripts/f356a-workflow-orchestration.test.mjs
+          node scripts/f356ah4-single-source-real-path.test.mjs
+          node scripts/f356ah3-single-source-sent-state.test.mjs
+          node scripts/f344-flow-golden-master.test.mjs
+          node scripts/f332-panel.test.mjs
+          H2_BASE_228="$BASE_228_SHA" H2_BASE_230="e89867de5120fe88e2f639effd59d24c3181f427" node scripts/f356ah2-client-approvals.test.mjs
+      - name: "Gate SUÍTES herdadas — notificações/handoff/visibilidade/referência + cadeia F3.5.5* + central [dist]"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f355eh4-grouped-notification-handoff.test.mjs
+          node scripts/f355eh3-global-notification-visibility.test.mjs
+          node scripts/f355eh2-reference-notification.test.mjs
+          node scripts/f355e-retire-modules-premium-notifications.test.mjs
+          node scripts/f355d-cron-quantity-universal-paste.test.mjs
+          node scripts/f354l-sla-central-persistent-reminders.test.mjs
+          node scripts/f354p-sla-decision-actions.test.mjs
+          node scripts/f354u-premium-common-notifications.test.mjs
+      - name: "Gate herdado — rich editor + agenda + notas + integração + regressão canônica (som/sessão)"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f355c-script-quantity-rich-editor.test.mjs
+          node scripts/f355b-agenda-premium.test.mjs
+          node scripts/f355ah1-internal-notes.test.mjs
+          node scripts/f355a-integration.test.mjs
+          node scripts/f354wh2-immediate-notification-sound.test.mjs
+          node scripts/f354vh1-session-persistence.test.mjs
+      - name: "Gate RED EMPACOTADO — CLIQUE REAL (H5) + H4 (caminho real) + H3 (token≠envio) GREEN em 1.0.243 — xvfb"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y >/dev/null 2>&1 || true
+          sudo apt-get install -y xvfb >/dev/null 2>&1 || true
+          H5_VERSION=1.0.243 timeout -k 15 600 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f356ah5-red-main.js
+          H4_VERSION=1.0.243 timeout -k 15 600 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f356ah4-red-main.js
+          H3_VERSION=1.0.243 timeout -k 15 600 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f356ah3-red-main.js
+      - name: "Gate ISOLAMENTO — produção = SOMENTE index.html vs 1.0.242 (dcc07e6); src/main INALTERADO; slaRules byte-idêntico; infra 1.0.228 congelada"
+        run: |
+          set -euo pipefail
+          git diff --name-only "$BASE_242_SHA"..HEAD > /tmp/delta.txt; echo "== DELTA vs 1.0.242 =="; cat /tmp/delta.txt
+          # allowlist: workflows H17 (novos), index.html (única produção), package/lock, e QUALQUER suíte .test.mjs
+          BAD=$(grep -vE '^(\.github/workflows/desktop-(build|release)-f356ah17\.yml$|desktop/src/renderer/index\.html$|desktop/package(-lock)?\.json$|desktop/scripts/[A-Za-z0-9._-]+\.test\.mjs$)' /tmp/delta.txt || true)
+          [ -z "$BAD" ] || { echo "::error::fora da allowlist H17: $BAD"; exit 1; }
+          # PRODUÇÃO congelada exceto index.html — src/main, preload, worker, copy-renderer, builder, tsconfig, functions, android, priorityEngine, superfícies de notificação
+          git diff --quiet "$BASE_242_SHA"..HEAD -- desktop/src/main desktop/src/preload cloudflare-worker.js desktop/scripts/copy-renderer.js desktop/electron-builder.yml desktop/tsconfig.json functions android-native android-native-beta desktop/src/renderer/priorityEngine.js desktop/src/renderer/bgnotify.html desktop/src/renderer/slareminder.html desktop/src/renderer/bgcall.html desktop/src/renderer/sounds || { echo "::error::mudança fora de index.html — H17 altera SOMENTE o renderer index.html"; exit 1; }
+          CHG_MAIN=$(git diff --name-only "$BASE_242_SHA"..HEAD -- desktop/src/main || true)
+          [ -z "$CHG_MAIN" ] || { echo "::error::src/main alterado (H17 não toca main): $CHG_MAIN"; exit 1; }
+          git diff --quiet "$BASE_242_SHA"..HEAD -- desktop/src/main/slaRules.js || { echo "::error::slaRules.js alterado (paridade golden master exige byte-idêntico)"; exit 1; }
+          git diff --quiet "$BASE_228_SHA"..HEAD -- desktop/src/main/bgNotify.ts desktop/src/main/notificationGrouping.ts desktop/src/renderer/bgnotify.html desktop/src/renderer/slareminder.html desktop/src/renderer/bgcall.html desktop/src/renderer/sounds desktop/src/preload/bgnotify-preload.ts desktop/src/preload/slareminder-preload.ts desktop/src/preload/preload.ts desktop/electron-builder.yml desktop/tsconfig.json || { echo "::error::congelado 1.0.228 alterado"; exit 1; }
+          echo "ISOLAMENTO H17: VERIFIED (index.html é o ÚNICO arquivo de produção alterado vs 1.0.242; slaRules INALTERADO; infra 1.0.228 congelada)."
+  build:
+    needs: verify
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: npm ci + build + electron-builder (--publish never)
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm run build
+          npx electron-builder --win nsis msi --publish never
+      - name: "Gate EMPACOTADO — versão 1.0.243 + marcadores H17 (C1..C4) + H16 (E1..E6) preservados no app.asar"
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          ASAR="dist-installer/win-unpacked/resources/app.asar"; test -f "$ASAR"
+          npx --yes @electron/asar extract "$ASAR" asar-x
+          node -e "const p=require('./asar-x/package.json'); if(p.version!=='1.0.243') process.exit(1);"
+          I=asar-x/src/renderer/index.html
+          # H17 (C1..C4) no app.asar
+          C=$(grep -c 'F3.5.6A-H17' "$I"); [ "$C" -eq 9 ] || { echo "::error::esperados 9 marcadores H17 no asar, achei $C"; exit 1; }
+          grep -qF "if(_fat>0 && !_fby && t.clientReview && t.clientReview.status==='aprovado' && Number(t.clientReview.at)===Number(_fat)){" "$I"
+          grep -qF "flashToast('Esta tarefa já foi concluída. O prazo está disponível apenas para consulta.'); return; }" "$I"
+          grep -qF "canSeeAll(state.user)&&!(typeof isTaskCompleted==='function'&&isTaskCompleted(t)))" "$I"
+          grep -qF "flashToast('Esta tarefa já foi concluída e não pode ser movimentada.'); return; }" "$I"
+          grep -qF "GUARDA DEFENSIVA (write-path do MOVE)" "$I"
+          MG=$(grep -cF "((typeof isTaskCompleted==='function'&&isTaskCompleted(t))?'':'<button" "$I"); [ "$MG" -eq 3 ] || { echo "::error::esperados 3 render-gates de Mover no asar, achei $MG"; exit 1; }
+          grep -qF "+svg('trash')+'Remover</button>':'')" "$I"
+          # H16 (E1..E6) preservados no app.asar
+          grep -qF "if(isTaskCompleted(t))return 'concluido';                             // F3.5.6A-H16: conclusão final tem PRECEDÊNCIA" "$I"
+          grep -qF "if(isTaskCompleted(t))return {key:'concluido',color:'#34D399',label:'Concluído final'," "$I"
+          grep -qF "carimbo do marco FINAL a partir da FONTE REAL" "$I"
+          grep -qF "const phUi=isTaskCompleted(t)?{l:'Concluída',c:'#10B981'}:" "$I"
+          grep -q 'function flowCanonicalSentSignal' asar-x/dist/main/slaRules.js
+          grep -q 'legacyCursor' asar-x/dist/main/workflowNotifier.js
+          # suítes contra o app.asar REAL (H17 + H16 + H15 + H12)
+          F356AH17_SRC=asar-x/src/renderer/index.html F356AH17_PKG=asar-x/package.json node scripts/f356ah17-postcompletion-write-guards.test.mjs
+          F356AH16_SRC=asar-x/src/renderer/index.html F356AH16_PKG=asar-x/package.json node scripts/f356ah16-final-completed-precedence.test.mjs
+          F356AH15_SRC=asar-x/src/renderer/index.html F356AH15_PKG=asar-x/package.json node scripts/f356ah15-nextaction-final-text.test.mjs
+          F356AH12_SRC=asar-x/src/renderer/index.html F356AH12_PKG=asar-x/package.json node scripts/f356ah12-final-state-premature.test.mjs
+          echo "GATE F3.5.6A-H17 EMPACOTADO: VERIFIED."
+      - name: Empacotar bundle + SHA256SUMS + VERSAO-DESKTOP
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes @cyclonedx/cyclonedx-npm --omit dev --output-format JSON --output-file "$RUNNER_TEMP/sbom.json" || echo '{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}' > "$RUNNER_TEMP/sbom.json"
+          OUT="$GITHUB_WORKSPACE/dist-pkg"; mkdir -p "$OUT"
+          EXE=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe | head -1); MSI=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.msi | head -1); BM=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap | head -1)
+          cp "$EXE" "$MSI" "$BM" dist-installer/latest.yml "$OUT/"; cp "$RUNNER_TEMP/sbom.json" "$OUT/SBOM-cyclonedx.json"
+          EXE_NAME=$(basename "$EXE"); MSI_NAME=$(basename "$MSI"); BM_NAME=$(basename "$BM")
+          ( cd "$OUT" && sha256sum "$EXE_NAME" "$MSI_NAME" latest.yml "$BM_NAME" SBOM-cyclonedx.json > SHA256SUMS )
+          { echo "productName : Agenda ID Seven Desktop"; echo "versionName : 1.0.243"; echo "rotulo      : 1.0.243-f356ah17-postcompletion-write-guards (ator final + SLA read-only + bloqueio de move pos-conclusao — pelo updater interno)"; echo "channel     : latest (NADA publicado neste build)"; echo "appId       : br.com.idseven.agenda.desktop"; echo "instalador  : $EXE_NAME"; echo "SHA-256 exe : $(sha256sum "$OUT/$EXE_NAME" | awk '{print $1}')"; echo "instalador2 : $MSI_NAME"; echo "SHA-256 msi : $(sha256sum "$OUT/$MSI_NAME" | awk '{print $1}')"; echo "commit      : $GITHUB_SHA (branch $GITHUB_REF_NAME)"; echo "base-codigo : Desktop 1.0.242 (dcc07e6 / 1e18d4c). BASELINE FISICA 1.0.228 (3f0d0af1). ROLLBACK imediato 1.0.228."; echo "origem      : F3.5.6A-H17 — fechamento pos-conclusao (renderer-only, index.html): C1 ator do marco final via clientReview com identidade temporal; C2 SLA pos-conclusao SOMENTE LEITURA (Editar prazo oculto + guardas ZERO escrita); C3 MOVER bloqueado (guardas ZERO escrita); C4 Remover preservado. isTaskCompleted/isFullyComplete/slaRules.js/Worker V64.61 INALTERADOS. MUDANCA: SOMENTE index.html."; echo "distribuicao: pelo updater interno; publicacao no Latest ocorre no workflow desktop-release-f356ah17.yml (mesmos bytes)"; } > "$OUT/VERSAO-DESKTOP.txt"
+          echo "== SHA256SUMS =="; cat "$OUT/SHA256SUMS"
+      - uses: actions/upload-artifact@v4
+        with: { name: agenda-id-seven-desktop-1.0.243-installer, path: "dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe\ndist-pkg/Agenda-ID-Seven-Desktop-*-x64.msi", if-no-files-found: error, retention-days: 30 }
+      - uses: actions/upload-artifact@v4
+        with: { name: agenda-id-seven-desktop-1.0.243-updatemeta, path: "dist-pkg/latest.yml\ndist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap\ndist-pkg/SHA256SUMS\ndist-pkg/SBOM-cyclonedx.json\ndist-pkg/VERSAO-DESKTOP.txt", if-no-files-found: error, retention-days: 30 }

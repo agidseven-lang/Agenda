@@ -172,8 +172,11 @@ ok('B6c fonte única de status/prazo', /function resolveTaskDisplayState\(/.test
   && /function detailSla\([\s\S]{0,600}resolveTaskDisplayState\(/.test(src));
 // B7 — "Sua etapa / Próxima ação" redesenhada premium (ícones + pill)
 ok('B7 etapa redesenhada (kbv2-stage2 + pill + ícones)', /kbv2-stage2/.test(src) && /kbv2-st2-pill/.test(src) && /kbv2-st2-ic/.test(src));
-// B8 — "Editar prazo" gated por canSeeAll (Social/Admin); designer comum não vê
-ok('B8 Editar prazo RBAC (canSeeAll)', /canSeeAll\(state\.user\)[\s\S]{0,80}data-sla-editprazo/.test(src) && /function slaEditPrazoOpen/.test(src));
+// B8 — "Editar prazo" gated por canSeeAll (Social/Admin); designer comum não vê.
+// F3.5.6A-H17: além do canSeeAll, o botão agora é ocultado quando isTaskCompleted (SLA pós-conclusão
+// SOMENTE LEITURA). O gate canSeeAll SEGUE presente antes do data-sla-editprazo — janela ampliada
+// 80->200 p/ acomodar a cláusula adicional !isTaskCompleted(t) sem perder a verificação de localidade.
+ok('B8 Editar prazo RBAC (canSeeAll)', /canSeeAll\(state\.user\)[\s\S]{0,200}data-sla-editprazo/.test(src) && /function slaEditPrazoOpen/.test(src));
 // B9 — F3.3.13: "Editar prazo" agora GRAVA, mas SÓ os campos de prazo autorizados (Opção A):
 //   dotted-path planStartAt+planDueAt; espelha plannedFinishAt só se já existia; read-back canônico;
 //   sem editedAt/editedBy/history/campo novo. (Detalhe completo em f33G-editprazo-write.test.mjs.)

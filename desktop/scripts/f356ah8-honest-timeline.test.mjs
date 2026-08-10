@@ -53,8 +53,8 @@ function grabDecl(SRC, marker) {
 }
 
 /* ---------- A. IDENTIDADE / VERSÃO ---------- */
-ok('A1 package.json 1.0.242', PKG.version === '1.0.242');
-ok('A2 package-lock 1.0.242 (raiz + packages[""])', LOCK.version === '1.0.242' && LOCK.packages[''].version === '1.0.242');
+ok('A1 package.json 1.0.243', PKG.version === '1.0.243');
+ok('A2 package-lock 1.0.243 (raiz + packages[""])', LOCK.version === '1.0.243' && LOCK.packages[''].version === '1.0.243');
 ok('A3 description marca H8 (durable-diag-honest-timeline)', /durable-diag-honest-timeline/i.test(PKG.description || ''));
 
 /* ---------- B. ESTRUTURA DA CORREÇÃO (renderer taskTimeline) ---------- */

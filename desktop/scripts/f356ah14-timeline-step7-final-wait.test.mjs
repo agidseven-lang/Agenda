@@ -9,7 +9,7 @@
  * independentemente do avanço do fluxo. Além disso, quando o marco final ('concluido') vira o CURRENT
  * (aguardando o cliente), a UI mostraria "Aprovado final / Concluído — EM ANDAMENTO" (impossível).
  *
- * Correção 1.0.242 (RENDERER-only, index.html, ESPECÍFICA — sem clamp geral):
+ * Correção 1.0.243 (RENDERER-only, index.html, ESPECÍFICA — sem clamp geral):
  *  - aguardando_legenda.done = !!(prodOk||resent), i.e. !pendingProduction || flowSentToClientSignal || finalOk.
  *  - marco 'concluido', quando state==='current', exibe rótulo contextual "Aguardando aprovação final"
  *    SEM mudar a chave canônica; concluído REAL (finalOk) mantém "Aprovado final / Concluído".
@@ -223,8 +223,8 @@ ok('S8 H13 _tlEventAt exato preservado', S.includes('return !!v && keys.indexOf(
 ok('S9 H13 carimbo THEMES ar_themes_r* preservado', S.includes("if(m.key==='enviado_cliente'){ const r=wfLatestRound(t,'themes');"));
 ok('S10 H13 carimbo FINAL ar_captions_r* preservado', S.includes("else if(m.key==='enviado_final'){ const r=wfLatestRound(t,'captions');"));
 // identidade
-ok('S17 package.json = 1.0.242 + marcador H14', PKG.version === '1.0.242' && /timeline-step7-final-wait/.test(PKG.description || ''));
-ok('S18 package-lock 1.0.242 (raiz + packages[""])', LOCK.version === '1.0.242' && LOCK.packages[''].version === '1.0.242');
+ok('S17 package.json = 1.0.243 + marcador H14', PKG.version === '1.0.243' && /timeline-step7-final-wait/.test(PKG.description || ''));
+ok('S18 package-lock 1.0.243 (raiz + packages[""])', LOCK.version === '1.0.243' && LOCK.packages[''].version === '1.0.243');
 ok('S19 marcadores herdados H13/H12 preservados na descrição', /timeline-honest-preenvio/.test(PKG.description || '') && /final-state-premature-fix/.test(PKG.description || ''));
 
 console.log('================= F3.5.6A-H14 — TIMELINE STEP7 + ESPERA FINAL =================');

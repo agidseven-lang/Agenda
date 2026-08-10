@@ -4045,6 +4045,9 @@ if(typeof window!=='undefined' && !window.__slaMonBound){ window.__slaMonBound=t
 function slaEditPrazoOpen(taskId){
   if(!(typeof canSeeAll==='function'&&state.user&&canSeeAll(state.user))){ if(typeof flashToast==='function')flashToast('Sem permissão para editar prazo.'); return; }
   var t=(state.tasks||[]).find(function(x){return x.id===taskId;}); if(!t){ if(typeof flashToast==='function')flashToast('Tarefa indisponível.'); return; }
+  // F3.5.6A-H17 — SLA pós-conclusão é SOMENTE LEITURA: com a tarefa CONCLUÍDA (isTaskCompleted) NÃO abre o
+  // editor de prazo (guarda funcional; o botão "Editar prazo" também é ocultado no render). ZERO escrita.
+  if(typeof isTaskCompleted==='function'&&isTaskCompleted(t)){ if(typeof flashToast==='function')flashToast('Esta tarefa já foi concluída. O prazo está disponível apenas para consulta.'); return; }
   var ds=t.designerSla||{};
   var toLocal=function(ms){ ms=Number(ms)||0; if(!ms) return ''; var d=new Date(ms),p=function(n){return(n<10?'0':'')+n;}; return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes()); };
   var startV=toLocal(ds.planStartAt), dueV=toLocal(slaPanelFinishMs(t,(typeof dtMs==='function'?dtMs:null)));
@@ -4070,6 +4073,13 @@ function slaEditPrazoOpen(taskId){
    confirmar planStartAt, planDueAt, (plannedFinishAt se existia) e slaPanelFinishMs()==prazo editado;
    senão recarrega o estado real do servidor (sem otimismo falso). */
 async function slaEditPrazoCommit(taskId, ov){
+  // F3.5.6A-H17 — GUARDA DEFENSIVA (write-path): SLA pós-conclusão é SOMENTE LEITURA. Mesmo com o editor
+  // aberto por DOM stale / chamada direta / bypass do botão oculto, com a tarefa CONCLUÍDA (isTaskCompleted)
+  // NÃO grava nada: não toca designerSla.planStartAt/planDueAt/plannedFinishAt, não incrementa
+  // scheduleRevision, não rearma timers/dedupes. ZERO escrita — toast de leitura + return ANTES de qualquer
+  // leitura de DOM ou update no Firestore.
+  var _tg=(state.tasks||[]).find(function(x){return x.id===taskId;});
+  if(_tg&&typeof isTaskCompleted==='function'&&isTaskCompleted(_tg)){ if(typeof flashToast==='function')flashToast('Esta tarefa já foi concluída. O prazo está disponível apenas para consulta.'); return; }
   var startEl=document.getElementById('slaedit-start'), dueEl=document.getElementById('slaedit-due');
   if(!startEl||!dueEl){ if(typeof flashToast==='function')flashToast('Campos de prazo indisponíveis.'); return; }
   var f=(typeof dtMs==='function'?dtMs:null);
@@ -6866,6 +6876,15 @@ function taskTimeline(t){
       if(_crr&&_crr.decision==='approved'&&Number(_crr.decisionAt)>0){ _fat=Number(_crr.decisionAt); _fby=_crr.recordedBy||t.clientFinalApprovedBy||_crr.by||null; }
       else if(Number(t.clientFinalApprovedAt)>0){ _fat=Number(t.clientFinalApprovedAt); _fby=t.clientFinalApprovedBy||null; }
       else { var _ce=_tlEventAt(t,['aprovado_cliente','client_approved','final_approved','aprovado_final']); if(_ce&&Number(_ce.at)>0){ _fat=Number(_ce.at); _fby=_ce.by||t.clientFinalApprovedBy||null; } }
+      // F3.5.6A-H17 — ATOR do marco FINAL: quando as fontes canônicas acima resolvem o HORÁRIO (_fat) mas
+      // NÃO trazem ator (recordedBy/clientFinalApprovedBy/evento exato vazios), aceitar o clientReview como
+      // ator SOMENTE com PROVA de identidade temporal/semântica com o MESMO instante da aprovação final:
+      // clientReview.status==='aprovado' && Number(clientReview.at)===Number(_fat). NÃO aceitar apenas
+      // status==='aprovado' — isso pode ser a aprovação dos TEMAS (horário DIFERENTE; ver H16 clientCol).
+      // NÃO fabrica "Cliente": usa o byName/by REAL do clientReview casado exatamente ao instante final.
+      if(_fat>0 && !_fby && t.clientReview && t.clientReview.status==='aprovado' && Number(t.clientReview.at)===Number(_fat)){
+        _fby=t.clientReview.byName||t.clientReview.by||null;
+      }
       if(_fat>0){ at=_fat; by=_fby||by; }
       if(!at) at=t.doneAt||null;
     }
@@ -7251,7 +7270,8 @@ function taskCard(t, persp){
   // 10) ações — Detalhes / Mover / ⋯ (menu com Excluir)
   h+='<div class="tcv4-foot">'+
        '<button class="tcv4-btn tcv4-btn-main tc-detail" data-detail="'+t.id+'">'+svg('eye')+'<span>Detalhes</span></button>'+
-       '<button class="tcv4-btn move" data-move="'+t.id+'">'+svg('swap')+'<span>Mover</span></button>'+
+       /* F3.5.6A-H17 — tarefa CONCLUÍDA não exibe "Mover" (guarda funcional em openMove/moveStatus). */
+       ((typeof isTaskCompleted==='function'&&isTaskCompleted(t))?'':'<button class="tcv4-btn move" data-move="'+t.id+'">'+svg('swap')+'<span>Mover</span></button>')+
        ((canDelTask(t)||hasDesigner(t))?'<span class="tcv4-more"><button class="tcv4-btn tcv4-btn-dots" data-cardmenu="'+t.id+'" title="Mais ações">···</button>'+
          '<span class="tcv4-menu" data-menu-of="'+t.id+'">'+
            (hasDesigner(t)?'<button class="tcv4-menu-it tcv4-menu-act" data-resend="'+t.id+'">'+svg('send')+'Reenviar notificação</button>':'')+
@@ -8147,7 +8167,8 @@ function kbv2Card(t, persp){
   // 11) footer ações (reutiliza handlers existentes via data-*)
   h+='<div class="kbv2-card-footer">'+
        '<button class="kbv2-btn kbv2-btn-main" data-detail="'+t.id+'">'+svg('eye')+'<span>Detalhes</span></button>'+
-       '<button class="kbv2-btn" data-move="'+t.id+'">'+svg('swap')+'<span>Mover</span></button>'+
+       /* F3.5.6A-H17 — tarefa CONCLUÍDA não exibe "Mover" (guarda funcional em openMove/moveStatus). */
+       ((typeof isTaskCompleted==='function'&&isTaskCompleted(t))?'':'<button class="kbv2-btn" data-move="'+t.id+'">'+svg('swap')+'<span>Mover</span></button>')+
        ((canDelTask(t)||hasDesigner(t))?'<span class="kbv2-more"><button class="kbv2-btn kbv2-btn-dots" data-cardmenu="'+t.id+'" title="Mais ações">⋯</button>'+
          '<span class="kbv2-menu" data-menu-of="'+t.id+'">'+
            /* F3.5.4F — EDITAR TAREFA (Edição de Cards): Social Media/Admin (canSeeAll) podem
@@ -8194,6 +8215,10 @@ function designerMoveOpts(t){const cur=designerCol(t);
 function openMove(taskId){
   if(slaGuardBlocked(taskId))return;   // FASE 5: atraso crítico bloqueia mover OUTRAS tarefas
   const t=state.tasks.find(x=>x.id===taskId);if(!t)return;
+  // F3.5.6A-H17 — MOVER pós-conclusão BLOQUEADO: com a tarefa CONCLUÍDA (isTaskCompleted) NÃO abre o seletor
+  // de status (guarda funcional; os botões "Mover"/"Mover status" também são ocultados no render). NÃO cria
+  // "Reabrir" (fora de escopo). "Remover" permanece disponível (ação administrativa, não passa por aqui).
+  if(typeof isTaskCompleted==='function'&&isTaskCompleted(t)){ if(typeof flashToast==='function')flashToast('Esta tarefa já foi concluída e não pode ser movimentada.'); return; }
   const opts=isDesignerAxisMove(t)
     ? designerMoveOpts(t).map(o=>({key:o.key,label:o.label,desc:o.desc,color:stOf(o.key).color}))
     : STATUS.filter(st=>st.key!==(t.status||'afazer'));
@@ -8215,6 +8240,14 @@ function openMove(taskId){
 async function moveStatus(taskId,newStatus){
   if(slaGuardBlocked(taskId))return;   // FASE 5: atraso crítico bloqueia avançar/concluir OUTRAS tarefas
   const t=state.tasks.find(x=>x.id===taskId);if(!t)return;const now=Date.now();
+  // F3.5.6A-H17 — GUARDA DEFENSIVA (write-path do MOVE): com a tarefa CONCLUÍDA (isTaskCompleted) NÃO
+  // movimenta — retorna ANTES de qualquer update: sem mudar status/designerFlowStatus/clientFlowStatus, sem
+  // history 'moved'/'designer_moved', sem workflowEvents/coluna — ZERO escrita/evento. SEGURO p/ o fluxo
+  // congelado: isTaskCompleted só é verdadeiro APÓS a aprovação final do cliente; a conclusão de PRODUÇÃO do
+  // designer (wfToggleItemDone→moveStatus('concluido')) roda ANTES da aprovação final (isTaskCompleted=false,
+  // pois grava clientFlowStatus='reenviado', nunca 'concluido') e NÃO é bloqueada. Cobre bypass por DOM stale
+  // (data-domove) e chamada direta.
+  if(typeof isTaskCompleted==='function'&&isTaskCompleted(t)){ if(typeof flashToast==='function')flashToast('Esta tarefa já foi concluída e não pode ser movimentada.'); return; }
   // F3.5.4Q — 'Devolver para A Fazer' passa pelo helper canônico ÚNICO buildReturnToTodoPatch (mesma
   // transição usada pela transação do check-in). Paridade byte-a-byte com o inline anterior nos 3 eixos
   // (golden-master antes×depois); origem sempre 'andamento' (leavingDone=false ⇒ não apaga campos).
@@ -8686,8 +8719,12 @@ function detailSlaBlock(t){
         '<div><div style="color:var(--faint);font-size:11px;margin-bottom:2px">Início planejado</div><div style="color:var(--ink);font-size:13px;font-weight:600">'+esc(startStr)+'</div></div>'+
         '<div><div style="color:var(--faint);font-size:11px;margin-bottom:2px">Prazo final / término</div><div style="color:var(--ink);font-size:13px;font-weight:600">'+esc(dueStr)+'</div></div>'+
       '</div>'+
-      /* F3.3.2 — "Editar prazo": SÓ Social Media/Admin (canSeeAll). Designer comum/Cliente não veem. */
-      ((typeof canSeeAll==='function'&&state.user&&canSeeAll(state.user))
+      /* F3.3.2 — "Editar prazo": SÓ Social Media/Admin (canSeeAll). Designer comum/Cliente não veem.
+         F3.5.6A-H17 — pós-conclusão o prazo é SOMENTE LEITURA: o bloco SLA DO DESIGNER continua VISÍVEL
+         (histórico: início planejado + prazo final), mas o botão "Editar prazo" NÃO é renderizado quando a
+         tarefa está CONCLUÍDA (isTaskCompleted). As guardas funcionais em slaEditPrazoOpen/slaEditPrazoCommit
+         garantem ZERO escrita mesmo por DOM stale / chamada direta / bypass do botão oculto. */
+      ((typeof canSeeAll==='function'&&state.user&&canSeeAll(state.user)&&!(typeof isTaskCompleted==='function'&&isTaskCompleted(t)))
         ? '<div style="margin-top:13px"><button class="slaedit-btn" data-sla-editprazo="'+esc(t.id)+'">'+svg('editnote')+'<span>Editar prazo</span></button></div>'
         : '')+
     '</div>';
@@ -8910,7 +8947,10 @@ function detFooter(t,cron){
   const taskBtns=
     /* F3.5.4F — EDITAR TAREFA no Detalhe (Edição de Cards; SM/Admin) — mesmo gate do menu ⋯. */
     (String(t.sector||'')==='edicao_cards'&&typeof canSeeAll==='function'&&state.user&&canSeeAll(state.user)?'<button class="btn ghost" data-cardedit="'+t.id+'">'+svg('editnote')+'Editar tarefa</button>':'')+
-    '<button class="btn ghost" data-move="'+t.id+'">'+svg('swap')+'Mover status</button>'+
+    /* F3.5.6A-H17 — tarefa CONCLUÍDA não exibe "Mover status" (guarda funcional em openMove/moveStatus).
+       "Remover" PERMANECE (ação administrativa: RBAC canDelTask + confirmação "digite EXCLUIR"; deleteTask
+       inalterado) — pós-conclusão continua sendo possível remover a tarefa. */
+    ((typeof isTaskCompleted==='function'&&isTaskCompleted(t))?'':'<button class="btn ghost" data-move="'+t.id+'">'+svg('swap')+'Mover status</button>')+
     (canDelTask(t)?'<button class="btn btn-danger" data-del="'+t.id+'">'+svg('trash')+'Remover</button>':'')+
     '<button class="btn det-close" data-modalclose="1">'+svg('close')+'Fechar</button>';
   return '<div class="det-actions"><div class="det-act-row det-act-row-solo">'+taskBtns+'</div></div>';
