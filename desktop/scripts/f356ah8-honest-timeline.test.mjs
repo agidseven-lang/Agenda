@@ -53,8 +53,8 @@ function grabDecl(SRC, marker) {
 }
 
 /* ---------- A. IDENTIDADE / VERSÃO ---------- */
-ok('A1 package.json 1.0.238', PKG.version === '1.0.238');
-ok('A2 package-lock 1.0.238 (raiz + packages[""])', LOCK.version === '1.0.238' && LOCK.packages[''].version === '1.0.238');
+ok('A1 package.json 1.0.239', PKG.version === '1.0.239');
+ok('A2 package-lock 1.0.239 (raiz + packages[""])', LOCK.version === '1.0.239' && LOCK.packages[''].version === '1.0.239');
 ok('A3 description marca H8 (durable-diag-honest-timeline)', /durable-diag-honest-timeline/i.test(PKG.description || ''));
 
 /* ---------- B. ESTRUTURA DA CORREÇÃO (renderer taskTimeline) ---------- */
@@ -78,6 +78,9 @@ const SRC = [
   grabFn(HTML, 'flowThemesApprovedSignal'), grabFn(HTML, 'flowCanonicalSentSignal'), grabFn(HTML, 'flowThemesSentSignal'),
   grabFn(HTML, 'flowThemesReadySignal'),
   grabFn(HTML, 'clientCol'), grabFn(HTML, 'operationalCol'), grabFn(HTML, 'clientStatusView'), grabFn(HTML, 'nextActionText'),
+  // F3.5.6A-H13: taskTimeline passou a resolver o carimbo canônico dos marcos "enviado" via approvalRounds
+  // (ar_themes_r* × ar_captions_r*); o sandbox precisa fornecer essas leaves puras (sem mudar contrato).
+  grabFn(HTML, 'wfRoundsOf'), grabFn(HTML, 'wfLatestRound'),
   grabFn(HTML, '_tlEventAt'), grabFn(HTML, '_tlHumanLabel'), grabFn(HTML, 'taskTimeline'),
 ].join('\n');
 const R = new Function('var state={users:[]};\n' + SRC + '\nreturn { tl: taskTimeline, clientCol: clientCol, canon: flowCanonicalSentSignal };')();

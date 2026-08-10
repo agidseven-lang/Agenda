@@ -6752,15 +6752,17 @@ function clientStatusView(t){
 // tenta enriquecer cada marco com {at,by} a partir de history[] (formato kind OU type),
 // clientActions[] e timestamps; tudo TOLERANTE: ausência de data/autor → null (sem quebrar).
 function _tlEventAt(t, keys){
-  // varre history[] (kind|type|label|channel) + clientActions[] buscando o evento mais recente
-  // cujo "rótulo" casa com alguma palavra-chave; devolve {at,by} ou null. Nunca lança.
+  // F3.5.6A-H13: casa por IGUALDADE EXATA de type|kind|channel (NUNCA substring) contra a allowlist
+  // do marco; devolve o evento MAIS RECENTE que casa, ou null. Elimina colisões de substring que
+  // acendiam marcos errados — ex.: 'enviado_cliente' ⊂ 'reenviado_cliente' e 'final' ⊂ 'final_review'/
+  // labels que só mencionam "final". NÃO lê mais e.label/e.to (texto livre) — só campos canônicos. Nunca lança.
   let best=null;
-  const consider=(txt,at,by)=>{ if(!at)return; const s=(txt||'').toString().toLowerCase();
-    if(keys.some(k=>s.indexOf(k)>=0)){ if(!best||at>best.at) best={at:Number(at),by:by||null}; } };
+  const hit=(v)=>{ v=(v||'').toString(); return !!v && keys.indexOf(v)>=0; };
+  const consider=(type,kind,channel,at,by)=>{ if(!at)return; if(hit(type)||hit(kind)||hit(channel)){ if(!best||at>best.at) best={at:Number(at),by:by||null}; } };
   try{ const h=Array.isArray(t&&t.history)?t.history:[]; h.forEach(e=>{ if(!e)return;
-    consider((e.kind||'')+' '+(e.type||'')+' '+(e.label||'')+' '+(e.channel||'')+' '+(e.to||''), e.at, e.byId||e.by||null); }); }catch(_){ }
+    consider(e.type,e.kind,e.channel, e.at, e.byId||e.by||null); }); }catch(_){ }
   try{ const ca=(t&&t.clientActions&&typeof t.clientActions==='object')?t.clientActions:{}; Object.keys(ca).forEach(k=>{const a=ca[k];if(!a)return;
-    consider((a.type||'')+' client', a.at, a.by||a.byId||null); }); }catch(_){ }
+    consider(a.type,null,'client', a.at, a.by||a.byId||null); }); }catch(_){ }
   return best;
 }
 // FASE 2 (passo 2.1) — HUMANIZAÇÃO de rótulos de evento (read-only). Mapeia kind/type internos
@@ -6815,17 +6817,18 @@ function taskTimeline(t){
   const resent=flowSentToClientSignal(t)||finalOk;
   const ajusteAtivo=!!((t.clientReview&&t.clientReview.status==='revisao')||hasPendingItemRevision(t));
   // 10 marcos canônicos com o done reaproveitando as flags acima.
+  // F3.5.6A-H13: ev[] agora são TIPOS/CANAIS EXATOS (casados por igualdade em _tlEventAt) — sem substring.
   const RAW=[
     {key:'criado',            label:'Criado',                        done:true,            ev:['criado','created']},
-    {key:'enviado_cliente',   label:'Enviado ao cliente',            done:!!sent,          ev:['enviado_cliente','enviou','share','link','sent_to_client']},
-    {key:'temas_aprovados',   label:'Temas aprovados',               done:!!themesOk,      ev:['approveall','approve','aprovou','aprovado']},
-    {key:'enviado_designer',  label:'Enviado ao designer',           done:!!hasD,          ev:['designer','sent_to_designer','atribu']},
-    {key:'designer_producao', label:'Designer em produção',          done:!!designerStarted, ev:['designer_moved','andamento','producao']},
-    {key:'designer_entregou', label:'Designer entregou',             done:!!delivered,     ev:['concluido','entreg','delivered']},
-    {key:'aguardando_legenda',label:'Aguardando legenda / posts',    done:!!prodOk,        ev:['social_producao','production','legenda','social_editou']},
-    {key:'enviado_final',     label:'Enviado para aprovação final',  done:!!resent,        ev:['reenviado_cliente','final_review','reenviado']},
-    {key:'ajuste',            label:'Cliente pediu ajuste',          done:false, optional:true, active:ajusteAtivo, ev:['reviseitem','revision','revis','em_revisao','editou']},
-    {key:'concluido',         label:'Aprovado final / Concluído',    done:!!finalOk,       ev:['final','concluido','aprovado final','ackfeedback']},
+    {key:'enviado_cliente',   label:'Enviado ao cliente',            done:!!sent,          ev:['enviado_cliente','sent_to_client','cronograma_enviado_cliente']},
+    {key:'temas_aprovados',   label:'Temas aprovados',               done:!!themesOk,      ev:['approveAll','approve','approveItem']},
+    {key:'enviado_designer',  label:'Enviado ao designer',           done:!!hasD,          ev:['sent_to_designer','designer_atribuido']},
+    {key:'designer_producao', label:'Designer em produção',          done:!!designerStarted, ev:['designer_moved','designer_andamento']},
+    {key:'designer_entregou', label:'Designer entregou',             done:!!delivered,     ev:['designer_done','designer_entregou','delivered']},
+    {key:'aguardando_legenda',label:'Aguardando legenda / posts',    done:!!prodOk,        ev:['social_producao','social_editou_conteudo']},
+    {key:'enviado_final',     label:'Enviado para aprovação final',  done:!!resent,        ev:['reenviado_cliente','final_sent','final_review']},
+    {key:'ajuste',            label:'Cliente pediu ajuste',          done:false, optional:true, active:ajusteAtivo, ev:['reviseItem','revision','edit_request']},
+    {key:'concluido',         label:'Aprovado final / Concluído',    done:!!finalOk,       ev:['final_approved','ackFeedback','aprovado_final']},
   ];
   // "current" = primeiro marco não-concluído (ignorando o de ajuste), quando ainda não encerrou.
   const firstPending = finalOk ? -1 : RAW.findIndex(m=>!m.done && m.key!=='ajuste');
@@ -6835,8 +6838,17 @@ function taskTimeline(t){
     else if(m.done) state='done';
     else if(i===firstPending) state='current';
     else state='pending';
-    const e=_tlEventAt(t,m.ev);
-    let at=e?e.at:null, by=e?e.by:null;
+    // F3.5.6A-H13 — HONESTIDADE: SÓ marco CONCLUÍDO (done) recebe carimbo (data/autor). Pendente/current
+    // NUNCA exibe data como se o evento já tivesse ocorrido (elimina 11:35 em "Enviado p/ aprovação
+    // final"/"Concluído" pendentes após "Salvar e reenviar" sem confirmar).
+    let at=null, by=null;
+    if(m.done){
+      const e=_tlEventAt(t,m.ev); at=e?e.at:null; by=e?e.by:null;
+      // Carimbo CANÔNICO dos envios via approvalRounds: THEMES (ar_themes_r*) e FINAL (ar_captions_r*) têm
+      // sentAt SEPARADOS — o 1º envio conserva o horário real e o reenvio da 2ª rodada nunca o sobrescreve.
+      if(m.key==='enviado_cliente'){ const r=wfLatestRound(t,'themes'); const s=r?Number(r.round&&r.round.sentAt)||0:0; if(s>0){ at=s; by=(r.round&&(r.round.sentBy||r.round.by))||by; } else if(!at){ at=Number(t.clientSentAt)||null; } }
+      else if(m.key==='enviado_final'){ const r=wfLatestRound(t,'captions'); const s=r?Number(r.round&&r.round.sentAt)||0:0; if(s>0){ at=s; by=(r.round&&(r.round.sentBy||r.round.by))||by; } }
+    }
     if(m.key==='criado'&&!at) at=t.createdAt||null;
     if(m.key==='concluido'&&!at&&finalOk) at=t.doneAt||null;
     return {key:m.key,label:m.label,state:state,done:!!m.done,optional:!!m.optional,at:at,by:by};
@@ -6928,6 +6940,10 @@ function clientCol4(t){const c=clientCol(t);
 // que o cliente entenderia — derivado dos MESMOS eixos (clientCol/operationalCol), só leitura.
 function clientFacingStatusView(t){
   const c=clientCol(t);
+  // F3.5.6A-H13: a FASE canônica manda. Na preparação da 2ª rodada (Social finalizando legendas/posts)
+  // NUNCA é "versão final disponível" — a equipe ainda finaliza — mesmo com o espelho legado 'producao'/'reenviado'.
+  const _wp=(t&&t.workflowPhase||'').toString();
+  if(_wp==='captions_preparation')return {key:'legendas',label:'A equipe está finalizando as artes',color:'#5B6CFF'};
   if(c==='concluido')return {key:'concluido',label:'Cronograma concluído',color:'#10B981'};
   if(c==='revisao'&&allPhaseItemsApproved(t))return {key:'aguarda_confirmacao',label:'Temas aprovados — aguardando confirmação',color:'#22D3EE'};
   if(c==='revisao')return {key:'revisao',label:'Ajuste solicitado — equipe corrigindo',color:'#F59E0B'};
@@ -8708,6 +8724,11 @@ async function markItemsAdjusted(taskId){
    Sem esse sinal, "Reenviado ao cliente" seria mentira → mostra "Aguardando envio final".
    Read-only; NÃO altera clientCol (card/Central/board seguem intactos). */
 function clientFlowDisplayLabel(t){
+  // F3.5.6A-H13: a FASE canônica (workflowPhase) tem prioridade sobre o espelho legado clientFlowStatus
+  // (que "Salvar e reenviar" grava como 'producao' e a entrega do designer grava como 'reenviado').
+  // Durante a preparação da 2ª rodada a Social ainda finaliza legendas/posts → "Aguardando envio final".
+  var wp=(t&&t.workflowPhase||'').toString();
+  if(wp==='captions_preparation') return {key:'aguardando_envio_final',label:'Aguardando envio final',color:'#5B6CFF'};
   var col=clientCol(t);
   if(col==='reenviado'&&!flowSentToClientSignal(t)) return {key:'aguardando_envio_final',label:'Aguardando envio final',color:'#5B6CFF'};
   return (CLIENT_COLS.find(function(c){return c.key===col;})||CLIENT_COLS[0]);
@@ -9160,9 +9181,15 @@ async function saveProduction(taskId,resend){
     pendingLegend:pLeg, pendingFeed:pFeed, pendingStory:pStory, pendingSocialReview:!resend,
     history:firebase.firestore.FieldValue.arrayUnion({type:'social_producao',label:'Social atualizou legendas/artes',by:u.name||'',byId:u.id||null,at:now,channel:'production'})};
   if(resend){patch.cronStatus='ready_for_final_client_review';patch.finalApprovalRequired=true;
-    // V1.0.98 — reenvio com versão final = fase FINAL no cliente.
+    // V1.0.98 / F3.5.6A-H13 — METADADO DE PREPARAÇÃO (Grupo A): 'final' seleciona a rodada da PRÉVIA/portal
+    // via clientApprovalPhaseOf; NÃO é "enviado" (flowSentToClientSignal exige workflowPhase=
+    // 'captions_waiting_client', gravado só pelo Worker na confirmação REAL). Preserva a prévia da 2ª rodada.
     patch.clientApprovalPhase='final';
-    patch.history=firebase.firestore.FieldValue.arrayUnion({type:'reenviado_cliente',label:'Reenviado ao cliente (versão FINAL)',by:u.name||'',byId:u.id||null,at:now,channel:'final_review',phase:'final'});}
+    // F3.5.6A-H13 — REMOVIDO o evento de histórico 'reenviado_cliente' daqui (Grupo B: afirmação de ENVIO).
+    // Registrar "reenviado ao cliente" ANTES da confirmação é histórico FALSO. O evento de envio final é
+    // gravado 1× SÓ na confirmação real bem-sucedida (btnConfirmSend → wfConfirmClientSend ok). "Salvar e
+    // reenviar" apenas salva o conteúdo (social_producao) + prepara o modal — não afirma envio.
+  }
   t.cronContents=contents;t.clientFlowStatus='producao';t.operationalStatus=opSnap;if(resend){t.cronStatus='ready_for_final_client_review';t.clientApprovalPhase='final';}   // otimista
   closeModal();render();
   try{await db.collection('tasks').doc(taskId).update(patch);}catch(e){console.warn('saveProduction',e);}
@@ -9670,6 +9697,11 @@ async function _wireGroupSend(ctx, msg, cardFile){
     try{ __csDiagPersist(ctx&&ctx.id); var _cd=$('btnCopyConfirmDiag'); if(_cd)_cd.style.display=''; }catch(_){}   // F3.5.6A-H8: PERSISTE (durável, sanitizado) + revela "Copiar diagnóstico da confirmação" após a tentativa
     if(r&&r.ok){
       b.innerHTML=svg('check')+'Envio confirmado ao cliente'; b.classList.add('is-done');   // sucesso server-side: permanece desabilitado (concluído)
+      // F3.5.6A-H13 — SÓ AQUI (confirmação real BEM-SUCEDIDA) e SÓ na 2ª rodada (final) grava-se o evento de
+      // ENVIO FINAL, UMA vez (o botão fica desabilitado após ok ⇒ sem duplo-clique). Falha/cancelamento/
+      // fechar o modal NÃO chegam a este ramo ⇒ ZERO evento. O estado canônico (sentAt/externalWait/
+      // captions_waiting_client) é EXCLUSIVO do Worker; este é só a anotação de auditoria (type EXATO).
+      try{ var _ft=(state.tasks||[]).find(function(x){return x.id===ctx.id;})||ctx; if(typeof clientApprovalPhaseOf==='function'&&clientApprovalPhaseOf(_ft)==='final'){ var _u=state.user||{}; db.collection('tasks').doc(ctx.id).update({history:firebase.firestore.FieldValue.arrayUnion({type:'reenviado_cliente',label:'Reenviado ao cliente (versão FINAL)',by:_u.name||'',byId:_u.id||null,at:Date.now(),channel:'final_review',phase:'final'})}); } }catch(_){ }
     }else{
       b.disabled=false; b.innerHTML=old;   // F3.5.6A-H5: FALHA (sessão/token/rede/Worker/HTTP) — reabilita + restaura rótulo (NUNCA falso "confirmado")
       if(r&&r.error==='no_session'){ flashToast('Envio não confirmado. A autenticação foi cancelada.',7000); }   // F3.5.6A-H10: cancelamento EXPLÍCITO da autenticação (0 POST; tarefa intacta) — NÃO é falha do envio
