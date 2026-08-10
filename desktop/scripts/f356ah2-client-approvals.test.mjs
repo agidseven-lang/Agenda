@@ -1,4 +1,4 @@
-/* F3.5.6A-H2 — CENTRAL DE APROVAÇÕES COMPACTA + DRAWER (Desktop 1.0.237) — suíte de CÓDIGO.
+/* F3.5.6A-H2 — CENTRAL DE APROVAÇÕES COMPACTA + DRAWER (Desktop 1.0.238) — suíte de CÓDIGO.
  * P0 UX da tela Cliente: a seção "Aprovações pendentes" deixa de ficar permanentemente expandida
  * acima do Kanban; vira barra compacta (recolhida) + drawer lateral sob demanda. Funcionalidade
  * preservada; SÓ UX. Notificações (1.0.228) e workflow (workflowEvents/workflowNotifier) INTOCADOS.
@@ -39,14 +39,14 @@ function fn(marker) {
 
 /* ═══ A — IDENTIDADE ═══ */
 const pkg = JSON.parse(read(PKG));
-ok("A1 versão 1.0.237", pkg.version === "1.0.237", pkg.version);
+ok("A1 versão 1.0.238", pkg.version === "1.0.238", pkg.version);
 ok("A2 description da fase H2 + cadeia de bases preservada",
   /f356ah2-client-approvals-compact-drawer/.test(pkg.description || "")
   && /f356ah1-workflow-notification-receipt-collision/.test(pkg.description || "")
   && /f356a-realtime-workflow-client-approval/.test(pkg.description || "")
   && /grouped-notification-handoff/.test(pkg.description || ""));
-try { const lock = JSON.parse(read(LOCK)); ok("A3 lock 1.0.237 ×2", lock.version === "1.0.237" && lock.packages[""].version === "1.0.237"); }
-catch (e) { ok("A3 lock 1.0.237 ×2", false, String(e.message)); }
+try { const lock = JSON.parse(read(LOCK)); ok("A3 lock 1.0.238 ×2", lock.version === "1.0.238" && lock.packages[""].version === "1.0.238"); }
+catch (e) { ok("A3 lock 1.0.238 ×2", false, String(e.message)); }
 
 /* ═══ B — BARRA COMPACTA (estado padrão RECOLHIDO) ═══ */
 ok("B1 board chama a BARRA compacta (não a lista expandida)",

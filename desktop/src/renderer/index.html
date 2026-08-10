@@ -6808,8 +6808,11 @@ function taskTimeline(t){
   // envio). REMOVIDO clientReviewToken/shareToken/clientSentBy como prova de envio — GERAR LINK ≠ ENVIAR.
   const sent=flowCanonicalSentSignal(t)||(cf!=='afazer');
   const prodOk=!pendingProduction(t);
-  const resent=(cf==='reenviado'||cf==='concluido');
   const finalOk=!!(t.finalApprovalCompleted||cf==='concluido'||operationalCol(t)==='concluido');
+  // F3.5.6A-H12: "Enviado para aprovação final" = ENVIO REAL da 2ª rodada (flowSentToClientSignal =
+  // workflowPhase 'captions_waiting_client') OU tarefa já concluída. O espelho legado cf==='reenviado'
+  // (gravado na ENTREGA do designer, fase 'captions_preparation') NÃO conta como envio final.
+  const resent=flowSentToClientSignal(t)||finalOk;
   const ajusteAtivo=!!((t.clientReview&&t.clientReview.status==='revisao')||hasPendingItemRevision(t));
   // 10 marcos canônicos com o done reaproveitando as flags acima.
   const RAW=[
@@ -6928,7 +6931,11 @@ function clientFacingStatusView(t){
   if(c==='concluido')return {key:'concluido',label:'Cronograma concluído',color:'#10B981'};
   if(c==='revisao'&&allPhaseItemsApproved(t))return {key:'aguarda_confirmacao',label:'Temas aprovados — aguardando confirmação',color:'#22D3EE'};
   if(c==='revisao')return {key:'revisao',label:'Ajuste solicitado — equipe corrigindo',color:'#F59E0B'};
-  if(c==='reenviado')return {key:'final',label:'Versão final disponível para análise',color:'#34D399'};
+  // F3.5.6A-H12: só é "versão final disponível" quando a 2ª rodada foi REALMENTE enviada
+  // (flowSentToClientSignal). Na entrega do designer (captions_preparation) a equipe ainda finaliza.
+  if(c==='reenviado')return flowSentToClientSignal(t)
+    ?{key:'final',label:'Versão final disponível para análise',color:'#34D399'}
+    :{key:'legendas',label:'A equipe está finalizando as artes',color:'#5B6CFF'};
   if(c==='aprovado'||c==='producao'){
     const oc=operationalCol(t);
     if(oc==='aguardando_envio')return {key:'temas_ok',label:'Temas aprovados — produção em andamento',color:'#34D399'};
@@ -8695,9 +8702,19 @@ async function markItemsAdjusted(taskId){
 }
 /* P1 — bloco de correções por conteúdo (quando o cliente pediu revisão/edição de itens). */
 // Resumo dos DOIS eixos no Detalhes: status do cliente + status do designer + prazos.
+/* F3.5.6A-H12 — rótulo do FLUXO DO CLIENTE guardado. O espelho legado clientFlowStatus='reenviado'
+   é gravado na ENTREGA do designer (fase 'captions_preparation' — bola volta à Social p/ legendas),
+   mas só é ENVIO FINAL de verdade quando flowSentToClientSignal(t) (workflowPhase='captions_waiting_client').
+   Sem esse sinal, "Reenviado ao cliente" seria mentira → mostra "Aguardando envio final".
+   Read-only; NÃO altera clientCol (card/Central/board seguem intactos). */
+function clientFlowDisplayLabel(t){
+  var col=clientCol(t);
+  if(col==='reenviado'&&!flowSentToClientSignal(t)) return {key:'aguardando_envio_final',label:'Aguardando envio final',color:'#5B6CFF'};
+  return (CLIENT_COLS.find(function(c){return c.key===col;})||CLIENT_COLS[0]);
+}
 function flowSummaryBlock(t){
   if(!isClientSector(secOf(t.sector).key))return '';
-  const cc=CLIENT_COLS.find(c=>c.key===clientCol(t))||CLIENT_COLS[0];
+  const cc=clientFlowDisplayLabel(t);
   let h='<div class="det-flow"><div class="det-flow-col"><div class="det-flow-lbl">Fluxo do cliente</div>'+
     '<span class="det-flow-pill" style="background:'+withAlpha(cc.color,.16)+';color:'+cc.color+'"><span class="dotc" style="background:'+cc.color+'"></span>'+esc(cc.label)+'</span></div>';
   if(hasDesigner(t)){

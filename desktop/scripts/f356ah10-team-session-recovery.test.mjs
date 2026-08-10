@@ -17,7 +17,7 @@
  *
  * Esta suíte roda ensureTeamSession + teamJwtValid + wfTeamAction REAIS extraídos do index.html
  * dentro de um DOM/fetch/localStorage FALSOS, contando POSTs e renovações — os 12 casos do
- * mandato do owner (RED na base 1.0.236, GREEN na 1.0.237) + invariantes de segurança/contrato.
+ * mandato do owner (RED na base 1.0.236, GREEN na 1.0.238) + invariantes de segurança/contrato.
  * Cada bloco comportamental é isolado: uma exceção conta como FALHA (não aborta) — na base
  * 1.0.236 (comportamento ausente) a suíte fica VERMELHA de forma limpa e auditável.
  *
@@ -320,7 +320,7 @@ await block('12', async (hold) => {
 });
 
 /* ============================ CONTRATO ESTÁTICO — segurança e fiação (não-regressão) ============================ */
-ok('S0 package.json = 1.0.237', PKG.version === '1.0.237');
+ok('S0 package.json = 1.0.238', PKG.version === '1.0.238');
 ok('S0 description marca H10 team-session-recovery', /f356ah10-team-session-recovery/i.test(PKG.description || ''));
 // container próprio, não-destrutivo
 ok('S1 CSS .ts-auth-back existe (camada empilhada z acima dos modais)', /\.ts-auth-back\{[^}]*z-index:90/.test(HTML));
