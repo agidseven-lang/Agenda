@@ -1,0 +1,233 @@
+# F3.5.6A-H15 — Desktop 1.0.241 (correcao TEXTUAL da "Proxima acao" da caixa OPERACAO apos o envio final).
+# A 1.0.240 (H14) esta correta (workflowPhase/operationalCol/timeline/cards/HERO). UNICO defeito: nextActionText(t)
+# case 'aguardando_final' devolvia texto legado "Tudo pronto. Proxima etapa: reenviar ao cliente e aguardar a
+# aprovacao final." — semanticamente errado, pois operationalCol='aguardando_final' SO ocorre com
+# flowSentToClientSignal(t)===true (o envio final JA aconteceu). Risco: reenvio/mensagem duplicada no WhatsApp.
+# CORRECAO 1.0.241 (RENDERER-only, index.html, 1 LINHA — SEM tocar condicao/logica): case 'aguardando_final'
+# passa a retornar "Envio final confirmado. Proxima etapa: aguardar a aprovacao final do cliente."
+# nextActionShort/detailState/clientFacingNextShort/operationalCol/taskTimeline/milestones H14 INALTERADOS.
+# MUDANCA de producao = SOMENTE desktop/src/renderer/index.html (1 linha). build GATED, --publish never.
+# Publicacao no Latest so no desktop-release-f356ah15.yml (mesmos bytes). Base tecnica 1.0.240 (b40259a).
+# BASELINE FISICA 1.0.228. ROLLBACK IMEDIATO 1.0.228. slaRules.js byte-identico; Worker V64.61 INALTERADO.
+name: "[push/manual] F3.5.6A-H15 — Desktop 1.0.241 (proxima acao / espera final textual) — Desktop Build"
+"on":
+  push:
+    branches: ["desktop/f356ah15-nextaction-text-1.0.241"]
+    paths-ignore: [".github/workflows/desktop-release-f356ah15.yml"]
+  workflow_dispatch: {}
+permissions: { contents: read }
+env:
+  TEST_BRANCH: "desktop/f356ah15-nextaction-text-1.0.241"
+  BASE_240_SHA: "b40259afadd0c4ddedf1e14f362249d542314927"
+  BASE_228_SHA: "3f0d0af192b4b6b32a8e8bbda4153dcf4df1bc6d"
+  APP_DIR: desktop
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: "Gate REF + ANCESTRIA (descende da 1.0.240 base técnica e da 1.0.228 baseline física)"
+        run: |
+          set -euo pipefail
+          [ "${GITHUB_REF_NAME}" = "$TEST_BRANCH" ] || { echo "::error::branch errada"; exit 1; }
+          for B in "$BASE_240_SHA" "$BASE_228_SHA"; do
+            git merge-base --is-ancestor "$B" HEAD || { echo "::error::não descende de $B"; exit 1; }
+          done
+      - name: "Gate VERSÃO 1.0.241 (package + lock x2 + marcador H15 + cadeia herdada)"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node -e "const p=require('./package.json'); if(p.version!=='1.0.241'){console.error('versão',p.version);process.exit(1);} for(const m of ['nextaction-final-wait-text','timeline-step7-final-wait','timeline-honest-preenvio','final-state-premature-fix']){ if(!(p.description||'').includes(m)){console.error('marcador ausente:',m);process.exit(1);} }"
+          [ "$(grep -c '"version": "1.0.241"' package-lock.json)" -ge 2 ]
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: "npm ci + TypeScript + sintaxe dos renderers (vm.Script) + worker"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          ./node_modules/.bin/tsc --noEmit -p tsconfig.json
+          node -e "const fs=require('fs'),vm=require('vm');const s=fs.readFileSync('src/renderer/bgnotify.html','utf8');const m=s.match(/<script>([\s\S]*?)<\/script>/);new vm.Script(m[1],{filename:'bgnotify-inline'});"
+          node -e "const fs=require('fs'),vm=require('vm');const s=fs.readFileSync('src/renderer/slareminder.html','utf8');const m=s.match(/<script>([\s\S]*?)<\/script>/);new vm.Script(m[1],{filename:'slareminder-inline'});"
+          node -e "const fs=require('fs'),vm=require('vm');const s=fs.readFileSync('src/renderer/index.html','utf8');const b=[...s.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(x=>x[1]);if(b.length<2){console.error('esperados >=2 blocos inline');process.exit(1);}b.forEach((x,i)=>new vm.Script(x,{filename:'index-inline-'+i}));console.log('blocos inline OK:',b.length);"
+          node --check ../cloudflare-worker.js
+      - name: "npm run build (tsc + copy-renderer)"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          npm run build
+      - name: "Gate MARCADOR H15 (texto novo da próxima ação) + isolamento cirúrgico da 1 linha vs 1.0.240"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          S=src/renderer/index.html
+          # (1) texto NOVO presente no case 'aguardando_final'
+          grep -qF "case 'aguardando_final':    return 'Envio final confirmado. Próxima etapa: aguardar a aprovação final do cliente.';" "$S"
+          # (2) texto LEGADO ausente
+          if grep -qF "Tudo pronto. Próxima etapa: reenviar ao cliente e aguardar a aprovação final." "$S"; then echo "::error::texto legado ainda presente"; exit 1; fi
+          # (3) superfícies já corretas PRESERVADAS byte a byte
+          grep -qF "case 'aguardando_final':            return 'Aguardar aprovação final';" "$S"
+          grep -qF "next:'Aguardar o cliente aprovar a versão final no portal.'," "$S"
+          grep -qF "case 'final':     return 'Aguardar a aprovação final do cliente';" "$S"
+          # (4) ISOLAMENTO CIRÚRGICO: o delta de index.html vs 1.0.240 é EXATAMENTE 1 linha (a string do case)
+          git diff "$BASE_240_SHA"..HEAD -- src/renderer/index.html > /tmp/idx.diff
+          grep -qF -- "-    case 'aguardando_final':    return 'Tudo pronto. Próxima etapa: reenviar ao cliente e aguardar a aprovação final.';" /tmp/idx.diff
+          grep -qF -- "+    case 'aguardando_final':    return 'Envio final confirmado. Próxima etapa: aguardar a aprovação final do cliente.';" /tmp/idx.diff
+          ADD=$(grep -cE '^\+[^+]' /tmp/idx.diff || true); REM=$(grep -cE '^-[^-]' /tmp/idx.diff || true)
+          [ "$ADD" = "1" ] && [ "$REM" = "1" ] || { echo "::error::delta de index.html != 1 linha (add=$ADD rem=$REM)"; exit 1; }
+          echo "MARCADOR H15 + isolamento 1-linha: VERIFIED."
+      - name: "Gate MARCADORES herdados H14 (timeline marco 7 + espera final) INALTERADOS no renderer"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          S=src/renderer/index.html
+          grep -qF "key:'aguardando_legenda',label:'Aguardando legenda / posts',    done:!!(prodOk||resent)," "$S"
+          grep -qF "if(m.key==='concluido'&&state==='current') dispLabel='Aguardando aprovação final';" "$S"
+          grep -qF "return {key:m.key,label:dispLabel,state:state," "$S"
+          grep -qF "function pendingProduction(t){return pendingLegend(t)||pendingFeed(t);}" "$S"
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/renderer/index.html','utf8');if(/for\s*\([^)]*\)\s*\{[^}]*\bdone\s*=\s*true/.test(s)||/milestones\.forEach\([^)]*done\s*=\s*true/.test(s)){console.error('clamp geral detectado — proibido');process.exit(1);}console.log('sem clamp geral');"
+          echo "MARCADORES H14: PRESERVED."
+      - name: "Gate MARCADORES herdados H13 (exact-match + carimbo canônico + wp-first) + H12 + H10/H8"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          S=src/renderer/index.html
+          grep -qF "return !!v && keys.indexOf(v)>=0;" "$S"
+          grep -qF "if(m.key==='enviado_cliente'){ const r=wfLatestRound(t,'themes');" "$S"
+          grep -qF "else if(m.key==='enviado_final'){ const r=wfLatestRound(t,'captions');" "$S"
+          grep -qF "if(wp==='captions_preparation') return {key:'aguardando_envio_final',label:'Aguardando envio final'" "$S"
+          grep -qF "type:'reenviado_cliente',label:'Reenviado ao cliente (versão FINAL)'" "$S"
+          grep -qF "key:'enviado_final',     label:'Enviado para aprovação final',  done:!!resent," "$S"
+          grep -qF "const resent=flowSentToClientSignal(t)||finalOk;" "$S"
+          grep -qF "function clientFlowDisplayLabel(t)" "$S"
+          grep -qF "if(wp==='captions_waiting_client')return true;" "$S"
+          grep -qF "const sent=flowCanonicalSentSignal(t)||(cf!=='afazer');" "$S"
+          grep -qF "root.id='tsAuthRoot'; root.className='ts-auth-back';" "$S"
+          grep -q 'legacyCursor' dist/main/workflowNotifier.js
+          echo "MARCADORES herdados H13/H12/H10/H8: VERIFIED."
+      - name: "Gate SUÍTES H15 (nova) + H14 + H13 + H12 + H10 + H8 + PIN F3.5.6A + golden master F3.4.4 + H2 [dist]"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f356ah15-nextaction-final-text.test.mjs
+          node scripts/f356ah14-timeline-step7-final-wait.test.mjs
+          node scripts/f356ah13-timeline-preenvio.test.mjs
+          node scripts/f356ah12-final-state-premature.test.mjs
+          node scripts/f356ah10-team-session-recovery.test.mjs
+          node scripts/f356ah8-durable-diagnostic.test.mjs
+          node scripts/f356ah8-honest-timeline.test.mjs
+          node scripts/f356a-workflow-orchestration.test.mjs
+          node scripts/f356ah4-single-source-real-path.test.mjs
+          node scripts/f356ah3-single-source-sent-state.test.mjs
+          node scripts/f344-flow-golden-master.test.mjs
+          H2_BASE_228="$BASE_228_SHA" H2_BASE_230="e89867de5120fe88e2f639effd59d24c3181f427" node scripts/f356ah2-client-approvals.test.mjs
+      - name: "Gate SUÍTES herdadas — notificações/handoff/visibilidade/referência + cadeia F3.5.5* + central [dist]"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f355eh4-grouped-notification-handoff.test.mjs
+          node scripts/f355eh3-global-notification-visibility.test.mjs
+          node scripts/f355eh2-reference-notification.test.mjs
+          node scripts/f355e-retire-modules-premium-notifications.test.mjs
+          node scripts/f355d-cron-quantity-universal-paste.test.mjs
+          node scripts/f354l-sla-central-persistent-reminders.test.mjs
+          node scripts/f354p-sla-decision-actions.test.mjs
+          node scripts/f354u-premium-common-notifications.test.mjs
+      - name: "Gate herdado — rich editor + agenda + notas + integração + regressão canônica (som/sessão)"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f355c-script-quantity-rich-editor.test.mjs
+          node scripts/f355b-agenda-premium.test.mjs
+          node scripts/f355ah1-internal-notes.test.mjs
+          node scripts/f355a-integration.test.mjs
+          node scripts/f354wh2-immediate-notification-sound.test.mjs
+          node scripts/f354vh1-session-persistence.test.mjs
+      - name: "Gate RED EMPACOTADO — CLIQUE REAL (H5) + H4 (caminho real) + H3 (token≠envio) GREEN em 1.0.241 — xvfb"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y >/dev/null 2>&1 || true
+          sudo apt-get install -y xvfb >/dev/null 2>&1 || true
+          H5_VERSION=1.0.241 timeout -k 15 600 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f356ah5-red-main.js
+          H4_VERSION=1.0.241 timeout -k 15 600 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f356ah4-red-main.js
+          H3_VERSION=1.0.241 timeout -k 15 600 xvfb-run -a ./node_modules/.bin/electron --no-sandbox scripts/f356ah3-red-main.js
+      - name: "Gate ISOLAMENTO — produção = SOMENTE index.html vs 1.0.240 (b40259a); src/main INALTERADO; slaRules byte-idêntico; infra 1.0.228 congelada"
+        run: |
+          set -euo pipefail
+          git diff --name-only "$BASE_240_SHA"..HEAD > /tmp/delta.txt; echo "== DELTA vs 1.0.240 =="; cat /tmp/delta.txt
+          BAD=$(grep -vE '^(\.github/workflows/desktop-(build|release)-f356ah15\.yml$|desktop/src/renderer/index\.html$|desktop/package(-lock)?\.json$|desktop/scripts/f356ah15-nextaction-final-text\.test\.mjs$|desktop/scripts/(f354p-sla-decision-actions|f354vh1-session-persistence|f354wh2-immediate-notification-sound|f355a-integration|f355ah1-internal-notes|f355b-agenda-premium|f355c-script-quantity-rich-editor|f355d-cron-quantity-universal-paste|f355e-retire-modules-premium-notifications|f355eh2-reference-notification|f355eh3-global-notification-visibility|f355eh4-grouped-notification-handoff|f356a-workflow-orchestration|f356ah2-client-approvals|f356ah3-single-source-sent-state|f356ah8-durable-diagnostic|f356ah8-honest-timeline|f356ah10-team-session-recovery|f356ah12-final-state-premature|f356ah13-timeline-preenvio|f356ah14-timeline-step7-final-wait)\.test\.mjs$)' /tmp/delta.txt || true)
+          [ -z "$BAD" ] || { echo "::error::fora da allowlist H15: $BAD"; exit 1; }
+          CHG_MAIN=$(git diff --name-only "$BASE_240_SHA"..HEAD -- desktop/src/main || true)
+          [ -z "$CHG_MAIN" ] || { echo "::error::src/main alterado (H15 não toca main): $CHG_MAIN"; exit 1; }
+          git diff --quiet "$BASE_240_SHA"..HEAD -- desktop/src/main desktop/src/preload cloudflare-worker.js desktop/scripts/copy-renderer.js desktop/electron-builder.yml desktop/tsconfig.json functions android-native android-native-beta desktop/src/renderer/priorityEngine.js desktop/src/renderer/bgnotify.html desktop/src/renderer/slareminder.html desktop/src/renderer/bgcall.html desktop/src/renderer/sounds || { echo "::error::mudança fora de index.html — H15 altera SOMENTE o renderer index.html"; exit 1; }
+          git diff --quiet "$BASE_240_SHA"..HEAD -- desktop/src/main/slaRules.js || { echo "::error::slaRules.js alterado (paridade golden master exige byte-idêntico)"; exit 1; }
+          git diff --quiet "$BASE_228_SHA"..HEAD -- desktop/src/main/bgNotify.ts desktop/src/main/notificationGrouping.ts desktop/src/renderer/bgnotify.html desktop/src/renderer/slareminder.html desktop/src/renderer/bgcall.html desktop/src/renderer/sounds desktop/src/preload/bgnotify-preload.ts desktop/src/preload/slareminder-preload.ts desktop/src/preload/preload.ts desktop/electron-builder.yml desktop/tsconfig.json || { echo "::error::congelado 1.0.228 alterado"; exit 1; }
+          echo "ISOLAMENTO H15: VERIFIED (index.html é o ÚNICO arquivo de produção alterado vs 1.0.240; slaRules INALTERADO; infra 1.0.228 congelada)."
+  build:
+    needs: verify
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: npm ci + build + electron-builder (--publish never)
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm run build
+          npx electron-builder --win nsis msi --publish never
+      - name: "Gate EMPACOTADO — versão 1.0.241 + marcador H15 + H14/H13/H12/H10/H8 preservados no app.asar"
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          ASAR="dist-installer/win-unpacked/resources/app.asar"; test -f "$ASAR"
+          npx --yes @electron/asar extract "$ASAR" asar-x
+          node -e "const p=require('./asar-x/package.json'); if(p.version!=='1.0.241') process.exit(1);"
+          I=asar-x/src/renderer/index.html
+          # H15 (texto novo presente, legado ausente)
+          grep -qF "case 'aguardando_final':    return 'Envio final confirmado. Próxima etapa: aguardar a aprovação final do cliente.';" "$I"
+          if grep -qF "Tudo pronto. Próxima etapa: reenviar ao cliente e aguardar a aprovação final." "$I"; then echo "::error::texto legado no app.asar"; exit 1; fi
+          grep -qF "case 'aguardando_final':            return 'Aguardar aprovação final';" "$I"
+          grep -qF "next:'Aguardar o cliente aprovar a versão final no portal.'," "$I"
+          grep -qF "case 'final':     return 'Aguardar a aprovação final do cliente';" "$I"
+          # herdados H14/H13/H12/H10/H8
+          grep -qF "key:'aguardando_legenda',label:'Aguardando legenda / posts',    done:!!(prodOk||resent)," "$I"
+          grep -qF "if(m.key==='concluido'&&state==='current') dispLabel='Aguardando aprovação final';" "$I"
+          grep -qF "return !!v && keys.indexOf(v)>=0;" "$I"
+          grep -qF "else if(m.key==='enviado_final'){ const r=wfLatestRound(t,'captions');" "$I"
+          grep -qF "const resent=flowSentToClientSignal(t)||finalOk;" "$I"
+          grep -qF "function clientFlowDisplayLabel(t)" "$I"
+          grep -qF "const sent=flowCanonicalSentSignal(t)||(cf!=='afazer');" "$I"
+          grep -qF "root.id='tsAuthRoot'; root.className='ts-auth-back';" "$I"
+          grep -q 'function flowCanonicalSentSignal' asar-x/dist/main/slaRules.js
+          grep -q 'legacyCursor' asar-x/dist/main/workflowNotifier.js
+          F356AH15_SRC=asar-x/src/renderer/index.html F356AH15_PKG=asar-x/package.json node scripts/f356ah15-nextaction-final-text.test.mjs
+          F356AH14_SRC=asar-x/src/renderer/index.html F356AH14_PKG=asar-x/package.json node scripts/f356ah14-timeline-step7-final-wait.test.mjs
+          F356AH13_SRC=asar-x/src/renderer/index.html F356AH13_PKG=asar-x/package.json node scripts/f356ah13-timeline-preenvio.test.mjs
+          F356AH12_SRC=asar-x/src/renderer/index.html F356AH12_PKG=asar-x/package.json node scripts/f356ah12-final-state-premature.test.mjs
+          echo "GATE F3.5.6A-H15 EMPACOTADO: VERIFIED."
+      - name: Empacotar bundle + SHA256SUMS + VERSAO-DESKTOP
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes @cyclonedx/cyclonedx-npm --omit dev --output-format JSON --output-file "$RUNNER_TEMP/sbom.json" || echo '{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}' > "$RUNNER_TEMP/sbom.json"
+          OUT="$GITHUB_WORKSPACE/dist-pkg"; mkdir -p "$OUT"
+          EXE=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe | head -1); MSI=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.msi | head -1); BM=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap | head -1)
+          cp "$EXE" "$MSI" "$BM" dist-installer/latest.yml "$OUT/"; cp "$RUNNER_TEMP/sbom.json" "$OUT/SBOM-cyclonedx.json"
+          EXE_NAME=$(basename "$EXE"); MSI_NAME=$(basename "$MSI"); BM_NAME=$(basename "$BM")
+          ( cd "$OUT" && sha256sum "$EXE_NAME" "$MSI_NAME" latest.yml "$BM_NAME" SBOM-cyclonedx.json > SHA256SUMS )
+          { echo "productName : Agenda ID Seven Desktop"; echo "versionName : 1.0.241"; echo "rotulo      : 1.0.241-f356ah15-nextaction-final-wait-text (proxima acao da caixa OPERACAO apos envio final — pelo updater interno)"; echo "channel     : latest (NADA publicado neste build)"; echo "appId       : br.com.idseven.agenda.desktop"; echo "instalador  : $EXE_NAME"; echo "SHA-256 exe : $(sha256sum "$OUT/$EXE_NAME" | awk '{print $1}')"; echo "instalador2 : $MSI_NAME"; echo "SHA-256 msi : $(sha256sum "$OUT/$MSI_NAME" | awk '{print $1}')"; echo "commit      : $GITHUB_SHA (branch $GITHUB_REF_NAME)"; echo "base-codigo : Desktop 1.0.240 (b40259a). BASELINE FISICA 1.0.228 (3f0d0af1). ROLLBACK imediato 1.0.228."; echo "origem      : F3.5.6A-H15 — nextActionText case 'aguardando_final' devolvia texto legado 'reenviar ao cliente' apos o envio final ja confirmado (flowSentToClientSignal=true). Correcao TEXTUAL de 1 linha: 'Envio final confirmado. Proxima etapa: aguardar a aprovacao final do cliente.' SEM tocar condicao/operationalCol/timeline/nextActionShort/detailState. MUDANCA: SOMENTE index.html (1 linha). slaRules.js e Worker V64.61 INALTERADOS."; echo "distribuicao: pelo updater interno; publicacao no Latest ocorre no workflow desktop-release-f356ah15.yml (mesmos bytes)"; } > "$OUT/VERSAO-DESKTOP.txt"
+          echo "== SHA256SUMS =="; cat "$OUT/SHA256SUMS"
+      - uses: actions/upload-artifact@v4
+        with: { name: agenda-id-seven-desktop-1.0.241-installer, path: "dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe\ndist-pkg/Agenda-ID-Seven-Desktop-*-x64.msi", if-no-files-found: error, retention-days: 30 }
+      - uses: actions/upload-artifact@v4
+        with: { name: agenda-id-seven-desktop-1.0.241-updatemeta, path: "dist-pkg/latest.yml\ndist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap\ndist-pkg/SHA256SUMS\ndist-pkg/SBOM-cyclonedx.json\ndist-pkg/VERSAO-DESKTOP.txt", if-no-files-found: error, retention-days: 30 }
