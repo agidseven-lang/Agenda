@@ -6856,7 +6856,7 @@ function taskTimeline(t){
     // F3.5.6A-H13 — HONESTIDADE: SÓ marco CONCLUÍDO (done) recebe carimbo (data/autor). Pendente/current
     // NUNCA exibe data como se o evento já tivesse ocorrido (elimina 11:35 em "Enviado p/ aprovação
     // final"/"Concluído" pendentes após "Salvar e reenviar" sem confirmar).
-    let at=null, by=null;
+    let at=null, by=null, byLabel=null;
     if(m.done){
       const e=_tlEventAt(t,m.ev); at=e?e.at:null; by=e?e.by:null;
       // Carimbo CANÔNICO dos envios via approvalRounds: THEMES (ar_themes_r*) e FINAL (ar_captions_r*) têm
@@ -6872,10 +6872,20 @@ function taskTimeline(t){
       //  (2) clientFinalApprovedAt / clientFinalApprovedBy (carimbo gravado pelo Worker NA aprovação final);
       //  (3) evento EXATO de aprovação do cliente (igualdade de chave, nunca substring);
       //  (4) fallback legado doneAt. Só sobrescreve o resultado genérico da linha acima por fonte MAIS canônica.
-      var _cr=wfLatestRound(t,'captions'); var _crr=_cr&&_cr.round; var _fat=0, _fby=null;
-      if(_crr&&_crr.decision==='approved'&&Number(_crr.decisionAt)>0){ _fat=Number(_crr.decisionAt); _fby=_crr.recordedBy||t.clientFinalApprovedBy||_crr.by||null; }
-      else if(Number(t.clientFinalApprovedAt)>0){ _fat=Number(t.clientFinalApprovedAt); _fby=t.clientFinalApprovedBy||null; }
-      else { var _ce=_tlEventAt(t,['aprovado_cliente','client_approved','final_approved','aprovado_final']); if(_ce&&Number(_ce.at)>0){ _fat=Number(_ce.at); _fby=_ce.by||t.clientFinalApprovedBy||null; } }
+      // F3.5.6A-H18 — PROVENIÊNCIA do ator final. _fby (o ator) é resolvido EXATAMENTE como na 1.0.243
+      // (recordedBy > clientFinalApprovedBy > _crr.by; ramos 2/3 idênticos) — 'by' NÃO muda. O novo _fext
+      // apenas CLASSIFICA a fonte: recordedBy/_crr.by/evento.by = UID INTERNO (resolvível em state.users);
+      // clientFinalApprovedBy/clientReview.byName = NOME LITERAL EXTERNO (ex.: "Cliente"), que vira byLabel
+      // p/ o renderer exibir sem tratar como UID. Nunca infere label a partir de UID desconhecido.
+      var _cr=wfLatestRound(t,'captions'); var _crr=_cr&&_cr.round; var _fat=0, _fby=null, _fext=false;
+      if(_crr&&_crr.decision==='approved'&&Number(_crr.decisionAt)>0){
+        _fat=Number(_crr.decisionAt);
+        if(_crr.recordedBy){ _fby=_crr.recordedBy; _fext=false; }
+        else if(t.clientFinalApprovedBy){ _fby=t.clientFinalApprovedBy; _fext=true; }
+        else { _fby=_crr.by||null; _fext=false; }
+      }
+      else if(Number(t.clientFinalApprovedAt)>0){ _fat=Number(t.clientFinalApprovedAt); _fby=t.clientFinalApprovedBy||null; _fext=!!t.clientFinalApprovedBy; }
+      else { var _ce=_tlEventAt(t,['aprovado_cliente','client_approved','final_approved','aprovado_final']); if(_ce&&Number(_ce.at)>0){ _fat=Number(_ce.at); if(_ce.by){ _fby=_ce.by; _fext=false; } else if(t.clientFinalApprovedBy){ _fby=t.clientFinalApprovedBy; _fext=true; } else { _fby=null; } } }
       // F3.5.6A-H17 — ATOR do marco FINAL: quando as fontes canônicas acima resolvem o HORÁRIO (_fat) mas
       // NÃO trazem ator (recordedBy/clientFinalApprovedBy/evento exato vazios), aceitar o clientReview como
       // ator SOMENTE com PROVA de identidade temporal/semântica com o MESMO instante da aprovação final:
@@ -6883,9 +6893,9 @@ function taskTimeline(t){
       // status==='aprovado' — isso pode ser a aprovação dos TEMAS (horário DIFERENTE; ver H16 clientCol).
       // NÃO fabrica "Cliente": usa o byName/by REAL do clientReview casado exatamente ao instante final.
       if(_fat>0 && !_fby && t.clientReview && t.clientReview.status==='aprovado' && Number(t.clientReview.at)===Number(_fat)){
-        _fby=t.clientReview.byName||t.clientReview.by||null;
+        _fby=t.clientReview.byName||t.clientReview.by||null; _fext=!!_fby; // clientReview.byName é NOME LITERAL externo
       }
-      if(_fat>0){ at=_fat; by=_fby||by; }
+      if(_fat>0){ at=_fat; by=_fby||by; if(_fext&&_fby) byLabel=_fby; }
       if(!at) at=t.doneAt||null;
     }
     // F3.5.6A-H14: rótulo contextual da ESPERA final. O marco 'concluido' só vira CURRENT com 1..8 done e
@@ -6895,7 +6905,7 @@ function taskTimeline(t){
     // 11º marco e o impossível "Concluído — EM ANDAMENTO". NÃO fabrica data/autor para marco encerrado por fluxo.
     let dispLabel=m.label;
     if(m.key==='concluido'&&state==='current') dispLabel='Aguardando aprovação final';
-    return {key:m.key,label:dispLabel,state:state,done:!!m.done,optional:!!m.optional,at:at,by:by};
+    return {key:m.key,label:dispLabel,state:state,done:!!m.done,optional:!!m.optional,at:at,by:by,byLabel:byLabel};
   });
   // ÚLTIMO evento (cronológico) — o item mais recente de history[]/clientActions[].
   // FASE 2 (passo 2.1): o rótulo é HUMANIZADO (via _tlHumanLabel) — nunca expõe kind/type cru.
@@ -8848,7 +8858,10 @@ function opPanelBlock(t){
     const isAjuste=(m.key==='ajuste');
     const cls = (m.state==='done')?'done':((m.state==='current'||m.state==='attention')?'cur':'todo');
     const stTxt = (m.state==='done')?'OK':(m.state==='current')?'Em andamento':(m.state==='attention')?'Atenção':(m.state==='optional')?'Se ocorrer':'Pendente';
-    const who=m.by?((state.users.find(u=>u.id===m.by)||{}).name||''):'';
+    // F3.5.6A-H18 — ator do marco: byLabel (NOME LITERAL de ator EXTERNO, ex.: "Cliente") tem PRECEDÊNCIA e
+    // é exibido direto; senão m.by é UID INTERNO e resolve em state.users. UID desconhecido e SEM byLabel ⇒
+    // vazio (NUNCA imprime UID cru). 'who' é escapado adiante via esc(meta) — byLabel jamais entra cru no HTML.
+    const who=m.byLabel?m.byLabel:(m.by?((state.users.find(u=>u.id===m.by)||{}).name||''):'');
     const when=m.at?(fmtDateTimeBR(m.at)+' · '+_tlRelAgo(m.at)):'';
     let meta=[when, who?('por '+who.split(' ')[0]):''].filter(Boolean).join(' · ');
     if(!meta) meta=(m.state==='done')?'concluído':(isAjuste&&m.state==='optional')?'somente se o cliente pedir':'aguardando';

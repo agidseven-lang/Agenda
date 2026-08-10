@@ -136,7 +136,7 @@ if (bootErr) {
 }
 
 /* ============================ CONTRATO ESTÁTICO (RED→GREEN + segurança) ============================ */
-ok('S0 package.json = 1.0.243', PKG.version === '1.0.243');
+ok('S0 package.json = 1.0.244', PKG.version === '1.0.244');
 ok('S0 description marca H12 final-state-premature-fix', /f356ah12-final-state-premature-fix/i.test(PKG.description || ''));
 // timeline: resent usa o portão canônico, NÃO o espelho cru
 ok('S3 taskTimeline resent = flowSentToClientSignal(t)||finalOk', /const resent=flowSentToClientSignal\(t\)\|\|finalOk;/.test(HTML));

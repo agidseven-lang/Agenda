@@ -320,7 +320,7 @@ await block('12', async (hold) => {
 });
 
 /* ============================ CONTRATO ESTÁTICO — segurança e fiação (não-regressão) ============================ */
-ok('S0 package.json = 1.0.243', PKG.version === '1.0.243');
+ok('S0 package.json = 1.0.244', PKG.version === '1.0.244');
 ok('S0 description marca H10 team-session-recovery', /f356ah10-team-session-recovery/i.test(PKG.description || ''));
 // container próprio, não-destrutivo
 ok('S1 CSS .ts-auth-back existe (camada empilhada z acima dos modais)', /\.ts-auth-back\{[^}]*z-index:90/.test(HTML));
