@@ -48,9 +48,9 @@ const wstate = wseg('async function handleClientCronogramaState(token, env)', 'P
 
 console.log('— A) versão 1.0.224 —');
 const pkg = JSON.parse(R('package.json'));
-ok('A1 package.json 1.0.241 (custom-script-quantity-rich-editor — RE-PINADO F3.5.6A-H2)', pkg.version === '1.0.241' && /custom-script-quantity-rich-editor/.test(pkg.description || ''));
-ok('A2 package-lock 1.0.241 (RE-PINADO F3.5.6A-H2)', JSON.parse(R('package-lock.json')).version === '1.0.241');
-ok('A3 lock packages[""] 1.0.241 (RE-PINADO F3.5.6A-H2)', JSON.parse(R('package-lock.json')).packages[''].version === '1.0.241');
+ok('A1 package.json 1.0.242 (custom-script-quantity-rich-editor — RE-PINADO F3.5.6A-H2)', pkg.version === '1.0.242' && /custom-script-quantity-rich-editor/.test(pkg.description || ''));
+ok('A2 package-lock 1.0.242 (RE-PINADO F3.5.6A-H2)', JSON.parse(R('package-lock.json')).version === '1.0.242');
+ok('A3 lock packages[""] 1.0.242 (RE-PINADO F3.5.6A-H2)', JSON.parse(R('package-lock.json')).packages[''].version === '1.0.242');
 
 console.log('— B) QUANTIDADE PERSONALIZADA DE ROTEIROS (35 obrigatórios) —');
 ok('B1 quantidade 1: subtipo sintético aceita n=1 com singular ("1 roteiro")', has(qcore, "return {label:n+(n===1?' roteiro':' roteiros')") && has(qcore, 'if(!(isFinite(n)&&n>=1))return null;'));

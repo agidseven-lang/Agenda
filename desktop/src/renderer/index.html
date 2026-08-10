@@ -6657,10 +6657,10 @@ function isFullyComplete(t){
   return !!(t.finalApprovalCompleted===true||t.operationalStatus==='concluido'||t.clientFlowStatus==='concluido');
 }
 // Status operacional REAL — DERIVADO dos eixos + pendências (sempre dinâmico).
-// 'concluido' tem caminho ÚNICO: isFullyComplete (aprovação final real + sem pendências).
+// 'concluido' tem PRECEDÊNCIA: isTaskCompleted (aprovação FINAL REAL do cliente) — mesmo com pendências residuais.
 function operationalCol(t){
   if(!isClientSector(secOf(t.sector).key))return t.status||'afazer';
-  if(isFullyComplete(t))return 'concluido';                              // ÚNICO caminho para concluído
+  if(isTaskCompleted(t))return 'concluido';                             // F3.5.6A-H16: conclusão final tem PRECEDÊNCIA (pendingProduction residual NÃO reabre); isFullyComplete inalterado
   const cf=clientCol(t);
   // V64.49: todos os itens aprovados com 'revisao' herdado = aguardando o cliente CONFIRMAR
   // no portal (botão "Aprovar temas") — para a Social isso é "Aguardando aprovação dos temas".
@@ -6733,7 +6733,7 @@ function opColOf(k){return OPERATIONAL_COLS.find(c=>c.key===k)||OPERATIONAL_COLS
 // FONTE ÚNICA de leitura do status VISUAL (badge) da tarefa. PURA, read-time e ADITIVA:
 // NÃO altera schema, NÃO altera bucketing de coluna e NÃO é usada por nenhum render ainda
 // (passo 1 — função dormente). É um wrapper FIEL de operationalCol(t):
-//  • cronograma  → key = operationalCol(t) (que já encadeia isFullyComplete > revisão >
+//  • cronograma  → key = operationalCol(t) (que já encadeia isTaskCompleted > revisão >
 //                  reenvio/final > designer > envio > afazer > produção); label/color de OPERATIONAL_COLS.
 //  • outros setores → key = t.status; label/color de STATUS[] (stOf).
 // Garantia (E2E de não-regressão): clientStatusView(t).{key,label,color} === o que o badge
@@ -6855,7 +6855,20 @@ function taskTimeline(t){
       else if(m.key==='enviado_final'){ const r=wfLatestRound(t,'captions'); const s=r?Number(r.round&&r.round.sentAt)||0:0; if(s>0){ at=s; by=(r.round&&(r.round.sentBy||r.round.by))||by; } }
     }
     if(m.key==='criado'&&!at) at=t.createdAt||null;
-    if(m.key==='concluido'&&!at&&finalOk) at=t.doneAt||null;
+    if(m.key==='concluido'&&finalOk){
+      // F3.5.6A-H16: carimbo do marco FINAL a partir da FONTE REAL da aprovação do cliente.
+      // SEM substring, SEM fabricar horário, SEM updatedAt. Prioridade canônica:
+      //  (1) rodada FINAL (captions) decision==='approved' → decisionAt + ator (recordedBy; senão clientFinalApprovedBy);
+      //  (2) clientFinalApprovedAt / clientFinalApprovedBy (carimbo gravado pelo Worker NA aprovação final);
+      //  (3) evento EXATO de aprovação do cliente (igualdade de chave, nunca substring);
+      //  (4) fallback legado doneAt. Só sobrescreve o resultado genérico da linha acima por fonte MAIS canônica.
+      var _cr=wfLatestRound(t,'captions'); var _crr=_cr&&_cr.round; var _fat=0, _fby=null;
+      if(_crr&&_crr.decision==='approved'&&Number(_crr.decisionAt)>0){ _fat=Number(_crr.decisionAt); _fby=_crr.recordedBy||t.clientFinalApprovedBy||_crr.by||null; }
+      else if(Number(t.clientFinalApprovedAt)>0){ _fat=Number(t.clientFinalApprovedAt); _fby=t.clientFinalApprovedBy||null; }
+      else { var _ce=_tlEventAt(t,['aprovado_cliente','client_approved','final_approved','aprovado_final']); if(_ce&&Number(_ce.at)>0){ _fat=Number(_ce.at); _fby=_ce.by||t.clientFinalApprovedBy||null; } }
+      if(_fat>0){ at=_fat; by=_fby||by; }
+      if(!at) at=t.doneAt||null;
+    }
     // F3.5.6A-H14: rótulo contextual da ESPERA final. O marco 'concluido' só vira CURRENT com 1..8 done e
     // finalOk=false ⇒ enviado_final done sem finalOk ⇒ flowSentToClientSignal=true (2ª rodada REALMENTE
     // enviada). Nesse estado a UI comunica "Aguardando aprovação final" SEM mudar a CHAVE canônica
@@ -6892,7 +6905,7 @@ function taskTimeline(t){
 function boardCol4(t){
   if(!isClientSector(secOf(t.sector).key))return t.status||'afazer';
   const oc=operationalCol(t);
-  if(oc==='concluido')return 'concluido';            // só quando isFullyComplete
+  if(oc==='concluido')return 'concluido';            // só quando concluído (operationalCol → isTaskCompleted desde H16)
   if(oc==='aguardando_revisao')return 'revisao';
   if(oc==='afazer')return 'afazer';
   return 'andamento';                                 // producao/aguardando_designer/legenda/final
@@ -8533,9 +8546,9 @@ function detailState(t){
       next:'Preencher os roteiros e enviar ao cliente para aprovação.',owner:'social',actions:['edit','sendclient']};
   }
   const cc=clientCol(t);const pend=pendingClientItems(t);
-  if(isFullyComplete(t))return {key:'concluido',color:'#34D399',label:'Concluído ✓',
-    sub:'O cliente aprovou a versão final. Cronograma encerrado.',
-    next:'Nada a fazer — aprovação final registrada'+(t.clientFinalApprovedAt?(' em '+fmtDateTimeBR(t.clientFinalApprovedAt)):'')+'.',
+  if(isTaskCompleted(t))return {key:'concluido',color:'#34D399',label:'Concluído final', // F3.5.6A-H16: conclusão final com PRECEDÊNCIA (isTaskCompleted) — só consulta segura; SEM prod/sendclient/edit
+    sub:'O cliente aprovou a versão final. Fluxo concluído.',
+    next:'Nenhuma pendência.',
     owner:'none',actions:['clientview']};
   // V64.49: cliente aprovou TODOS os itens mas ainda não confirmou no portal (botão
   // "Aprovar temas") — globais seguem 'revisao' herdado. NÃO é ajuste pendente.
@@ -8764,7 +8777,7 @@ function flowSummaryBlock(t){
   h+='<div class="det-flow-col"><div class="det-flow-lbl">Status operacional</div>'+
     '<span class="det-flow-pill" style="background:'+withAlpha(oc.color,.16)+';color:'+oc.color+'"><span class="dotc" style="background:'+oc.color+'"></span>'+esc(oc.label)+'</span></div>';
   // V1.0.98 — Fase de aprovação do cliente (themes/production/final).
-  const ph=clientApprovalPhaseOf(t);const phUi={themes:{l:'Aprovação de temas',c:'#5B6CFF'},production:{l:'Aprovação de legendas/artes',c:'#F59E0B'},final:{l:'Aprovação final',c:'#34D399'}}[ph];
+  const ph=clientApprovalPhaseOf(t);const phUi=isTaskCompleted(t)?{l:'Concluída',c:'#10B981'}:{themes:{l:'Aprovação de temas',c:'#5B6CFF'},production:{l:'Aprovação de legendas/artes',c:'#F59E0B'},final:{l:'Aprovação final',c:'#34D399'}}[ph]; // F3.5.6A-H16: DISPLAY-ONLY 'Concluída' quando finalizado — NÃO altera clientApprovalPhase canônico
   h+='<div class="det-flow-col"><div class="det-flow-lbl">Fase do cliente</div>'+
     '<span class="det-flow-pill" style="background:'+withAlpha(phUi.c,.16)+';color:'+phUi.c+'"><span class="dotc" style="background:'+phUi.c+'"></span>'+esc(phUi.l)+'</span></div>';
   return h+'</div>';
@@ -9133,6 +9146,7 @@ async function ikUpload(file,folder){
 }
 function openProductionModal(taskId){
   const t=state.tasks.find(x=>x.id===taskId);if(!t)return;
+  if(isTaskCompleted(t)){flashToast('Esta tarefa já foi concluída e não pode ser reenviada.');return;} // F3.5.6A-H16: BLOQUEIO FUNCIONAL pós-conclusão — ZERO write; fail-safe mesmo com botão oculto (não abre editor, não salva produção)
   state._prod={taskId:taskId,items:(Array.isArray(t.cronContents)?t.cronContents:[]).map(c=>({tema:(c&&c.tema)||'',legenda:(c&&c.legenda)||'',temaRich:(c&&c.temaRich)||'',legendaRich:(c&&c.legendaRich)||'',feedImageUrl:(c&&c.feedImageUrl)||'',storyImageUrl:(c&&c.storyImageUrl)||''}))};
   renderProductionModal();
 }
@@ -9459,6 +9473,10 @@ async function ensureReviewToken(taskId){return ensureStableClientReviewToken(ta
 function clientPreviewLink(ctx){return buildInternalClientLink(ctx);}
 function clientMessage(ctx){return buildClientMessage(ctx);}
 async function openSendClientModal(taskOrForm){
+  // F3.5.6A-H16: BLOQUEIO FUNCIONAL pós-conclusão — ANTES de ensureReviewToken e de QUALQUER escrita.
+  // Nenhuma nova rodada, workflowPhase, history, approvalRound ou fluxo WhatsApp são iniciados. ZERO write.
+  { const _tc=(taskOrForm&&taskOrForm.id)?(state.tasks.find(x=>x.id===taskOrForm.id)||taskOrForm):taskOrForm;
+    if(_tc&&isTaskCompleted(_tc)){flashToast('Esta tarefa já foi concluída e não pode ser reenviada.');return;} }
   // Garante o token publico ANTES de montar a mensagem (link HTTPS valido no preview).
   // HOTFIX: se a confirmacao do token no Firestore falhar, ABORTA o modal — nunca
   // exibe/permite enviar um link orfao. O usuario ve um aviso claro e tenta de novo.
