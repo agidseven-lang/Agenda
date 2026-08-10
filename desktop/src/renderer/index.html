@@ -6825,7 +6825,12 @@ function taskTimeline(t){
     {key:'enviado_designer',  label:'Enviado ao designer',           done:!!hasD,          ev:['sent_to_designer','designer_atribuido']},
     {key:'designer_producao', label:'Designer em produção',          done:!!designerStarted, ev:['designer_moved','designer_andamento']},
     {key:'designer_entregou', label:'Designer entregou',             done:!!delivered,     ev:['designer_done','designer_entregou','delivered']},
-    {key:'aguardando_legenda',label:'Aguardando legenda / posts',    done:!!prodOk,        ev:['social_producao','social_editou_conteudo']},
+    // F3.5.6A-H14: o marco de PREPARAÇÃO encerra quando a produção terminou (prodOk) OU quando o ENVIO
+    // REAL da 2ª rodada foi confirmado (resent = flowSentToClientSignal||finalOk). A confirmação do envio
+    // final é autoridade suficiente p/ afirmar que a preparação foi encerrada NO FLUXO, mesmo com
+    // pendingProduction residual (Feed/Story/legenda faltando). Correção ESPECÍFICA do marco 7 (sem clamp
+    // geral de monotonicidade); pendingProduction NÃO é alterado globalmente (segue valendo p/ editor/cards).
+    {key:'aguardando_legenda',label:'Aguardando legenda / posts',    done:!!(prodOk||resent),  ev:['social_producao','social_editou_conteudo']},
     {key:'enviado_final',     label:'Enviado para aprovação final',  done:!!resent,        ev:['reenviado_cliente','final_sent','final_review']},
     {key:'ajuste',            label:'Cliente pediu ajuste',          done:false, optional:true, active:ajusteAtivo, ev:['reviseItem','revision','edit_request']},
     {key:'concluido',         label:'Aprovado final / Concluído',    done:!!finalOk,       ev:['final_approved','ackFeedback','aprovado_final']},
@@ -6851,7 +6856,14 @@ function taskTimeline(t){
     }
     if(m.key==='criado'&&!at) at=t.createdAt||null;
     if(m.key==='concluido'&&!at&&finalOk) at=t.doneAt||null;
-    return {key:m.key,label:m.label,state:state,done:!!m.done,optional:!!m.optional,at:at,by:by};
+    // F3.5.6A-H14: rótulo contextual da ESPERA final. O marco 'concluido' só vira CURRENT com 1..8 done e
+    // finalOk=false ⇒ enviado_final done sem finalOk ⇒ flowSentToClientSignal=true (2ª rodada REALMENTE
+    // enviada). Nesse estado a UI comunica "Aguardando aprovação final" SEM mudar a CHAVE canônica
+    // ('concluido'); Concluído REAL (finalOk ⇒ state 'done') mantém "Aprovado final / Concluído". Evita um
+    // 11º marco e o impossível "Concluído — EM ANDAMENTO". NÃO fabrica data/autor para marco encerrado por fluxo.
+    let dispLabel=m.label;
+    if(m.key==='concluido'&&state==='current') dispLabel='Aguardando aprovação final';
+    return {key:m.key,label:dispLabel,state:state,done:!!m.done,optional:!!m.optional,at:at,by:by};
   });
   // ÚLTIMO evento (cronológico) — o item mais recente de history[]/clientActions[].
   // FASE 2 (passo 2.1): o rótulo é HUMANIZADO (via _tlHumanLabel) — nunca expõe kind/type cru.
