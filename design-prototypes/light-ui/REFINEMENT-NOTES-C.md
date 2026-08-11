@@ -4,6 +4,17 @@
 Somente pesquisa + design + simulação. Nada toca `desktop/`, o app, o tema, workflows ou release.
 Fonte da verdade = `proposta-c-refinada-v2-frame1.html` (self-contained; fontes embutidas em `_fonts.css`).
 
+## V4 — fidelidade ao produto real (owner aprovou a linguagem visual da V3)
+Arquivo: `proposta-c-refinada-v4-frame1.html`. Mesma qualidade visual da V3, corrigindo tudo que era
+**inventado / implicava funcionalidade inexistente** — matriz de auditoria READ-ONLY do renderer real em
+`LIGHT-UI-FUTURE-UX-BACKLOG.md`. Removidos (→ backlog): alternador Kanban/Lista/Calendário, "Espaço da
+Agência" + seletor de workspace, "Plano Business", lista de clientes na sidebar, densidade Compacto/Confortável,
+"Ordenar". Corrigido: label real "Social Medias"; marca "Agenda ID Seven / sincronizado"; sidebar = nav real
+(Minhas Prioridades/Hoje/Agenda/Tarefas/Equipe/Perfil/Executivo/Relatórios/Notificações/Configurações, Tarefas ativo).
+Mantidos por serem reais: busca+⌘K, SLA, notificações, perfil, Nova tarefa, Filtros + filtro por Responsável,
+abas (Meu quadro/Cliente/Designers/Social Medias/Setores). Cards com **1 tag principal** (progressive disclosure);
+drawer com melhor rítmo vertical. Sem barra de métricas; 1920×1080 exatos.
+
 ## V3 — refinamento (evolução da V2, mesma arquitetura; owner aprovou a direção)
 Arquivo: `proposta-c-refinada-v3-frame1.html` · comparação: `C_v2_v3_comparacao.png`.
 - **Sem barra de métricas inferior** — o Kanban ocupa a maior parte da tela (métricas migram para Executivo/summary recolhível).
