@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920">
+<title>Proposta B — Executive · Agenda ID Seven (Maquete)</title>
+<style>
+  /* ===== MAQUETE DE DESIGN — NÃO É PRODUÇÃO ===== */
+  :root{
+    --bg:#F4F5F7; --surface:#FFFFFF; --surface2:#EBEEF2; --surface3:#F1F3F6;
+    --line:#DDE1E7; --line2:#E9ECF0;
+    --ink:#141B26; --soft:#586274; --faint:#909AA8;
+    --accent:#2F6FED;                 /* B: azul corporativo */
+    --s-azul:#2E6BE6; --s-laranja:#F5860F; --s-violeta:#8250DF; --s-verde:#1FA85C;
+    --r-sm:6px; --r-md:9px; --r-lg:12px; --r-pill:999px;
+    --sh-xs:0 1px 1px rgba(20,27,38,.06);
+    --sh-sm:0 1px 2px rgba(20,27,38,.10);
+    --sh-md:0 4px 12px rgba(20,27,38,.10);
+    --sh-lg:0 14px 34px rgba(20,27,38,.16);
+    --sh-hover:0 6px 16px rgba(20,27,38,.14);
+    --sh-drawer:-18px 0 48px rgba(20,27,38,.16);
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:#cfd4db;font-family:var(--font);color:var(--ink);-webkit-font-smoothing:antialiased}
+  .page{padding:34px 40px 80px}
+  .doc-banner{max-width:1920px;margin:0 auto 26px;background:#fff;border:1px solid #c6ccd4;border-left:5px solid var(--accent);border-radius:10px;padding:16px 22px;box-shadow:var(--sh-sm)}
+  .doc-banner h1{margin:0 0 4px;font-size:18px;letter-spacing:-.01em}
+  .doc-banner p{margin:0;color:var(--soft);font-size:13px;line-height:1.5}
+  .doc-banner .tag-nprod{display:inline-block;background:#FEF2F2;color:#B42318;border:1px solid #FECDCA;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;margin-left:8px;letter-spacing:.02em}
+  .caption{max-width:1920px;margin:40px auto 12px;color:#2b3440;font-size:14px;font-weight:600;display:flex;align-items:center;gap:10px}
+  .caption .num{background:var(--accent);color:#fff;font-size:12px;font-weight:700;padding:3px 10px;border-radius:6px}
+  .caption .sub{color:#5c6672;font-weight:500}
+  .frame{width:1920px;height:1080px;margin:0 auto;background:var(--bg);border-radius:14px;overflow:hidden;position:relative;box-shadow:var(--sh-lg);display:flex}
+  .ic{width:17px;height:17px;stroke:currentColor;stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:none}
+  .ic.sm{width:14px;height:14px}
+  .ic.xs{width:12px;height:12px;stroke-width:1.9}
+
+  /* ===== SIDEBAR (clara, densa) ===== */
+  .side{width:236px;flex:none;background:#FAFBFC;border-right:1px solid var(--line);display:flex;flex-direction:column;padding:16px 12px}
+  .brand{display:flex;align-items:center;gap:10px;padding:4px 6px 16px;border-bottom:1px solid var(--line2);margin-bottom:10px}
+  .brand .mk{width:34px;height:34px;border-radius:8px;background:linear-gradient(150deg,#2F6FED,#1B54C4);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:16px;box-shadow:0 4px 10px rgba(47,111,237,.32)}
+  .brand .bt{font-weight:700;font-size:14px;letter-spacing:-.01em}
+  .brand .bs{font-size:10.5px;color:var(--faint);margin-top:1px}
+  .nav{display:flex;flex-direction:column;gap:1px}
+  .nlabel{font-size:10.5px;font-weight:700;color:var(--faint);letter-spacing:.06em;text-transform:uppercase;padding:14px 8px 6px}
+  .ni{display:flex;align-items:center;gap:10px;padding:7px 9px;border-radius:7px;color:var(--soft);font-size:13px;font-weight:500;cursor:pointer}
+  .ni:hover{background:var(--surface2)}
+  .ni.active{background:#E7EFFD;color:#1B54C4;font-weight:600}
+  .ni.active .ic{color:#1B54C4}
+  .ni .cnt{margin-left:auto;font-size:10.5px;background:#E3E7ED;color:var(--soft);padding:1px 6px;border-radius:5px;font-weight:700}
+  .ni.active .cnt{background:#CFE0FC;color:#1B54C4}
+  .brd{display:flex;align-items:center;gap:9px;padding:6px 9px;border-radius:7px;color:var(--soft);font-size:12.5px;cursor:pointer}
+  .brd:hover{background:var(--surface2)}
+  .brd .sw{width:8px;height:8px;border-radius:2px;flex:none}
+  .brd .bc{margin-left:auto;font-size:10.5px;color:var(--faint);font-weight:600}
+  .side-foot{margin-top:auto;border-top:1px solid var(--line);padding-top:10px;display:flex;align-items:center;gap:9px}
+  .side-foot .ava{width:30px;height:30px;font-size:11px}
+  .side-foot .nm{font-size:12px;font-weight:600}
+  .side-foot .rl{font-size:10.5px;color:var(--faint)}
+
+  /* ===== MAIN ===== */
+  .main{flex:1;display:flex;flex-direction:column;min-width:0}
+  .top{height:60px;flex:none;border-bottom:1px solid var(--line);background:#fff;display:flex;align-items:center;gap:14px;padding:0 22px}
+  .top h2{font-size:18px;letter-spacing:-.01em;margin:0}
+  .top .crumb{font-size:11px;color:var(--faint)}
+  .search{margin-left:6px;display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid transparent;border-radius:8px;padding:7px 12px;width:260px;color:var(--faint)}
+  .search input{border:0;background:transparent;outline:0;font-family:inherit;font-size:12.5px;color:var(--ink);width:100%}
+  .top-right{margin-left:auto;display:flex;align-items:center;gap:9px}
+  .segbtn{display:flex;background:var(--surface2);border-radius:7px;padding:2px}
+  .segbtn button{border:0;background:transparent;padding:6px 11px;border-radius:6px;display:flex;align-items:center;gap:6px;font-family:inherit;font-size:12px;font-weight:600;color:var(--soft);cursor:pointer}
+  .segbtn button.on{background:#fff;color:var(--ink);box-shadow:var(--sh-xs)}
+  .iconbtn{width:36px;height:36px;border-radius:8px;border:1px solid var(--line);background:#fff;display:flex;align-items:center;justify-content:center;color:var(--soft);cursor:pointer;position:relative}
+  .iconbtn:hover{background:var(--surface2)}
+  .iconbtn .badge{position:absolute;top:7px;right:8px;width:6px;height:6px;background:#F5860F;border-radius:50%;border:1.5px solid #fff}
+  .btn-primary{display:flex;align-items:center;gap:7px;background:var(--accent);color:#fff;border:0;font-family:inherit;font-size:12.5px;font-weight:600;padding:9px 14px;border-radius:8px;cursor:pointer;box-shadow:0 4px 10px rgba(47,111,237,.28)}
+  .btn-primary:hover{filter:brightness(1.05)}
+
+  /* ===== KPI + FILTER STRIP (Executive) ===== */
+  .subbar{height:52px;flex:none;display:flex;align-items:center;gap:0;padding:0 22px;border-bottom:1px solid var(--line);background:var(--surface3)}
+  .kpi{display:flex;align-items:center;gap:9px;padding-right:22px;margin-right:22px;border-right:1px solid var(--line)}
+  .kpi .kv{font-size:17px;font-weight:800;letter-spacing:-.02em}
+  .kpi .kl{font-size:11px;color:var(--soft);font-weight:600;line-height:1.15}
+  .kpi.risk .kv{color:#C4463F}
+  .kpi.done .kv{color:#0F7A43}
+  .subbar .flabel{font-size:11px;color:var(--faint);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-right:2px}
+  .peostack{display:flex}
+  .peostack .ava{width:27px;height:27px;font-size:10px;margin-left:-7px;border:2px solid #fff}
+  .peostack .ava:first-child{margin-left:0}
+  .peostack .more-a{width:27px;height:27px;border-radius:50%;background:var(--surface2);color:var(--soft);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-left:-7px;border:2px solid #fff}
+  .fchip{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--soft);border:1px solid var(--line);background:#fff;border-radius:7px;padding:6px 11px;cursor:pointer;font-weight:600}
+  .fchip:hover{background:var(--surface2)}
+  .fchip .ic{color:var(--faint)}
+  .fspace{margin-left:auto}
+  .subbar .grp{display:flex;align-items:center;gap:9px}
+
+  /* ===== BOARD (denso) ===== */
+  .board{flex:1;display:flex;gap:14px;padding:16px 22px;overflow:hidden}
+  .col{flex:1 1 0;min-width:0;background:var(--surface2);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column}
+  .col-head{display:flex;align-items:center;gap:8px;padding:11px 12px;border-bottom:1px solid var(--line);border-top:2px solid var(--s);border-radius:12px 12px 0 0;background:var(--surface3)}
+  .status{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:700;letter-spacing:-.01em;text-transform:uppercase;font-size:11.5px;letter-spacing:.03em}
+  .sdot{width:9px;height:9px;border-radius:50%;flex:none;background:var(--s)}
+  .status .ic{color:var(--s)}
+  .col .count{background:#fff;border:1px solid var(--line);color:var(--soft);font-size:11px;font-weight:700;padding:1px 8px;border-radius:5px}
+  .col .wip{font-size:10.5px;color:var(--faint);font-weight:600}
+  .col-head .add{margin-left:auto;width:24px;height:24px;border-radius:6px;border:0;background:transparent;color:var(--faint);display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .col-head .add:hover{background:#fff;color:var(--ink)}
+  .col-body{display:flex;flex-direction:column;gap:8px;padding:8px;overflow:hidden}
+
+  /* ===== CARD (info-dense) ===== */
+  .card{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--u,var(--line));border-radius:9px;padding:10px 11px;box-shadow:var(--sh-xs);cursor:pointer;transition:box-shadow .13s,transform .13s}
+  .card:hover{box-shadow:var(--sh-hover);transform:translateY(-1px)}
+  .card.sel{box-shadow:0 0 0 2px var(--accent),var(--sh-hover);border-color:transparent}
+  .ctop{display:flex;align-items:center;gap:7px;margin-bottom:7px}
+  .pri{font-size:9.5px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;padding:2px 6px;border-radius:4px}
+  .pri-high{color:#B42318;background:#FEECEB}
+  .pri-med{color:#B4610A;background:#FDF0DF}
+  .pri-low{color:#0E7BAA;background:#E5F4FB}
+  .client{font-size:11px;font-weight:600;color:var(--soft);display:flex;align-items:center;gap:5px}
+  .client .cdot{width:6px;height:6px;border-radius:2px;background:var(--u);flex:none}
+  .id{margin-left:auto;font-size:10.5px;color:var(--faint);font-weight:600;font-family:ui-monospace,Menlo,monospace}
+  .ctitle{font-size:13px;font-weight:600;line-height:1.3;letter-spacing:-.005em;margin:0 0 8px}
+  .cmeta-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:9px;font-size:11px;color:var(--faint);font-weight:500}
+  .cmeta-row span{display:inline-flex;align-items:center;gap:4px}
+  .cmeta-row .due.soon{color:#C4463F;font-weight:700}
+  .cmeta-row .subc{color:var(--soft);font-weight:600}
+  .tag{font-size:10px;font-weight:600;color:var(--soft);background:var(--surface2);border-radius:4px;padding:2px 6px}
+  .progress{height:5px;border-radius:999px;background:var(--surface2);overflow:hidden;margin-bottom:9px}
+  .progress i{display:block;height:100%;border-radius:999px;background:var(--s-laranja)}
+  .cfoot{display:flex;align-items:center;gap:7px;border-top:1px solid var(--line2);padding-top:8px}
+  .resp{display:inline-flex;align-items:center;gap:6px}
+  .resp .ava{width:22px;height:22px;font-size:9px}
+  .resp .rn{font-size:11px;font-weight:600;color:color-mix(in srgb,var(--u) 80%,#101a28)}
+  .cfoot .end{margin-left:auto;display:flex;align-items:center;gap:11px;color:var(--faint);font-size:11px;font-weight:600}
+  .cfoot .end span{display:inline-flex;align-items:center;gap:4px}
+  .ava{border-radius:50%;background:var(--u,#94a3b8);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none;box-shadow:0 0 0 1px #fff,0 0 0 2.5px var(--u,#94a3b8);letter-spacing:.02em}
+  .approve{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;color:#6D3FB8;background:#F2ECFB;border-radius:4px;padding:3px 7px;margin-bottom:9px;text-transform:uppercase;letter-spacing:.02em}
+  .done-line{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;color:#0F7A43;margin-bottom:8px;text-transform:uppercase;letter-spacing:.02em}
+
+  /* ===== DRAWER (denso) ===== */
+  .drawer{width:436px;flex:none;background:#fff;border-left:1px solid var(--line);box-shadow:var(--sh-drawer);display:flex;flex-direction:column}
+  .dw-head{padding:16px 20px 12px;border-bottom:1px solid var(--line);background:var(--surface3)}
+  .dw-top{display:flex;align-items:center;gap:9px;margin-bottom:11px}
+  .dw-crumb{font-size:11px;color:var(--soft);font-weight:700;display:flex;align-items:center;gap:6px;text-transform:uppercase;letter-spacing:.03em}
+  .dw-crumb .cdot{width:6px;height:6px;border-radius:2px;background:var(--u)}
+  .dw-id{font-size:10.5px;color:var(--faint);font-family:ui-monospace,Menlo,monospace;font-weight:600}
+  .dw-x{margin-left:auto;width:30px;height:30px;border-radius:7px;border:1px solid var(--line);background:#fff;display:flex;align-items:center;justify-content:center;color:var(--soft);cursor:pointer}
+  .statuspill{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:800;border-radius:5px;padding:4px 10px;text-transform:uppercase;letter-spacing:.03em}
+  .statuspill .sdot{width:7px;height:7px}
+  .sp-laranja{background:#FDEEDA;color:#B4610A}
+  .dw-title{font-size:18px;font-weight:700;letter-spacing:-.01em;line-height:1.25;margin:10px 0 0}
+  .dw-tabs{display:flex;gap:2px;padding:0 20px;border-bottom:1px solid var(--line);background:#fff}
+  .dw-tab{padding:11px 12px;font-size:12.5px;font-weight:600;color:var(--soft);border-bottom:2px solid transparent;cursor:pointer}
+  .dw-tab.on{color:var(--accent);border-bottom-color:var(--accent)}
+  .dw-body{flex:1;overflow:hidden;padding:16px 20px;display:flex;flex-direction:column;gap:16px}
+  .dw-sec-t{font-size:10.5px;font-weight:800;color:var(--faint);letter-spacing:.06em;text-transform:uppercase;margin-bottom:9px}
+  .resp-big{display:flex;align-items:center;gap:11px;padding:10px;border-radius:9px;background:color-mix(in srgb,var(--u) 8%,#fff);border:1px solid color-mix(in srgb,var(--u) 22%,#fff)}
+  .resp-big .ava{width:38px;height:38px;font-size:13px}
+  .resp-big .rn{font-size:13.5px;font-weight:700}
+  .resp-big .rr{font-size:11.5px;color:var(--soft);margin-top:1px}
+  .resp-big .rtag{margin-left:auto;font-size:10.5px;font-weight:800;color:color-mix(in srgb,var(--u) 80%,#101a28);background:#fff;border:1px solid color-mix(in srgb,var(--u) 30%,#fff);border-radius:5px;padding:3px 9px;text-transform:uppercase;letter-spacing:.03em}
+  .meta-table{border:1px solid var(--line);border-radius:9px;overflow:hidden}
+  .meta-row{display:flex;align-items:center;padding:9px 12px;border-bottom:1px solid var(--line2);font-size:12.5px}
+  .meta-row:last-child{border-bottom:0}
+  .meta-row .k{width:110px;color:var(--soft);font-weight:600;display:flex;align-items:center;gap:7px}
+  .meta-row .v{font-weight:600}
+  .meta-row .v.soon{color:#C4463F}
+  .meta-row .v.high{color:#B42318}
+  .desc{font-size:12.5px;line-height:1.55;color:#37424F}
+  .prog-row{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+  .prog-row .pct{font-size:12.5px;font-weight:800}
+  .prog-row .progress{flex:1;margin:0;height:7px}
+  .check{display:flex;align-items:center;gap:9px;padding:7px 2px;border-bottom:1px solid var(--line2);font-size:12.5px}
+  .check:last-child{border-bottom:0}
+  .cbox{width:17px;height:17px;border-radius:5px;border:1.7px solid #CBD3DC;flex:none;display:flex;align-items:center;justify-content:center}
+  .cbox.on{background:var(--s-verde);border-color:var(--s-verde);color:#fff}
+  .check.on span{color:var(--faint);text-decoration:line-through}
+  .dw-foot{border-top:1px solid var(--line);padding:12px 20px;display:flex;gap:9px;background:var(--surface3)}
+  .dw-foot .btn-primary{flex:1;justify-content:center;padding:10px}
+  .dw-foot .btn-ghost{flex:none;display:flex;align-items:center;gap:7px;border:1px solid var(--line);background:#fff;border-radius:8px;padding:10px 13px;font-family:inherit;font-size:12.5px;font-weight:600;color:var(--soft);cursor:pointer}
+
+  /* ===== VIEW 3 ===== */
+  .board.states{align-items:stretch}
+  .state-note{margin:8px;font-size:11px;color:var(--soft);line-height:1.5;background:#fff;border:1px solid var(--line);border-radius:8px;padding:9px 11px}
+  .state-note b{color:var(--ink)}
+  .legend-strip{position:absolute;left:0;right:0;bottom:0;height:56px;background:#fff;border-top:1px solid var(--line);display:flex;align-items:center;gap:24px;padding:0 32px;font-size:12px;color:var(--soft)}
+  .legend-strip .li{display:flex;align-items:center;gap:8px;font-weight:600}
+  .legend-strip .li b{color:var(--ink);font-weight:800}
+  .legend-strip .sdot{width:10px;height:10px}
+
+  /* ===== VIEW 4 ===== */
+  .userwrap{flex:1;display:flex;flex-direction:column;padding:22px 26px;overflow:hidden}
+  .uhead{margin-bottom:16px}
+  .uhead h3{font-size:18px;letter-spacing:-.01em;margin:0 0 5px}
+  .uhead p{margin:0;color:var(--soft);font-size:12.5px;max-width:840px;line-height:1.5}
+  .utable{width:100%;border-collapse:separate;border-spacing:0;background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .utable th{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);font-weight:800;text-align:left;padding:11px 14px;background:var(--surface3);border-bottom:1px solid var(--line)}
+  .utable td{padding:10px 14px;border-bottom:1px solid var(--line2);font-size:12.5px;vertical-align:middle}
+  .utable tr:last-child td{border-bottom:0}
+  .u-person{display:flex;align-items:center;gap:10px}
+  .u-person .ava{width:32px;height:32px;font-size:11px}
+  .u-person .nm{font-weight:700}
+  .u-person .rl{font-size:11px;color:var(--faint)}
+  .u-sw{display:inline-flex;align-items:center;gap:9px}
+  .u-sw i{width:22px;height:22px;border-radius:6px;background:var(--u);box-shadow:var(--sh-xs)}
+  .u-sw .hex{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:var(--soft);font-weight:600}
+  .u-apply{display:flex;gap:7px}
+  .u-apply .mini{font-size:10px;font-weight:700;color:color-mix(in srgb,var(--u) 80%,#101a28);background:color-mix(in srgb,var(--u) 12%,#fff);border-radius:4px;padding:3px 7px;display:inline-flex;align-items:center;gap:5px}
+  .u-apply .mini .d{width:6px;height:6px;border-radius:50%;background:var(--u)}
+  .u-chip{display:inline-flex;align-items:center;gap:6px;background:color-mix(in srgb,var(--u) 10%,#fff);border:1px solid color-mix(in srgb,var(--u) 26%,#fff);border-radius:6px;padding:4px 9px 4px 4px}
+  .u-chip .ava{width:20px;height:20px;font-size:8.5px}
+  .u-chip .cn{font-size:11px;font-weight:700;color:color-mix(in srgb,var(--u) 80%,#101a28)}
+  .scale-note{margin-top:14px;display:flex;align-items:center;gap:18px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 16px}
+  .scale-note .swatches{display:flex;gap:4px}
+  .scale-note .swatches i{width:18px;height:18px;border-radius:5px;display:block}
+  .scale-note p{margin:0;font-size:11.5px;color:var(--soft);line-height:1.5}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></symbol>
+  <symbol id="i-kanban" viewBox="0 0 24 24"><rect x="3" y="4" width="6" height="16" rx="1.5"/><rect x="10.5" y="4" width="6" height="11" rx="1.5"/><rect x="18" y="4" width="3" height="16" rx="1.5"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2.5"/><path d="M3 9h18M8 2v4M16 2v4"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5 19 12 7 19.5z"/></symbol>
+  <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M3 12h5l2 3h4l2-3h5M3 12l3-7h12l3 7v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-comment" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="i-attach" viewBox="0 0 24 24"><path d="M21 11.5 12.5 20a5 5 0 0 1-7-7l8-8a3.3 3.3 0 0 1 4.7 4.7l-8 8a1.7 1.7 0 0 1-2.4-2.4l7.4-7.4"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></symbol>
+  <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0 1 12 0M17 5a3 3 0 0 1 0 6M22 20a6 6 0 0 0-4-5.6"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V4M4 20h16M8 20v-6M13 20V9M18 20v-9"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></symbol>
+  <symbol id="i-move" viewBox="0 0 24 24"><path d="M5 9 2 12l3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h2M10 12h10M4 18h7M15 18h5"/><circle cx="15" cy="6" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="13" cy="18" r="2"/></symbol>
+  <symbol id="i-list-check" viewBox="0 0 24 24"><path d="M3 6l2 2 3-3M3 13l2 2 3-3M3 20l2 2 3-3M12 6h9M12 13h9M12 20h9"/></symbol>
+</svg>
+
+<div class="page">
+  <div class="doc-banner">
+    <h1>Proposta B — “Executive” <span class="tag-nprod">MAQUETE · NÃO É PRODUÇÃO</span></h1>
+    <p>Direção densa e profissional: paleta fria e nítida, bordas crisp de 1px, tira de KPIs, IDs de tarefa e cards com mais informação por linha (prioridade, prazo, subtarefas, contagens). Ideal para gestores que acompanham muitos itens. Todas as 4 vistas em 1920×1080. Não altera o app, o tema, nem entra no build.</p>
+  </div>
+
+  <!-- ===================== VISTA 1 ===================== -->
+  <div class="caption"><span class="num">Vista 1</span> Quadro completo “Meu quadro” <span class="sub">— denso, com tira de KPIs e 4 colunas populadas</span></div>
+  <div class="frame">
+    <aside class="side">
+      <div class="brand"><div class="mk">7</div><div><div class="bt">Agenda ID Seven</div><div class="bs">Espaço da Agência</div></div></div>
+      <nav class="nav">
+        <div class="ni active"><svg class="ic sm"><use href="#i-kanban"/></svg>Meu quadro<span class="cnt">24</span></div>
+        <div class="ni"><svg class="ic sm"><use href="#i-list-check"/></svg>Minhas tarefas<span class="cnt">7</span></div>
+        <div class="ni"><svg class="ic sm"><use href="#i-cal"/></svg>Calendário</div>
+        <div class="ni"><svg class="ic sm"><use href="#i-users"/></svg>Clientes</div>
+        <div class="ni"><svg class="ic sm"><use href="#i-chart"/></svg>Relatórios</div>
+      </nav>
+      <div class="nlabel">Quadros de clientes</div>
+      <div class="nav">
+        <div class="brd"><span class="sw" style="background:#F0616D"></span>Sunset Wear<span class="bc">6</span></div>
+        <div class="brd"><span class="sw" style="background:#159FD6"></span>MoveOn<span class="bc">5</span></div>
+        <div class="brd"><span class="sw" style="background:#7C5CFF"></span>Startup Lab<span class="bc">4</span></div>
+        <div class="brd"><span class="sw" style="background:#12A56A"></span>Bold Brands<span class="bc">4</span></div>
+        <div class="brd"><span class="sw" style="background:#E08A1E"></span>GreenLife<span class="bc">3</span></div>
+        <div class="brd"><span class="sw" style="background:#64748B"></span>Café do Centro<span class="bc">2</span></div>
+      </div>
+      <div class="side-foot"><span class="ava" style="--u:#4C63D9">FA</span><div><div class="nm">Felipe Andrade</div><div class="rl">Gestor de projetos</div></div></div>
+    </aside>
+    <div class="main">
+      <header class="top">
+        <div><div class="crumb">Espaço da Agência · Quadro</div><h2>Meu quadro</h2></div>
+        <div class="search"><svg class="ic sm"><use href="#i-search"/></svg><input placeholder="Buscar por tarefa, cliente ou #ID…"></div>
+        <div class="top-right">
+          <div class="segbtn"><button class="on"><svg class="ic sm"><use href="#i-kanban"/></svg>Kanban</button><button><svg class="ic sm"><use href="#i-list"/></svg>Lista</button><button><svg class="ic sm"><use href="#i-cal"/></svg>Calendário</button></div>
+          <button class="iconbtn"><svg class="ic"><use href="#i-bell"/></svg><span class="badge"></span></button>
+          <button class="btn-primary"><svg class="ic sm"><use href="#i-plus"/></svg>Nova tarefa</button>
+        </div>
+      </header>
+      <div class="subbar">
+        <div class="kpi"><span class="kv">24</span><span class="kl">Tarefas<br>ativas</span></div>
+        <div class="kpi"><span class="kv">8</span><span class="kl">Em<br>andamento</span></div>
+        <div class="kpi risk"><span class="kv">3</span><span class="kl">Em<br>risco</span></div>
+        <div class="kpi done"><span class="kv">6</span><span class="kl">Concluídas<br>na semana</span></div>
+        <span class="flabel" style="margin-left:6px">Responsável</span>
+        <div class="peostack"><span class="ava" style="--u:#F0616D">AB</span><span class="ava" style="--u:#159FD6">BC</span><span class="ava" style="--u:#7C5CFF">CM</span><span class="ava" style="--u:#12A56A">DR</span><span class="ava" style="--u:#E08A1E">GN</span><span class="more-a">+5</span></div>
+        <div class="fspace"></div>
+        <div class="grp"><button class="fchip"><svg class="ic sm"><use href="#i-filter"/></svg>Filtros</button><button class="fchip"><svg class="ic sm"><use href="#i-sliders"/></svg>Prazo</button></div>
+      </div>
+      <div class="board">
+        <!-- A FAZER -->
+        <section class="col" style="--s:var(--s-azul)">
+          <div class="col-head"><span class="status"><span class="sdot"></span>A Fazer<svg class="ic xs"><use href="#i-inbox"/></svg></span><span class="count">6</span><span class="wip">WIP —</span><button class="add"><svg class="ic sm"><use href="#i-plus"/></svg></button></div>
+          <div class="col-body">
+            <article class="card" style="--u:#159FD6"><div class="ctop"><span class="pri pri-high">Alta</span><span class="client"><span class="cdot"></span>MoveOn</span><span class="id">#1051</span></div><h4 class="ctitle">Anúncios Google Ads — Search</h4><div class="cmeta-row"><span class="due soon"><svg class="ic xs"><use href="#i-clock"/></svg>15 ago</span><span class="subc"><svg class="ic xs"><use href="#i-list-check"/></svg>0/6</span><span class="tag">Tráfego</span></div><div class="cfoot"><span class="resp"><span class="ava">BC</span><span class="rn">Bruno</span></span><span class="end"><span><svg class="ic xs"><use href="#i-attach"/></svg>1</span></span></div></article>
+            <article class="card" style="--u:#E08A1E"><div class="ctop"><span class="pri pri-med">Média</span><span class="client"><span class="cdot"></span>GreenLife</span><span class="id">#1048</span></div><h4 class="ctitle">Plano de Conteúdo — Setembro</h4><div class="cmeta-row"><span class="due"><svg class="ic xs"><use href="#i-clock"/></svg>18 ago</span><span class="tag">Social</span><span class="tag">Estratégia</span></div><div class="cfoot"><span class="resp"><span class="ava">GN</span><span class="rn">Gabriela</span></span><span class="end"><span><svg class="ic xs"><use href="#i-comment"/></svg>2</span></span></div></article>
+            <article class="card" style="--u:#7C5CFF"><div class="ctop"><span class="pri pri-med">Média</span><span class="client"><span class="cdot"></span>Startup Lab</span><span class="id">#1045</span></div><h4 class="ctitle">Layout Apresentação Comercial</h4><div class="cmeta-row"><span class="due"><svg class="ic xs"><use href="#i-clock"/></svg>22 ago</span><span class="tag">Design</span></div><div class="cfoot"><span class="resp"><span class="ava">CM</span><span class="rn">Carla</span></span></div></article>
+            <article class="card" style="--u:#64748B"><div class="ctop"><span class="pri pri-low">Baixa</span><span class="client"><span class="cdot"></span>Café do Centro</span><span class="id">#1043</span></div><h4 class="ctitle">Relatório de Resultados — Julho</h4><div class="cmeta-row"><span class="due"><svg class="ic xs"><use href="#i-clock"/></svg>25 ago</span><span class="tag">Dados</span></div><div class="cfoot"><span class="resp"><span class="ava">JP</span><span class="rn">João Pedro</span></span></div></article>
+            <article class="card" style="--u:#E24C9A"><div class="ctop"><span class="pri pri-low">Baixa</span><span class="client"><span class="cdot"></span>Startup Lab</span><span class="id">#1040</span></div><h4 class="ctitle">Plano de Conteúdo — Blog</h4><div class="cmeta-row"><span class="due"><svg class="ic xs"><use href="#i-clock"/></svg>28 ago</span><span class="tag">Redação</span></div><div class="cfoot"><span class="resp"><span class="ava">EL</span><span class="rn">Eduarda</span></span></div></article>
+          </div>
+        </section>
+        <!-- EM ANDAMENTO -->
+        <section class="col" style="--s:var(--s-laranja)">
+          <div class="col-head"><span class="status"><span class="sdot"></span>Em andamento<svg class="ic xs"><use href="#i-play"/></svg></span><span class="count">8</span><span class="wip">WIP 8/8</span><button class="add"><svg class="ic sm"><use href="#i-plus"/></svg></button></div>
+          <div class="col-body">
+            <article class="card" style="--u:#F0616D"><div class="ctop"><span class="pri pri-high">Alta</span><span class="client"><span class="cdot"></span>Sunset Wear</span><span class="id">#1042</span></div><h4 class="ctitle">Campanha de Lançamento — Verão</h4><div class="cmeta-row"><span class="due soon"><svg class="ic xs"><use href="#i-clock"/></svg>14 ago</span><span class="subc"><svg class="ic xs"><use href="#i-list-check"/></svg>3/5</span></div><div class="progress"><i style="width:60%"></i></div><div class="cfoot"><span class="resp"><span class="ava">AB</span><span class="rn">Ana Beatriz</span></span><span class="end"><span><svg class="ic xs"><use href="#i-comment"/></svg>3</span></span></div></article>
+            <article class="card" style="--u:#12A56A"><div class="ctop"><span class="pri pri-med">Média</span><span class="client"><span class="cdot"></span>Bold Brands</span><span class="id">#1039</span></div><h4 class="ctitle">Vídeo Institucional — Roteiro</h4><div class="cmeta-row"><span class="due"><svg class="ic xs"><use href="#i-clock"/></svg>19 ago</span><span class="subc"><svg class="ic xs"><use href="#i-list-check"/></svg>2/5</span></div><div class="progress"><i style="width:40%"></i></div><div class="cfoot"><span class="resp"><span class="ava">DR</span><span class="rn">Diego</span></span><span class="end"><span><svg class="ic xs"><use href="#i-attach"/></svg>4</span></span></div></article>
+            <article class="card" style="--u:#4C63D9"><div class="ctop"><span class="pri pri-med">Média</span><span class="client"><span class="cdot"></span>MoveOn</span><span class="id">#1036</span></div><h4 class="ctitle">Anúncios Google Ads — Display</h4><div class="cmeta-row"><span class="due"><svg class="ic xs"><use href="#i-clock"/></svg>20 ago</span><span class="subc"><svg class="ic xs"><use href="#i-list-check"/></svg>1/4</span></div><div class="progress"><i style="width:25%"></i></div><div class="cfoot"><span class="resp"><span class="ava">FA</span><span class="rn">Felipe</span></span></div></article>
+            <article class="card" style="--u:#0FB5B0"><div class="ctop"><span class="pri pri-low">Baixa</span><span class="client"><span class="cdot"></span>Bold Brands</span><span class="id">#1033</span></div><h4 class="ctitle">Vídeo Institucional — Motion</h4><div class="cmeta-row"><span class="due"><svg class="ic xs"><use href="#i-clock"/></svg>23 ago</span><span class="subc"><svg class="ic xs"><use href="#i-list-check"/></svg>2/3</span></div><div class="progress"><i style="width:66%"></i></div><div class="cfoot"><span class="resp"><span class="ava">HD</span><span class="rn">Henrique</span></span></div></article>
+          </div>
+        </section>
+        <!-- REVISÃO -->
+        <section class="col" style="--s:var(--s-violeta)">
+          <div class="col-head"><span class="status"><span class="sdot"></span>Revisão<svg class="ic xs"><use href="#i-eye"/></svg></span><span class="count">4</span><span class="wip">WIP —</span><button class="add"><svg class="ic sm"><use href="#i-plus"/></svg></button></div>
+          <div class="col-body">
+            <article class="card" style="--u:#12A56A"><div class="ctop"><span class="pri pri-high">Alta</span><span class="client"><span class="cdot"></span>Bold Brands</span><span class="id">#1029</span></div><h4 class="ctitle">Vídeo Institucional — Corte 2</h4><span class="approve"><svg class="ic xs"><use href="#i-eye"/></svg>Aguardando aprovação</span><div class="cfoot"><span class="resp"><span class="ava">DR</span><span class="rn">Diego</span></span><span class="end"><span><svg class="ic xs"><use href="#i-comment"/></svg>5</span></span></div></article>
+            <article class="card" style="--u:#B84AC0"><div class="ctop"><span class="pri pri-med">Média</span><span class="client"><span class="cdot"></span>Sunset Wear</span><span class="id">#1026</span></div><h4 class="ctitle">Campanha de Lançamento — Peças</h4><div class="cmeta-row"><span class="tag">Social</span><span class="tag">Design</span></div><div class="cfoot"><span class="resp"><span class="ava">IF</span><span class="rn">Isabela</span></span><span class="end"><span><svg class="ic xs"><use href="#i-comment"/></svg>2</span></span></div></article>
+            <article class="card" style="--u:#E08A1E"><div class="ctop"><span class="pri pri-med">Média</span><span class="client"><span class="cdot"></span>GreenLife</span><span class="id">#1024</span></div><h4 class="ctitle">Plano de Conteúdo — Agosto</h4><span class="approve"><svg class="ic xs"><use href="#i-eye"/></svg>Revisão do cliente</span><div class="cfoot"><span class="resp"><span class="ava">GN</span><span class="rn">Gabriela</span></span><span class="end"><span><svg class="ic xs"><use href="#i-attach"/></svg>3</span></span></div></article>
+          </div>
+        </section>
+        <!-- FINALIZADO -->
+        <section class="col" style="--s:var(--s-verde)">
+          <div class="col-head"><span class="status"><span class="sdot"></span>Finalizado<svg class="ic xs"><use href="#i-check"/></svg></span><span class="count">6</span><span class="wip">semana</span><button class="add"><svg class="ic sm"><use href="#i-plus"/></svg></button></div>
+          <div class="col-body">
+            <article class="card" style="--u:#64748B"><div class="ctop"><span class="pri pri-low">Baixa</span><span class="client"><span class="cdot"></span>Café do Centro</span><span class="id">#1018</span></div><h4 class="ctitle">Relatório de Resultados — Junho</h4><span class="done-line"><svg class="ic xs"><use href="#i-check"/></svg>Concluído 05 ago</span><div class="cfoot"><span class="resp"><span class="ava">JP</span><span class="rn">João Pedro</span></span><span class="end"><span><svg class="ic xs"><use href="#i-attach"/></svg>1</span></span></div></article>
+            <article class="card" style="--u:#0FB5B0"><div class="ctop"><span class="pri pri-med">Média</span><span class="client"><span class="cdot"></span>Bold Brands</span><span class="id">#1015</span></div><h4 class="ctitle">Vídeo Institucional — Teaser</h4><span class="done-line"><svg class="ic xs"><use href="#i-check"/></svg>Concluído 02 ago</span><div class="cfoot"><span class="resp"><span class="ava">HD</span><span class="rn">Henrique</span></span><span class="end"><span><svg class="ic xs"><use href="#i-comment"/></svg>6</span></span></div></article>
+            <article class="card" style="--u:#7C5CFF"><div class="ctop"><span class="pri pri-low">Baixa</span><span class="client"><span class="cdot"></span>Startup Lab</span><span class="id">#1011</span></div><h4 class="ctitle">Layout Apresentação — Pitch</h4><span class="done-line"><svg class="ic xs"><use href="#i-check"/></svg>Concluído 31 jul</span><div class="cfoot"><span class="resp"><span class="ava">CM</span><span class="rn">Carla</span></span></div></article>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== VISTA 2 ===================== -->
+  <div class="caption"><span class="num">Vista 2</span> Card selecionado + drawer lateral (com abas) <span class="sub">— detalhes densos à direita</span></div>
+  <div class="frame">
+    <aside class="side">
+      <div class="brand"><div class="mk">7</div><div><div class="bt">Agenda ID Seven</div><div class="bs">Espaço da Agência</div></div></div>
+      <nav class="nav">
+        <div class="ni active"><svg class="ic sm"><use href="#i-kanban"/></svg>Meu quadro<span class="cnt">24</span></div>
+        <div class="ni"><svg class="ic sm"><use href="#i-list-check"/></svg>Minhas tarefas<span class="cnt">7</span></div>
+        <div class="ni"><svg class="ic sm"><use href="#i-cal"/></svg>Calendário</div>
+        <div class="ni"><svg class="ic sm"><use href="#i-users"/></svg>Clientes</div>
+        <div class="ni"><svg class="ic sm"><use href="#i-chart"/></svg>Relatórios</div>
+      </nav>
+      <div class="nlabel">Quadros de clientes</div>
+      <div class="nav">
+        <div class="brd"><span class="sw" style="background:#F0616D"></span>Sunset Wear<span class="bc">6</span></div>
+        <div class="brd"><span class="sw" style="background:#159FD6"></span>MoveOn<span class="bc">5</span></div>
+        <div class="brd"><span class="sw" style="background:#7C5CFF"></span>Startup Lab<span class="bc">4</span></div>
+        <div class="brd"><span class="sw" style="background:#12A56A"></span>Bold Brands<span class="bc">4</span></div>
+      </div>
+      <div class="side-foot"><span class="ava" style="--u:#4C63D9">FA</span><div><div class="nm">Felipe Andrade</div><div class="rl">Gestor de projetos</div></div></div>
+    </aside>
+    <div class="main">
+      <header class="top">
+        <div><div class="crumb">Espaço da Agência · Quadro</div><h2>Meu quadro</h2></div>
+        <div class="search"><svg class="ic sm"><use href="#i-search"/></svg><input placeholder="Buscar por tarefa, cliente ou #ID…"></div>
+        <div class="top-right"><div class="segbtn"><button class="on"><svg class="ic sm"><use href="#i-kanban"/></svg>Kanban</button><button><svg class="ic sm"><use href="#i-list"/></svg>Lista</button></div><button class="iconbtn"><svg class="ic"><use href="#i-bell"/></svg><span class="badge"></span></button><button class="btn-primary"><svg class="ic sm"><use href="#i-plus"/></svg>Nova tarefa</button></div>
+      </header>
+      <div class="subbar">
+        <div class="kpi"><span class="kv">24</span><span class="kl">Tarefas<br>ativas</span></div>
+        <div class="kpi"><span class="kv">8</span><span class="kl">Em<br>andamento</span></div>
+        <div class="kpi risk"><span class="kv">3</span><span class="kl">Em<br>risco</span></div>
+        <div class="fspace"></div>
+        <div class="grp"><button class="fchip"><svg class="ic sm"><use href="#i-filter"/></svg>Filtros</button></div>
+      </div>
+      <div class="board">
+        <section class="col" style="--s:var(--s-azul)">
+          <div class="col-head"><span class="status"><span class="sdot"></span>A Fazer<svg class="ic xs"><use href="#i-inbox"/></svg></span><span class="count">6</span></div>
+          <div class="col-body">
+            <article class="card" style="--u:#159FD6"><div class="ctop"><span class="pri pri-high">Alta</span><span class="client"><span class="cdot"></span>MoveOn</span><span class="id">#1051</span></div><h4 class="ctitle">Anúncios Google Ads — Search</h4><div class="cmeta-row"><span class="due soon"><svg class="ic xs"><use href="#i-clock"/></svg>15 ago</span></div><div class="cfoot"><span class="resp"><span class="ava">BC</span><span class="rn">Bruno</span></span></div></article>
+            <article class="card" style="--u:#E08A1E"><div class="ctop"><span class="pri pri-med">Média</span><span class="client"><span class="cdot"></span>GreenLife</span><span class="id">#1048</span></div><h4 class="ctitle">Plano de Conteúdo — Setembro</h4><div class="cfoot"><span class="resp"><span class="ava">GN</span><span class="rn">Gabriela</span></span></div></article>
+          </div>
+        </section>
+        <section class="col" style="--s:var(--s-laranja)">
+          <div class="col-head"><span class="status"><span class="sdot"></span>Em andamento<svg class="ic xs"><use href="#i-play"/></svg></span><span class="count">8</span></div>
+          <div class="col-body">
+            <article class="card sel" style="--u:#F0616D"><div class="ctop"><span class="pri pri-high">Alta</span><span class="client"><span class="cdot"></span>Sunset Wear</span><span class="id">#1042</span></div><h4 class="ctitle">Campanha de Lançamento — Verão</h4><div class="cmeta-row"><span class="due soon"><svg class="ic xs"><use href="#i-clock"/></svg>14 ago</span><span class="subc"><svg class="ic xs"><use href="#i-list-check"/></svg>3/5</span></div><div class="progress"><i style="width:60%"></i></div><div class="cfoot"><span class="resp"><span class="ava">AB</span><span class="rn">Ana Beatriz</span></span><span class="end"><span><svg class="ic xs"><use href="#i-comment"/></svg>3</span></span></div></article>
+            <article class="card" style="--u:#12A56A"><div class="ctop"><span class="pri pri-med">Média</span><span class="client"><span class="cdot"></span>Bold Brands</span><span class="id">#1039</span></div><h4 class="ctitle">Vídeo Institucional — Roteiro</h4><div class="progress"><i style="width:40%"></i></div><div class="cfoot"><span class="resp"><span class="ava">DR</span><span class="rn">Diego</span></span></div></article>
+          </div>
+        </section>
+        <section class="col" style="--s:var(--s-violeta)">
+          <div class="col-head"><span class="status"><span class="sdot"></span>Revisão<svg class="ic xs"><use href="#i-eye"/></svg></span><span class="count">4</span></div>
+          <div class="col-body">
+            <article class="card" style="--u:#12A56A"><div class="ctop"><span class="pri pri-high">Alta</span><span class="client"><span class="cdot"></span>Bold Brands</span><span class="id">#1029</span></div><h4 class="ctitle">Vídeo Institucional — Corte 2</h4><span class="approve"><svg class="ic xs"><use href="#i-eye"/></svg>Aguardando aprovação</span><div class="cfoot"><span class="resp"><span class="ava">DR</span><span class="rn">Diego</span></span></div></article>
+          </div>
+        </section>
+      </div>
+    </div>
+    <aside class="drawer" style="--u:#F0616D">
+      <div class="dw-head">
+        <div class="dw-top"><span class="dw-crumb"><span class="cdot"></span>Sunset Wear</span><span class="dw-id">#1042</span><button class="dw-x"><svg class="ic sm"><use href="#i-x"/></svg></button></div>
+        <span class="statuspill sp-laranja"><span class="sdot" style="background:var(--s-laranja)"></span>Em andamento</span>
+        <h3 class="dw-title">Campanha de Lançamento — Verão</h3>
+      </div>
+      <div class="dw-tabs"><span class="dw-tab on">Detalhes</span><span class="dw-tab">Subtarefas · 5</span><span class="dw-tab">Anexos · 2</span><span class="dw-tab">Atividade</span></div>
+      <div class="dw-body">
+        <div>
+          <div class="dw-sec-t">Responsável</div>
+          <div class="resp-big"><span class="ava">AB</span><div><div class="rn">Ana Beatriz Rocha</div><div class="rr">Direção de arte</div></div><span class="rtag">Coral</span></div>
+        </div>
+        <div class="meta-table">
+          <div class="meta-row"><span class="k"><svg class="ic xs"><use href="#i-clock"/></svg>Prazo</span><span class="v soon">14 ago 2026 · em 3 dias</span></div>
+          <div class="meta-row"><span class="k"><svg class="ic xs"><use href="#i-flag"/></svg>Prioridade</span><span class="v high">Alta</span></div>
+          <div class="meta-row"><span class="k"><svg class="ic xs"><use href="#i-folder"/></svg>Cliente</span><span class="v">Sunset Wear</span></div>
+          <div class="meta-row"><span class="k"><svg class="ic xs"><use href="#i-cal"/></svg>Criado</span><span class="v">02 ago 2026 · por Felipe</span></div>
+          <div class="meta-row"><span class="k"><svg class="ic xs"><use href="#i-list-check"/></svg>Progresso</span><span class="v">60% · 3 de 5</span></div>
+        </div>
+        <div>
+          <div class="dw-sec-t">Descrição</div>
+          <p class="desc">Desenvolver a campanha de verão da Sunset Wear: conceito criativo, peças para Instagram/Meta Ads e página de captura. Alinhar tom com o novo posicionamento e preparar variações para teste A/B.</p>
+        </div>
+        <div>
+          <div class="dw-sec-t">Subtarefas · 3 de 5</div>
+          <div class="prog-row"><div class="progress"><i style="width:60%"></i></div><span class="pct">60%</span></div>
+          <div class="check on"><span class="cbox on"><svg class="ic xs"><use href="#i-check"/></svg></span><span>Briefing aprovado</span></div>
+          <div class="check on"><span class="cbox on"><svg class="ic xs"><use href="#i-check"/></svg></span><span>Conceito criativo</span></div>
+          <div class="check on"><span class="cbox on"><svg class="ic xs"><use href="#i-check"/></svg></span><span>Peças para o feed</span></div>
+          <div class="check"><span class="cbox"></span><span>Peças para stories</span></div>
+          <div class="check"><span class="cbox"></span><span>Página de captura</span></div>
+        </div>
+      </div>
+      <div class="dw-foot"><button class="btn-primary"><svg class="ic sm"><use href="#i-move"/></svg>Mover</button><button class="btn-ghost"><svg class="ic sm"><use href="#i-comment"/></svg>Comentar</button><button class="btn-ghost"><svg class="ic sm"><use href="#i-more"/></svg></button></div>
+    </aside>
+  </div>
+
+  <!-- ===================== VISTA 3 ===================== -->
+  <div class="caption"><span class="num">Vista 3</span> Os 4 estados de coluna <span class="sub">— cor + rótulo + ícone (nunca só a cor)</span></div>
+  <div class="frame">
+    <div class="main">
+      <header class="top"><div><div class="crumb">Sistema de status</div><h2>Estados das colunas</h2></div><div class="top-right"><span style="font-size:12px;color:var(--faint);font-weight:600">Cada estado combina ponto colorido + rótulo + ícone</span></div></header>
+      <div class="board states" style="padding-bottom:76px">
+        <section class="col" style="--s:var(--s-azul)">
+          <div class="col-head"><span class="status"><span class="sdot"></span>A Fazer<svg class="ic xs"><use href="#i-inbox"/></svg></span><span class="count">6</span></div>
+          <div class="col-body"><article class="card" style="--u:#159FD6"><div class="ctop"><span class="pri pri-high">Alta</span><span class="client"><span class="cdot"></span>MoveOn</span><span class="id">#1051</span></div><h4 class="ctitle">Anúncios Google Ads — Search</h4><div class="cmeta-row"><span class="due soon"><svg class="ic xs"><use href="#i-clock"/></svg>15 ago</span></div><div class="cfoot"><span class="resp"><span class="ava">BC</span><span class="rn">Bruno</span></span></div></article></div>
+          <div class="state-note"><b>A Fazer — Azul.</b> Fila de trabalho; ícone de lista/inbox.</div>
+        </section>
+        <section class="col" style="--s:var(--s-laranja)">
+          <div class="col-head"><span class="status"><span class="sdot"></span>Em andamento<svg class="ic xs"><use href="#i-play"/></svg></span><span class="count">8</span></div>
+          <div class="col-body"><article class="card" style="--u:#F0616D"><div class="ctop"><span class="pri pri-high">Alta</span><span class="client"><span class="cdot"></span>Sunset Wear</span><span class="id">#1042</span></div><h4 class="ctitle">Campanha de Lançamento — Verão</h4><div class="progress"><i style="width:60%"></i></div><div class="cfoot"><span class="resp"><span class="ava">AB</span><span class="rn">Ana Beatriz</span></span></div></article></div>
+          <div class="state-note"><b>Em andamento — Laranja.</b> Execução ativa; barra de progresso; ícone de play.</div>
+        </section>
+        <section class="col" style="--s:var(--s-violeta)">
+          <div class="col-head"><span class="status"><span class="sdot"></span>Revisão<svg class="ic xs"><use href="#i-eye"/></svg></span><span class="count">4</span></div>
+          <div class="col-body"><article class="card" style="--u:#B84AC0"><div class="ctop"><span class="pri pri-med">Média</span><span class="client"><span class="cdot"></span>Sunset Wear</span><span class="id">#1026</span></div><h4 class="ctitle">Campanha de Lançamento — Peças</h4><span class="approve"><svg class="ic xs"><use href="#i-eye"/></svg>Aguardando aprovação</span><div class="cfoot"><span class="resp"><span class="ava">IF</span><span class="rn">Isabela</span></span></div></article></div>
+          <div class="state-note"><b>Revisão — Violeta.</b> Aprovação interna/cliente; ícone de olho.</div>
+        </section>
+        <section class="col" style="--s:var(--s-verde)">
+          <div class="col-head"><span class="status"><span class="sdot"></span>Finalizado<svg class="ic xs"><use href="#i-check"/></svg></span><span class="count">6</span></div>
+          <div class="col-body"><article class="card" style="--u:#0FB5B0"><div class="ctop"><span class="pri pri-low">Baixa</span><span class="client"><span class="cdot"></span>Bold Brands</span><span class="id">#1015</span></div><h4 class="ctitle">Vídeo Institucional — Teaser</h4><span class="done-line"><svg class="ic xs"><use href="#i-check"/></svg>Concluído 02 ago</span><div class="cfoot"><span class="resp"><span class="ava">HD</span><span class="rn">Henrique</span></span></div></article></div>
+          <div class="state-note"><b>Finalizado — Verde.</b> Concluído, com data; ícone de check.</div>
+        </section>
+      </div>
+    </div>
+    <div class="legend-strip">
+      <span class="li"><span class="sdot" style="background:var(--s-azul)"></span><b>A Fazer</b></span>
+      <span class="li"><span class="sdot" style="background:var(--s-laranja)"></span><b>Em andamento</b></span>
+      <span class="li"><span class="sdot" style="background:var(--s-violeta)"></span><b>Revisão</b></span>
+      <span class="li"><span class="sdot" style="background:var(--s-verde)"></span><b>Finalizado</b></span>
+      <span class="li" style="margin-left:auto;color:var(--faint)">Acessibilidade: cor + rótulo + ícone — nunca só a cor.</span>
+    </div>
+  </div>
+
+  <!-- ===================== VISTA 4 ===================== -->
+  <div class="caption"><span class="num">Vista 4</span> Cor por usuário <span class="sub">— tabela de tokens + aplicação no card (anel, filete, chip)</span></div>
+  <div class="frame">
+    <div class="userwrap">
+      <div class="uhead"><h3>Sistema de cor por responsável</h3><p>Uma cor fixa por pessoa, aplicada como identidade (anel do avatar, filete de acento na borda, chip “responsável” e filtro). Nunca colore o card inteiro — identifica sem dominar. Tabela de tokens abaixo.</p></div>
+      <table class="utable">
+        <thead><tr><th style="width:26%">Pessoa</th><th style="width:16%">Função</th><th style="width:20%">Cor / token</th><th style="width:22%">Aplicação</th><th>Chip “responsável”</th></tr></thead>
+        <tbody>
+          <tr style="--u:#F0616D"><td><div class="u-person"><span class="ava">AB</span><span class="nm">Ana Beatriz Rocha</span></div></td><td>Direção de arte</td><td><span class="u-sw"><i></i><span class="hex">#F0616D · Coral</span></span></td><td><span class="u-apply"><span class="mini"><span class="d"></span>anel</span><span class="mini">filete</span><span class="mini">filtro</span></span></td><td><span class="u-chip"><span class="ava">AB</span><span class="cn">Ana Beatriz</span></span></td></tr>
+          <tr style="--u:#159FD6"><td><div class="u-person"><span class="ava">BC</span><span class="nm">Bruno Carvalho</span></div></td><td>Mídia paga</td><td><span class="u-sw"><i></i><span class="hex">#159FD6 · Ciano</span></span></td><td><span class="u-apply"><span class="mini"><span class="d"></span>anel</span><span class="mini">filete</span><span class="mini">filtro</span></span></td><td><span class="u-chip"><span class="ava">BC</span><span class="cn">Bruno</span></span></td></tr>
+          <tr style="--u:#7C5CFF"><td><div class="u-person"><span class="ava">CM</span><span class="nm">Carla Mendonça</span></div></td><td>Design</td><td><span class="u-sw"><i></i><span class="hex">#7C5CFF · Violeta</span></span></td><td><span class="u-apply"><span class="mini"><span class="d"></span>anel</span><span class="mini">filete</span><span class="mini">filtro</span></span></td><td><span class="u-chip"><span class="ava">CM</span><span class="cn">Carla</span></span></td></tr>
+          <tr style="--u:#12A56A"><td><div class="u-person"><span class="ava">DR</span><span class="nm">Diego Ramos</span></div></td><td>Audiovisual</td><td><span class="u-sw"><i></i><span class="hex">#12A56A · Esmeralda</span></span></td><td><span class="u-apply"><span class="mini"><span class="d"></span>anel</span><span class="mini">filete</span><span class="mini">filtro</span></span></td><td><span class="u-chip"><span class="ava">DR</span><span class="cn">Diego</span></span></td></tr>
+          <tr style="--u:#E24C9A"><td><div class="u-person"><span class="ava">EL</span><span class="nm">Eduarda Lima</span></div></td><td>Redação</td><td><span class="u-sw"><i></i><span class="hex">#E24C9A · Rosa</span></span></td><td><span class="u-apply"><span class="mini"><span class="d"></span>anel</span><span class="mini">filete</span><span class="mini">filtro</span></span></td><td><span class="u-chip"><span class="ava">EL</span><span class="cn">Eduarda</span></span></td></tr>
+          <tr style="--u:#4C63D9"><td><div class="u-person"><span class="ava">FA</span><span class="nm">Felipe Andrade</span></div></td><td>Gestão</td><td><span class="u-sw"><i></i><span class="hex">#4C63D9 · Índigo</span></span></td><td><span class="u-apply"><span class="mini"><span class="d"></span>anel</span><span class="mini">filete</span><span class="mini">filtro</span></span></td><td><span class="u-chip"><span class="ava">FA</span><span class="cn">Felipe</span></span></td></tr>
+          <tr style="--u:#E08A1E"><td><div class="u-person"><span class="ava">GN</span><span class="nm">Gabriela Nunes</span></div></td><td>Conteúdo</td><td><span class="u-sw"><i></i><span class="hex">#E08A1E · Âmbar</span></span></td><td><span class="u-apply"><span class="mini"><span class="d"></span>anel</span><span class="mini">filete</span><span class="mini">filtro</span></span></td><td><span class="u-chip"><span class="ava">GN</span><span class="cn">Gabriela</span></span></td></tr>
+          <tr style="--u:#0FB5B0"><td><div class="u-person"><span class="ava">HD</span><span class="nm">Henrique Dias</span></div></td><td>Motion</td><td><span class="u-sw"><i></i><span class="hex">#0FB5B0 · Turquesa</span></span></td><td><span class="u-apply"><span class="mini"><span class="d"></span>anel</span><span class="mini">filete</span><span class="mini">filtro</span></span></td><td><span class="u-chip"><span class="ava">HD</span><span class="cn">Henrique</span></span></td></tr>
+          <tr style="--u:#B84AC0"><td><div class="u-person"><span class="ava">IF</span><span class="nm">Isabela Freitas</span></div></td><td>Social</td><td><span class="u-sw"><i></i><span class="hex">#B84AC0 · Magenta</span></span></td><td><span class="u-apply"><span class="mini"><span class="d"></span>anel</span><span class="mini">filete</span><span class="mini">filtro</span></span></td><td><span class="u-chip"><span class="ava">IF</span><span class="cn">Isabela</span></span></td></tr>
+          <tr style="--u:#64748B"><td><div class="u-person"><span class="ava">JP</span><span class="nm">João Pedro Vasconcelos</span></div></td><td>Dados</td><td><span class="u-sw"><i></i><span class="hex">#64748B · Grafite</span></span></td><td><span class="u-apply"><span class="mini"><span class="d"></span>anel</span><span class="mini">filete</span><span class="mini">filtro</span></span></td><td><span class="u-chip"><span class="ava">JP</span><span class="cn">João Pedro</span></span></td></tr>
+        </tbody>
+      </table>
+      <div class="scale-note">
+        <div class="swatches"><i style="background:#F0616D"></i><i style="background:#159FD6"></i><i style="background:#7C5CFF"></i><i style="background:#12A56A"></i><i style="background:#E24C9A"></i><i style="background:#4C63D9"></i><i style="background:#E08A1E"></i><i style="background:#0FB5B0"></i><i style="background:#B84AC0"></i><i style="background:#64748B"></i><i style="background:#7BAF3A"></i><i style="background:#3E8BFF"></i><i style="background:#9A5BD6"></i><i style="background:#D2683C"></i><i style="background:#0E7C86"></i><i style="background:#D6336C"></i><i style="background:#8A8F2E"></i><i style="background:#2D53C8"></i><i style="background:#7048B6"></i><i style="background:#B07A2E"></i></div>
+        <p><b>Escala 20+.</b> Hues bem separados (ângulo áureo, S/L fixos), sempre com iniciais + nome — distinção mantida mesmo com muitas pessoas. Ver TOKENS.md.</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
