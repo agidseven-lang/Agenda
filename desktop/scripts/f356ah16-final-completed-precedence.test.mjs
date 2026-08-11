@@ -12,7 +12,7 @@
  * vs isFullyComplete(t) (com guardas duras pendingProduction/pendingStory) — usada por
  * operationalCol/detailState → Detalhes STALE quando há conteúdo residual (pendingProduction=true).
  *
- * Correção 1.0.245 (RENDERER-only, index.html):
+ * Correção 1.0.246 (RENDERER-only, index.html):
  *   E1 operationalCol: PRECEDÊNCIA isTaskCompleted → 'concluido' (residual não reabre).
  *   E2 detailState: 1ª ramificação isTaskCompleted → concluído final (owner none, só clientview).
  *   E3 openProductionModal: guarda isTaskCompleted → toast + return; ZERO write.
@@ -246,8 +246,8 @@ ok('S9 H15 preservada (nextActionText texto NOVO da espera final)', HTML.include
 ok('S10 H14 preservada (step7 done prodOk||resent + rótulo contextual do marco final)', HTML.includes("key:'aguardando_legenda',label:'Aguardando legenda / posts',    done:!!(prodOk||resent),") && HTML.includes("if(m.key==='concluido'&&state==='current') dispLabel='Aguardando aprovação final';"));
 
 /* =========================== IDENTIDADE =========================== */
-ok('ID1 package.json = 1.0.245 + marcador H16', PKG.version === '1.0.245' && /final-completed-precedence/.test(PKG.description || ''));
-ok('ID2 package-lock 1.0.245 (raiz + packages[""])', LOCK.version === '1.0.245' && LOCK.packages[''].version === '1.0.245');
+ok('ID1 package.json = 1.0.246 + marcador H16', PKG.version === '1.0.246' && /final-completed-precedence/.test(PKG.description || ''));
+ok('ID2 package-lock 1.0.246 (raiz + packages[""])', LOCK.version === '1.0.246' && LOCK.packages[''].version === '1.0.246');
 ok('ID3 marcadores herdados H15/H14/H13/H12 preservados', /nextaction-final-wait-text/.test(PKG.description || '') && /timeline-step7-final-wait/.test(PKG.description || '') && /timeline-honest-preenvio/.test(PKG.description || '') && /final-state-premature-fix/.test(PKG.description || ''));
 
 console.log('================= F3.5.6A-H16 — CONCLUSÃO FINAL / PRECEDÊNCIA + BLOQUEIO DE WRITES =================');

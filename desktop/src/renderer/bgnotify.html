@@ -124,7 +124,11 @@
       return (ac.state==='running')?'played':('started_state_'+String(ac.state));
     }catch(e){ return 'failed:'+String((e&&e.name)||'err'); }
   }
-  var PREMIUM_TYPES={task_moved:1,task_assigned:1,task_reassigned:1,task_updated:1,task_completed:1,task_reopened:1,designer_assigned:1};
+  /* F3.5.6B-H2 (1.0.246) — os eventos de workflow COM WF_POLICY passam a usar o MODELO PREMIUM (mesmo template:
+     avatar flutuante, card premium, CTA "Abrir →", topmost; fora de foco/minimizado/bandeja). Reuso do modelo
+     existente — sem redesign. wf_designer_assigned NÃO entra (H1/1.0.245: DESIGNER_ASSIGNED não notifica ⇒
+     buildWorkflowPayload=null). Passthrough preservado: wf_* NÃO entra em GROUPABLE_EVENT_TYPES. Só o allowlist muda. */
+  var PREMIUM_TYPES={task_moved:1,task_assigned:1,task_reassigned:1,task_updated:1,task_completed:1,task_reopened:1,designer_assigned:1,wf_client_themes_approved:1,wf_client_captions_approved:1,wf_client_themes_adjustment_requested:1,wf_client_captions_adjustment_requested:1,wf_client_themes_first_viewed:1,wf_client_captions_first_viewed:1,wf_designer_item_completed:1,wf_design_production_completed:1,wf_themes_ready:1,wf_captions_ready:1};
   function premiumUse(p){ return !!(p&&p._premiumCommon===true&&PREMIUM_TYPES[String(p.eventType||'')]); }
   function premiumSevIcon(s){ return s==='critical'?'!':(s==='warning'?'⏱':(s==='success'?'✓':'i')); }
   function premiumHM(){ try{ var d=new Date(); var z=function(n){return(n<10?'0':'')+n;}; return z(d.getHours())+':'+z(d.getMinutes()); }catch(_){ return ''; } }

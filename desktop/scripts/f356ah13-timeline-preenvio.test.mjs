@@ -10,7 +10,7 @@
  *  (C) "Fluxo do cliente" virava "Em produção" (espelho clientFlowStatus='producao').
  *  (D) WRITER: "Salvar e reenviar" gravava history 'reenviado_cliente' ANTES da confirmação.
  *
- * Correção 1.0.245 (RENDERER-only, index.html):
+ * Correção 1.0.246 (RENDERER-only, index.html):
  *  - _tlEventAt casa por type/kind/channel EXATO (sem substring, sem label/to).
  *  - taskTimeline: SÓ marco done recebe carimbo; enviado_cliente/enviado_final usam approvalRounds
  *    sentAt canônico (ar_themes_r* × ar_captions_r* separados).
@@ -231,7 +231,7 @@ ok('S14 btnConfirmSend: gravação gated pela rodada FINAL (clientApprovalPhaseO
 ok('S15 btnConfirmSend: anti-duplo-clique (b.disabled=true antes do request) → 1 evento por confirmação', CB.includes('b.disabled=true'));
 ok('S16 fechar modal/cancelar/falha não passam pelo ramo de sucesso ⇒ zero evento (else reabilita)', CB.includes('b.disabled=false; b.innerHTML=old;'));
 // versão + isolamento (espelho)
-ok('S17 package.json = 1.0.245 + marcador H13', PKG.version === '1.0.245' && /f356ah13-timeline-honest-preenvio/.test(PKG.description || ''));
+ok('S17 package.json = 1.0.246 + marcador H13', PKG.version === '1.0.246' && /f356ah13-timeline-honest-preenvio/.test(PKG.description || ''));
 ok('S18 marcador H12 herdado preservado na descrição', /f356ah12-final-state-premature-fix/.test(PKG.description || ''));
 
 console.log('================= F3.5.6A-H13 — TIMELINE/HISTÓRICO honestos + pré-envio =================');

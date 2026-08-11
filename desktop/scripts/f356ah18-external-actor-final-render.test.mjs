@@ -10,7 +10,7 @@
  * SAÍDA do resolver (by==='Cliente') e NUNCA renderizavam opPanelBlock — por isso ficaram
  * verdes com o físico vermelho. ESTA suíte RENDERIZA opPanelBlock(t) DE VERDADE.
  *
- * Correção 1.0.245 (RENDERER-only, index.html):
+ * Correção 1.0.246 (RENDERER-only, index.html):
  *   C1 — taskTimeline marco 'concluido' emite byLabel SOMENTE p/ ator LITERAL externo
  *        (recordedBy vazio + clientFinalApprovedBy, ou clientReview.byName casado ao MESMO
  *        instante final); 'by' permanece IDÊNTICO à 1.0.243; NÃO infere label de UID.
@@ -116,7 +116,7 @@ function mkConcluida(opts){
 function concluido(t){ const tl = taskTimeline(t); return tl.milestones.find(m=>m.key==='concluido'); }
 
 /* =========================== PRECONDIÇÕES / IDENTIDADE =========================== */
-ok('ID1 package.json = 1.0.245 + marcador H18', PKG.version === '1.0.245' && /f356ah18-external-actor-final-milestone-render/.test(PKG.description || ''));
+ok('ID1 package.json = 1.0.246 + marcador H18', PKG.version === '1.0.246' && /f356ah18-external-actor-final-milestone-render/.test(PKG.description || ''));
 ok('ID2 marcador H17 herdado preservado (postcompletion-write-guards)', /postcompletion-write-guards/.test(PKG.description || ''));
 ok('ID3 marcadores herdados H16/H14/H12 + 1.0.228 preservados',
   /final-completed-precedence/.test(PKG.description||'') && /timeline-step7-final-wait/.test(PKG.description||'') &&

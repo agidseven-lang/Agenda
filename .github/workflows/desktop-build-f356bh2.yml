@@ -1,0 +1,232 @@
+# F3.5.6B-H2 — Desktop 1.0.246 (notificacoes de WORKFLOW no MODELO PREMIUM).
+# Continuacao da 1.0.245 (H1). Os eventos de WORKFLOW (wf_*) que possuem WF_POLICY e realmente notificam
+# caiam no template COMPACTO ("Abrir tarefa") em vez do PREMIUM (avatar flutuante, card premium, CTA
+# "Abrir ->", topmost, fora de foco/minimizado/bandeja). CAUSA: o seletor premiumUse() das DUAS superficies
+# do renderer so reconhecia os 7 tipos da Categoria A no allowlist PREMIUM_TYPES; os wf_* ficavam de fora.
+# CORRECAO 1.0.246 (SOMENTE 2 arquivos de producao, sem logica de negocio): adicionar ao PREMIUM_TYPES
+# de desktop/src/renderer/index.html E desktop/src/renderer/bgnotify.html os 10 eventos wf_* notificaveis
+# (client themes/captions first_viewed/approved/adjustment_requested; designer_item_completed;
+# design_production_completed; themes_ready; captions_ready). REUSO do template existente premiumCommonInner
+# — sem redesign.
+# H1 PRESERVADA: wf_designer_assigned NAO entra no allowlist E o produtor nem o emite (DESIGNER_ASSIGNED
+# fora de WF_POLICY -> buildWorkflowPayload=null) => ZERO entrega por essa via. PASSTHROUGH intacto: wf_*
+# NAO entra em GROUPABLE_EVENT_TYPES (sem coalescencia/dedupe/grupo/Central/sino). SEM mudanca em
+# produtores/entrega/recibos/cursor/timeout/CTA; workflowEvents.js/notifEvents.js/workflowNotifier.ts/
+# deliverNotification/main.ts/notificationGrouping.ts/slaRules.js/Worker V64.61/infra 1.0.228 INTOCADOS.
+# build GATED, --publish never. Publicacao no Latest so no desktop-release-f356bh2.yml (mesmos bytes).
+# Base 1.0.245 (743dfa2). BASELINE FISICA OFICIAL 1.0.244. ROLLBACK IMEDIATO 1.0.228.
+name: "[push/manual] F3.5.6B-H2 — Desktop 1.0.246 (workflow notifications premium) — Desktop Build"
+"on":
+  push:
+    branches: ["desktop/f356bh2-workflow-notifications-premium-1.0.246"]
+    paths-ignore: [".github/workflows/desktop-release-f356bh2.yml"]
+  workflow_dispatch: {}
+permissions: { contents: read }
+env:
+  TEST_BRANCH: "desktop/f356bh2-workflow-notifications-premium-1.0.246"
+  BASE_245_SHA: "743dfa26804a8d576a5f83f3cee53bbdae73fa79"
+  BASE_244_SHA: "28a081ca44dc5445a40fd28b7be3fe6e55b96ca4"
+  BASE_230_SHA: "e89867de5120fe88e2f639effd59d24c3181f427"
+  BASE_228_SHA: "3f0d0af192b4b6b32a8e8bbda4153dcf4df1bc6d"
+  APP_DIR: desktop
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: "Gate REF + ANCESTRIA (descende da 1.0.245 H1 + 1.0.244 base + 1.0.228 baseline fisica)"
+        run: |
+          set -euo pipefail
+          [ "${GITHUB_REF_NAME}" = "$TEST_BRANCH" ] || { echo "::error::branch errada"; exit 1; }
+          for B in "$BASE_245_SHA" "$BASE_244_SHA" "$BASE_228_SHA"; do
+            git merge-base --is-ancestor "$B" HEAD || { echo "::error::não descende de $B"; exit 1; }
+          done
+      - name: "Gate VERSAO 1.0.246 (package + lock x2 + marcador H2 + H1 + cadeia herdada)"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node -e "const p=require('./package.json'); if(p.version!=='1.0.246'){console.error('versão',p.version);process.exit(1);} for(const m of ['f356bh2-workflow-notifications-premium','f356bh1-designer-assigned-dedupe','f356ah18-external-actor-final-milestone-render','durable-diag-honest-timeline','custom-script-quantity-rich-editor']){ if(!(p.description||'').includes(m)){console.error('marcador ausente:',m);process.exit(1);} }"
+          [ "$(grep -c '"version": "1.0.246"' package-lock.json)" -ge 2 ]
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: "npm ci + TypeScript + sintaxe dos renderers (vm.Script) + worker"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          ./node_modules/.bin/tsc --noEmit -p tsconfig.json
+          node -e "const fs=require('fs'),vm=require('vm');const s=fs.readFileSync('src/renderer/bgnotify.html','utf8');const m=s.match(/<script>([\s\S]*?)<\/script>/);new vm.Script(m[1],{filename:'bgnotify-inline'});"
+          node -e "const fs=require('fs'),vm=require('vm');const s=fs.readFileSync('src/renderer/index.html','utf8');const b=[...s.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(x=>x[1]);if(b.length<2){console.error('esperados >=2 blocos inline');process.exit(1);}b.forEach((x,i)=>new vm.Script(x,{filename:'index-inline-'+i}));console.log('blocos inline OK:',b.length);"
+          node --check ../cloudflare-worker.js
+      - name: "npm run build (tsc + copy-renderer: workflowEvents.js/notificationGrouping -> dist/main)"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          npm run build
+          test -f dist/main/workflowEvents.js
+          test -f dist/main/notifEvents.js
+          test -f dist/main/workflowNotifier.js
+          test -f dist/main/notificationGrouping.js
+      - name: "Gate CONTRATO H2 (renderers): 10 wf_* no PREMIUM_TYPES das 2 superficies; wf_designer_assigned FORA; gate opt-in intacto"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          for R in src/renderer/index.html src/renderer/bgnotify.html; do
+            # os 10 wf_* notificaveis estao no allowlist PREMIUM_TYPES
+            for T in wf_client_themes_approved wf_client_captions_approved wf_client_themes_adjustment_requested wf_client_captions_adjustment_requested wf_client_themes_first_viewed wf_client_captions_first_viewed wf_designer_item_completed wf_design_production_completed wf_themes_ready wf_captions_ready; do
+              grep -qF "$T:1" "$R" || { echo "::error::$T ausente do PREMIUM_TYPES em $R"; exit 1; }
+            done
+            # wf_designer_assigned NAO pode estar no allowlist (H1)
+            ! grep -qF "wf_designer_assigned:1" "$R" || { echo "::error::wf_designer_assigned NO allowlist de $R (viola H1)"; exit 1; }
+            # gate opt-in inalterado (===true)
+            grep -qF "return !!(p&&p._premiumCommon===true&&PREMIUM_TYPES[String(p.eventType||'')])" "$R" || { echo "::error::gate premiumUse alterado em $R"; exit 1; }
+          done
+          # a linha PREMIUM_TYPES e byte-identica entre as duas superficies
+          A="$(grep -m1 'var PREMIUM_TYPES=' src/renderer/index.html)"; B="$(grep -m1 'var PREMIUM_TYPES=' src/renderer/bgnotify.html)"
+          [ "$A" = "$B" ] || { echo "::error::PREMIUM_TYPES divergente entre index e bgnotify"; exit 1; }
+          # PASSTHROUGH: GROUPABLE_EVENT_TYPES NAO contem wf_ (fonte + dist)
+          ! grep -qE "wf_" src/main/notificationGrouping.ts || { echo "::error::wf_ em notificationGrouping.ts (passthrough violado)"; exit 1; }
+          ! grep -qE "wf_" dist/main/notificationGrouping.js || { echo "::error::wf_ em dist notificationGrouping.js"; exit 1; }
+          # H1: DESIGNER_ASSIGNED continua FORA de WF_POLICY (workflowEvents.js congelado vs 1.0.245)
+          node -e "const w=require('./src/main/workflowEvents.js'); const k=Object.keys(w.WF_POLICY); if(k.length!==10||k.includes('DESIGNER_ASSIGNED')){console.error('WF_POLICY inesperada:',k);process.exit(1);} console.log('WF_POLICY OK (10):',k.join(','));"
+          echo "CONTRATO H2 (renderers): VERIFIED."
+      - name: "Gate CONGELADOS — TUDO exceto os 2 renderers byte-identico a 1.0.245 (743dfa2); Worker; infra 1.0.228"
+        run: |
+          set -euo pipefail
+          # H2 NAO toca: workflowEvents.js (H1), notifEvents.js, workflowNotifier.ts, deliverNotification (main.ts),
+          # notificationGrouping.ts, slaRules.js, notifierA.ts, bgNotify.ts, slareminder.html, preload, Worker, build config.
+          git diff --quiet "$BASE_245_SHA"..HEAD -- \
+            desktop/src/main/workflowEvents.js \
+            desktop/src/main/notifEvents.js \
+            desktop/src/main/workflowNotifier.ts \
+            desktop/src/main/main.ts \
+            desktop/src/main/notificationGrouping.ts \
+            desktop/src/main/slaRules.js \
+            desktop/src/main/notifierA.ts \
+            desktop/src/main/bgNotify.ts \
+            desktop/src/renderer/slareminder.html \
+            desktop/src/preload/preload.ts \
+            cloudflare-worker.js \
+            desktop/electron-builder.yml \
+            desktop/tsconfig.json \
+            desktop/scripts/copy-renderer.js \
+            || { echo "::error::arquivo congelado alterado (H2 só toca os 2 renderers)"; exit 1; }
+          echo "CONGELADOS (workflowEvents/notifEvents/workflowNotifier/main/grouping/slaRules/Worker/infra 1.0.228): VERIFIED."
+      - name: "Gate SUITE H2 (RED->GREEN premium wf_*) + regressao H1 + frozen allowlist + orquestracao [dist]"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f356bh2-workflow-notifications-premium.test.mjs
+          node scripts/f356bh1-designer-assigned-dedupe.test.mjs
+          node scripts/f354u-premium-common-notifications.test.mjs
+          node scripts/f354u-h1-notification-hotfix.test.mjs
+          node scripts/f356a-workflow-orchestration.test.mjs
+          node scripts/f356ah18-external-actor-final-render.test.mjs
+          node scripts/f356ah17-postcompletion-write-guards.test.mjs
+          node scripts/f356ah16-final-completed-precedence.test.mjs
+          node scripts/f356ah15-nextaction-final-text.test.mjs
+          node scripts/f356ah14-timeline-step7-final-wait.test.mjs
+          node scripts/f356ah13-timeline-preenvio.test.mjs
+          node scripts/f356ah12-final-state-premature.test.mjs
+          node scripts/f356ah10-team-session-recovery.test.mjs
+          node scripts/f356ah8-durable-diagnostic.test.mjs
+          node scripts/f356ah8-honest-timeline.test.mjs
+          node scripts/f356ah4-single-source-real-path.test.mjs
+          node scripts/f356ah3-single-source-sent-state.test.mjs
+          node scripts/f344-flow-golden-master.test.mjs
+          node scripts/f332-panel.test.mjs
+          H2_BASE_228="$BASE_228_SHA" H2_BASE_230="$BASE_230_SHA" node scripts/f356ah2-client-approvals.test.mjs
+      - name: "Gate SUITES herdadas — notificacoes/handoff/visibilidade/referencia + F3.5.5* + central [dist]"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f355eh4-grouped-notification-handoff.test.mjs
+          node scripts/f355eh3-global-notification-visibility.test.mjs
+          node scripts/f355eh2-reference-notification.test.mjs
+          node scripts/f355e-retire-modules-premium-notifications.test.mjs
+          node scripts/f355d-cron-quantity-universal-paste.test.mjs
+          node scripts/f354l-sla-central-persistent-reminders.test.mjs
+          node scripts/f354p-sla-decision-actions.test.mjs
+      - name: "Gate herdado — rich editor + agenda + notas + integracao + regressao canonica (som/sessao)"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          node scripts/f355c-script-quantity-rich-editor.test.mjs
+          node scripts/f355b-agenda-premium.test.mjs
+          node scripts/f355ah1-internal-notes.test.mjs
+          node scripts/f355a-integration.test.mjs
+          node scripts/f354wh2-immediate-notification-sound.test.mjs
+          node scripts/f354vh1-session-persistence.test.mjs
+      - name: "Gate ISOLAMENTO — producao = SOMENTE os 2 renderers vs 1.0.245 (743dfa2)"
+        run: |
+          set -euo pipefail
+          git diff --name-only "$BASE_245_SHA"..HEAD > /tmp/delta.txt; echo "== DELTA vs 1.0.245 =="; cat /tmp/delta.txt
+          BAD=$(grep -vE '^(\.github/workflows/desktop-(build|release)-f356bh2\.yml$|desktop/src/renderer/(index|bgnotify)\.html$|desktop/package(-lock)?\.json$|desktop/scripts/[A-Za-z0-9._-]+\.test\.mjs$)' /tmp/delta.txt || true)
+          [ -z "$BAD" ] || { echo "::error::fora da allowlist H2: $BAD"; exit 1; }
+          # producao (src/): SOMENTE os 2 renderers
+          SRC_CHG=$(git diff --name-only "$BASE_245_SHA"..HEAD -- desktop/src | grep -vE '^desktop/src/renderer/(index|bgnotify)\.html$' || true)
+          [ -z "$SRC_CHG" ] || { echo "::error::producao fora dos 2 renderers: $SRC_CHG"; exit 1; }
+          echo "ISOLAMENTO H2: VERIFIED (index.html + bgnotify.html sao os UNICOS arquivos de producao alterados vs 1.0.245)."
+  build:
+    needs: verify
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: npm ci + build + electron-builder (--publish never)
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm run build
+          npx electron-builder --win nsis msi --publish never
+      - name: "Gate EMPACOTADO — 1.0.246 + wf_* premium nas 2 superficies + wf_designer_assigned ZERO entrega + SUITE H2 contra os BYTES EMPACOTADOS"
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          ASAR="dist-installer/win-unpacked/resources/app.asar"; test -f "$ASAR"
+          npx --yes @electron/asar extract "$ASAR" asar-x
+          node -e "const p=require('./asar-x/package.json'); if(p.version!=='1.0.246') process.exit(1);"
+          IDX=asar-x/src/renderer/index.html; BG=asar-x/src/renderer/bgnotify.html; test -f "$IDX" && test -f "$BG"
+          WE=asar-x/dist/main/workflowEvents.js; test -f "$WE"
+          GRP=asar-x/dist/main/notificationGrouping.js; test -f "$GRP"
+          # >>> GATE CRITICO 1: nos BYTES EMPACOTADOS, os 10 wf_* estao no PREMIUM_TYPES das DUAS superficies <<<
+          for R in "$IDX" "$BG"; do
+            for T in wf_client_themes_approved wf_client_captions_approved wf_client_themes_adjustment_requested wf_client_captions_adjustment_requested wf_client_themes_first_viewed wf_client_captions_first_viewed wf_designer_item_completed wf_design_production_completed wf_themes_ready wf_captions_ready; do
+              grep -qF "$T:1" "$R" || { echo "::error::$T ausente do PREMIUM_TYPES empacotado ($R)"; exit 1; }
+            done
+            grep -qF "task_assigned:1" "$R" || { echo "::error::task_assigned saiu do allowlist empacotado ($R)"; exit 1; }
+            # >>> GATE CRITICO 2 (H1): wf_designer_assigned FORA do allowlist empacotado <<<
+            ! grep -qF "wf_designer_assigned:1" "$R" || { echo "::error::wf_designer_assigned no allowlist empacotado ($R)"; exit 1; }
+          done
+          # >>> GATE CRITICO 3 (H1): nos BYTES EMPACOTADOS, DESIGNER_ASSIGNED fora de WF_POLICY => ZERO entrega <<<
+          node -e "const w=require('./asar-x/dist/main/workflowEvents.js'); const k=Object.keys(w.WF_POLICY); if(k.length!==10||k.includes('DESIGNER_ASSIGNED')){console.error('WF_POLICY empacotada inesperada:',k);process.exit(1);} if(w.buildWorkflowPayload({type:'DESIGNER_ASSIGNED',id:'x',by:'a',ru:'b'},{id:'t'},{resolveProfile:()=>null})!==null){console.error('buildWorkflowPayload(DESIGNER_ASSIGNED) != null');process.exit(1);}"
+          # >>> GATE CRITICO 4: PASSTHROUGH — GROUPABLE_EVENT_TYPES empacotado SEM wf_ <<<
+          ! grep -qE "wf_" "$GRP" || { echo "::error::wf_ em GROUPABLE (dist empacotado)"; exit 1; }
+          # >>> RODA a SUITE H2 (RED->GREEN + por-evento + render-real + produtor) contra os BYTES EMPACOTADOS <<<
+          F356BH2_IDX="$IDX" F356BH2_BG="$BG" F356BH2_WE="$WE" F356BH2_GRP="$GRP" F356BH2_PKG=asar-x/package.json node scripts/f356bh2-workflow-notifications-premium.test.mjs
+          echo "GATE F3.5.6B-H2 EMPACOTADO (wf_* premium nas 2 superficies + wf_designer_assigned zero entrega + H1 intacta): VERIFIED."
+      - name: Empacotar bundle + SHA256SUMS + VERSAO-DESKTOP
+        working-directory: desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes @cyclonedx/cyclonedx-npm --omit dev --output-format JSON --output-file "$RUNNER_TEMP/sbom.json" || echo '{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}' > "$RUNNER_TEMP/sbom.json"
+          OUT="$GITHUB_WORKSPACE/dist-pkg"; mkdir -p "$OUT"
+          EXE=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe | head -1); MSI=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.msi | head -1); BM=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap | head -1)
+          cp "$EXE" "$MSI" "$BM" dist-installer/latest.yml "$OUT/"; cp "$RUNNER_TEMP/sbom.json" "$OUT/SBOM-cyclonedx.json"
+          EXE_NAME=$(basename "$EXE"); MSI_NAME=$(basename "$MSI"); BM_NAME=$(basename "$BM")
+          ( cd "$OUT" && sha256sum "$EXE_NAME" "$MSI_NAME" latest.yml "$BM_NAME" SBOM-cyclonedx.json > SHA256SUMS )
+          { echo "productName : Agenda ID Seven Desktop"; echo "versionName : 1.0.246"; echo "rotulo      : 1.0.246-f356bh2-workflow-notifications-premium (notificacoes de workflow no modelo premium — pelo updater interno)"; echo "channel     : latest (NADA publicado neste build)"; echo "appId       : br.com.idseven.agenda.desktop"; echo "instalador  : $EXE_NAME"; echo "SHA-256 exe : $(sha256sum "$OUT/$EXE_NAME" | awk '{print $1}')"; echo "instalador2 : $MSI_NAME"; echo "SHA-256 msi : $(sha256sum "$OUT/$MSI_NAME" | awk '{print $1}')"; echo "commit      : $GITHUB_SHA (branch $GITHUB_REF_NAME)"; echo "base-codigo : Desktop 1.0.245 (743dfa2). BASELINE FISICA OFICIAL 1.0.244. ROLLBACK imediato 1.0.228 (3f0d0af1)."; echo "origem      : F3.5.6B-H2 — notificacoes de workflow (wf_*) no MODELO PREMIUM (2 arquivos: desktop/src/renderer/index.html + bgnotify.html): +10 wf_* no PREMIUM_TYPES; wf_designer_assigned FORA (H1 preservada); GROUPABLE/producao/entrega/recibos/timeout/CTA/Worker V64.61/infra 1.0.228 INALTERADOS."; echo "distribuicao: pelo updater interno; publicacao no Latest ocorre no workflow desktop-release-f356bh2.yml (mesmos bytes)"; } > "$OUT/VERSAO-DESKTOP.txt"
+          echo "== SHA256SUMS =="; cat "$OUT/SHA256SUMS"
+      - uses: actions/upload-artifact@v4
+        with: { name: agenda-id-seven-desktop-1.0.246-installer, path: "dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe\ndist-pkg/Agenda-ID-Seven-Desktop-*-x64.msi", if-no-files-found: error, retention-days: 30 }
+      - uses: actions/upload-artifact@v4
+        with: { name: agenda-id-seven-desktop-1.0.246-updatemeta, path: "dist-pkg/latest.yml\ndist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap\ndist-pkg/SHA256SUMS\ndist-pkg/SBOM-cyclonedx.json\ndist-pkg/VERSAO-DESKTOP.txt", if-no-files-found: error, retention-days: 30 }

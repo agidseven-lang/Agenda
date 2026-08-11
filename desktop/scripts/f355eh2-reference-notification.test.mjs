@@ -29,15 +29,15 @@ function extract(src, name) {
   return src.slice(i, j);
 }
 
-/* ============ A. IDENTIDADE (RE-PINADO F3.5.6A-H2: candidata 1.0.245; contrato VISUAL da referência CONGELADO) ============ */
+/* ============ A. IDENTIDADE (RE-PINADO F3.5.6A-H2: candidata 1.0.246; contrato VISUAL da referência CONGELADO) ============ */
 console.log('— A) identidade da candidata —');
-ok('A1 package.json 1.0.245 (RE-PINADO F3.5.6A-H2)', /"version":\s*"1\.0\.245"/.test(PKG));
+ok('A1 package.json 1.0.246 (RE-PINADO F3.5.6A-H2)', /"version":\s*"1\.0\.246"/.test(PKG));
 ok('A2 description: marcador da fase + cadeia de bases preservada',
   PKG.indexOf('1.0.226-f355eh2-reference-notification') >= 0 &&
   PKG.indexOf('base 1.0.225-f355eh1-ultra-premium-notifications') >= 0 &&
   PKG.indexOf('base 1.0.224-f355e-retire-legacy-modules-premium-notifications') >= 0 &&
   PKG.indexOf('base 1.0.223-f355d-custom-cronograma-quantity-universal-paste') >= 0);
-ok('A3 package-lock 1.0.245 (2x — RE-PINADO F3.5.6A-H2)', (LOCK.match(/"version":\s*"1\.0\.245"/g) || []).length >= 2);
+ok('A3 package-lock 1.0.246 (2x — RE-PINADO F3.5.6A-H2)', (LOCK.match(/"version":\s*"1\.0\.246"/g) || []).length >= 2);
 
 /* ============ B. CONTRATO CSS DA REFERÊNCIA (2 superfícies) ============ */
 console.log('— B) contrato CSS da referência —');
@@ -185,9 +185,9 @@ ok('C17 grupo: mesma moldura da referência (avatar flutuante + cabeçalho + lis
 
 /* ============ D. REGRAS FUNCIONAIS DA 1.0.224/1.0.225 INTOCADAS ============ */
 console.log('— D) regras funcionais congeladas —');
-ok('D1 gate premiumUse byte-idêntico + PREMIUM_TYPES congelado',
+ok('D1 gate premiumUse byte-idêntico + PREMIUM_TYPES 7 Categoria-A + 10 wf_* (RE-PINADO F3.5.6B-H2)',
   (() => { const a = extract(S, 'premiumUse'); return !!a && a === extract(BG, 'premiumUse'); })()
-  && S.indexOf('PREMIUM_TYPES={task_moved:1,task_assigned:1,task_reassigned:1,task_updated:1,task_completed:1,task_reopened:1,designer_assigned:1}') >= 0);
+  && S.indexOf('PREMIUM_TYPES={task_moved:1,task_assigned:1,task_reassigned:1,task_updated:1,task_completed:1,task_reopened:1,designer_assigned:1,wf_client_themes_approved:1,wf_client_captions_approved:1,wf_client_themes_adjustment_requested:1,wf_client_captions_adjustment_requested:1,wf_client_themes_first_viewed:1,wf_client_captions_first_viewed:1,wf_designer_item_completed:1,wf_design_production_completed:1,wf_themes_ready:1,wf_captions_ready:1}') >= 0);
 ok('D2 clique/teclado via [data-cta] preservado (2 superfícies)',
   S.indexOf("closest('[data-cta]')") >= 0 && BG.indexOf("closest('[data-cta]')") >= 0);
 both('D3 teclado Enter/Espaço preservado', "el.addEventListener('keydown',function(ev){ try{ var k=ev.key; if(k!=='Enter'&&k!==' ')return;");

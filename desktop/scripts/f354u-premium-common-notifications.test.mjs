@@ -134,7 +134,11 @@ ok(norm(bgBlock) === norm(idxBlock), "E02 construtores IDÊNTICOS (paridade estr
 ok(api.premiumUse({ eventType: "task_moved" }) === false, "E03 opt-in: SEM _premiumCommon ⇒ layout clássico (regressão preservada)");
 ok(api.premiumUse({ eventType: "task_moved", _premiumCommon: false }) === false, "E04 flag OFF ⇒ layout clássico");
 ok(api.premiumUse({ eventType: "help_requested", _premiumCommon: true }) === false, "E05 tipo fora do escopo (help) ⇒ NÃO premium mesmo com flag");
-ok(Object.keys(api.PREMIUM_TYPES).length === 7, "E06 allowlist premium = 7 tipos (moved/assigned/reassigned/updated/completed/reopened/designer_assigned)");
+ok(Object.keys(api.PREMIUM_TYPES).length === 17, "E06 allowlist premium = 17 tipos: 7 Categoria-A + 10 workflow wf_* (RE-PINADO F3.5.6B-H2)");
+ok(api.premiumUse({ eventType: "wf_client_themes_approved", _premiumCommon: true }) === true, "E06b wf_client_themes_approved ⇒ PREMIUM (F3.5.6B-H2)");
+ok(api.premiumUse({ eventType: "wf_designer_item_completed", _premiumCommon: true }) === true, "E06c wf_designer_item_completed ⇒ PREMIUM (F3.5.6B-H2)");
+ok(api.premiumUse({ eventType: "wf_designer_assigned", _premiumCommon: true }) === false, "E06d wf_designer_assigned FORA do premium (H1/1.0.245 preservada) ⇒ nunca entregue por esta via");
+ok(api.premiumUse({ eventType: "task_assigned", _premiumCommon: true }) === true, "E06e task_assigned (Categoria A) segue PREMIUM (regressão)");
 ok(/premiumUse\(p\)\{ return !!\(p&&p\._premiumCommon===true/.test(BG) && /premiumUse\(p\)\{ return !!\(p&&p\._premiumCommon===true/.test(IDX), "E07 gate ===true (opt-in) nas duas superfícies");
 
 // ══════════════════════ F) MAIN.TS — FLAG + FIAÇÃO ══════════════════════

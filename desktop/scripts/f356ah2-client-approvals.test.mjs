@@ -1,4 +1,4 @@
-/* F3.5.6A-H2 — CENTRAL DE APROVAÇÕES COMPACTA + DRAWER (Desktop 1.0.245) — suíte de CÓDIGO.
+/* F3.5.6A-H2 — CENTRAL DE APROVAÇÕES COMPACTA + DRAWER (Desktop 1.0.246) — suíte de CÓDIGO.
  * P0 UX da tela Cliente: a seção "Aprovações pendentes" deixa de ficar permanentemente expandida
  * acima do Kanban; vira barra compacta (recolhida) + drawer lateral sob demanda. Funcionalidade
  * preservada; SÓ UX. Notificações (1.0.228) e workflow (workflowEvents/workflowNotifier) INTOCADOS.
@@ -39,14 +39,14 @@ function fn(marker) {
 
 /* ═══ A — IDENTIDADE ═══ */
 const pkg = JSON.parse(read(PKG));
-ok("A1 versão 1.0.245", pkg.version === "1.0.245", pkg.version);
+ok("A1 versão 1.0.246", pkg.version === "1.0.246", pkg.version);
 ok("A2 description da fase H2 + cadeia de bases preservada",
   /f356ah2-client-approvals-compact-drawer/.test(pkg.description || "")
   && /f356ah1-workflow-notification-receipt-collision/.test(pkg.description || "")
   && /f356a-realtime-workflow-client-approval/.test(pkg.description || "")
   && /grouped-notification-handoff/.test(pkg.description || ""));
-try { const lock = JSON.parse(read(LOCK)); ok("A3 lock 1.0.245 ×2", lock.version === "1.0.245" && lock.packages[""].version === "1.0.245"); }
-catch (e) { ok("A3 lock 1.0.245 ×2", false, String(e.message)); }
+try { const lock = JSON.parse(read(LOCK)); ok("A3 lock 1.0.246 ×2", lock.version === "1.0.246" && lock.packages[""].version === "1.0.246"); }
+catch (e) { ok("A3 lock 1.0.246 ×2", false, String(e.message)); }
 
 /* ═══ B — BARRA COMPACTA (estado padrão RECOLHIDO) ═══ */
 ok("B1 board chama a BARRA compacta (não a lista expandida)",
@@ -115,8 +115,15 @@ let gitOk = true, showBase = () => "";
 try { showBase = (sha, p) => execFileSync("git", ["show", sha + ":" + p], { cwd: ROOT, maxBuffer: 64 * 1024 * 1024 }).toString("utf8"); showBase(BASE_228, "desktop/package.json"); }
 catch (_) { gitOk = false; }
 if (gitOk) {
-  for (const f of ["desktop/src/main/bgNotify.ts", "desktop/src/main/notificationGrouping.ts", "desktop/src/renderer/bgnotify.html", "desktop/src/preload/preload.ts"])
+  for (const f of ["desktop/src/main/bgNotify.ts", "desktop/src/main/notificationGrouping.ts", "desktop/src/preload/preload.ts"])
     { try { ok("G congelado 1.0.228 byte-idêntico: " + f, showBase(BASE_228, f) === read(path.join(ROOT, f))); } catch (e) { ok("G congelado: " + f, false, String(e.message)); } }
+  // F3.5.6B-H2 (1.0.246): bgnotify.html deixou de ser byte-idêntico à 1.0.228 — a ÚNICA mudança é o allowlist
+  // PREMIUM_TYPES (adição dos 10 wf_* ao modelo premium) + seu comentário. Normaliza os dois lados (remove o
+  // comentário H2 e canoniza a linha do allowlist) e prova que TODO o resto do renderer segue byte-idêntico.
+  { const normH2 = (s) => s.replace(/ *\/\* F3\.5\.6B-H2[\s\S]*?\*\/\n/, "").replace(/var PREMIUM_TYPES=\{[^}]*\};/, "var PREMIUM_TYPES=__H2__;");
+    const f = "desktop/src/renderer/bgnotify.html";
+    try { ok("G congelado (byte-idêntico à 1.0.228 EXCETO o allowlist premium wf_* da H2/1.0.246): " + f, normH2(showBase(BASE_228, f)) === normH2(read(path.join(ROOT, f)))); }
+    catch (e) { ok("G congelado (H2 norm): " + f, false, String(e.message)); } }
   // F3.5.6B-H1 — workflowNotifier.ts e o Worker seguem CONGELADOS byte-idênticos à 1.0.230.
   for (const f of ["desktop/src/main/workflowNotifier.ts", "cloudflare-worker.js"])
     { try { ok("G congelado 1.0.230 byte-idêntico: " + f, showBase(BASE_230, f) === read(path.join(ROOT, f))); } catch (e) { ok("G congelado: " + f, false, String(e.message)); } }

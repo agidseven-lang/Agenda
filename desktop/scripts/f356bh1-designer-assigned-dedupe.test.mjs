@@ -88,10 +88,10 @@ function totalDeliveriesToDesigner(t, uid) {
 
 /* ═══ A — IDENTIDADE (candidato 1.0.245) ═══ */
 const pkg = JSON.parse(read(PKG));
-ok("A1 versão 1.0.245", pkg.version === "1.0.245", pkg.version);
+ok("A1 versão 1.0.246", pkg.version === "1.0.246", pkg.version);
 try {
   const lock = JSON.parse(read(LOCK));
-  ok("A2 lock 1.0.245 ×2", lock.version === "1.0.245" && lock.packages[""].version === "1.0.245");
+  ok("A2 lock 1.0.246 ×2", lock.version === "1.0.246" && lock.packages[""].version === "1.0.246");
 } catch (e) { ok("A2 lock 1.0.245 ×2", false, String(e.message)); }
 ok("A3 marcador f356bh1 na descrição", (pkg.description || "").includes("f356bh1-designer-assigned-dedupe"));
 ok("A4 motor de política workflowEvents.js carregado", typeof WE.wfRecipientOk === "function" && typeof WE.buildWorkflowPayload === "function" && !!WE.WF_POLICY);

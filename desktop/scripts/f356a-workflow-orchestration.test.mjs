@@ -62,11 +62,11 @@ function extractFn(src, marker) {
 
 /* ═══ A — IDENTIDADE ═══ */
 const pkg = JSON.parse(read(PKG));
-ok("A1 versão 1.0.245", pkg.version === "1.0.245", pkg.version);
+ok("A1 versão 1.0.246", pkg.version === "1.0.246", pkg.version);
 try {
   const lock = JSON.parse(read(LOCK));
-  ok("A2 lock 1.0.245 ×2", lock.version === "1.0.245" && lock.packages[""].version === "1.0.245");
-} catch (e) { ok("A2 lock 1.0.245 ×2", false, String(e.message)); }
+  ok("A2 lock 1.0.246 ×2", lock.version === "1.0.246" && lock.packages[""].version === "1.0.246");
+} catch (e) { ok("A2 lock 1.0.246 ×2", false, String(e.message)); }
 ok("A3 workflowEvents.js existe (motor puro)", fs.existsSync(WE_PATH));
 ok("A4 workflowNotifier compilado no dist", fs.existsSync(WN_DIST));
 
@@ -78,10 +78,17 @@ try {
   showBase("desktop/package.json");
 } catch (_) { gitOk = false; }
 if (gitOk) {
-  for (const f of ["desktop/src/main/bgNotify.ts", "desktop/src/main/notificationGrouping.ts", "desktop/src/renderer/bgnotify.html"]) {
+  for (const f of ["desktop/src/main/bgNotify.ts", "desktop/src/main/notificationGrouping.ts"]) {
     try { ok("B congelado byte-idêntico: " + f, showBase(f) === read(path.join(ROOT, f))); }
     catch (e) { ok("B congelado byte-idêntico: " + f, false, String(e.message)); }
   }
+  // F3.5.6B-H2 (1.0.246): bgnotify.html deixou de ser byte-idêntico à 1.0.228 — a ÚNICA mudança é o allowlist
+  // PREMIUM_TYPES (adição dos 10 wf_* ao modelo premium) + seu comentário. Normaliza os dois lados e prova
+  // que TODO o resto do renderer segue byte-idêntico à 1.0.228.
+  { const normH2 = (s) => s.replace(/ *\/\* F3\.5\.6B-H2[\s\S]*?\*\/\n/, "").replace(/var PREMIUM_TYPES=\{[^}]*\};/, "var PREMIUM_TYPES=__H2__;");
+    const f = "desktop/src/renderer/bgnotify.html";
+    try { ok("B congelado (byte-idêntico à 1.0.228 EXCETO o allowlist premium wf_* da H2/1.0.246): " + f, normH2(showBase(f)) === normH2(read(path.join(ROOT, f)))); }
+    catch (e) { ok("B congelado (H2 norm): " + f, false, String(e.message)); } }
 } else {
   console.log("# B: git baseline indisponível neste checkout — gate coberto pelos pins literais das suítes f355eh4/f355eh3");
   ok("B congelados cobertos por suítes herdadas (git raso)", true);
