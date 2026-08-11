@@ -1,0 +1,261 @@
+# =====================================================================
+# F3.5.6B-H2 — Publicacao da Desktop 1.0.246 no CANAL DO ATUALIZADOR INTERNO (Latest)
+# ---------------------------------------------------------------------
+# Notificacoes de WORKFLOW (wf_*) no MODELO PREMIUM. Continuacao da 1.0.245 (H1). Os eventos de
+# workflow que possuem WF_POLICY e realmente notificam caiam no template COMPACTO em vez do PREMIUM.
+# Correcao 1.0.246 (SOMENTE 2 arquivos de producao: desktop/src/renderer/index.html + bgnotify.html):
+# +10 eventos wf_* no PREMIUM_TYPES das duas superficies -> passam a usar premiumCommonInner (avatar
+# flutuante, card premium, CTA "Abrir ->", topmost, fora de foco/minimizado/bandeja). REUSO do modelo
+# existente. H1 PRESERVADA: wf_designer_assigned FORA (produtor nem o emite; buildWorkflowPayload=null)
+# => ZERO entrega. PASSTHROUGH intacto: wf_* fora de GROUPABLE_EVENT_TYPES. workflowEvents.js/notifEvents/
+# workflowNotifier/deliverNotification/main.ts/notificationGrouping/slaRules.js/Worker V64.61/infra 1.0.228
+# INALTERADOS. O gate do app.asar RODOU a suite f356bh2 contra os BYTES EMPACOTADOS (wf_* premium nas 2
+# superficies + wf_designer_assigned zero entrega + task_assigned premium). USA os BYTES do run de build
+# F3.5.6B-H2 31484322929 (gated, verde nos 2 jobs; --publish never): NAO RECOMPILA. TUDO PINADO: run id,
+# digests, 5 hashes SHA-256, tag v1.0.246 no head EXATO. ESCRITAS so via GitHub App "Agenda ID Seven
+# Release Bot". BASELINE FISICA OFICIAL 1.0.244; ROLLBACK IMEDIATO 1.0.228.
+# =====================================================================
+name: "F3.5.6B-H2 Desktop Release — 1.0.246 no canal do updater (workflow notifications premium; sem build novo)"
+"on":
+  push:
+    branches:
+      - "desktop/f356bh2-workflow-notifications-premium-1.0.246"
+    paths:
+      - ".github/workflows/desktop-release-f356bh2.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: agidseven-lang/Agenda
+      # ── PINAGEM COMPLETA (F3.5.6B-H2; do run de build verde 31484322929) ──
+      RUN_ID: "31484322929"
+      STABLE_SHA: "0fa343350e3bcc00c4ee114530d0ff19a9adbfc4"
+      TEST_BRANCH: "desktop/f356bh2-workflow-notifications-premium-1.0.246"
+      BASE_245_SHA: "743dfa26804a8d576a5f83f3cee53bbdae73fa79"
+      BASE_244_SHA: "28a081ca44dc5445a40fd28b7be3fe6e55b96ca4"
+      BASE_228_SHA: "3f0d0af192b4b6b32a8e8bbda4153dcf4df1bc6d"
+      TAG: "v1.0.246"
+      TITLE: "Agenda ID Seven Desktop 1.0.246 — notificacoes de workflow no modelo premium (pelo updater)"
+      ART_INST: "agenda-id-seven-desktop-1.0.246-installer"
+      ART_INST_DIGEST: "sha256:d2e2cb36ca27ea8aa95f418e4640f2e25a4bc0b2d61d45e94dca3db157e30102"
+      ART_META: "agenda-id-seven-desktop-1.0.246-updatemeta"
+      ART_META_DIGEST: "sha256:b3943ede8002d5de452c31b6cb6496deda9fa71218cc72006b67d781f8eda5e0"
+      EXE_NAME: "Agenda-ID-Seven-Desktop-1.0.246-x64.exe"
+      MSI_NAME: "Agenda-ID-Seven-Desktop-1.0.246-x64.msi"
+      BM_NAME: "Agenda-ID-Seven-Desktop-1.0.246-x64.exe.blockmap"
+      LY_NAME: "latest.yml"
+      EXP_EXE: "65224c19a463b3bc9f3aaa5635738648545fe5ca6a1fe303b46bd18981daf931"
+      EXP_MSI: "66aee9ab53fe7f929f189394357fc59e22018430dc3cfa7db6ac8fc339691293"
+      EXP_LY: "c9161157fda598d8fd4ceddbfa5821217ab37d3b397b57e270d2b857feb3257e"
+      EXP_BM: "f15b1a311d39a6f0a04a19fc8592bb527050807201dd97de9b973279ad6e2436"
+      EXP_SBOM: "51aa88e6156ffbc4618d81d1a451aef16f45e838c3d7fb3f4aaa1b6e7b400d7b"
+      PREV_LATEST_TAG: "v1.0.245"
+      PRES_244_TAG: "v1.0.244"
+      PRES_243_TAG: "v1.0.243"
+      PRES_242_TAG: "v1.0.242"
+      PRES_241_TAG: "v1.0.241"
+      PRES_240_TAG: "v1.0.240"
+      PRES_238_TAG: "v1.0.238"
+      PRES_236_TAG: "v1.0.236"
+      PRES_232_TAG: "v1.0.232"
+      PRES_230_TAG: "v1.0.230"
+      PRES_228_TAG: "v1.0.228"
+      PROD_ROLLBACK_TAG: "v1.0.228"
+    steps:
+      - name: "Gate 0 — contexto: branch de teste correta (publicacao autorizada F3.5.6B-H2)"
+        run: |
+          set -euo pipefail
+          [ "${{ github.ref_name }}" = "$TEST_BRANCH" ] || { echo "::error::ref '${{ github.ref_name }}' != $TEST_BRANCH — nada publicado"; exit 1; }
+          echo "OK: rodando na branch de teste autorizada"
+
+      - name: "Gate 0a — token temporario do Release Bot (GitHub App; expira sozinho)"
+        id: release_bot
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: Agenda
+          permission-contents: write
+          permission-workflows: write
+
+      - name: "Gate 0b — token do Release Bot ATIVO + escopo SO Agenda"
+        env:
+          BOT_TOKEN: ${{ steps.release_bot.outputs.token }}
+        run: |
+          set -euo pipefail
+          [ -n "$BOT_TOKEN" ] || { echo "::error::token do Release Bot vazio — NADA publicado."; exit 1; }
+          FN="$(GH_TOKEN="$BOT_TOKEN" gh api "repos/$REPO" --jq '.full_name' 2>/dev/null || true)"
+          [ "$FN" = "$REPO" ] || { echo "::error::Release Bot sem acesso a $REPO."; exit 1; }
+          J="$(GH_TOKEN="$BOT_TOKEN" gh api /installation/repositories)"
+          N="$(echo "$J" | jq -r '.total_count')"; R="$(echo "$J" | jq -r '.repositories[0].full_name')"
+          { [ "$N" = "1" ] && [ "$R" = "$REPO" ]; } || { echo "::error::escopo do Release Bot != {1 repo, $REPO} ($N,$R)."; exit 1; }
+          echo "OK: Release Bot ativo, escopo restrito a $REPO"
+
+      - name: "Gate 1 — run de build F3.5.6B-H2 completed/success e head EXATO"
+        run: |
+          set -euo pipefail
+          J="$(gh api "repos/$REPO/actions/runs/$RUN_ID")"
+          ST="$(echo "$J" | jq -r '.status + "|" + .conclusion')"
+          HS="$(echo "$J" | jq -r '.head_sha')"
+          BR="$(echo "$J" | jq -r '.head_branch')"
+          echo "run $RUN_ID: $ST head=$HS branch=$BR"
+          [ "$ST" = "completed|success" ] || { echo "::error::run de build invalido"; exit 1; }
+          [ "$HS" = "$STABLE_SHA" ] || { echo "::error::head do run != STABLE_SHA"; exit 1; }
+          [ "$BR" = "$TEST_BRANCH" ] || { echo "::error::branch do run != branch de teste"; exit 1; }
+
+      - name: "Gate 2 — STABLE_SHA na linhagem do tip; commits alem dele SO o workflow de release; insumos de build intactos; bases na linhagem"
+        run: |
+          set -euo pipefail
+          H="$(gh api "repos/$REPO/git/ref/heads/$TEST_BRANCH" --jq '.object.sha')"
+          CMP="$(gh api "repos/$REPO/compare/$STABLE_SHA...$H" --jq '.status')"
+          echo "compare $STABLE_SHA...$H: $CMP"
+          { [ "$CMP" = "identical" ] || [ "$CMP" = "ahead" ]; } || { echo "::error::STABLE_SHA fora da linhagem do tip ($CMP)"; exit 1; }
+          gh api "repos/$REPO/compare/$STABLE_SHA...$H" --jq '.files[].filename' | tee /tmp/extra.txt || true
+          if grep -vE '^\.github/workflows/desktop-release-f356bh2\.yml$' /tmp/extra.txt | grep -q .; then
+            echo "::error::commits pos-candidato tocam arquivos alem do workflow de release"; exit 1; fi
+          if grep -qE '^(desktop/src/|desktop/scripts/copy-renderer\.js|desktop/package\.json|desktop/package-lock\.json|desktop/tsconfig\.json|desktop/electron-builder)' /tmp/extra.txt; then
+            echo "::error::insumo de build alterado apos STABLE_SHA — bytes publicados nao corresponderiam ao build"; exit 1; fi
+          for B in "$BASE_245_SHA" "$BASE_244_SHA" "$BASE_228_SHA"; do
+            C="$(gh api "repos/$REPO/compare/$B...$STABLE_SHA" --jq '.status')"
+            { [ "$C" = "ahead" ] || [ "$C" = "identical" ]; } || { echo "::error::STABLE_SHA nao descende de $B ($C)"; exit 1; }
+          done
+          echo "OK: STABLE_SHA ancestral do tip; extras = so o workflow de release; bases 1.0.245/1.0.244/1.0.228 na linhagem"
+
+      - name: "Gate 3 — release v1.0.246 NAO existe; tag so pode preexistir apontando p/ STABLE_SHA"
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then echo "::error::release $TAG ja existe"; exit 1; fi
+          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            TS="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+            [ "$TS" = "$STABLE_SHA" ] || { echo "::error::tag $TAG aponta para outro sha ($TS)"; exit 1; }
+          fi
+          echo "OK: release/tag livres (ou tag ja em STABLE_SHA)"
+
+      - name: "Gate 4 — artifacts: ids+digests conferem (mesmos bytes do run verde)"
+        run: |
+          set -euo pipefail
+          json="$(gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts" --paginate)"
+          chk() { local d; d="$(echo "$json" | jq -r --arg n "$1" '.artifacts[]|select(.name==$n)|.digest')"; echo "$1: $d"; [ "$d" = "$2" ] || { echo "::error::digest $1 divergente"; exit 1; }; }
+          chk "$ART_INST" "$ART_INST_DIGEST"
+          chk "$ART_META" "$ART_META_DIGEST"
+
+      - name: "Baixar artifacts (installer + updatemeta) — SEM recompilar"
+        run: |
+          set -euo pipefail
+          gh run download "$RUN_ID" -R "$REPO" -n "$ART_INST" -D pacote
+          gh run download "$RUN_ID" -R "$REPO" -n "$ART_META" -D pacote
+          for f in "$EXE_NAME" "$MSI_NAME" "$LY_NAME" "$BM_NAME" SHA256SUMS SBOM-cyclonedx.json VERSAO-DESKTOP.txt; do
+            test -f "pacote/$f" || { echo "::error::arquivo ausente: $f"; exit 1; }
+          done
+          if [ -f pacote/canary.yml ]; then echo "::error::canary.yml presente — canal ambiguo"; exit 1; fi
+
+      - name: "Gate 5 — hashes SHA-256 + latest.yml (versao/EXE/sha512) + VERSAO-DESKTOP"
+        run: |
+          set -euo pipefail
+          declare -A EXP=( ["$EXE_NAME"]="$EXP_EXE" ["$MSI_NAME"]="$EXP_MSI" ["$LY_NAME"]="$EXP_LY" ["$BM_NAME"]="$EXP_BM" ["SBOM-cyclonedx.json"]="$EXP_SBOM" )
+          for f in "${!EXP[@]}"; do
+            H="$(sha256sum "pacote/$f" | awk '{print $1}')"; echo "$f=$H"
+            [ "$H" = "${EXP[$f]}" ] || { echo "::error::hash $f divergente"; exit 1; }
+          done
+          ( cd pacote && sha256sum -c SHA256SUMS ) || { echo "::error::SHA256SUMS nao confere"; exit 1; }
+          grep -q "version: 1.0.246" "pacote/$LY_NAME" || { echo "::error::latest.yml version != 1.0.246"; exit 1; }
+          grep -qE "^path: $EXE_NAME" "pacote/$LY_NAME" || { echo "::error::latest.yml path != EXE"; exit 1; }
+          META_SHA512=$(grep -E '^sha512:' "pacote/$LY_NAME" | head -1 | sed -E 's/^sha512:[[:space:]]*//' | tr -d '\r')
+          CALC_SHA512=$(openssl dgst -sha512 -binary "pacote/$EXE_NAME" | openssl base64 -A)
+          [ "$META_SHA512" = "$CALC_SHA512" ] || { echo "::error::sha512 do latest.yml != EXE (updater rejeitaria)"; exit 1; }
+          grep -q "versionName : 1.0.246" pacote/VERSAO-DESKTOP.txt || { echo "::error::VERSAO-DESKTOP sem 1.0.246"; exit 1; }
+          grep -q "1.0.246-f356bh2-workflow-notifications-premium" pacote/VERSAO-DESKTOP.txt || { echo "::error::rotulo da candidata ausente"; exit 1; }
+          echo "OK: 5 hashes + SHA256SUMS + latest.yml (1.0.246/EXE/sha512==EXE) + VERSAO-DESKTOP"
+
+      - name: "Release notes"
+        run: |
+          cat > notas.md <<'NOTAS'
+          Agenda ID Seven Desktop 1.0.246 — notificacoes de workflow no modelo premium (pelo atualizador interno)
+
+          Atualização disponibilizada pelo ATUALIZADOR INTERNO do app (Configurações ->
+          Atualizações -> Verificar atualizações -> Baixar -> Instalar e reiniciar).
+
+          Continuação da 1.0.245 (H1). Correção pontual e de baixo risco: SÓ a APRESENTAÇÃO das
+          notificações de fluxo (workflow). Nenhuma regra de negócio muda.
+
+          O QUE MUDA vs 1.0.245 (SÓ os 2 renderers — index.html + bgnotify.html):
+          - As notificações dos eventos de FLUXO com o cliente (cliente visualizou/aprovou/pediu ajuste
+            nos temas e nas legendas; produção concluída; cards concluídos; temas/legendas prontos)
+            chegavam num formato SIMPLES (compacto). Agora chegam no MESMO cartão PREMIUM já usado pelas
+            notificações de tarefa: avatar flutuante, cartão premium, ação "Abrir →", sempre no topo,
+            funcionando com o app fora de foco, minimizado, na bandeja ou oculto.
+
+          O QUE NÃO MUDA (preservado; garantido por gate):
+          - a correção da 1.0.245 (atribuição ao Designer chega UMA única vez) segue intacta — a
+            notificação de "Nova atribuição" do fluxo continua desligada;
+          - o agrupamento, a Central de notificações (sino), o histórico, o tempo em tela, o som, a
+            entrega, os recibos, o SLA, a tela do cliente, o Worker e a base 1.0.228 seguem INALTERADOS;
+          - regras de negócio, produtores de evento e a lógica do fluxo: intocados.
+          Delta de produção vs 1.0.245: SOMENTE desktop/src/renderer/index.html e bgnotify.html.
+
+          COMO VALIDAR:
+          Gere uma tarefa de Cronograma, envie ao cliente e faça o cliente aprovar os temas (ou pedir
+          ajuste). O responsável deve receber a notificação no CARTÃO PREMIUM (avatar, "Abrir →"),
+          inclusive com o app minimizado/fora de foco. A atribuição ao Designer deve continuar chegando
+          UMA única vez. Em caso de problema: ROLLBACK IMEDIATO v1.0.228.
+
+          Procedencia: run de build F3.5.6B-H2 31484322929 (success; --publish never; verify + Windows
+          verdes). Destaque: o gate do app.asar RODOU a suite f356bh2 contra os BYTES EMPACOTADOS —
+          provando wf_* no modelo premium nas 2 superficies, task_assigned premium preservado e
+          wf_designer_assigned com ZERO entrega (H1 intacta) nos bytes reais.
+          @ commit 0fa343350e3bcc00c4ee114530d0ff19a9adbfc4
+          (branch desktop/f356bh2-workflow-notifications-premium-1.0.246). Mesmos bytes; sem recompilar.
+          Confira SHA-256 em SHA256SUMS.
+          NOTAS
+
+      - name: "Criar tag v1.0.246 pinada em STABLE_SHA — ESCRITA via Release Bot"
+        env:
+          GH_TOKEN: ${{ steps.release_bot.outputs.token }}
+        run: |
+          set -euo pipefail
+          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            TS="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+            [ "$TS" = "$STABLE_SHA" ] || { echo "::error::tag $TAG aponta para outro sha ($TS)"; exit 1; }
+          else
+            gh api -X POST "repos/$REPO/git/refs" -f ref="refs/tags/$TAG" -f sha="$STABLE_SHA" >/dev/null
+            echo "tag $TAG criada em $STABLE_SHA"
+          fi
+
+      - name: "Publicar release no canal do updater (latest=true, prerelease=false) — 6 assets — via Release Bot"
+        env:
+          GH_TOKEN: ${{ steps.release_bot.outputs.token }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" -R "$REPO" \
+            --target "$STABLE_SHA" --latest=true \
+            --title "$TITLE" --notes-file notas.md \
+            "pacote/$EXE_NAME" "pacote/$MSI_NAME" "pacote/$LY_NAME" "pacote/$BM_NAME" "pacote/SHA256SUMS" "pacote/VERSAO-DESKTOP.txt"
+          echo "publicado: $TAG (canal do electron-updater: release Latest com latest.yml)"
+
+      - name: "Pos-verificacao (Latest=1.0.246; 1.0.245..1.0.228 preservadas; rollback 1.0.228 preservado)"
+        run: |
+          set -euo pipefail
+          FLAGS="$(gh release view "$TAG" -R "$REPO" --json isPrerelease,isDraft --jq '(.isPrerelease|tostring)+"|"+(.isDraft|tostring)')"
+          [ "$FLAGS" = "false|false" ] || { echo "::error::flags incorretas: $FLAGS"; exit 1; }
+          N="$(gh release view "$TAG" -R "$REPO" --json assets --jq '.assets|length')"
+          [ "$N" = "6" ] || { echo "::error::esperado 6 assets, encontrados $N"; exit 1; }
+          for a in "$EXE_NAME" "$MSI_NAME" "$LY_NAME" "$BM_NAME" SHA256SUMS VERSAO-DESKTOP.txt; do
+            gh release view "$TAG" -R "$REPO" --json assets --jq '.assets[].name' | grep -qx "$a" || { echo "::error::asset $a ausente"; exit 1; }
+          done
+          if gh release view "$TAG" -R "$REPO" --json assets --jq '.assets[].name' | grep -qx "app-update.yml"; then echo "::error::app-update.yml nao pode ser asset"; exit 1; fi
+          TAGSHA="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+          [ "$TAGSHA" = "$STABLE_SHA" ] || { echo "::error::tag != STABLE_SHA"; exit 1; }
+          LATEST_TAG="$(gh api "repos/$REPO/releases/latest" --jq '.tag_name')"
+          [ "$LATEST_TAG" = "$TAG" ] || { echo "::error::Latest do repo != $TAG (got $LATEST_TAG)"; exit 1; }
+          for t in "$PREV_LATEST_TAG" "$PRES_244_TAG" "$PRES_243_TAG" "$PRES_242_TAG" "$PRES_241_TAG" "$PRES_240_TAG" "$PRES_238_TAG" "$PRES_236_TAG" "$PRES_232_TAG" "$PRES_230_TAG" "$PRES_228_TAG"; do
+            gh release view "$t" -R "$REPO" --json tagName --jq '.tagName' | grep -qx "$t" || { echo "::error::$t (preservada/rollback) sumiu"; exit 1; }
+          done
+          echo "===== GO: 1.0.246 (workflow notifications premium) no canal do updater (Latest); ROLLBACK IMEDIATO 1.0.228; 1.0.245..1.0.228 preservadas ====="
