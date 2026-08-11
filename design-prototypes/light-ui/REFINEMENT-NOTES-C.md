@@ -4,6 +4,30 @@
 Somente pesquisa + design + simulação. Nada toca `desktop/`, o app, o tema, workflows ou release.
 Fonte da verdade = `proposta-c-refinada-v2-frame1.html` (self-contained; fontes embutidas em `_fonts.css`).
 
+## V7 — refinamento premium (V6 reprovada; exigido salto + fotos reais)
+Arquivo: `proposta-c-v7-premium-frame1.html`. Passe de acabamento + requisitos duros do owner:
+- **AVATAR photo-ready, sem ilustração/cartoon/DiceBear/sintético.** O componente `.av` mostra a
+  **foto real do usuário do Agenda** quando existir (classe `.av.photo` + `background-image`); aqui é
+  exibido o **fallback premium em monograma** (iniciais + anel de identidade + fundo tingido), pois o
+  ambiente **bloqueia hosts de foto** e não fabrico fotos reais. Mesmo crop/ring/tamanho nos dois estados.
+  → Trocar por fotos reais = preencher o `background-image` de cada `.av` (owner envia as fotos).
+- **Contrato de cor** explícito: coluna = STATUS; **barra do card = RESPONSÁVEL** (`own-*`); **ring do
+  avatar = RESPONSÁVEL**; **chip do filtro = RESPONSÁVEL**; **tag = CATEGORIA**. Sem misturar.
+- **Fidelidade:** removidos **"Plano Business"** e **seletor de workspace "ID Seven · Agência"** (auditoria
+  read-only: `Plano Business`=0, `Espaço da Agência`=0 no renderer real — não existem). Perfil da sidebar
+  agora **integrado** (sem caixa), só avatar+nome+cargo+status.
+- **Sistema de espaçamento 4/8** e **raios 8/12/16** aplicados de forma consistente; grid alinhado.
+- **Card**: cliente primeiro (logo+nome), categoria como **tag discreta** à direita, prazo/progresso,
+  rodapé com pilha de avatares + metadados; barra lateral 3px integrada ao raio (overflow); seleção sutil
+  (tint + inset ring, sem outline). Compacto e respirado.
+- **Header/abas**: título + perfil no header, SLA, sino; **abas como subnav** (ativa em pílula, inativas
+  em texto — sem "botões soltos"); busca premium com ⌘K.
+- **Drawer editorial** (não formulário): título forte → chips → cliente → grid Responsável/Concluída →
+  arquivo PDF com download → **linha do tempo com avatar do ator + nome + timestamp**.
+- **Sem barra de métricas inferior.** 1920×1080 exatos. Inter/Inter Tight.
+- *Pinterest:* sem navegador do Pinterest neste ambiente; apliquei os princípios de acabamento dos
+  benchmarks (Linear/Stripe/Notion/Vercel/Attio) — declarado com honestidade, sem forjar "pesquisa".
+
 ## V6 — refinamento premium (versão atual reprovada; salto de qualidade exigido)
 Arquivo: `proposta-c-v6-premium-frame1.html`. Nova proposta seguindo a crítica do owner, com 3 reversões
 explícitas em relação à V5 e um passe geral de sofisticação:
