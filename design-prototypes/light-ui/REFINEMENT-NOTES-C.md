@@ -4,6 +4,18 @@
 Somente pesquisa + design + simulação. Nada toca `desktop/`, o app, o tema, workflows ou release.
 Fonte da verdade = `proposta-c-refinada-v2-frame1.html` (self-contained; fontes embutidas em `_fonts.css`).
 
+## V5 — reprodução fiel da referência do owner ("100% idêntico")
+Arquivo: `proposta-c-v5-fiel-referencia-frame1.html`. O owner definiu a referência anexada como o alvo
+exato do layout. Reproduzido: sidebar navy (ID Seven + Nova tarefa no topo + nav Workspace/Sistema +
+cartão do usuário + "ID Seven · Agência" + Plano Business 80%); header (voltar + avatar + "Meu quadro/CEO"
++ MONITOR SLA AO VIVO + sino + avatar); busca ⌘K + abas em pílula (Meu quadro/Cliente/Designers/Social
+Mídias/Setores); linha "Filtrar por responsável" (Ardyjany/Sunset/MovOn/TechOne/GreenLife/Todos); 4 colunas
+(A Fazer 8 / Em andamento 6 / Revisão 4 / Finalizado 12) com badges de categoria, cliente, prazo, progresso%,
+pilha de avatares + contagens, marcador/checks; drawer (Finalizado, chips, estrela+título, cliente, responsável,
+conteúdo PDF, linha do tempo, CTA); barra de métricas inferior (32/78%/5/98% + deltas + legenda). 1920×1080.
+**Única substituição:** avatares = iniciais coloridas (mesmo sistema de cor por responsável), pois não reproduzo
+fotos de pessoas reais. Base tipográfica Inter/Inter Tight.
+
 ## V4 — fidelidade ao produto real (owner aprovou a linguagem visual da V3)
 Arquivo: `proposta-c-refinada-v4-frame1.html`. Mesma qualidade visual da V3, corrigindo tudo que era
 **inventado / implicava funcionalidade inexistente** — matriz de auditoria READ-ONLY do renderer real em
