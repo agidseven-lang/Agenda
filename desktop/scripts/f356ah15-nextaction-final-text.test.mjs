@@ -9,7 +9,7 @@
  * a "reenviar ao cliente" (risco de mensagem duplicada no WhatsApp). Os cards (nextActionShort),
  * o HERO dos Detalhes (detailState) e o quadro Cliente (clientFacingNextShort) JÁ estavam corretos.
  *
- * Correção 1.0.244 (RENDERER-only, index.html, TEXTUAL — 1 linha; SEM mudar condição/lógica):
+ * Correção 1.0.245 (RENDERER-only, index.html, TEXTUAL — 1 linha; SEM mudar condição/lógica):
  *   case 'aguardando_final': return 'Envio final confirmado. Próxima etapa: aguardar a aprovação final do cliente.';
  *
  * RED na base 1.0.240 (b40259a); GREEN na 1.0.241.
@@ -158,8 +158,8 @@ ok('S14 H14 step7 preservado (done:!!(prodOk||resent))', HTML.includes("key:'agu
 ok('S15 H14 rótulo contextual do marco final preservado', HTML.includes("if(m.key==='concluido'&&state==='current') dispLabel='Aguardando aprovação final';"));
 
 /* =========================== IDENTIDADE =========================== */
-ok('ID1 package.json = 1.0.244 + marcador H15', PKG.version === '1.0.244' && /nextaction-final-wait-text/.test(PKG.description || ''));
-ok('ID2 package-lock 1.0.244 (raiz + packages[""])', LOCK.version === '1.0.244' && LOCK.packages[''].version === '1.0.244');
+ok('ID1 package.json = 1.0.245 + marcador H15', PKG.version === '1.0.245' && /nextaction-final-wait-text/.test(PKG.description || ''));
+ok('ID2 package-lock 1.0.245 (raiz + packages[""])', LOCK.version === '1.0.245' && LOCK.packages[''].version === '1.0.245');
 ok('ID3 marcadores herdados H14/H13/H12 preservados', /timeline-step7-final-wait/.test(PKG.description || '') && /timeline-honest-preenvio/.test(PKG.description || '') && /final-state-premature-fix/.test(PKG.description || ''));
 
 console.log('================= F3.5.6A-H15 — PRÓXIMA AÇÃO / ESPERA FINAL =================');

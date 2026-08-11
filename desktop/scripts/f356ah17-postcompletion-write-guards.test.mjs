@@ -9,7 +9,7 @@
  *               designerSla.* + scheduleRevision++ sem guarda de conclusão).
  *   RESÍDUO 3 — "Mover status" ainda presente e o write (moveStatus) ocorria pós-conclusão.
  *
- * Correção 1.0.244 (RENDERER-only, index.html):
+ * Correção 1.0.245 (RENDERER-only, index.html):
  *   C1 — ATOR do marco FINAL: além das fontes canônicas (rodada FINAL recordedBy →
  *        clientFinalApprovedBy → evento exato), aceita clientReview.byName/by SOMENTE com PROVA
  *        de identidade temporal (clientReview.status==='aprovado' && clientReview.at===FINAL_AT).
@@ -271,8 +271,8 @@ ok('S13 H16 preservada — E1 operationalCol precedência isTaskCompleted', /if\
 ok('S14 H16 preservada — E6 timeline carimbo FONTE REAL (rodada FINAL decisionAt/recordedBy)', S_TT.includes('carimbo do marco FINAL a partir da FONTE REAL') && /decision==='approved'&&Number\(_crr\.decisionAt\)/.test(S_TT));
 
 /* =========================== IDENTIDADE =========================== */
-ok('ID1 package.json = 1.0.244 + marcador H17', PKG.version === '1.0.244' && /postcompletion-write-guards|post-completion-write-guards/.test(PKG.description || ''));
-ok('ID2 package-lock 1.0.244 (raiz + packages[""])', LOCK.version === '1.0.244' && LOCK.packages[''].version === '1.0.244');
+ok('ID1 package.json = 1.0.245 + marcador H17', PKG.version === '1.0.245' && /postcompletion-write-guards|post-completion-write-guards/.test(PKG.description || ''));
+ok('ID2 package-lock 1.0.245 (raiz + packages[""])', LOCK.version === '1.0.245' && LOCK.packages[''].version === '1.0.245');
 ok('ID3 marcadores herdados preservados (H16/H15/H14/H13/H12)', /final-completed-precedence/.test(PKG.description || '') && /nextaction-final-wait-text/.test(PKG.description || '') && /timeline-step7-final-wait/.test(PKG.description || '') && /timeline-honest-preenvio/.test(PKG.description || '') && /final-state-premature-fix/.test(PKG.description || ''));
 
 console.log('================= F3.5.6A-H17 — FECHAMENTO PÓS-CONCLUSÃO (ATOR + SLA read-only + MOVE bloqueado) =================');

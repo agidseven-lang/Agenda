@@ -62,11 +62,11 @@ function extractFn(src, marker) {
 
 /* ═══ A — IDENTIDADE ═══ */
 const pkg = JSON.parse(read(PKG));
-ok("A1 versão 1.0.244", pkg.version === "1.0.244", pkg.version);
+ok("A1 versão 1.0.245", pkg.version === "1.0.245", pkg.version);
 try {
   const lock = JSON.parse(read(LOCK));
-  ok("A2 lock 1.0.244 ×2", lock.version === "1.0.244" && lock.packages[""].version === "1.0.244");
-} catch (e) { ok("A2 lock 1.0.244 ×2", false, String(e.message)); }
+  ok("A2 lock 1.0.245 ×2", lock.version === "1.0.245" && lock.packages[""].version === "1.0.245");
+} catch (e) { ok("A2 lock 1.0.245 ×2", false, String(e.message)); }
 ok("A3 workflowEvents.js existe (motor puro)", fs.existsSync(WE_PATH));
 ok("A4 workflowNotifier compilado no dist", fs.existsSync(WN_DIST));
 
@@ -148,7 +148,13 @@ function mkLedger(entries) { const m = {}; entries.forEach((e, i) => { m[e.k || 
   const t = { id: "T1", client: "Hospital Visão", socialOwnerId: "sm1", cronContents: [{}, {}] };
   const mk = (type, extra) => Object.assign({ id: "e1", type, at: NOW, by: "", ru: "", n: 0, tot: 0, phase: "assignment_pending" }, extra || {});
   const ctxOf = (uid, role, admin) => ({ uid, user: { id: uid, role: role || "", admin: !!admin }, resolveProfile: () => null });
-  ok("C13 designer_ru: SÓ o designer indicado", WE.wfRecipientOk(mk("DESIGNER_ASSIGNED", { ru: "d1" }), t, ctxOf("d1")) === true
+  // F3.5.6B-H1 — DESIGNER_ASSIGNED SAIU de WF_POLICY (duplicidade física "A3"): a atribuição já emite
+  // a notificação canônica "Tarefa atribuída" (Categoria A legada, notifEvents.task_assigned). Agora
+  // NINGUÉM é notificado por esta via (nem o designer indicado), como *_APPROVAL_REQUESTED; o ledger
+  // ev_dassign_/DESIGNER_ASSIGNED segue gravado e derivado (observabilidade). Cobertura RED→GREEN
+  // completa em f356bh1-designer-assigned-dedupe.test.mjs.
+  ok("C13 [H1] DESIGNER_ASSIGNED NÃO notifica ninguém (canônico = task_assigned legado)",
+    WE.wfRecipientOk(mk("DESIGNER_ASSIGNED", { ru: "d1" }), t, ctxOf("d1")) === false
     && WE.wfRecipientOk(mk("DESIGNER_ASSIGNED", { ru: "d1" }), t, ctxOf("d2")) === false);
   ok("C14 social_resp: responsável definido recebe; outro social NÃO", WE.wfRecipientOk(mk("CLIENT_THEMES_APPROVED"), t, ctxOf("sm1")) === true
     && WE.wfRecipientOk(mk("CLIENT_THEMES_APPROVED"), t, ctxOf("sm2", "social media")) === false);

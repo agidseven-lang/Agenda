@@ -1,4 +1,4 @@
-/* F3.5.6A-H2 — CENTRAL DE APROVAÇÕES COMPACTA + DRAWER (Desktop 1.0.244) — suíte de CÓDIGO.
+/* F3.5.6A-H2 — CENTRAL DE APROVAÇÕES COMPACTA + DRAWER (Desktop 1.0.245) — suíte de CÓDIGO.
  * P0 UX da tela Cliente: a seção "Aprovações pendentes" deixa de ficar permanentemente expandida
  * acima do Kanban; vira barra compacta (recolhida) + drawer lateral sob demanda. Funcionalidade
  * preservada; SÓ UX. Notificações (1.0.228) e workflow (workflowEvents/workflowNotifier) INTOCADOS.
@@ -39,14 +39,14 @@ function fn(marker) {
 
 /* ═══ A — IDENTIDADE ═══ */
 const pkg = JSON.parse(read(PKG));
-ok("A1 versão 1.0.244", pkg.version === "1.0.244", pkg.version);
+ok("A1 versão 1.0.245", pkg.version === "1.0.245", pkg.version);
 ok("A2 description da fase H2 + cadeia de bases preservada",
   /f356ah2-client-approvals-compact-drawer/.test(pkg.description || "")
   && /f356ah1-workflow-notification-receipt-collision/.test(pkg.description || "")
   && /f356a-realtime-workflow-client-approval/.test(pkg.description || "")
   && /grouped-notification-handoff/.test(pkg.description || ""));
-try { const lock = JSON.parse(read(LOCK)); ok("A3 lock 1.0.244 ×2", lock.version === "1.0.244" && lock.packages[""].version === "1.0.244"); }
-catch (e) { ok("A3 lock 1.0.244 ×2", false, String(e.message)); }
+try { const lock = JSON.parse(read(LOCK)); ok("A3 lock 1.0.245 ×2", lock.version === "1.0.245" && lock.packages[""].version === "1.0.245"); }
+catch (e) { ok("A3 lock 1.0.245 ×2", false, String(e.message)); }
 
 /* ═══ B — BARRA COMPACTA (estado padrão RECOLHIDO) ═══ */
 ok("B1 board chama a BARRA compacta (não a lista expandida)",
@@ -117,8 +117,23 @@ catch (_) { gitOk = false; }
 if (gitOk) {
   for (const f of ["desktop/src/main/bgNotify.ts", "desktop/src/main/notificationGrouping.ts", "desktop/src/renderer/bgnotify.html", "desktop/src/preload/preload.ts"])
     { try { ok("G congelado 1.0.228 byte-idêntico: " + f, showBase(BASE_228, f) === read(path.join(ROOT, f))); } catch (e) { ok("G congelado: " + f, false, String(e.message)); } }
-  for (const f of ["desktop/src/main/workflowEvents.js", "desktop/src/main/workflowNotifier.ts", "cloudflare-worker.js"])
-    { try { ok("G workflow/Worker 1.0.230 byte-idêntico: " + f, showBase(BASE_230, f) === read(path.join(ROOT, f))); } catch (e) { ok("G workflow: " + f, false, String(e.message)); } }
+  // F3.5.6B-H1 — workflowNotifier.ts e o Worker seguem CONGELADOS byte-idênticos à 1.0.230.
+  for (const f of ["desktop/src/main/workflowNotifier.ts", "cloudflare-worker.js"])
+    { try { ok("G congelado 1.0.230 byte-idêntico: " + f, showBase(BASE_230, f) === read(path.join(ROOT, f))); } catch (e) { ok("G congelado: " + f, false, String(e.message)); } }
+  // F3.5.6B-H1 — workflowEvents.js MUDA DE PROPÓSITO (dedupe A3: DESIGNER_ASSIGNED removido de WF_POLICY).
+  // Prova que o ÚNICO delta vs 1.0.230 é essa remoção de política: a tabela perde só DESIGNER_ASSIGNED
+  // e o MOTOR (deriveLedgerEvents/wfRecipientOk/buildWorkflowPayload) permanece byte-idêntico.
+  try {
+    const weBase = showBase(BASE_230, "desktop/src/main/workflowEvents.js");
+    const weNow = read(path.join(ROOT, "desktop/src/main/workflowEvents.js"));
+    const keysOf = (s) => { const m = s.match(/var WF_POLICY = \{([\s\S]*?)\n\};/); return m ? (m[1].match(/^\s*([A-Z_]+):/gm) || []).map((x) => x.trim().replace(":", "")) : []; };
+    const kb = keysOf(weBase), kn = keysOf(weNow);
+    ok("G [H1] WF_POLICY: 1.0.230 tinha DESIGNER_ASSIGNED; agora removido (único delta de política)",
+      kb.includes("DESIGNER_ASSIGNED") && !kn.includes("DESIGNER_ASSIGNED") && JSON.stringify(kb.filter((k) => k !== "DESIGNER_ASSIGNED")) === JSON.stringify(kn), { kb, kn });
+    const fnEq = (name) => { const re = new RegExp("function " + name + "\\([\\s\\S]*?\\n\\}"); const a = weBase.match(re), b = weNow.match(re); return !!a && !!b && a[0] === b[0]; };
+    ok("G [H1] motor workflowEvents intocado vs 1.0.230 (deriveLedgerEvents/wfRecipientOk/buildWorkflowPayload byte-idênticos)",
+      fnEq("deriveLedgerEvents") && fnEq("wfRecipientOk") && fnEq("buildWorkflowPayload"));
+  } catch (e) { ok("G [H1] workflowEvents delta controlado vs 1.0.230", false, String(e.message)); }
 } else {
   console.log("# G: git baseline indisponível — congelados cobertos pelo gate de isolamento do workflow de build");
   ok("G congelados cobertos pelo gate de isolamento (git raso)", true);

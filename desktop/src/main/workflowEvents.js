@@ -159,7 +159,15 @@ function externalWaitInfo(t, nowMs) {
    designer_ru  = SOMENTE o Designer indicado no evento (ru) — nunca os demais.
    Sem entrada na tabela ⇒ evento NÃO notifica (ex.: *_APPROVAL_REQUESTED tem confirmação
    inline na UI; WORKFLOW_COMPLETED é coberto pela aprovação de legendas; DESIGNER_STARTED
-   atualiza status em tempo real sem interromper ninguém). */
+   atualiza status em tempo real sem interromper ninguém).
+   F3.5.6B-H1 — DESIGNER_ASSIGNED SAIU da tabela (duplicidade física provada, cenário "A3"):
+   a atribuição já emite a notificação CANÔNICA e superior "Tarefa atribuída" pela Categoria A
+   legada (notifEvents.js → task_assigned, derivada do campo designerAssignment). A entrada
+   aqui gerava uma SEGUNDA notificação ("Nova atribuição") ao mesmo Designer. O evento de
+   ledger ev_dassign_/DESIGNER_ASSIGNED CONTINUA gravado (observabilidade/auditoria/timeline);
+   só a POLÍTICA de notificação foi removida ⇒ zero toast por esta via, exatamente como
+   *_APPROVAL_REQUESTED (wfRecipientOk retorna false e buildWorkflowPayload retorna null para
+   evento sem política; o consumidor filtra antes do ingresso, sem recibo/cursor/retry). */
 var WF_POLICY = {
   CLIENT_THEMES_APPROVED:               { aud: 'social_resp', sev: 'success', sound: true },
   CLIENT_CAPTIONS_APPROVED:             { aud: 'social_resp', sev: 'success', sound: true },
@@ -167,7 +175,6 @@ var WF_POLICY = {
   CLIENT_CAPTIONS_ADJUSTMENT_REQUESTED: { aud: 'social_resp', sev: 'warning', sound: true },
   CLIENT_THEMES_FIRST_VIEWED:           { aud: 'social_resp', sev: 'info', sound: false },
   CLIENT_CAPTIONS_FIRST_VIEWED:         { aud: 'social_resp', sev: 'info', sound: false },
-  DESIGNER_ASSIGNED:                    { aud: 'designer_ru', sev: 'success', sound: true },
   DESIGNER_ITEM_COMPLETED:              { aud: 'social_resp', sev: 'info', sound: true, aggregate: true },
   DESIGN_PRODUCTION_COMPLETED:          { aud: 'social_resp', sev: 'success', sound: true },
   THEMES_READY:                         { aud: 'social_resp', sev: 'info', sound: true },
