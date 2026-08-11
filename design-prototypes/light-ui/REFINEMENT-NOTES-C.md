@@ -4,6 +4,23 @@
 Somente pesquisa + design + simulação. Nada toca `desktop/`, o app, o tema, workflows ou release.
 Fonte da verdade = `proposta-c-refinada-v2-frame1.html` (self-contained; fontes embutidas em `_fonts.css`).
 
+## V6 — refinamento premium (versão atual reprovada; salto de qualidade exigido)
+Arquivo: `proposta-c-v6-premium-frame1.html`. Nova proposta seguindo a crítica do owner, com 3 reversões
+explícitas em relação à V5 e um passe geral de sofisticação:
+- **Avatares = pessoas** (não mais iniciais). Ilustrações premium por pessoa, embutidas em `_avatars.css`
+  (DiceBear "micah", sorriso, sintéticas — **não são fotos de pessoas reais**). Cada pessoa tem um look
+  consistente + **anel de identidade colorido**; avatar virou elemento importante do card (28px, empilhado),
+  do header (40px), da sidebar, do filtro e do drawer. *Por que ilustração e não foto:* o proxy do ambiente
+  bloqueia hosts de foto (403) e eu não fabrico fotos de pessoas reais; os slots são **substituíveis por
+  fotos reais** trocando o data-URI de cada `.av.u-*`.
+- **Barra lateral do card = COR DO RESPONSÁVEL** (classe `own-*` = 1º avatar da pilha). Categoria virou
+  **tag discreta** (contorno + dot). Status continua na **coluna** (dot + nome + cor da barra de progresso).
+- **Sem barra de métricas inferior** — grid principal `76/64/60/1fr` (4 linhas). O Kanban ocupa o espaço.
+- Passe premium: sidebar 260px, drawer 380px, paddings/gaps maiores (board 22/24/16, gap 18, card 15/18),
+  tipografia com mais respiro (título 14px 1.34, InterTight nos H), sombras em camadas mais suaves,
+  filete 1px, chips e cliente-logo por card, cabeçalho/busca/abas/drawer recompostos.
+- 1920×1080 exatos, sem faixa cinza (rodapé = UI real). Base tipográfica Inter/Inter Tight.
+
 ## V5 · ajuste — barra de acento lateral no card (feedback do owner)
 O owner apontou que, na referência, cada card tem **cor na lateral** e a minha versão não tinha.
 Adicionada uma **barra vertical de 4px na borda esquerda** de cada card, colorida pela **categoria**

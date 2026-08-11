@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, initial-scale=1">
+<title>Agenda ID Seven — Proposta C V6 (refinamento premium) — Meu quadro</title>
+<link rel="stylesheet" href="_fonts.css">
+<link rel="stylesheet" href="_avatars.css">
+<style>
+/* ============================================================
+   AGENDA ID SEVEN · LIGHT UI · V6 — refinamento premium (fidelidade à referência)
+   FRAME "Meu quadro" 1920×1080 · DESIGN PROTOTYPE (não é produção).
+   - Avatares = ilustrações premium por pessoa (sintéticas, não fotos reais).
+   - Barra lateral do card = COR DO RESPONSÁVEL. Categoria = tag discreta. Status = coluna.
+   - Sem barra de métricas inferior (espaço para o Kanban).
+   ============================================================ */
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+svg{display:block}
+
+:root{
+  --canvas:#F4F6F9; --surface:#FFFFFF; --surface-2:#FBFCFD; --sunk:#EEF1F6;
+  --hair:#E7EBF1; --hair-2:#EFF2F7; --hair-3:#F2F4F8;
+  --tx-1:#161A23; --tx-2:#565E6D; --tx-3:#828B9A; --tx-4:#AAB2BF;
+  --sb-1:#20243A; --sb-2:#181B2C; --sb-tx:#C9CEDC; --sb-dim:#8A90A6; --sb-faint:#6A7089;
+  --sb-active:rgba(255,255,255,.08); --sb-hover:rgba(255,255,255,.045);
+  --brand:#5B7CFA;
+  --grad:linear-gradient(135deg,#6E5EF3 0%,#9A6BF5 100%);
+  --blue:#3B82F6; --blue-ink:#2563EB;
+  --orange:#F59E0B; --orange-ink:#B45309;
+  --violet:#8B5CF6; --violet-ink:#6D28D9;
+  --green:#22A06B; --green-ink:#127A4E;
+  --red:#EF4444; --red-ink:#C0343A;
+  --sh-card:0 0 0 1px var(--hair),0 1px 2px rgba(20,26,40,.045),0 4px 10px rgba(20,26,40,.035);
+  --sh-card-hi:0 0 0 1px var(--hair),0 2px 4px rgba(20,26,40,.06),0 10px 22px rgba(20,26,40,.07);
+  --sh-pop:0 14px 34px rgba(20,26,40,.13),0 3px 8px rgba(20,26,40,.06);
+  --sh-drawer:-16px 0 44px rgba(20,26,40,.08),-1px 0 0 var(--hair);
+}
+.u-indigo{--u:#5B6CF0}.u-violet{--u:#8A5CF6}.u-teal{--u:#12A69B}.u-emerald{--u:#1FA36F}
+.u-amber{--u:#DE9E2C}.u-rose{--u:#E85D8C}.u-sky{--u:#3BA0E6}.u-coral{--u:#EE6E48}
+.u-cyan{--u:#12A7C4}.u-fuchsia{--u:#C258CE}.u-blue{--u:#3B72F0}.u-orange{--u:#E5842B}
+.u-plum{--u:#9A6BA0}.u-slate{--u:#6B7A99}.u-sea{--u:#149684}.u-lime{--u:#77A83A}
+/* responsável → cor da barra lateral do card */
+.own-indigo{--bar:#5B6CF0}.own-violet{--bar:#8A5CF6}.own-teal{--bar:#12A69B}.own-emerald{--bar:#1FA36F}
+.own-amber{--bar:#DE9E2C}.own-rose{--bar:#E85D8C}.own-sky{--bar:#3BA0E6}.own-coral{--bar:#EE6E48}
+.own-cyan{--bar:#12A7C4}.own-fuchsia{--bar:#C258CE}.own-plum{--bar:#9A6BA0}.own-slate{--bar:#6B7A99}
+
+body{font-family:'Inter',-apple-system,'Segoe UI',Roboto,sans-serif;color:var(--tx-1);background:var(--canvas);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-feature-settings:"cv05" 1,"cv11" 1}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.ic-sm{width:15px;height:15px}.ic-14{width:14px;height:14px;stroke-width:1.8}
+.tnum{font-variant-numeric:tabular-nums}
+
+/* avatar (ilustração por pessoa, embutida via _avatars.css) */
+.av{width:28px;height:28px;border-radius:50%;flex:none;display:inline-block;background-size:cover;background-position:center 16%;background-repeat:no-repeat;background-color:#E7ECF3;color:transparent;text-indent:-9999px;overflow:hidden;box-shadow:0 0 0 1.5px #fff,0 0 0 2.5px color-mix(in srgb,var(--u) 45%,#fff)}
+.av-22{width:22px;height:22px}.av-24{width:24px;height:24px}.av-28{width:28px;height:28px}
+.av-34{width:34px;height:34px}.av-38{width:38px;height:38px}.av-40{width:40px;height:40px}
+.stack{display:flex}.stack .av{margin-left:-9px;box-shadow:0 0 0 2.5px var(--sk,#fff),0 0 0 4px color-mix(in srgb,var(--u) 42%,#fff)}.stack .av:first-child{margin-left:0}
+
+/* ============================================================ FRAME */
+.frame{width:1920px;height:1080px;overflow:hidden;position:relative;background:var(--canvas);display:grid;grid-template-columns:260px 1fr;grid-template-rows:1080px;font-size:13px;isolation:isolate}
+.frame::after{content:"";position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 0 1px rgba(20,26,40,.05);z-index:60}
+
+/* ============================================================ SIDEBAR */
+.sb{background:linear-gradient(180deg,var(--sb-1),var(--sb-2));color:var(--sb-tx);display:flex;flex-direction:column;min-height:0;overflow:hidden;padding:0 0 14px}
+.brand{display:flex;align-items:center;gap:12px;padding:22px 18px 16px}
+.brand-mark{width:40px;height:40px;border-radius:12px;flex:none;background:linear-gradient(140deg,#5B7CFA,#6E5EF3);display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(94,110,243,.42),inset 0 1px 0 rgba(255,255,255,.25)}
+.brand-mark .ic{width:21px;height:21px;color:#fff;stroke-width:1.9}
+.brand-txt{min-width:0;flex:1}
+.brand-name{font-family:'InterTight';font-weight:700;font-size:16.5px;color:#F3F5FA;letter-spacing:-.01em;line-height:1.1}
+.brand-sub{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--sb-faint);margin-top:3px}
+.brand-sync{width:6px;height:6px;border-radius:50%;background:#33D6A6;box-shadow:0 0 0 3px rgba(51,214,166,.16)}
+.newtask{margin:4px 16px 14px;height:44px;border-radius:12px;background:var(--grad);color:#fff;font-size:13.5px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:9px;box-shadow:0 8px 18px rgba(110,94,243,.36)}
+.newtask .ic{width:18px;height:18px;stroke-width:2.1}
+.sb-scroll{flex:1;overflow:hidden;padding:2px 14px;display:flex;flex-direction:column}
+.nav-label{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--sb-faint);padding:14px 10px 7px}
+.nav-item{display:flex;align-items:center;gap:12px;height:37px;padding:0 11px;border-radius:10px;color:var(--sb-tx);position:relative;font-size:13px;font-weight:450}
+.nav-item .ic{color:var(--sb-dim);width:18px;height:18px}
+.nav-item:hover{background:var(--sb-hover)}
+.nav-item .cnt{margin-left:auto;font-size:11px;font-weight:600;color:var(--sb-faint);font-variant-numeric:tabular-nums}
+.nav-item.active{background:var(--sb-active);color:#F4F6FA;font-weight:550}
+.nav-item.active .ic{color:#AEB9FF}
+.nav-item.active::before{content:"";position:absolute;left:-14px;top:9px;bottom:9px;width:3px;border-radius:0 3px 3px 0;background:linear-gradient(180deg,#7C8CFF,#6E5EF3)}
+.nav-badge{margin-left:auto;height:18px;padding:0 7px;border-radius:999px;background:#EF4444;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center}
+.sb-user{margin:10px 14px 0;padding:11px;border-radius:14px;background:rgba(255,255,255,.05);box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
+.sb-user-row{display:flex;align-items:center;gap:11px}
+.sb-user-txt{min-width:0;flex:1}
+.sb-user-name{font-size:13px;font-weight:600;color:#F0F3F8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-user-role{font-size:10.5px;color:var(--sb-faint);margin-top:2px;display:flex;align-items:center;gap:5px}
+.udot{width:6px;height:6px;border-radius:50%;background:#33D6A6}
+.sb-user .ic{color:var(--sb-faint)}
+.sb-switch{display:flex;align-items:center;gap:9px;margin-top:10px;padding:9px 10px;border-radius:10px;background:rgba(0,0,0,.22);font-size:11.5px;color:var(--sb-dim)}
+.sw-dot{width:16px;height:16px;border-radius:5px;background:linear-gradient(140deg,#5B7CFA,#6E5EF3);flex:none}
+.plan{margin-top:11px}
+.plan-top{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--sb-dim);margin-bottom:6px}
+.plan-top .crown{color:#E0A02E}
+.plan-top b{color:#DDE3EF;font-weight:600}
+.plan-top .pct{margin-left:auto;color:var(--sb-faint);font-weight:600}
+.plan-bar{height:5px;border-radius:999px;background:rgba(255,255,255,.09);overflow:hidden}
+.plan-bar>i{display:block;height:100%;width:80%;border-radius:999px;background:linear-gradient(90deg,#7C8CFF,#6E5EF3)}
+
+/* ============================================================ MAIN (sem métricas) */
+.main{display:grid;grid-template-rows:76px 64px 60px 1fr;min-width:0;min-height:0;overflow:hidden;background:var(--canvas)}
+
+/* header */
+.hd{display:flex;align-items:center;gap:16px;padding:0 26px;background:var(--surface);box-shadow:0 1px 0 var(--hair)}
+.hd-back{width:36px;height:36px;border-radius:11px;display:flex;align-items:center;justify-content:center;color:var(--tx-2);box-shadow:inset 0 0 0 1px var(--hair)}
+.hd-title{display:flex;align-items:center;gap:13px}
+.hd-title .tl{display:flex;flex-direction:column;line-height:1.05}
+.hd-title .tl b{font-family:'InterTight';font-weight:700;font-size:22px;letter-spacing:-.02em;color:var(--tx-1)}
+.hd-title .tl span{font-size:12px;color:var(--tx-3);margin-top:3px}
+.hd-right{margin-left:auto;display:flex;align-items:center;gap:14px}
+.sla{display:flex;align-items:center;gap:11px;height:46px;padding:0 17px 0 13px;border-radius:13px;background:linear-gradient(180deg,#F1FBF7,#E8F8F0);box-shadow:inset 0 0 0 1px #CBEEDD}
+.sla-ic{width:31px;height:31px;border-radius:9px;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 5px rgba(18,80,54,.16)}
+.sla-ic .ic{width:16px;height:16px;color:var(--green)}
+.sla-tx{display:flex;flex-direction:column;line-height:1.18}
+.sla-k{font-size:9px;font-weight:800;letter-spacing:.06em;color:#3E9C74;display:flex;align-items:center;gap:5px}
+.livedot{width:6px;height:6px;border-radius:50%;background:#22C58A;box-shadow:0 0 0 3px rgba(34,197,138,.2)}
+.sla-v{font-size:13px;font-weight:650;color:#115E3D}
+.hd-bell{width:44px;height:44px;border-radius:13px;display:flex;align-items:center;justify-content:center;color:var(--tx-2);box-shadow:inset 0 0 0 1px var(--hair);position:relative}
+.hd-bell .dot{position:absolute;top:10px;right:11px;width:8px;height:8px;border-radius:50%;background:#7C6BF5;box-shadow:0 0 0 2px var(--surface)}
+.hd-av{box-shadow:0 0 0 2px #fff,0 0 0 3.5px color-mix(in srgb,var(--u) 45%,#fff)}
+
+/* toolbar (search + tabs) */
+.tb{display:flex;align-items:center;gap:18px;padding:0 26px;background:var(--surface);box-shadow:0 1px 0 var(--hair)}
+.search{flex:0 1 460px;height:42px;display:flex;align-items:center;gap:11px;padding:0 14px;border-radius:12px;background:var(--sunk);box-shadow:inset 0 0 0 1px var(--hair);color:var(--tx-3)}
+.search .ic{color:var(--tx-3);width:17px;height:17px}
+.search input{border:0;background:none;outline:none;flex:1;font-size:13px;color:var(--tx-1)}
+.search input::placeholder{color:var(--tx-3)}
+.kbd{display:inline-flex;align-items:center;gap:2px;height:22px;padding:0 8px;border-radius:6px;background:var(--surface);box-shadow:inset 0 0 0 1px var(--hair);font-size:11px;font-weight:600;color:var(--tx-3)}
+.tabs{margin-left:auto;display:flex;align-items:center;gap:8px}
+.tab{display:flex;align-items:center;gap:8px;height:40px;padding:0 16px;border-radius:11px;font-size:12.5px;font-weight:550;color:var(--tx-2);background:var(--sunk)}
+.tab .ic{width:15px;height:15px;color:var(--tx-3)}
+.tab.on{background:var(--blue);color:#fff;box-shadow:0 6px 14px rgba(59,130,246,.34)}
+.tab.on .ic{color:#fff}
+
+/* filter row */
+.fr{display:flex;align-items:center;gap:11px;padding:0 26px;background:var(--surface);box-shadow:0 1px 0 var(--hair)}
+.fr-lab{font-size:12.5px;color:var(--tx-3);margin-right:4px}
+.rchip{display:flex;align-items:center;gap:9px;height:38px;padding:0 15px 0 9px;border-radius:999px;font-size:12.5px;font-weight:550;color:var(--tx-2);box-shadow:inset 0 0 0 1px var(--hair)}
+.rchip.on{color:var(--blue-ink);box-shadow:inset 0 0 0 1.5px var(--blue);background:color-mix(in srgb,var(--blue) 6%,#fff)}
+.rchip.todos{color:var(--tx-2)}
+.rchip.todos .ic{width:15px;height:15px;color:var(--tx-3)}
+
+/* ============================================================ BOARD */
+.stage{display:flex;min-height:0;overflow:hidden}
+.board{flex:1;min-width:0;min-height:0;padding:22px 24px 16px;display:grid;grid-template-columns:repeat(4,1fr);gap:18px;overflow:hidden}
+.col{display:flex;flex-direction:column;min-width:0}
+.col-h{display:flex;align-items:center;gap:10px;padding:2px 6px 14px}
+.col-dot{width:9px;height:9px;border-radius:50%;background:var(--c)}
+.col-nm{font-size:13.5px;font-weight:650;color:var(--tx-1)}
+.col-ct{margin-left:auto;font-size:11px;font-weight:700;color:var(--tx-3);background:var(--surface);box-shadow:inset 0 0 0 1px var(--hair);min-width:23px;height:21px;display:flex;align-items:center;justify-content:center;border-radius:999px;padding:0 7px;font-variant-numeric:tabular-nums}
+.col-add{width:23px;height:23px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--tx-4)}
+.col-add .ic{width:15px;height:15px}
+.col-body{display:flex;flex-direction:column;gap:14px;min-height:0}
+.s-todo{--c:var(--blue)}.s-doing{--c:var(--orange)}.s-review{--c:var(--violet)}.s-done{--c:var(--green)}
+
+.card{position:relative;background:var(--surface);border-radius:15px;padding:15px 15px 13px 18px;box-shadow:var(--sh-card);overflow:hidden}
+.card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--bar,#C7CCD6)}
+.card.sel{box-shadow:var(--sh-card-hi),0 0 0 1.5px color-mix(in srgb,var(--bar) 60%,#fff)}
+.card-top{display:flex;align-items:flex-start;gap:9px;margin-bottom:11px}
+.card-title{font-size:14px;font-weight:650;color:var(--tx-1);line-height:1.34;letter-spacing:-.006em;flex:1}
+.bookmark{color:var(--tx-4);width:16px;height:16px;flex:none;margin-top:1px}
+.check{width:21px;height:21px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;flex:none;box-shadow:0 2px 6px rgba(34,160,107,.36)}
+.check .ic{width:12px;height:12px;color:#fff;stroke-width:2.6}
+.crow{display:flex;align-items:center;gap:9px;margin-bottom:12px}
+.tag{display:inline-flex;align-items:center;height:21px;padding:0 9px;border-radius:7px;font-size:10px;font-weight:700;letter-spacing:.02em;background:var(--surface);color:var(--tx-2);box-shadow:inset 0 0 0 1px var(--hair)}
+.tag .d{width:6px;height:6px;border-radius:50%;margin-right:6px;background:var(--tgc,#98A0AE)}
+.t-marketing{--tgc:#3B82F6}.t-video{--tgc:#8B5CF6}.t-trafego{--tgc:#F59E0B}.t-social{--tgc:#EC4899}
+.t-crm{--tgc:#14B8A6}.t-design{--tgc:#6366F1}.t-relatorio{--tgc:#64748B}
+.cli{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--tx-2);margin-left:auto}
+.cli .logo{width:20px;height:20px;border-radius:6px;flex:none;display:flex;align-items:center;justify-content:center;color:#fff;font-size:9.5px;font-weight:700;font-family:'InterTight'}
+.prazo{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--tx-2);margin-bottom:13px}
+.prazo .ic{width:15px;height:15px;color:var(--tx-3)}
+.prazo.done{color:var(--green-ink)}.prazo.done .ic{color:var(--green)}
+.prog{margin-bottom:13px}
+.prog-top{display:flex;align-items:center;justify-content:space-between;font-size:11px;margin-bottom:6px}
+.prog-top .k{color:var(--tx-3);font-weight:550}
+.prog-top .v{color:var(--tx-1);font-weight:700;font-variant-numeric:tabular-nums}
+.prog-bar{height:6px;border-radius:999px;background:var(--sunk);overflow:hidden}
+.prog-bar>i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,color-mix(in srgb,var(--c) 68%,#fff),var(--c))}
+.card-foot{display:flex;align-items:center;gap:11px;padding-top:12px;box-shadow:inset 0 1px 0 var(--hair-2)}
+.foot-r{margin-left:auto;display:flex;align-items:center;gap:13px}
+.meta{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:550;color:var(--tx-3);font-variant-numeric:tabular-nums}
+.meta .ic{width:15px;height:15px;color:var(--tx-4)}
+.foot-cnt{font-size:11.5px;font-weight:650;color:var(--tx-2);margin-left:1px}
+.addtask{margin-top:2px;height:42px;border-radius:13px;display:flex;align-items:center;justify-content:center;gap:8px;color:var(--tx-3);font-size:12.5px;font-weight:550;box-shadow:inset 0 0 0 1px var(--hair);background:color-mix(in srgb,#fff 55%,transparent)}
+.addtask .ic{width:15px;height:15px}
+
+/* ============================================================ DRAWER */
+.drawer{width:380px;flex:none;background:var(--surface);box-shadow:var(--sh-drawer);display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.dr-h{padding:18px 20px 15px;display:flex;flex-direction:column;gap:14px;box-shadow:0 1px 0 var(--hair)}
+.dr-h-top{display:flex;align-items:center;gap:9px}
+.dr-status{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:650;color:var(--green-ink)}
+.dr-status .d{width:8px;height:8px;border-radius:50%;background:var(--green)}
+.dr-h-top .sp{margin-left:auto}
+.dr-ib{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:var(--tx-3)}
+.dr-ib:hover{background:var(--sunk)}
+.dr-ib .ic{width:16px;height:16px}
+.dr-chips{display:flex;flex-wrap:wrap;gap:7px}
+.dr-chip{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px 0 8px;border-radius:8px;font-size:11px;font-weight:600;background:color-mix(in srgb,var(--green) 10%,#fff);color:var(--green-ink);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--green) 16%,#fff)}
+.dr-chip .ic{width:12px;height:12px;stroke-width:2.4}
+.dr-title{display:flex;align-items:flex-start;gap:10px}
+.dr-star{color:#E0A02E;flex:none;margin-top:2px}
+.dr-star .ic{fill:#E0A02E;stroke:#E0A02E;width:20px;height:20px}
+.dr-title b{font-family:'InterTight';font-weight:700;font-size:19px;line-height:1.24;letter-spacing:-.015em;color:var(--tx-1)}
+.dr-body{flex:1;overflow:hidden;padding:17px 20px;display:flex;flex-direction:column;gap:18px}
+.dr-client{display:flex;align-items:center;gap:11px}
+.dr-clogo{width:34px;height:34px;border-radius:9px;background:linear-gradient(140deg,#8A5CF6,#6D28D9);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px;font-family:'InterTight';flex:none}
+.dr-client .nm{font-size:13.5px;font-weight:600;color:var(--tx-1)}
+.dr-client .sub{font-size:11px;color:var(--tx-3);margin-top:1px}
+.dr-sec-k{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--tx-3);margin-bottom:11px;display:flex;align-items:center}
+.dr-sec-k .cnt{margin-left:auto;color:var(--tx-4);font-weight:600;letter-spacing:.02em}
+.dr-resp{display:flex;align-items:center;gap:11px}
+.dr-resp .nm{font-size:13.5px;font-weight:600;color:var(--tx-1)}
+.dr-resp .sub{font-size:11px;color:var(--tx-3);margin-top:1px}
+.dr-when{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--tx-2)}
+.dr-when .ic{width:15px;height:15px;color:var(--tx-3)}
+.file{display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:12px;background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--hair)}
+.file-ic{width:32px;height:34px;border-radius:8px;flex:none;background:#FBE9E7;display:flex;align-items:center;justify-content:center;position:relative;box-shadow:inset 0 0 0 1px #F3D3CE}
+.file-ic .ic{width:15px;height:15px;color:#D9483B}
+.file-ic .ext{position:absolute;bottom:3px;font-size:6px;font-weight:800;color:#D9483B}
+.file .nm{flex:1;min-width:0;font-size:12.5px;font-weight:600;color:var(--tx-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.file .sz{font-size:11px;color:var(--tx-3);font-variant-numeric:tabular-nums}
+.tl{position:relative;display:flex;gap:13px;padding-bottom:16px}
+.tl:last-child{padding-bottom:0}
+.tl-rail{position:relative;display:flex;flex-direction:column;align-items:center;width:12px;flex:none}
+.tl-d{width:11px;height:11px;border-radius:50%;background:var(--tc);box-shadow:0 0 0 3px color-mix(in srgb,var(--tc) 16%,#fff);margin-top:2px;z-index:1}
+.tl-l{position:absolute;top:14px;bottom:-6px;width:1.5px;background:var(--hair);border-radius:2px}
+.tl:last-child .tl-l{display:none}
+.tl-b .dt{font-size:11px;color:var(--tx-3);font-variant-numeric:tabular-nums;margin-bottom:3px}
+.tl-b .ev{font-size:12.5px;font-weight:550;color:var(--tx-1)}
+.dr-foot{padding:14px 20px 17px;display:flex;gap:10px;box-shadow:0 -1px 0 var(--hair)}
+.dr-cta{flex:1;height:46px;border-radius:13px;background:var(--grad);color:#fff;font-size:13px;font-weight:650;display:flex;align-items:center;justify-content:center;gap:9px;box-shadow:0 8px 18px rgba(110,94,243,.32)}
+.dr-cta .ic{width:16px;height:16px}
+.dr-more{width:46px;height:46px;border-radius:13px;display:flex;align-items:center;justify-content:center;color:var(--tx-3);box-shadow:inset 0 0 0 1px var(--hair)}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-logo" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><path d="M8.5 9.5h7M8.5 13h7M8.5 16.5h4"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.6l2.55 5.17 5.7.83-4.13 4.02.98 5.68L12 16.98 6.9 19.3l.98-5.68L3.75 9.6l5.7-.83z"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.5h17M8 3.3v3.4M16 3.3v3.4"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8.5 6.5h11M8.5 12h11M8.5 17.5h11"/><path d="M4.4 6.5h.02M4.4 12h.02M4.4 17.5h.02"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9.2" cy="8.2" r="3.3"/><path d="M3.6 19.2a5.6 5.6 0 0111.2 0"/><path d="M15.8 5.4a3.1 3.1 0 010 5.7M17.4 19.2a5.3 5.3 0 00-2.1-4.2"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.4"/><path d="M5.6 20a6.4 6.4 0 0112.8 0"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 4v16h16"/><path d="M8 16.5v-3M12 16.5V9M16 16.5v-5.5"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 24 24"><path d="M6.2 3.4h6.6l4.9 4.9V19.6a1.2 1.2 0 01-1.2 1.2H6.2A1.2 1.2 0 015 19.6V4.6a1.2 1.2 0 011.2-1.2z"/><path d="M12.6 3.6V8.4h4.8M8.6 13h6.8M8.6 16.4h4.8"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6.6 10.2a5.4 5.4 0 0110.8 0c0 4.6 1.9 5.8 1.9 5.8H4.7s1.9-1.2 1.9-5.8z"/><path d="M10.2 19.4a2 2 0 003.6 0"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.1"/><path d="M12 2.6v2.4M12 19v2.4M4.4 4.4l1.7 1.7M17.9 17.9l1.7 1.7M2.6 12h2.4M19 12h2.4M4.4 19.6l1.7-1.7M17.9 6.1l1.7-1.7"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.6"/><path d="M20 20l-4-4"/></symbol>
+  <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="M14.5 6l-6 6 6 6"/></symbol>
+  <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="M6 9.5l6 6 6-6"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.6"/><rect x="13" y="4" width="7" height="7" rx="1.6"/><rect x="4" y="13" width="7" height="7" rx="1.6"/><rect x="13" y="13" width="7" height="7" rx="1.6"/></symbol>
+  <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M6.5 4h11a1 1 0 011 1v15l-6.5-4-6.5 4V5a1 1 0 011-1z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.4 4.4L19 7.3"/></symbol>
+  <symbol id="i-comment" viewBox="0 0 24 24"><path d="M20 11.6a7.4 7.4 0 01-10.7 6.6L4.4 19.6l1.4-4.9A7.4 7.4 0 1120 11.6z"/></symbol>
+  <symbol id="i-clip" viewBox="0 0 24 24"><path d="M19.4 11.2l-8 8a4.2 4.2 0 01-5.9-5.9l8-8a2.8 2.8 0 014 4l-8 8a1.4 1.4 0 01-2-2l7.4-7.4"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 7.6V12l3 1.9"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v5.2c0 4.4-3 7.4-7 8.8-4-1.4-7-4.4-7-8.8V6z"/><path d="M9 12l2.1 2.1L15.2 10"/></symbol>
+  <symbol id="i-crown" viewBox="0 0 24 24"><path d="M4 8l3.5 3L12 5l4.5 6L20 8l-1.5 10h-13z"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M15 3l6 6-3 1-3.5 3.5L14 20l-2-2M9.5 9.5L3.5 15.5l2 2 6-6"/></symbol>
+  <symbol id="i-dots" viewBox="0 0 24 24"><circle cx="5.5" cy="12" r="1.5" style="fill:currentColor;stroke:none"/><circle cx="12" cy="12" r="1.5" style="fill:currentColor;stroke:none"/><circle cx="18.5" cy="12" r="1.5" style="fill:currentColor;stroke:none"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M7 3.4h7l4.4 4.4V20a1 1 0 01-1 1H7a1 1 0 01-1-1V4.4a1 1 0 011-1z"/><path d="M13.6 3.6V8.2h4.6"/></symbol>
+</svg>
+
+<div class="frame">
+  <!-- ===================== SIDEBAR ===================== -->
+  <aside class="sb">
+    <div class="brand">
+      <div class="brand-mark"><svg class="ic"><use href="#i-logo"/></svg></div>
+      <div class="brand-txt">
+        <div class="brand-name">ID Seven</div>
+        <div class="brand-sub"><span class="brand-sync"></span> sincronizado</div>
+      </div>
+    </div>
+    <button class="newtask"><svg class="ic"><use href="#i-plus"/></svg> Nova tarefa</button>
+
+    <div class="sb-scroll">
+      <div class="nav-label">Workspace</div>
+      <a class="nav-item"><svg class="ic"><use href="#i-star"/></svg> Minhas Prioridades</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-sun"/></svg> Hoje</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-calendar"/></svg> Agenda</a>
+      <a class="nav-item active"><svg class="ic"><use href="#i-list"/></svg> Tarefas</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-users"/></svg> Equipe</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-user"/></svg> Perfil</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-chart"/></svg> Executivo</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-doc"/></svg> Relatórios</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-bell"/></svg> Notificações <span class="nav-badge">9+</span></a>
+      <div class="nav-label">Sistema</div>
+      <a class="nav-item"><svg class="ic"><use href="#i-gear"/></svg> Configurações</a>
+    </div>
+
+    <div class="sb-user">
+      <div class="sb-user-row">
+        <span class="av av-38 u-indigo">AC</span>
+        <div class="sb-user-txt">
+          <div class="sb-user-name">Ardyjany Cariô…</div>
+          <div class="sb-user-role"><span class="udot"></span> CEO · admin</div>
+        </div>
+        <svg class="ic ic-sm"><use href="#i-chevron-down"/></svg>
+      </div>
+      <div class="sb-switch"><span class="sw-dot"></span> ID Seven · Agência <svg class="ic ic-14" style="margin-left:auto"><use href="#i-chevron-down"/></svg></div>
+      <div class="plan">
+        <div class="plan-top"><svg class="ic ic-14 crown"><use href="#i-crown"/></svg> Plano <b>Business</b><span class="pct">80%</span></div>
+        <div class="plan-bar"><i></i></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ===================== MAIN ===================== -->
+  <div class="main">
+    <!-- header -->
+    <header class="hd">
+      <button class="hd-back"><svg class="ic"><use href="#i-chevron-left"/></svg></button>
+      <div class="hd-title">
+        <span class="av av-40 u-indigo">AC</span>
+        <div class="tl"><b>Meu quadro</b><span>CEO</span></div>
+      </div>
+      <div class="hd-right">
+        <div class="sla">
+          <span class="sla-ic"><svg class="ic"><use href="#i-shield"/></svg></span>
+          <div class="sla-tx"><span class="sla-k"><span class="livedot"></span> MONITOR SLA • AO VIVO</span><span class="sla-v">Tudo em dia</span></div>
+        </div>
+        <button class="hd-bell"><svg class="ic"><use href="#i-bell"/></svg><span class="dot"></span></button>
+        <span class="av av-40 hd-av u-indigo">AC</span>
+      </div>
+    </header>
+
+    <!-- toolbar: search + tabs -->
+    <div class="tb">
+      <label class="search"><svg class="ic"><use href="#i-search"/></svg><input placeholder="Buscar tarefas..."><span class="kbd">⌘ K</span></label>
+      <div class="tabs">
+        <button class="tab on"><svg class="ic"><use href="#i-user"/></svg> Meu quadro</button>
+        <button class="tab"><svg class="ic"><use href="#i-eye"/></svg> Cliente</button>
+        <button class="tab"><svg class="ic"><use href="#i-grid"/></svg> Designers</button>
+        <button class="tab"><svg class="ic"><use href="#i-users"/></svg> Social Mídias</button>
+        <button class="tab"><svg class="ic"><use href="#i-grid"/></svg> Setores</button>
+      </div>
+    </div>
+
+    <!-- filter row -->
+    <div class="fr">
+      <span class="fr-lab">Filtrar por responsável:</span>
+      <button class="rchip on"><span class="av av-24 u-indigo">AC</span> Ardyjany</button>
+      <button class="rchip"><span class="av av-24 u-teal">FL</span> Felipe</button>
+      <button class="rchip"><span class="av av-24 u-rose">AB</span> Ana Beatriz</button>
+      <button class="rchip"><span class="av av-24 u-emerald">DR</span> Diego</button>
+      <button class="rchip"><span class="av av-24 u-amber">GB</span> Gabriela</button>
+      <button class="rchip todos"><svg class="ic"><use href="#i-grid"/></svg> Todos <svg class="ic ic-14"><use href="#i-chevron-down"/></svg></button>
+    </div>
+
+    <!-- stage -->
+    <div class="stage">
+      <section class="board">
+
+        <!-- A Fazer -->
+        <div class="col s-todo">
+          <div class="col-h"><span class="col-dot"></span><span class="col-nm">A Fazer</span><span class="col-ct">8</span><button class="col-add"><svg class="ic"><use href="#i-plus"/></svg></button></div>
+          <div class="col-body">
+            <article class="card own-indigo">
+              <div class="card-top"><div class="card-title">Campanha de Lançamento Nova Coleção Verão</div><svg class="ic bookmark"><use href="#i-bookmark"/></svg></div>
+              <div class="crow"><span class="tag t-marketing"><span class="d"></span>Marketing</span><span class="cli"><span class="logo" style="background:linear-gradient(140deg,#F0913E,#E86F52)">SW</span>Sunset Wear</span></div>
+              <div class="prazo"><svg class="ic"><use href="#i-calendar"/></svg> Prazo 10/08/2026</div>
+              <div class="card-foot"><div class="stack"><span class="av av-28 u-indigo">AC</span><span class="av av-28 u-rose">AB</span><span class="av av-28 u-emerald">DR</span></div><span class="foot-cnt">+3</span><div class="foot-r"><span class="meta"><svg class="ic"><use href="#i-comment"/></svg> 3</span><span class="meta"><svg class="ic"><use href="#i-clip"/></svg> 2</span></div></div>
+            </article>
+            <article class="card own-amber">
+              <div class="card-top"><div class="card-title">Criação de Conteúdo Redes Sociais Agosto</div><svg class="ic bookmark"><use href="#i-bookmark"/></svg></div>
+              <div class="crow"><span class="tag t-social"><span class="d"></span>Social Mídias</span><span class="cli"><span class="logo" style="background:linear-gradient(140deg,#7A5AF0,#6D28D9)">CC</span>Café do Centro</span></div>
+              <div class="prazo"><svg class="ic"><use href="#i-calendar"/></svg> Prazo 18/08/2026</div>
+              <div class="card-foot"><div class="stack"><span class="av av-28 u-amber">GB</span><span class="av av-28 u-teal">FL</span></div><div class="foot-r"><span class="meta"><svg class="ic"><use href="#i-comment"/></svg> 2</span><span class="meta"><svg class="ic"><use href="#i-clip"/></svg> 1</span></div></div>
+            </article>
+            <article class="card own-violet">
+              <div class="card-top"><div class="card-title">Redesign Landing Page Produto X</div><svg class="ic bookmark"><use href="#i-bookmark"/></svg></div>
+              <div class="crow"><span class="tag t-design"><span class="d"></span>Design</span><span class="cli"><span class="logo" style="background:linear-gradient(140deg,#3BA0E6,#2563EB)">TO</span>TechOne</span></div>
+              <div class="prazo"><svg class="ic"><use href="#i-calendar"/></svg> Prazo 20/08/2026</div>
+              <div class="card-foot"><div class="stack"><span class="av av-28 u-violet">CM</span><span class="av av-28 u-coral">HP</span></div><div class="foot-r"><span class="meta"><svg class="ic"><use href="#i-comment"/></svg> 4</span><span class="meta"><svg class="ic"><use href="#i-clip"/></svg> 2</span></div></div>
+            </article>
+            <article class="card own-sky">
+              <div class="card-top"><div class="card-title">Kit de Anúncios Institucional</div><svg class="ic bookmark"><use href="#i-bookmark"/></svg></div>
+              <div class="crow"><span class="tag t-trafego"><span class="d"></span>Tráfego</span><span class="cli"><span class="logo" style="background:linear-gradient(140deg,#22A06B,#12764C)">GL</span>GreenLife</span></div>
+              <div class="prazo"><svg class="ic"><use href="#i-calendar"/></svg> Prazo 22/08/2026</div>
+              <div class="card-foot"><div class="stack"><span class="av av-28 u-sky">BR</span><span class="av av-28 u-indigo">AC</span></div><div class="foot-r"><span class="meta"><svg class="ic"><use href="#i-comment"/></svg> 1</span><span class="meta"><svg class="ic"><use href="#i-clip"/></svg> 0</span></div></div>
+            </article>
+            <button class="addtask"><svg class="ic"><use href="#i-plus"/></svg> Adicionar tarefa</button>
+          </div>
+        </div>
+
+        <!-- Em andamento -->
+        <div class="col s-doing">
+          <div class="col-h"><span class="col-dot"></span><span class="col-nm">Em andamento</span><span class="col-ct">6</span><button class="col-add"><svg class="ic"><use href="#i-plus"/></svg></button></div>
+          <div class="col-body">
+            <article class="card own-emerald">
+              <div class="card-top"><div class="card-title">Vídeo Institucional Nova Identidade</div><svg class="ic bookmark"><use href="#i-bookmark"/></svg></div>
+              <div class="crow"><span class="tag t-video"><span class="d"></span>Vídeo</span><span class="cli"><span class="logo" style="background:linear-gradient(140deg,#3BA0E6,#2563EB)">MO</span>MovOn</span></div>
+              <div class="prog"><div class="prog-top"><span class="k">Progresso</span><span class="v">65%</span></div><div class="prog-bar"><i style="width:65%"></i></div></div>
+              <div class="card-foot"><div class="stack"><span class="av av-28 u-emerald">DR</span><span class="av av-28 u-indigo">AC</span><span class="av av-28 u-rose">AB</span></div><span class="foot-cnt">+1</span><div class="foot-r"><span class="meta"><svg class="ic"><use href="#i-comment"/></svg> 3</span></div></div>
+            </article>
+            <article class="card own-rose">
+              <div class="card-top"><div class="card-title">E-mail Marketing Newsletter Julho</div><svg class="ic bookmark"><use href="#i-bookmark"/></svg></div>
+              <div class="crow"><span class="tag t-crm"><span class="d"></span>CRM</span><span class="cli"><span class="logo" style="background:linear-gradient(140deg,#22A06B,#12764C)">GL</span>GreenLife</span></div>
+              <div class="prog"><div class="prog-top"><span class="k">Progresso</span><span class="v">40%</span></div><div class="prog-bar"><i style="width:40%"></i></div></div>
+              <div class="card-foot"><div class="stack"><span class="av av-28 u-rose">AB</span></div><div class="foot-r"><span class="meta"><svg class="ic"><use href="#i-comment"/></svg> 1</span><span class="meta"><svg class="ic"><use href="#i-clip"/></svg> 0</span></div></div>
+            </article>
+            <article class="card own-cyan">
+              <div class="card-top"><div class="card-title">UI Kit Dashboard Projeto Interno</div><svg class="ic bookmark"><use href="#i-bookmark"/></svg></div>
+              <div class="crow"><span class="tag t-design"><span class="d"></span>Design</span><span class="cli"><span class="logo" style="background:linear-gradient(140deg,#8A5CF6,#6D28D9)">AP</span>Arquipro</span></div>
+              <div class="prog"><div class="prog-top"><span class="k">Progresso</span><span class="v">20%</span></div><div class="prog-bar"><i style="width:20%"></i></div></div>
+              <div class="card-foot"><div class="stack"><span class="av av-28 u-cyan">BZ</span><span class="av av-28 u-fuchsia">IS</span><span class="av av-28 u-sky">BR</span></div><div class="foot-r"><span class="meta"><svg class="ic"><use href="#i-comment"/></svg> 2</span><span class="meta"><svg class="ic"><use href="#i-clip"/></svg> 3</span></div></div>
+            </article>
+            <button class="addtask"><svg class="ic"><use href="#i-plus"/></svg> Adicionar tarefa</button>
+          </div>
+        </div>
+
+        <!-- Revisão -->
+        <div class="col s-review">
+          <div class="col-h"><span class="col-dot"></span><span class="col-nm">Revisão</span><span class="col-ct">4</span><button class="col-add"><svg class="ic"><use href="#i-plus"/></svg></button></div>
+          <div class="col-body">
+            <article class="card own-coral">
+              <div class="card-top"><div class="card-title">Anúncios Google Ads Campanha Q3</div><svg class="ic bookmark"><use href="#i-bookmark"/></svg></div>
+              <div class="crow"><span class="tag t-trafego"><span class="d"></span>Tráfego</span><span class="cli"><span class="logo" style="background:linear-gradient(140deg,#E85D8C,#C0343A)">SL</span>Startup Lab</span></div>
+              <div class="prog"><div class="prog-top"><span class="k">Progresso</span><span class="v">80%</span></div><div class="prog-bar"><i style="width:80%"></i></div></div>
+              <div class="card-foot"><div class="stack"><span class="av av-28 u-coral">HP</span><span class="av av-28 u-indigo">AC</span></div><div class="foot-r"><span class="meta"><svg class="ic"><use href="#i-comment"/></svg> 2</span><span class="meta"><svg class="ic"><use href="#i-clip"/></svg> 1</span></div></div>
+            </article>
+            <article class="card own-plum">
+              <div class="card-top"><div class="card-title">Layout Apresentação Comercial</div><svg class="ic bookmark"><use href="#i-bookmark"/></svg></div>
+              <div class="crow"><span class="tag t-design"><span class="d"></span>Design</span><span class="cli"><span class="logo" style="background:linear-gradient(140deg,#9A6BA0,#6D28D9)">BB</span>Bold Brands</span></div>
+              <div class="prog"><div class="prog-top"><span class="k">Progresso</span><span class="v">75%</span></div><div class="prog-bar"><i style="width:75%"></i></div></div>
+              <div class="card-foot"><div class="stack"><span class="av av-28 u-plum">MV</span><span class="av av-28 u-emerald">DR</span></div><div class="foot-r"><span class="meta"><svg class="ic"><use href="#i-comment"/></svg> 2</span><span class="meta"><svg class="ic"><use href="#i-clip"/></svg> 2</span></div></div>
+            </article>
+            <article class="card own-teal">
+              <div class="card-top"><div class="card-title">Plano de Conteúdo Setembro</div><svg class="ic bookmark"><use href="#i-bookmark"/></svg></div>
+              <div class="crow"><span class="tag t-social"><span class="d"></span>Social Mídias</span><span class="cli"><span class="logo" style="background:linear-gradient(140deg,#7A5AF0,#6D28D9)">CC</span>Café do Centro</span></div>
+              <div class="prog"><div class="prog-top"><span class="k">Progresso</span><span class="v">60%</span></div><div class="prog-bar"><i style="width:60%"></i></div></div>
+              <div class="card-foot"><div class="stack"><span class="av av-28 u-teal">FL</span><span class="av av-28 u-amber">GB</span></div><div class="foot-r"><span class="meta"><svg class="ic"><use href="#i-comment"/></svg> 1</span><span class="meta"><svg class="ic"><use href="#i-clip"/></svg> 1</span></div></div>
+            </article>
+            <button class="addtask"><svg class="ic"><use href="#i-plus"/></svg> Adicionar tarefa</button>
+          </div>
+        </div>
+
+        <!-- Finalizado -->
+        <div class="col s-done">
+          <div class="col-h"><span class="col-dot"></span><span class="col-nm">Finalizado</span><span class="col-ct">12</span><button class="col-add"><svg class="ic"><use href="#i-plus"/></svg></button></div>
+          <div class="col-body">
+            <article class="card own-indigo sel">
+              <div class="card-top"><div class="card-title">Identidade Visual Marca Bold</div><span class="check"><svg class="ic"><use href="#i-check"/></svg></span></div>
+              <div class="crow"><span class="tag t-design"><span class="d"></span>Design</span><span class="cli"><span class="logo" style="background:linear-gradient(140deg,#8A5CF6,#6D28D9)">BB</span>Bold Brands</span></div>
+              <div class="prazo done"><svg class="ic"><use href="#i-check"/></svg> Concluída em 07/08/2026</div>
+              <div class="card-foot"><div class="stack"><span class="av av-28 u-indigo">AC</span><span class="av av-28 u-emerald">DR</span></div><div class="foot-r"><span class="meta"><svg class="ic"><use href="#i-clip"/></svg> 1</span></div></div>
+            </article>
+            <article class="card own-fuchsia">
+              <div class="card-top"><div class="card-title">Posts Redes Sociais Julho</div><span class="check"><svg class="ic"><use href="#i-check"/></svg></span></div>
+              <div class="crow"><span class="tag t-social"><span class="d"></span>Social Mídias</span><span class="cli"><span class="logo" style="background:linear-gradient(140deg,#7A5AF0,#6D28D9)">CC</span>Café do Centro</span></div>
+              <div class="prazo done"><svg class="ic"><use href="#i-check"/></svg> Concluída em 06/08/2026</div>
+              <div class="card-foot"><div class="stack"><span class="av av-28 u-fuchsia">IS</span><span class="av av-28 u-amber">GB</span></div><div class="foot-r"><span class="meta"><svg class="ic"><use href="#i-comment"/></svg> 2</span></div></div>
+            </article>
+            <article class="card own-slate">
+              <div class="card-top"><div class="card-title">Relatório de Resultados Junho</div><span class="check"><svg class="ic"><use href="#i-check"/></svg></span></div>
+              <div class="crow"><span class="tag t-relatorio"><span class="d"></span>Relatório</span><span class="cli"><span class="logo" style="background:linear-gradient(140deg,#F0913E,#E86F52)">SW</span>Sunset Wear</span></div>
+              <div class="prazo done"><svg class="ic"><use href="#i-check"/></svg> Concluída em 05/08/2026</div>
+              <div class="card-foot"><div class="stack"><span class="av av-28 u-slate">JP</span></div><div class="foot-r"><span class="meta"><svg class="ic"><use href="#i-clip"/></svg> 1</span></div></div>
+            </article>
+            <button class="addtask"><svg class="ic"><use href="#i-plus"/></svg> Adicionar tarefa</button>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ===================== DRAWER ===================== -->
+      <aside class="drawer">
+        <div class="dr-h">
+          <div class="dr-h-top">
+            <span class="dr-status"><span class="d"></span> Finalizado</span>
+            <span class="sp"></span>
+            <button class="dr-ib"><svg class="ic"><use href="#i-pin"/></svg></button>
+            <button class="dr-ib"><svg class="ic"><use href="#i-dots"/></svg></button>
+            <button class="dr-ib"><svg class="ic"><use href="#i-x"/></svg></button>
+          </div>
+          <div class="dr-chips">
+            <span class="dr-chip"><svg class="ic"><use href="#i-check"/></svg> Concluída final</span>
+            <span class="dr-chip"><svg class="ic"><use href="#i-check"/></svg> Aprovada pelo cliente</span>
+            <span class="dr-chip"><svg class="ic"><use href="#i-check"/></svg> Entregue</span>
+          </div>
+          <div class="dr-title"><span class="dr-star"><svg class="ic"><use href="#i-star"/></svg></span><b>Identidade Visual Marca Bold</b></div>
+        </div>
+        <div class="dr-body">
+          <div class="dr-client">
+            <span class="dr-clogo">B</span>
+            <div><div class="nm">Bold Brands</div><div class="sub">Cliente</div></div>
+          </div>
+          <div>
+            <div class="dr-sec-k">Responsável</div>
+            <div class="dr-resp"><span class="av av-34 u-indigo">AC</span><div><div class="nm">Ardyjany Carlos</div><div class="sub">CEO</div></div></div>
+          </div>
+          <div class="dr-when"><svg class="ic"><use href="#i-clock"/></svg> Concluída em 07/08/2026 às 14:30</div>
+          <div>
+            <div class="dr-sec-k">Conteúdo <span class="cnt">1 arquivo</span></div>
+            <div class="file"><span class="file-ic"><svg class="ic"><use href="#i-file"/></svg><span class="ext">PDF</span></span><span class="nm">Manual_Identidade_Bold.pdf</span><span class="sz">12.4 MB</span></div>
+          </div>
+          <div>
+            <div class="dr-sec-k">Linha do tempo</div>
+            <div class="tl"><div class="tl-rail"><span class="tl-d" style="--tc:#22A06B"></span><span class="tl-l"></span></div><div class="tl-b"><div class="dt">07/08/2026</div><div class="ev">Identidade aprovada pelo cliente</div></div></div>
+            <div class="tl"><div class="tl-rail"><span class="tl-d" style="--tc:#3B82F6"></span><span class="tl-l"></span></div><div class="tl-b"><div class="dt">06/08/2026</div><div class="ev">Revisões aplicadas</div></div></div>
+            <div class="tl"><div class="tl-rail"><span class="tl-d" style="--tc:#F59E0B"></span><span class="tl-l"></span></div><div class="tl-b"><div class="dt">04/08/2026</div><div class="ev">Ajustes de feedback</div></div></div>
+            <div class="tl"><div class="tl-rail"><span class="tl-d" style="--tc:#8B5CF6"></span></div><div class="tl-b"><div class="dt">28/07/2026</div><div class="ev">Briefing aprovado</div></div></div>
+          </div>
+        </div>
+        <div class="dr-foot">
+          <button class="dr-cta"><svg class="ic"><use href="#i-eye"/></svg> Ver detalhes completos</button>
+          <button class="dr-more"><svg class="ic"><use href="#i-dots"/></svg></button>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+</body>
+</html>
