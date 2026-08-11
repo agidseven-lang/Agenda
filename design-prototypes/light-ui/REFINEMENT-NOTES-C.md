@@ -4,6 +4,18 @@
 Somente pesquisa + design + simulação. Nada toca `desktop/`, o app, o tema, workflows ou release.
 Fonte da verdade = `proposta-c-refinada-v2-frame1.html` (self-contained; fontes embutidas em `_fonts.css`).
 
+## V3 — refinamento (evolução da V2, mesma arquitetura; owner aprovou a direção)
+Arquivo: `proposta-c-refinada-v3-frame1.html` · comparação: `C_v2_v3_comparacao.png`.
+- **Sem barra de métricas inferior** — o Kanban ocupa a maior parte da tela (métricas migram para Executivo/summary recolhível).
+- **Header com menos ruído / 3 níveis**: (1) título "Meu quadro" dominante; (2) busca / Kanban·Lista·Calendário / SLA compacto ("Tudo em dia" + dot) / sino / avatar / Nova tarefa; (3) subnav de abas + filtros contextuais mais leves.
+- **Abas como subnav** (pill sutil no ativo, sem underline/color em excesso).
+- **Cards**: tags mais discretas (contorno, sem preenchimento), prioridade "Alta" suave (tint 8% + contorno), barra de progresso 4px refinada, **seleção sutil** (anel de marca 1px + tint 3% + microssombra, sem outline forte), cliente como metadata (menor/muted), contraste maior nos metadados.
+- **Drawer**: header em camadas (status principal + linha secundária "Aprovada pelo cliente · Entregue · Concluída 07/08" no lugar de 3 badges), **linha do tempo** refinada (linha 1,5px, nós menores + avatar do ator), componente de arquivo e CTA em gradiente ajustados.
+- **Sidebar**: "Clientes 12" compacta (4 recentes + "Ver todos os clientes"); **cartão do usuário integrado** (sem caixa, divisória superior + barra do Plano fina).
+- **Contraste** dos textos secundários/terciários aumentado; **sombras** ainda mais sutis (cards quase flat; elevação progressiva em hover/selected/drawer).
+- **Render**: exatamente 1920×1080, sem faixa cinza (o que parecia "vazio" na V2 era o cânvas do quadro sob a barra de métricas — resolvido preenchendo as colunas e removendo a barra).
+- **Densidade** Compacta preservada; quadro com conteúdo realista (22 tarefas, 4 colunas).
+
 ## Pesquisa aplicada (benchmark real)
 Pesquisa de padrões de dashboards SaaS premium (design systems públicos: Atlassian, Primer/GitHub,
 Carbon/IBM, Tailwind, Radix; e extrações de tokens de Linear, Stripe, Notion, Vercel, Cal, Superhuman).
