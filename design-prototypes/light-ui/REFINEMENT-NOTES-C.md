@@ -4,6 +4,14 @@
 Somente pesquisa + design + simulação. Nada toca `desktop/`, o app, o tema, workflows ou release.
 Fonte da verdade = `proposta-c-refinada-v2-frame1.html` (self-contained; fontes embutidas em `_fonts.css`).
 
+## V5 · ajuste — barra de acento lateral no card (feedback do owner)
+O owner apontou que, na referência, cada card tem **cor na lateral** e a minha versão não tinha.
+Adicionada uma **barra vertical de 4px na borda esquerda** de cada card, colorida pela **categoria**
+(Marketing=azul, Vídeo=violeta, Tráfego=âmbar, Social=rosa, CRM=teal, Design=índigo, Dados=azul-céu,
+Relatório=ardósia) — mesma paleta dos badges. Implementado em CSS (`.card::before` + seletor `:has(.b-*)`),
+`overflow:hidden` para respeitar o raio do card e `padding-left` ajustado; **zero alteração** no corpo
+HTML de cada card. Frame revalidado em 3840×2160 (=1920×1080 @DSF2), sem defeito de faixa.
+
 ## V5 — reprodução fiel da referência do owner ("100% idêntico")
 Arquivo: `proposta-c-v5-fiel-referencia-frame1.html`. O owner definiu a referência anexada como o alvo
 exato do layout. Reproduzido: sidebar navy (ID Seven + Nova tarefa no topo + nav Workspace/Sistema +

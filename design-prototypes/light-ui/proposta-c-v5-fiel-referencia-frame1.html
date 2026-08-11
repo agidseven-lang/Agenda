@@ -151,7 +151,16 @@ body{font-family:'Inter',-apple-system,'Segoe UI',Roboto,sans-serif;color:var(--
 .col-body{display:flex;flex-direction:column;gap:12px;min-height:0}
 .s-todo{--c:var(--blue)}.s-doing{--c:var(--orange)}.s-review{--c:var(--violet)}.s-done{--c:var(--green)}
 
-.card{position:relative;background:var(--surface);border-radius:14px;padding:14px 14px 12px;box-shadow:var(--sh-card)}
+.card{position:relative;background:var(--surface);border-radius:14px;padding:14px 14px 12px 16px;box-shadow:var(--sh-card);overflow:hidden}
+.card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--c)}
+.card:has(.b-marketing)::before{background:#3B82F6}
+.card:has(.b-video)::before{background:#8B5CF6}
+.card:has(.b-trafego)::before{background:#F59E0B}
+.card:has(.b-social)::before{background:#EC4899}
+.card:has(.b-crm)::before{background:#14B8A6}
+.card:has(.b-design)::before{background:#6366F1}
+.card:has(.b-dados)::before{background:#0EA5E9}
+.card:has(.b-relatorio)::before{background:#64748B}
 .card-top{display:flex;align-items:flex-start;gap:8px;margin-bottom:9px}
 .card-title{font-size:14px;font-weight:650;color:var(--tx-1);line-height:1.32;letter-spacing:-.006em;flex:1}
 .bookmark{color:var(--tx-4);width:16px;height:16px;flex:none;margin-top:1px}
