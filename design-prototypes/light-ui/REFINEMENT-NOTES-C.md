@@ -20,6 +20,42 @@ Firestore seguem intocáveis. Toda nova superfície deve ser comparada à V10 an
 - **Títulos longos**: máximo visual controlado — line-height fixo (1.45) + line-clamp 2; nunca
   cards desproporcionais.
 
+## FRAME 3 — DESIGNERS (candidata) · `proposta-c-frame3-designers.html`
+**Status dos anteriores:** FRAME 2 · Cliente = **LAYOUT APROVADO / GOLDEN VISUAL REFERENCE** (junto
+com a V10). FRAME 3 aplica o mesmo DS congelado à tela Designers REAL — redesign VISUAL, nunca
+funcional (sem dashboard, ranking, KPI, score, leaderboard ou barra de métricas: não existem no
+produto e não foram criados).
+
+**Auditoria read-only (renderer real 1.0.246):**
+- **Superfície real**: hub "Designers — cada designer em um quadro Kanban próprio" com AUTOLOAD
+  (F3.5.4-B: a tela nunca abre vazia) + faixa compacta de seleção `f354DesignerStrip` (foto +
+  1º nome + contagem por designer). Tarefas entram pela atribuição (`designerOf`/`isDesignerFlow`).
+- **Colunas REAIS** (`DESIGNER_COLS4`): **A Fazer** `#9BA0AB` · **Em andamento** `#F59E0B` ·
+  **Revisão/Ajuste** `#60A5FA` · **Entregue** `#34D399` (nomes e cores canônicos; "Recebido" não
+  existe — o estado recém-atribuído é A Fazer). Badge do card em andamento = "Designer em produção"
+  (`designerStatusView`). Ordenação real por prazo (`dtMs` asc — atrasado primeiro).
+- **SLA REAL** (`kbv2SlaLocal`, fonte única `resolveTaskDisplayState`, por PRAZO FINAL):
+  "Em prazo" (azul) · "Prazo próximo" (laranja) · "Prazo encerrado" (vermelho) ·
+  "Entregue"/"Concluído" (verde) · neutro sem chip. Nenhuma regra reescrita/inferida.
+- **Prazo** (`taskDeadline`): data + "Faltam Xh/Xd" / "Hoje" / "Atrasada" / "Concluída".
+- **Progresso real**: trilho de 3 etapas do designer (A Fazer → produção → entrega) → componente
+  aprovado como "Etapa N de 3" (sem percentual inventado). **Próxima ação** (`designerNextShort`):
+  "Iniciar a produção" / "Finalizar e entregar" / "Corrigir o ajuste e reenviar" /
+  "Entregue — aguardando a Social". **Conteúdo** (`kbv2ContentSlot`): "N temas" ·
+  "N vídeos/roteiros" · "Legenda · Observações" (Edição de Cards).
+- **Timeline** = marcos canônicos (`taskTimeline`), honestidade H13 (atual sem carimbo).
+
+**Composição:** sidebar/header/busca/subnav idênticos (Designers ativo); linha 3 = faixa real de
+quadros (Felipe ativo · 12, Boaz · 5) + contexto real "Designer e Editor · 12 tarefas · 1 em
+atraso"; Kanban 4 colunas reais (3/4/2/3, scroll-peek onde contador > visíveis); **faixa de TODOS
+os cards = teal do Felipe** (responsável primário do quadro — contrato); tag = categoria/setor
+(Cronograma/Vídeos/Cards); estados simulados: recém-atribuída, não iniciada, em produção, em prazo,
+perto do prazo, atrasada, revisão/ajuste, entregue — todos reais. Card selecionado (Em andamento,
+"Prazo próximo") abre o drawer congelado adaptado: status → título → cliente → chips → DESIGNER
+RESPONSÁVEL (Felipe 48px) → PRAZO E SLA (editorial: data+hora + estado + "faltam 26h") → CONTEÚDO
+(8 vídeos/roteiros) → LINHA DO TEMPO (atual sem carimbo + "Designer em produção" + "Enviado ao
+designer") → CTA "Ver detalhes completos". Zero fotos versionadas (`_team-photos.css` local-only).
+
 ## FRAME 2 — CLIENTE (candidata) · `proposta-c-frame2-cliente.html`
 DS congelado da V10 aplicado à tela **Cliente REAL** — sidebar/header/busca/subnav/tokens/cards/
 drawer idênticos; muda apenas o conteúdo da superfície. **Auditoria read-only primeiro**, no
