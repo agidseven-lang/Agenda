@@ -1,8 +1,60 @@
-# Proposta C — Refinamento Profissional · FRAME 1 ("Meu quadro" 1920×1080)
+# Proposta C — Refinamento Profissional · Light UI (1920×1080)
 
-**Status:** direção C aprovada para refinamento; design final NÃO aprovado; implementação NÃO autorizada.
-Somente pesquisa + design + simulação. Nada toca `desktop/`, o app, o tema, workflows ou release.
-Fonte da verdade = `proposta-c-refinada-v2-frame1.html` (self-contained; fontes embutidas em `_fonts.css`).
+**Status:** **FRAME 1 · Meu quadro · V10 = LAYOUT APROVADO / GOLDEN VISUAL REFERENCE** (decisão do
+owner). Isso congela o Design System (workspace light, sidebar petróleo, proporções, header, busca,
+subnav, filtro, fotos reais, Kanban 4 colunas, cards brancos + faixa=responsável, ring=responsável,
+coluna=status, tag=categoria, Inter/Inter Tight, grid/spacing, sombras, radius, iconografia, drawer,
+timeline, componente de arquivo, CTA gradiente, SEM barra de métricas, SEM funções inventadas) —
+e NÃO autoriza implementação: `desktop/src`, CSS/JS real, release, baseline, workflows, Worker e
+Firestore seguem intocáveis. Toda nova superfície deve ser comparada à V10 antes de ser apresentada
+("Parece pertencer exatamente ao mesmo produto?").
+
+**Microcontratos registrados (decisão do owner):**
+- **Foto do Miercohévisk**: o recorte de screenshot da maquete é exclusivamente temporário; a
+  implementação real DEVE usar a foto original cadastrada, resolvida pelo runtime real
+  (`photoOf` → `avatar()`); o recorte NUNCA vai a produção nem ao Git.
+- **Responsável primário**: faixa lateral do card = responsável primário da tarefa; múltiplos
+  participantes aparecem só nos avatares; nunca faixa multicolorida; categoria/status nunca usam
+  essa cor.
+- **Header**: whitespace preservado — não ocupar espaços livres com botões novos.
+- **Títulos longos**: máximo visual controlado — line-height fixo (1.45) + line-clamp 2; nunca
+  cards desproporcionais.
+
+## FRAME 2 — CLIENTE (candidata) · `proposta-c-frame2-cliente.html`
+DS congelado da V10 aplicado à tela **Cliente REAL** — sidebar/header/busca/subnav/tokens/cards/
+drawer idênticos; muda apenas o conteúdo da superfície. **Auditoria read-only primeiro**, no
+renderer real do Desktop 1.0.246 (branch `desktop/f356bh2-...-1.0.246`, extraído para leitura):
+- **Colunas reais** (`CLIENT_COLS4`): Enviado `#5B6CFF` · Em análise `#22D3EE` · Revisão
+  solicitada `#F59E0B` · Aprovado `#34D399` (mapeamento `clientCol4`: visualizado-sem-resposta
+  fica em ENVIADO; produção/legendas/reenviado ficam em EM ANÁLISE; Aprovado = só conclusão real).
+- **Central "Aprovações pendentes"** (`wfApprovalsBarHtml`, F3.5.6A-H2 — recolhida por padrão):
+  badge = nv+vs+aj; categorias reais com cores próprias (Não visualizadas `#F2A93B`,
+  Visualizadas sem resposta `#22D3EE`, Ajustes solicitados `#EF4444`, Aprovadas recentemente
+  secundária); aviso ">24h"; botão "Ver aprovações →". Reproduzida como faixa premium de 64px
+  no slot da 3ª linha (a tela Cliente real NÃO tem filtro por responsável — nada foi inventado).
+- **Linguagem do card sem jargão** (`clientFacingStatusView`/`clientFacingNextShort`): chips
+  derivados ("Aguarda análise", "Em produção", "Legendas e posts", "Versão final", "Em correção",
+  "Concluído") + próxima ação real ("Aguardar a análise dos temas", "Equipe corrige e reenvia"...).
+- **Visualização/espera reais** (`wfExternalInfo`): "Visualizado às HH:MM · há Nh",
+  "Não visualizado · enviado há Nh", "Ajuste solicitado · há Nh" — par esquerda/direita no mesmo
+  padrão do prog-top da V10. Conteúdo = contagem real (N temas · N legendas · N roteiros/vídeos).
+- **Prioridades de informação do mandato**: 1 cliente (nome em destaque no topo do card — o rótulo
+  "Cliente" sai do card porque o quadro inteiro é Cliente; fica no drawer) → 2 tarefa → 3 fase
+  (tint+dot+label; nunca card pintado) → 4 visualizado → 5 tempo aguardando → 6 responsável
+  (faixa+ring+avatar) → 7 próxima ação (linha "→ ..."). Trilho de % omitido no card (não está nas
+  7 prioridades; o fluxo completo vive no drawer).
+- **Drawer = anatomia V10 EXATA** adaptada ao fluxo: status da coluna → título → Cliente · X →
+  chips de fase ("Temas enviados" + "Visualizado às 14:32") → RESPONSÁVEL (foto 48) → ENVIO AO
+  CLIENTE (data · por autor) → VISUALIZAÇÃO E RESPOSTA (visto às + aguardando há · nenhuma decisão)
+  → CONTEÚDO (bloco no shape do file-card: "Temas do cronograma · 12 temas · 8 legendas · 1ª rodada")
+  → LINHA DO TEMPO com marcos canônicos reais (`taskTimeline`; honestidade H13: marco ATUAL sem
+  carimbo — círculo tonal com relógio; só concluídos têm data/autor) → CTA seguro "Ver detalhes
+  completos" (gradiente ID Seven).
+- **Números coerentes**: 5+6+3+9 = 23 tarefas (header); Central 8 = 2 nv + 3 vs + 3 aj; urgência
+  ">24h" = 2 (MovOn 26h nv + Café do Centro 26h vs — o card selecionado); scroll-peek presente
+  onde contador > cards visíveis (Enviado/Em análise/Aprovado) e ausente em Revisão (3=3).
+- **Fotos reais** reutilizadas read-only via `_team-photos.css` LOCAL-ONLY (gitignored) — zero
+  fotos versionadas; fallback iniciais só para quem não tem foto.
 
 ## V10 — lapidação final sobre a arquitetura aprovada da V9 (candidata final)
 Arquitetura **congelada** (mandato V10): mesma estrutura da V9 — sidebar escura, header, busca+subnav,
