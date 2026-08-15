@@ -4,6 +4,30 @@
 Somente pesquisa + design + simulação. Nada toca `desktop/`, o app, o tema, workflows ou release.
 Fonte da verdade = `proposta-c-refinada-v2-frame1.html` (self-contained; fontes embutidas em `_fonts.css`).
 
+## V8 — STOP pré-render (item 46 do mandato): fotos reais não materializáveis neste ambiente
+Auditoria READ-ONLY do produto real (renderer 1.0.246, `wt-f356bh2/desktop/src/renderer/index.html`):
+- **Como o produto obtém a foto:** `photoOf(u)` (linha 2846) lê, na ordem, os campos
+  `photo, photoUrl, avatar, avatarUrl, image, imageUrl, picture, foto` do doc do usuário (Firestore `users`,
+  projeto `agenda-id-seven`). `resolveUserIdentity` (4406–4417) devolve `{avatarUrl, initials, hasRealAvatar}`.
+- **Como renderiza:** `avatar()` (linha 2860) — se o valor casa `^https?:` **ou** `^data:` → `background-image`
+  com a foto; senão → **iniciais coloridas** (fallback). Ou seja: o contrato "foto se existir, monograma só
+  sem foto" é o do próprio produto, e ele **aceita `data:` URI** (caminho limpo p/ mockup com foto embutida).
+- **Onde moram os VALORES das fotos:** por usuário, nos docs do Firestore de produção — **não no repositório**.
+  Repo (desktop/): 8 imagens versionadas = ícones do app, prints de referência e banners OG; **0 fotos de usuário**.
+  Únicos `data:image` no renderer = logo + Card Premium WhatsApp; **0 fotos de usuário**. Sem cache local aqui
+  (ambiente de protótipo não tem app instalado/userData).
+- **Tentativas de materialização a partir deste ambiente:**
+  · Firestore (`users`): **sem credencial/sessão** neste ambiente (env vazio) — e não extraio/contorno auth.
+  · `firebasestorage.googleapis.com`: **alcançável** (HTTP 404 na raiz), mas inútil sem as URLs/tokens por
+    usuário que estão no Firestore.
+  · `lh3.googleusercontent.com` (fotos Google): **bloqueado** pela política de egress (000).
+  · `ik.imagekit.io` / `upload.imagekit.io` (host de imagens que o próprio app usa): **bloqueados** (000).
+  · Hosts genéricos de fotos: **403 policy denial** (testado nesta sessão).
+- **Decisão (conforme item 46):** NÃO renderizei a V8 com iniciais. STOP e pedido ao owner das fotos dos
+  usuários do frame (ou das URLs firebasestorage), para embutir como `data:` URI com crop/ring premium.
+- Melhorias visuais da V8 (anti-miniaturização: cards/tipografia/avatares/header/sidebar/drawer maiores,
+  proporção do Kanban) ficam prontas para aplicar assim que as fotos chegarem.
+
 ## V7 — refinamento premium (V6 reprovada; exigido salto + fotos reais)
 Arquivo: `proposta-c-v7-premium-frame1.html`. Passe de acabamento + requisitos duros do owner:
 - **AVATAR photo-ready, sem ilustração/cartoon/DiceBear/sintético.** O componente `.av` mostra a
