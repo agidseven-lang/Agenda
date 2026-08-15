@@ -4,6 +4,44 @@
 Somente pesquisa + design + simulação. Nada toca `desktop/`, o app, o tema, workflows ou release.
 Fonte da verdade = `proposta-c-refinada-v2-frame1.html` (self-contained; fontes embutidas em `_fonts.css`).
 
+## V10 — lapidação final sobre a arquitetura aprovada da V9 (candidata final)
+Arquitetura **congelada** (mandato V10): mesma estrutura da V9 — sidebar escura, header, busca+subnav,
+filtro por responsável, Kanban 4 colunas, drawer à direita, fotos reais, cor por RESPONSÁVEL.
+V10 é lapidação de presença/refino, não redesenho. Arquivo: `proposta-c-v10-premium-frame1.html`.
+
+**O que mudou V9 → V10 (resumo por área):**
+- **Presença/hierarquia (~+10%)**: título do header 26px (Inter Tight 700), sidebar 284px, brand 18px,
+  "Nova tarefa" 48px, nav-item 42px, header 92px / toolbar 72px / filtro 64px.
+- **Cards (+~10% conforto interno)**: padding 22/22/18/25, título 16px/640/1.45, cliente maior
+  (rótulo 12.5 + nome 13.5/600 em texto — **sem logos fictícios**), tag de categoria discreta
+  (23px, microdot + tint 6%), prazo 13px, progresso 5px, avatares 32px, meta 13px.
+- **Faixa do responsável mais suave**: `.card::before` 3px com `color-mix(... 62%, #fff)`.
+- **Toolbar/filtro**: busca 520×48 r14, aba ativa pílula azul 44px, chips de responsável 44px r12
+  com foto 30px.
+- **Canvas**: board 30/32px, gap 24, col-header 15px/650 + contador 23px; **scroll-peek** (4º card
+  cortado na base) coerente com os contadores (8/6/4/12 > cards visíveis).
+- **DRAWER (prioridade máxima)**: 7 níveis — status → título 23px → cliente → chips 27px →
+  RESPONSÁVEL (foto 48px + nome 15/620 + dot de identidade) → CONCLUÍDA EM → CONTEÚDO (arquivo
+  PDF com ícone 44×46, nome 14, "PDF · 12.4 MB", botão download 36) → LINHA DO TEMPO (fotos 30px,
+  evento 14/600, autor 12.5, data 12) → CTA gradiente 52px r14. Ajuste final de respiro
+  (head 24/18 gap 15; body pt22 gap 20; rótulos mb12; tl pb16) para a última entrada da
+  timeline fechar completa acima do rodapé.
+- **Renderer determinístico**: `--virtual-time-budget=8000` no Chromium headless (elimina corrida
+  com `font-display:block` das fontes embutidas).
+
+**REGISTRO OBRIGATÓRIO (item 8 do mandato V10) — foto do Miercohévisk:**
+Nesta maquete, a foto do Miercohévisk vem de um **recorte temporário e local** da captura de tela
+da página Equipe fornecida pelo owner no chat (uso exclusivo de simulação; nunca versionado).
+**A IMPLEMENTAÇÃO REAL NÃO PODE usar esse recorte.** No produto, o avatar dele deve vir da
+**foto original cadastrada no Agenda**, resolvida pelo MESMO fluxo runtime já auditado:
+`photoOf(u)` → `avatar()` (renderer), alimentado por `usersPublic` — exatamente como as demais fotos.
+O recorte existe só porque o host da foto é bloqueado pelo egress deste ambiente de design.
+
+**Higiene (mandato V10 itens 33–35, revalidada):** `_team-photos.css` (data-URIs das 5 fotos reais)
+é LOCAL-ONLY e está no `.gitignore`; nenhum HTML/CSS/JPG/data-URI de foto real versionado;
+zero toque em `desktop/`, produção, tema, workflows, release ou Firestore (zero writes).
+Proibições mantidas: sem barra de métricas, sem Plano/workspace, sem Lista/Calendário, sem favoritos.
+
 ## V9 · esgotamento das rotas para a foto do Miercohévisk (mandato "assuma a parte técnica")
 Todas as rotas legítimas do ambiente foram tentadas, na ordem do mandato:
 1. **Fluxo real do app** (`photoOf`→`avatar()`): resolve apenas a URL; o download é do stack de rede do
