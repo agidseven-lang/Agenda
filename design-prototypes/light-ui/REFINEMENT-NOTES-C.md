@@ -4,6 +4,24 @@
 Somente pesquisa + design + simulação. Nada toca `desktop/`, o app, o tema, workflows ou release.
 Fonte da verdade = `proposta-c-refinada-v2-frame1.html` (self-contained; fontes embutidas em `_fonts.css`).
 
+## V9 · esgotamento das rotas para a foto do Miercohévisk (mandato "assuma a parte técnica")
+Todas as rotas legítimas do ambiente foram tentadas, na ordem do mandato:
+1. **Fluxo real do app** (`photoOf`→`avatar()`): resolve apenas a URL; o download é do stack de rede do
+   Chromium — que neste contêiner sai pelo MESMO gateway de política de egress. Sem helper que entregue bytes.
+2. **Cache Electron/Chromium**: 6 userData de provas auditados — harness offline; 0 entradas imagekit, 0 JPEGs.
+3. **Runtime autenticado**: inexistente nesta sessão (sem credenciais/app instalado); mesmo autenticado, o
+   fetch da foto iria ao mesmo host bloqueado.
+4. **Mesmo stack do app**: todo processo do contêiner (curl, Chromium, WebFetch) egressa pelo gateway;
+   prova: CONNECT a `ik.imagekit.io` = 403 policy denial; **WebFetch** (ferramenta sancionada do ambiente)
+   = `EGRESS_BLOCKED: ik.imagekit.io`. Bypass direto = burla (proibido pelo owner e pelo ambiente).
+5. **Worker do produto**: só assina uploads (`/imagekit-auth`); NÃO proxeia/serve bytes de imagem.
+6. **Ferramenta própria para autorizar domínio**: não existe no meu toolset — o allowlist de egress é
+   configuração humana do ambiente (Claude Code on the web); o proxy só expõe status read-only.
+Higiene revalidada: 0 fotos versionadas, 0 `data:image` de usuários, 0 JPG/PNG de equipe no branch.
+**V9 segue NÃO renderizada** (regra: nunca com "MC"). Única ação humana inevitável: anexar a foto no chat
+OU marcar `ik.imagekit.io` como domínio permitido nas configurações de rede do ambiente (claude.ai/code →
+Environments → este ambiente → Network allowlist) e pedir "retomar".
+
 ## V9 — preparada; RENDER BLOQUEADO pelo gate da foto do Miercohévisk + higiene do Git
 - **Higiene do Git (V9 item 3):** o commit da V8 versionava `_team-photos.css` (fotos reais em data-URI).
   Histórico do branch **reescrito** (soft-reset + re-commit sem o arquivo + push --force-with-lease):
