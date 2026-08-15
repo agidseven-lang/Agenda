@@ -4,7 +4,52 @@
 Somente pesquisa + design + simulação. Nada toca `desktop/`, o app, o tema, workflows ou release.
 Fonte da verdade = `proposta-c-refinada-v2-frame1.html` (self-contained; fontes embutidas em `_fonts.css`).
 
-## V8 — STOP pré-render (item 46 do mandato): fotos reais não materializáveis neste ambiente
+## V9 — preparada; RENDER BLOQUEADO pelo gate da foto do Miercohévisk + higiene do Git
+- **Higiene do Git (V9 item 3):** o commit da V8 versionava `_team-photos.css` (fotos reais em data-URI).
+  Histórico do branch **reescrito** (soft-reset + re-commit sem o arquivo + push --force-with-lease):
+  as fotos **não existem mais em nenhum commit**. `_team-photos.css` agora é **local-only** (.gitignore),
+  gerado na hora do render a partir de `usersPublic` (read-only). O HTML referencia o slot; o Git não
+  carrega fotos pessoais.
+- **Gate Miercohévisk (V9 item 2):** re-auditoria da sessão: userData/caches Electron das provas antigas
+  (6 diretórios) = harness offline, **zero** imagem de usuário; repo inteiro (todas as pastas) = mockups/
+  ícones/banners, **zero** foto de equipe; denormalizados em `tasks` copiam a **URL** (photoOf → string),
+  não bytes. Conclusão: os bytes da foto dele só existem em `ik.imagekit.io` — host **bloqueado pela
+  política de egress deste ambiente**. Sem rota legítima → **V9 NÃO renderizada** (gate do owner).
+  Desbloqueios possíveis: (a) anexar a foto dele no chat (uso local, nunca commitada); (b) liberar
+  `ik.imagekit.io` na política de rede do ambiente (Claude Code on the web) e pedir para retomar.
+- **V9 pronta** (`proposta-c-v9-premium-frame1.html`, todos os 41 itens): cards +10–15% de respiro
+  (padding 20/23, gaps 16/22, board 28/30), título 15.5/1.42 dominante, **cliente sem logo fictício**
+  (texto "Cliente · Nome"), tag terciária (tint 7%), **faixa dessaturada** (72% do hue do responsável),
+  progresso refinado, metadata 12.5 legível, header 88 composição única, busca 500×46, subnav com ativa
+  em pílula e inativas texto, filtro 42px raio 12 com foto 28, sidebar 284 (labels .14em, item 41px,
+  ativo tint+accent+hairline), **colunas com scroll-peek** (4º card corta na base → contadores coerentes),
+  **drawer editorial 408** (status→título 22→"Cliente · Bold Brands"→chips; seções empilhadas sem grid de
+  formulário; responsável 44 + dot de identidade; arquivo 40px + download; timeline com foto 28 do ator,
+  evento→ator→data), CTA 50. Slot `.p-mie` pronto — o render acontece assim que a foto materializar.
+
+## V8 — FOTOS REAIS (fluxo do próprio produto) + anti-miniaturização
+Arquivo: `proposta-c-v8-premium-frame1.html` + `_team-photos.css`. O owner corrigiu a rota: as fotos JÁ
+estão no Agenda; reutilizar read-only pelo MESMO fluxo do produto. Auditoria do runtime real:
+`state.users = db.collection('usersPublic').onSnapshot(...)` (renderer linha 3047) — a linhagem viva lê
+o Firestore SEM Firebase Auth (F4.2F revertida na 1.0.186), ou seja, `usersPublic` é legível pelo fluxo
+público do app (API key pública do próprio renderer). Reproduzi esse fluxo com uma leitura REST read-only:
+- **Equipe real (5 ativos):** Arydyjany Carlôto (Ceo) · Miercohévisk N. F. N. Carlôto (CEO) ·
+  Felipe Teodozio (Designer e Editor) · Tatiana Gomes (Social media) · Boaz Macêdo (Editor).
+- **4 fotos materializadas**: o campo `photo` desses docs já é `data:` URI (≈240×240 JPEG) — exatamente o
+  que o app exibe. Embutidas em `_team-photos.css` (`.av.p-ary/.p-fel/.p-tat/.p-boa`).
+- **Miercohévisk**: foto EXISTE (URL `ik.imagekit.io`), mas o host é bloqueado pela política de egress
+  deste ambiente → **único** com fallback monograma (permitido pelo item 45 do briefing). `users/<id>`
+  direto = PERMISSION_DENIED (Rules protegem a coleção privada — correto).
+- **Elenco do frame trocado para a equipe REAL** (cards, filtro, drawer, timeline) com cores de identidade:
+  Arydyjany=índigo, Miercohévisk=violeta, Felipe=teal, Tatiana=rosa, Boaz=ciano.
+- **Anti-miniaturização:** sidebar 280px, header 84px, toolbar 68, filtro 60, drawer 400px; título do card
+  15px/1.4, cliente 13px, tag 22px, avatares 30 (card) / 26 (filtro/timeline) / 44 (header/sidebar) / 40
+  (drawer); busca 480×46; abas 42px; gaps e paddings ampliados (board 26/28, gap 20, card 18/21).
+- Nenhum write em produção. Sem métricas inferiores. Sem Plano/workspace. 1920×1080 exatos.
+- Bug corrigido no primeiro render: regra `[class*=" p-"]{background-image:none}` anulava as fotos por
+  vir depois na cascata com mesma especificidade — removida.
+
+## V8 (histórico) — STOP pré-render (item 46 do mandato): fotos reais não materializáveis neste ambiente
 Auditoria READ-ONLY do produto real (renderer 1.0.246, `wt-f356bh2/desktop/src/renderer/index.html`):
 - **Como o produto obtém a foto:** `photoOf(u)` (linha 2846) lê, na ordem, os campos
   `photo, photoUrl, avatar, avatarUrl, image, imageUrl, picture, foto` do doc do usuário (Firestore `users`,
