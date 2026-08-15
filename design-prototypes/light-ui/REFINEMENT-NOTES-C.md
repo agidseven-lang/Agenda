@@ -20,6 +20,49 @@ Firestore seguem intocáveis. Toda nova superfície deve ser comparada à V10 an
 - **Títulos longos**: máximo visual controlado — line-height fixo (1.45) + line-clamp 2; nunca
   cards desproporcionais.
 
+## FRAME 4 — SOCIAL MEDIAS (candidata) · `proposta-c-frame4-socialmedias.html`
+**Status dos anteriores:** FRAME 3 · Designers = **LAYOUT APROVADO / GOLDEN** (junto com V10 e
+Cliente). FRAME 4 aplica o DS congelado à tela Social Medias REAL — redesign VISUAL apenas.
+
+**Auditoria read-only (renderer real 1.0.246):**
+- **Superfície real**: hub "Social Medias — cada Social Media em um quadro próprio — sem misturar";
+  seleção automática determinística (`f354SocialAutoPick`, espelho dos Designers) + faixa
+  `f354SocialStrip` (foto + 1º nome + contagem). Dona da tarefa = `socialOf`
+  (socialOwnerId → criador social → responsável social). Sub real: "Fluxo operacional · N tarefas".
+- **Colunas REAIS** (`SOCIAL_COLS4`): **A Fazer** `#9BA0AB` · **Em andamento** `#F59E0B` ·
+  **Revisão** `#60A5FA` · **Finalizado** `#34D399` — bucket do EIXO OPERACIONAL
+  (`flowBoardCol('social')`): "a Social vê o estágio REAL; aprovação parcial do cliente NÃO vira
+  Concluído". Ordenação real por prazo.
+- **Estágios operacionais reais** (`OPERATIONAL_COLS`) no chip do card (recortes fiéis):
+  A Fazer · Aprovação dos temas `#22D3EE` · Envio ao designer `#22D3EE` · Designer em produção
+  `#A78BFA` · Legendas e posts `#5B6CFF` · Ajuste do cliente `#F59E0B` · Concluído final `#10B981`
+  (+ Aguardando aprovação final `#34D399` e Designer em revisão `#60A5FA` existentes no eixo).
+- **Próxima ação real** (`nextActionShort`): "Criar e enviar ao cliente" / "Aguardar feedback do
+  cliente" / "Enviar ao designer" / "Aguardar entrega do designer" / "Adicionar legendas e posts" /
+  "Corrigir e reenviar ao cliente" / "Aguardar aprovação final" / "Tarefa encerrada".
+- **SLA interno × espera externa (regra crítica preservada)**: `externalWaitOf`
+  (themes_waiting_client/captions_waiting_client) faz `resolveTaskDisplayState` retornar
+  `waiting_client` NEUTRO com SLA interno PAUSADO (`inPanel:false` — zero alerta/culpa interna).
+  Nos cards aguardando cliente, a eyeline mostra a espera externa (visualizado/não + tempo,
+  `wfExternalInfo`) sem alarme; "Atrasada" (`taskDeadline`) só com bola interna. THEMES ≠
+  FINAL/CAPTIONS (rodadas separadas; envio final só com `flowSentToClientSignal`).
+- **Progresso real**: trilho dos marcos canônicos (9 principais de `taskTimeline`) → componente
+  aprovado como "Fluxo N de 9". Conteúdo (`kbv2ContentSlot`): "N temas (· N legendas preenchidas)"
+  / "N vídeos/roteiros" / "Legenda · Observações".
+
+**Composição:** sidebar/header/busca/subnav idênticos (Social Medias ativo); faixa real de quadros
+(Tatiana ativa · 14 — única Social Media do elenco real) + contexto "Fluxo operacional · 14 tarefas
+· 1 em atraso"; Kanban 4 colunas reais (2/8/2/2; scroll-peek onde contador > visíveis); faixa de
+TODOS os cards = rosa da Tatiana (responsável primário do quadro); estados visíveis: preparação
+(A Fazer), aprovação dos temas com espera externa honesta, retorno do designer + legendas
+(SELECIONADO), handoff "Enviar ao designer" identificável no peek, designer em produção (contador),
+ajuste do cliente, atrasada interna, concluído final. Drawer congelado no eixo Social: status →
+título → cliente → chips ("Legendas e posts" + "Designer entregou") → RESPONSÁVEL ATUAL (Tatiana
+48px — a bola voltou à Social; nunca falsifica owner) → ENTREGA DO DESIGNER (13/08 · por Felipe) →
+PRAZO E SLA ("Em prazo — faltam 5 dias para o envio final") → CONTEÚDO (12 temas · 7 legendas
+preenchidas) → LINHA DO TEMPO (marco atual "Aguardando legenda / posts" sem carimbo + entregas
+carimbadas) → CTA. SEM dashboard/ranking/KPI (não existem). Zero fotos versionadas.
+
 ## FRAME 3 — DESIGNERS (candidata) · `proposta-c-frame3-designers.html`
 **Status dos anteriores:** FRAME 2 · Cliente = **LAYOUT APROVADO / GOLDEN VISUAL REFERENCE** (junto
 com a V10). FRAME 3 aplica o mesmo DS congelado à tela Designers REAL — redesign VISUAL, nunca

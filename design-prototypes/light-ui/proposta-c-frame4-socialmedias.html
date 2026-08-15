@@ -1,0 +1,544 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, initial-scale=1">
+<title>Agenda ID Seven — Proposta C — FRAME 4 · Social Medias</title>
+<link rel="stylesheet" href="_fonts.css">
+<link rel="stylesheet" href="_team-photos.css">
+<style>
+/* ============================================================
+   AGENDA ID SEVEN · LIGHT UI · FRAME 4 — SOCIAL MEDIAS · 1920×1080
+   DESIGN PROTOTYPE (não é produção). Quarta superfície do MESMO software:
+   Design System congelado dos Frames 1–3 (Golden) aplicado à tela SOCIAL
+   MEDIAS REAL — tokens, sidebar, header, busca, subnav, cards, drawer,
+   tipografia, grid 4/8, raios, sombras e CTA IDÊNTICOS; zero redesign funcional.
+   ▸ FIDELIDADE (auditoria read-only no renderer real do Desktop 1.0.246):
+     · Hub real: "Social Medias — cada Social Media em um quadro próprio — sem
+       misturar"; seleção automática determinística (f354SocialAutoPick, espelho
+       dos Designers) + faixa f354SocialStrip (foto + 1º nome + contagem).
+       Dona da tarefa = socialOf (socialOwnerId → criador social → responsável).
+     · Colunas REAIS (SOCIAL_COLS4): A Fazer #9BA0AB · Em andamento #F59E0B ·
+       Revisão #60A5FA · Finalizado #34D399 — bucket do EIXO OPERACIONAL
+       (flowBoardCol 'social'): "a Social vê o estágio REAL; aprovação parcial
+       do cliente NÃO vira Concluído". Sub real: "Fluxo operacional · N tarefas".
+     · Estágios operacionais REAIS (OPERATIONAL_COLS) exibidos no chip do card:
+       A Fazer · Aguardando aprovação dos temas #22D3EE · Aguardando envio ao
+       designer #22D3EE · Designer em produção #A78BFA · Aguardando legendas e
+       posts #5B6CFF · Ajuste solicitado pelo cliente #F59E0B · Aguardando
+       aprovação final #34D399 · Concluído final #10B981 (recortes fiéis).
+     · Próxima ação REAL (nextActionShort): "Criar e enviar ao cliente" ·
+       "Aguardar feedback do cliente" · "Enviar ao designer" · "Aguardar
+       entrega do designer" · "Adicionar legendas e posts" · "Corrigir e
+       reenviar ao cliente" · "Aguardar aprovação final" · "Tarefa encerrada".
+     · SLA INTERNO × ESPERA EXTERNA (regra real preservada): quando a bola está
+       com o CLIENTE (externalWaitOf: themes_waiting_client/captions_waiting_client),
+       resolveTaskDisplayState retorna waiting_client NEUTRO e o SLA interno é
+       PAUSADO (inPanel:false — zero alerta). O card mostra a espera externa
+       (visualizado/não + tempo, wfExternalInfo) sem culpa interna; "Atrasada"
+       só quando a bola é interna (taskDeadline). THEMES ≠ FINAL/CAPTIONS
+       (rodadas separadas, flowSentToClientSignal).
+     · Conteúdo real (kbv2ContentSlot): "N temas (+ N legendas preenchidas)" ·
+       "N vídeos/roteiros" · "Legenda · Observações". Timeline = marcos
+       canônicos (taskTimeline; honestidade H13: marco atual sem carimbo).
+     · SEM dashboard/ranking/KPI/score/produtividade — não existem no produto.
+   ▸ MICROCONTRATOS (mantidos): faixa lateral = RESPONSÁVEL PRIMÁRIO (aqui, a
+     Social dona do quadro — rosa em todos os cards, por contrato); títulos com
+     line-clamp 2; header com whitespace preservado; foto do Miercohévisk =
+     recorte temporário — a implementação real usa a foto cadastrada via
+     photoOf → avatar(). FOTOS: _team-photos.css é LOCAL-ONLY (gitignored).
+   ============================================================ */
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+svg{display:block}
+
+:root{
+  --canvas:#F5F6F9; --surface:#FFFFFF; --surface-2:#FAFBFD; --sunk:#F1F4F8;
+  --hair:#E8EBF1; --hair-2:#EFF1F6;
+  --tx-1:#14181F; --tx-2:#4B5364; --tx-3:#767E8D; --tx-4:#A8AFBC;
+  --sb-1:#252B3D; --sb-2:#1B2031; --sb-tx:#D0D5E1; --sb-dim:#9299AC; --sb-faint:#727990;
+  --sb-active:rgba(255,255,255,.065); --sb-hover:rgba(255,255,255,.04);
+  --brand:#5B7CFA; --grad:linear-gradient(135deg,#6E5EF3,#9A6BF5);
+  --blue:#3B82F6; --blue-ink:#2563EB;
+  --orange:#F59E0B; --violet:#8B5CF6; --green:#22A06B; --green-ink:#12784C; --red:#EF4444;
+  /* eixo REAL da Social (SOCIAL_COLS4 + OPERATIONAL_COLS do renderer 1.0.246) */
+  --dg-afz:#9BA0AB; --dg-and:#F59E0B; --dg-rev:#60A5FA; --dg-ent:#34D399; --dg-hub:#22D3EE;
+  --op-tem:#22D3EE; --op-env:#22D3EE; --op-dsg:#A78BFA; --op-leg:#5B6CFF; --op-aju:#F59E0B; --op-fin:#34D399; --op-ok:#10B981;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-pill:999px;
+  --sh-1:0 0 0 1px var(--hair),0 1px 2px rgba(19,24,38,.04),0 5px 14px rgba(19,24,38,.035);
+  --sh-2:0 0 0 1px var(--hair),0 2px 6px rgba(19,24,38,.06),0 16px 34px rgba(19,24,38,.085);
+  --sh-drawer:-18px 0 48px rgba(19,24,38,.085),-1px 0 0 var(--hair);
+}
+/* identidade por pessoa (equipe REAL) */
+.u-indigo{--u:#5B6CF0}   /* Arydyjany Carlôto */
+.u-violet{--u:#8A5CF6}   /* Miercohévisk N. Carlôto */
+.u-teal{--u:#12A69B}     /* Felipe Teodozio */
+.u-rose{--u:#E85D8C}     /* Tatiana Gomes */
+.u-cyan{--u:#12A7C4}     /* Boaz Macêdo */
+.own-indigo{--bar:#5B6CF0}.own-violet{--bar:#8A5CF6}.own-teal{--bar:#12A69B}
+.own-rose{--bar:#E85D8C}.own-cyan{--bar:#12A7C4}
+
+body{font-family:'Inter',-apple-system,'Segoe UI',Roboto,sans-serif;color:var(--tx-1);background:var(--canvas);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-feature-settings:"cv05" 1,"cv11" 1}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.ic-sm{width:15px;height:15px}.ic-14{width:14px;height:14px;stroke-width:1.8}
+
+/* AVATAR photo-ready (foto real via .p-*; monograma só sem foto) */
+.av{position:relative;width:32px;height:32px;border-radius:50%;flex:none;display:grid;place-items:center;
+  font-weight:600;font-size:11px;letter-spacing:.01em;line-height:1;
+  color:color-mix(in srgb,var(--u) 74%,#26303f);
+  background-color:color-mix(in srgb,var(--u) 15%,#fff);
+  background-image:radial-gradient(120% 120% at 50% 22%,color-mix(in srgb,var(--u) 20%,#fff),color-mix(in srgb,var(--u) 12%,#fff));
+  background-size:cover;background-position:center;background-repeat:no-repeat;
+  box-shadow:0 0 0 2px #fff,0 0 0 3.5px color-mix(in srgb,var(--u) 46%,#fff),0 1px 3px rgba(19,24,38,.16)}
+.av-30{width:30px;height:30px;font-size:10.5px}.av-32{width:32px;height:32px;font-size:11px}
+.av-46{width:46px;height:46px;font-size:15.5px}.av-48{width:48px;height:48px;font-size:16px}
+.stack{display:flex}.stack .av{margin-left:-10px;box-shadow:0 0 0 2.5px var(--sk,#fff),0 0 0 4px color-mix(in srgb,var(--u) 44%,#fff),0 1px 3px rgba(19,24,38,.14)}.stack .av:first-child{margin-left:0}
+
+/* ============================================================ FRAME */
+.frame{width:1920px;height:1080px;overflow:hidden;position:relative;background:var(--canvas);display:grid;grid-template-columns:284px 1fr;grid-template-rows:1080px;font-size:13.5px;isolation:isolate}
+.frame::after{content:"";position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 0 1px rgba(19,24,38,.05);z-index:60}
+
+/* ============================================================ SIDEBAR (idêntica aos Frames 1–2) */
+.sb{background:linear-gradient(180deg,var(--sb-1),var(--sb-2));color:var(--sb-tx);display:flex;flex-direction:column;min-height:0;overflow:hidden;padding:0 0 12px}
+.brand{display:flex;align-items:center;gap:14px;padding:30px 24px 22px}
+.brand-mark{width:46px;height:46px;border-radius:14px;flex:none;background:linear-gradient(140deg,#5B7CFA,#6E5EF3);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px rgba(94,110,243,.4),inset 0 1px 0 rgba(255,255,255,.24)}
+.brand-mark .ic{width:24px;height:24px;stroke-width:1.9;color:#fff}
+.brand-txt{min-width:0;flex:1}
+.brand-name{font-family:'InterTight';font-weight:700;font-size:18px;color:#F5F7FB;letter-spacing:-.014em;line-height:1.14}
+.brand-sub{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--sb-faint);margin-top:4px}
+.brand-sync{width:6px;height:6px;border-radius:50%;background:#33D6A6;box-shadow:0 0 0 3px rgba(51,214,166,.15)}
+.newtask{margin:0 20px 20px;height:48px;border-radius:13px;background:var(--grad);color:#fff;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:9px;box-shadow:0 8px 20px rgba(110,94,243,.34)}
+.newtask .ic{width:18px;height:18px;stroke-width:2.1}
+.sb-scroll{flex:1;overflow:hidden;padding:0 14px;display:flex;flex-direction:column}
+.nav-label{font-size:10.5px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--sb-faint);padding:18px 14px 10px}
+.nav-item{display:flex;align-items:center;gap:13px;height:42px;padding:0 14px;border-radius:11px;color:var(--sb-tx);position:relative;font-size:14px;font-weight:450;line-height:1}
+.nav-item .ic{color:var(--sb-dim);width:19px;height:19px}
+.nav-item:hover{background:var(--sb-hover)}
+.nav-item.active{background:var(--sb-active);color:#F7F9FC;font-weight:560;box-shadow:inset 0 0 0 1px rgba(255,255,255,.055)}
+.nav-item.active .ic{color:#B7C1FF}
+.nav-item.active::before{content:"";position:absolute;left:-14px;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;background:linear-gradient(180deg,#7C8CFF,#6E5EF3)}
+.nav-badge{margin-left:auto;height:20px;min-width:20px;padding:0 7px;border-radius:var(--r-pill);background:#EF4444;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.sb-user{margin-top:12px;padding:20px 24px 10px;display:flex;align-items:center;gap:14px;box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+.sb-user-txt{min-width:0;flex:1}
+.sb-user-name{font-size:14px;font-weight:600;color:#F3F6FB;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-user-role{font-size:12px;color:var(--sb-faint);margin-top:3px;display:flex;align-items:center;gap:6px}
+.udot{width:6px;height:6px;border-radius:50%;background:#33D6A6}
+.sb-user .chev{color:var(--sb-faint)}
+
+/* ============================================================ MAIN — mesma composição 92/72/64 */
+.main{display:grid;grid-template-rows:92px 72px 64px 1fr;min-width:0;min-height:0;overflow:hidden;background:var(--canvas)}
+
+.hd{display:flex;align-items:center;gap:18px;padding:0 34px;background:var(--surface);box-shadow:0 1px 0 var(--hair-2)}
+.hd-back{width:42px;height:42px;border-radius:var(--r-md);display:flex;align-items:center;justify-content:center;color:var(--tx-2);box-shadow:inset 0 0 0 1px var(--hair)}
+.hd-title{display:flex;align-items:center;gap:16px}
+.hd-eye{width:46px;height:46px;border-radius:14px;flex:none;background:color-mix(in srgb,var(--dg-hub) 15%,#fff);display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--dg-hub) 28%,#fff)}
+.hd-eye .ic{width:22px;height:22px;color:#0E8FA6}
+.hd-title .tl{display:flex;flex-direction:column;line-height:1.08}
+.hd-title .tl b{font-family:'InterTight';font-weight:700;font-size:26px;letter-spacing:-.024em;color:var(--tx-1)}
+.hd-title .tl span{font-size:13.5px;color:var(--tx-3);margin-top:4px}
+.hd-right{margin-left:auto;display:flex;align-items:center;gap:14px}
+.sla{display:flex;align-items:center;gap:12px;height:50px;padding:0 19px 0 14px;border-radius:14px;background:linear-gradient(180deg,#F1FBF7,#E8F8F0);box-shadow:inset 0 0 0 1px #CBEEDD}
+.sla-ic{width:34px;height:34px;border-radius:10px;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(18,80,54,.16)}
+.sla-ic .ic{width:18px;height:18px;color:var(--green)}
+.sla-tx{display:flex;flex-direction:column;line-height:1.22}
+.sla-k{font-size:9.5px;font-weight:800;letter-spacing:.06em;color:#3E9C74;display:flex;align-items:center;gap:5px}
+.livedot{width:6px;height:6px;border-radius:50%;background:#22C58A;box-shadow:0 0 0 3px rgba(34,197,138,.2)}
+.sla-v{font-size:14px;font-weight:650;color:#115E3D}
+.hd-bell{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;color:var(--tx-2);box-shadow:inset 0 0 0 1px var(--hair);position:relative}
+.hd-bell .ic{width:20px;height:20px}
+.hd-bell .dot{position:absolute;top:12px;right:13px;width:8px;height:8px;border-radius:50%;background:#7C6BF5;box-shadow:0 0 0 2px var(--surface)}
+
+.tb{display:flex;align-items:center;gap:24px;padding:0 34px;background:var(--surface);box-shadow:0 1px 0 var(--hair-2)}
+.search{flex:0 1 520px;height:48px;display:flex;align-items:center;gap:12px;padding:0 17px;border-radius:14px;background:var(--sunk);box-shadow:inset 0 0 0 1px var(--hair);color:var(--tx-3)}
+.search .ic{color:var(--tx-3);width:18px;height:18px}
+.search input{border:0;background:none;outline:none;flex:1;font-size:14px;color:var(--tx-1)}
+.search input::placeholder{color:var(--tx-3)}
+.kbd{display:inline-flex;align-items:center;gap:2px;height:25px;padding:0 9px;border-radius:7px;background:var(--surface);box-shadow:inset 0 0 0 1px var(--hair);font-size:11.5px;font-weight:600;color:var(--tx-3)}
+.tabs{margin-left:auto;display:flex;align-items:center;gap:2px}
+.tab{display:flex;align-items:center;gap:9px;height:44px;padding:0 17px;border-radius:12px;font-size:13.5px;font-weight:500;color:var(--tx-3)}
+.tab .ic{width:16px;height:16px;color:var(--tx-4)}
+.tab:hover{color:var(--tx-2)}
+.tab.on{background:var(--blue);color:#fff;font-weight:600;box-shadow:0 7px 16px rgba(59,130,246,.30)}
+.tab.on .ic{color:#fff}
+
+/* ── FAIXA REAL de quadros por designer (f354DesignerStrip + autoload F3.5.4-B) ── */
+.fr{display:flex;align-items:center;gap:12px;padding:0 34px;background:var(--surface);box-shadow:0 1px 0 var(--hair),0 8px 20px rgba(19,24,38,.03)}
+.fr-lab{font-size:13px;color:var(--tx-3);margin-right:6px}
+.rchip{display:flex;align-items:center;gap:11px;height:44px;padding:0 13px 0 10px;border-radius:12px;font-size:13.5px;font-weight:550;color:var(--tx-2);box-shadow:inset 0 0 0 1px var(--hair)}
+.rchip.on{color:var(--blue-ink);box-shadow:inset 0 0 0 1.5px var(--blue);background:color-mix(in srgb,var(--blue) 5%,#fff)}
+.rchip .ct{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:21px;padding:0 7px;border-radius:var(--r-pill);background:var(--sunk);box-shadow:inset 0 0 0 1px var(--hair);font-size:11.5px;font-weight:700;color:var(--tx-3)}
+.rchip.on .ct{background:color-mix(in srgb,var(--blue) 10%,#fff);color:var(--blue-ink);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--blue) 24%,#fff)}
+.fr-ctx{margin-left:auto;font-size:13px;color:var(--tx-3)}
+.fr-ctx b{color:var(--tx-2);font-weight:600}
+.fr-ctx .late{color:#B45309;font-weight:600}
+
+/* ============================================================ BOARD — canvas premium */
+.stage{display:flex;min-height:0;overflow:hidden}
+.board{flex:1;min-width:0;min-height:0;padding:30px 32px 0;display:grid;grid-template-columns:repeat(4,1fr);gap:24px;overflow:hidden}
+.col{display:flex;flex-direction:column;min-width:0}
+.col-h{display:flex;align-items:center;gap:11px;padding:0 6px 18px}
+.col-dot{width:9px;height:9px;border-radius:50%;background:var(--c)}
+.col-nm{font-size:15px;font-weight:650;color:var(--tx-1);letter-spacing:-.006em;line-height:1}
+.col-ct{margin-left:auto;font-size:12px;font-weight:700;color:var(--tx-3);background:var(--surface);box-shadow:inset 0 0 0 1px var(--hair);min-width:25px;height:23px;display:flex;align-items:center;justify-content:center;border-radius:var(--r-pill);padding:0 8px}
+.col-add{width:25px;height:25px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--tx-4)}
+.col-add .ic{width:16px;height:16px}
+.col-body{display:flex;flex-direction:column;gap:18px;min-height:0;overflow:hidden}
+/* colunas REAIS do eixo do designer */
+.s-afz{--c:var(--dg-afz)}.s-and{--c:var(--dg-and)}.s-drev{--c:var(--dg-rev)}.s-ent{--c:var(--dg-ent)}
+
+.card{position:relative;background:var(--surface);border-radius:var(--r-lg);padding:22px 22px 18px 25px;box-shadow:var(--sh-1);overflow:hidden;flex:none}
+.card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:color-mix(in srgb,var(--bar,#C7CCD6) 62%,#fff)}
+.card.sel{box-shadow:var(--sh-2),inset 0 0 0 1.5px color-mix(in srgb,var(--bar) 40%,#fff);background:color-mix(in srgb,var(--bar) 2%,#fff)}
+/* microcontrato: título com line-height fixo + clamp 2 */
+.card-title{font-size:16px;font-weight:640;color:var(--tx-1);line-height:1.45;letter-spacing:-.009em;margin-bottom:15px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.crow{display:flex;align-items:center;gap:8px;margin-bottom:15px}
+.cli{display:flex;align-items:baseline;gap:8px;font-size:13px;min-width:0;flex:1}
+.cli .k{color:var(--tx-3);font-weight:450;font-size:12.5px;flex:none}
+.cli .nm{color:var(--tx-1);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* tag = CATEGORIA/TIPO (setor real) — discreta, nunca compete com título/status */
+.tag{margin-left:auto;display:inline-flex;align-items:center;height:23px;padding:0 8px;border-radius:6px;font-size:10px;font-weight:700;letter-spacing:.03em;color:var(--tx-2);background:color-mix(in srgb,var(--tgc,#98A0AE) 6%,#fff);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--tgc,#98A0AE) 14%,#fff);flex:none;white-space:nowrap}
+.tag .d{width:6px;height:6px;border-radius:50%;margin-right:7px;background:var(--tgc,#98A0AE)}
+.t-afz{--tgc:#6E7480}.t-tem{--tgc:var(--op-tem)}.t-env{--tgc:var(--op-env)}.t-dsg{--tgc:var(--op-dsg)}.t-leg{--tgc:var(--op-leg)}.t-aju{--tgc:var(--op-aju)}.t-fin{--tgc:var(--op-fin)}.t-ok{--tgc:var(--op-ok)}
+/* linha PRAZO (esq, taskDeadline) + estado SLA REAL (dir, kbv2SlaLocal) */
+.eyeline{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12.5px;color:var(--tx-2);font-weight:500;margin-bottom:15px}
+.eyeline .l{display:flex;align-items:center;gap:8px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.eyeline .ic{width:17px;height:17px;color:var(--tx-3)}
+.eyeline b{font-weight:650;color:var(--tx-1);flex:none;white-space:nowrap}
+.eyeline b.sl-az{color:#2563EB}.eyeline b.sl-la{color:#C07C15}.eyeline b.sl-ve{color:#DC2626}.eyeline b.sl-ok{color:var(--green-ink)}
+.eyeline.done{color:var(--green-ink)}.eyeline.done .ic{color:var(--green)}
+.eyeline.warn .ic{color:#D08A1D}.eyeline.late .ic{color:#E05252}
+/* progresso REAL do designer: trilho de 3 etapas no componente aprovado */
+.prog{margin-bottom:15px}
+.prog-top{display:flex;align-items:center;justify-content:space-between;font-size:12px;margin-bottom:8px}
+.prog-top .k{color:var(--tx-3);font-weight:500}
+.prog-top .v{color:var(--tx-1);font-weight:700;font-size:12.5px}
+.prog-bar{height:5px;border-radius:var(--r-pill);background:var(--sunk);overflow:hidden;box-shadow:inset 0 0 0 1px rgba(19,24,38,.03)}
+.prog-bar>i{display:block;height:100%;border-radius:var(--r-pill);background:linear-gradient(90deg,color-mix(in srgb,var(--c) 62%,#fff),var(--c))}
+/* próxima ação REAL (designerNextShort) */
+.nxt{display:flex;align-items:center;gap:8px;font-size:12.5px;margin-bottom:15px}
+.nxt .k{color:var(--tx-4);flex:none;font-weight:600}
+.nxt .v{color:var(--tx-2);font-weight:550;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card-foot{display:flex;align-items:center;gap:12px;padding-top:16px;box-shadow:inset 0 1px 0 var(--hair-2)}
+.foot-r{margin-left:auto;display:flex;align-items:center;gap:16px}
+.meta{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:550;color:var(--tx-2)}
+.meta .ic{width:17px;height:17px;color:var(--tx-3)}
+
+/* ============================================================ DRAWER — anatomia congelada, eixo do designer */
+.drawer{width:416px;flex:none;background:var(--surface);box-shadow:var(--sh-drawer);display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.dr-h{padding:24px 28px 18px;display:flex;flex-direction:column;gap:15px;box-shadow:0 1px 0 var(--hair)}
+.dr-h-top{display:flex;align-items:center;gap:10px}
+.dr-status{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:650;letter-spacing:.01em;color:#B45309}
+.dr-status .d{width:8px;height:8px;border-radius:50%;background:var(--dg-and)}
+.dr-h-top .sp{margin-left:auto}
+.dr-ib{width:34px;height:34px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;color:var(--tx-3)}
+.dr-ib:hover{background:var(--sunk)}
+.dr-ib .ic{width:17px;height:17px}
+.dr-title b{font-family:'InterTight';font-weight:700;font-size:23px;line-height:1.28;letter-spacing:-.02em;color:var(--tx-1)}
+.dr-client{font-size:14px;color:var(--tx-3)}
+.dr-client b{color:var(--tx-1);font-weight:600}
+.dr-chips{display:flex;flex-wrap:wrap;gap:8px}
+.dr-chip{display:inline-flex;align-items:center;gap:6px;height:27px;padding:0 12px 0 10px;border-radius:8px;font-size:12px;font-weight:600;background:color-mix(in srgb,var(--chc,#22A06B) 9%,#fff);color:var(--chk,#12784C);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--chc,#22A06B) 15%,#fff)}
+.dr-chip .ic{width:13px;height:13px;stroke-width:2.4}
+.ch-amber{--chc:#E8940A;--chk:#9A6206}
+.ch-ind{--chc:#5B6CFF;--chk:#4353D8}
+.dr-body{flex:1;overflow:hidden;padding:18px 28px 24px;display:flex;flex-direction:column;gap:14px}
+.dr-sec-k{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--tx-3);margin-bottom:11px;display:flex;align-items:center}
+.dr-sec-k .cnt{margin-left:auto;color:var(--tx-4);font-weight:600;letter-spacing:.02em}
+.dr-resp{display:flex;align-items:center;gap:15px}
+.dr-resp .nm{font-size:15px;font-weight:620;color:var(--tx-1)}
+.dr-resp .sub{font-size:12.5px;color:var(--tx-3);margin-top:3px;display:flex;align-items:center;gap:6px}
+.dr-resp .idot{width:7px;height:7px;border-radius:50%;background:var(--u)}
+.dr-when{display:flex;align-items:center;gap:9px;font-size:14px;color:var(--tx-1);font-weight:550}
+.dr-when .ic{width:18px;height:18px;color:var(--tx-3)}
+.dr-when .mut{color:var(--tx-3);font-weight:450}
+.dr-sub{font-size:12.5px;color:var(--tx-3);margin-top:5px;padding-left:27px}
+.dr-sub b{color:#C07C15;font-weight:650}
+.dr-sub b.ok{color:#2563EB}
+/* bloco de conteúdo (kbv2ContentSlot — contagens reais) */
+.file{display:flex;align-items:center;gap:14px;padding:12px 15px;border-radius:13px;background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--hair)}
+.file-ic{width:44px;height:46px;border-radius:10px;flex:none;background:#F1EBFE;display:flex;align-items:center;justify-content:center;position:relative;box-shadow:inset 0 0 0 1px #E2D7FB}
+.file-ic .ic{width:19px;height:19px;color:#7C5CE8}
+.file-tx{flex:1;min-width:0}
+.file .nm{font-size:14px;font-weight:600;color:var(--tx-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.file .sz{font-size:12px;color:var(--tx-3);margin-top:3px}
+.file .dl{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--tx-2);box-shadow:inset 0 0 0 1px var(--hair);flex:none}
+.file .dl .ic{width:17px;height:17px}
+.tl{position:relative;display:flex;gap:15px;padding-bottom:13px}
+.tl:last-child{padding-bottom:0}
+.tl-rail{position:relative;display:flex;justify-content:center;width:32px;flex:none}
+.tl-l{position:absolute;top:36px;bottom:-6px;width:2px;background:var(--hair-2);border-radius:2px}
+.tl:last-child .tl-l{display:none}
+/* marco ATUAL (sem carimbo — honestidade H13) */
+.tl-now{width:30px;height:30px;border-radius:50%;flex:none;display:grid;place-items:center;background:color-mix(in srgb,var(--op-leg) 12%,#fff);box-shadow:0 0 0 2px #fff,0 0 0 3.5px color-mix(in srgb,var(--op-leg) 40%,#fff)}
+.tl-now .ic{width:15px;height:15px;color:#4F5FE8}
+.tl-b{padding-top:2px}
+.tl-b .ev{font-size:14px;font-weight:600;color:var(--tx-1);line-height:1.32}
+.tl-b .who{font-size:12.5px;color:var(--tx-3);margin-top:4px}
+.tl-b .dt{font-size:12px;color:var(--tx-3);margin-top:2px}
+.dr-foot{padding:17px 28px 21px;display:flex;gap:12px;box-shadow:0 -1px 0 var(--hair)}
+.dr-cta{flex:1;height:52px;border-radius:14px;background:var(--grad);color:#fff;font-size:14.5px;font-weight:650;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 8px 20px rgba(110,94,243,.28)}
+.dr-cta .ic{width:18px;height:18px}
+.dr-more{width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;color:var(--tx-3);box-shadow:inset 0 0 0 1px var(--hair)}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-logo" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><path d="M8.5 9.5h7M8.5 13h7M8.5 16.5h4"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.6l2.55 5.17 5.7.83-4.13 4.02.98 5.68L12 16.98 6.9 19.3l.98-5.68L3.75 9.6l5.7-.83z"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.5h17M8 3.3v3.4M16 3.3v3.4"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8.5 6.5h11M8.5 12h11M8.5 17.5h11"/><path d="M4.4 6.5h.02M4.4 12h.02M4.4 17.5h.02"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9.2" cy="8.2" r="3.3"/><path d="M3.6 19.2a5.6 5.6 0 0111.2 0"/><path d="M15.8 5.4a3.1 3.1 0 010 5.7M17.4 19.2a5.3 5.3 0 00-2.1-4.2"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.4"/><path d="M5.6 20a6.4 6.4 0 0112.8 0"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 4v16h16"/><path d="M8 16.5v-3M12 16.5V9M16 16.5v-5.5"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 24 24"><path d="M6.2 3.4h6.6l4.9 4.9V19.6a1.2 1.2 0 01-1.2 1.2H6.2A1.2 1.2 0 015 19.6V4.6a1.2 1.2 0 011.2-1.2z"/><path d="M12.6 3.6V8.4h4.8M8.6 13h6.8M8.6 16.4h4.8"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6.6 10.2a5.4 5.4 0 0110.8 0c0 4.6 1.9 5.8 1.9 5.8H4.7s1.9-1.2 1.9-5.8z"/><path d="M10.2 19.4a2 2 0 003.6 0"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.1"/><path d="M12 2.6v2.4M12 19v2.4M4.4 4.4l1.7 1.7M17.9 17.9l1.7 1.7M2.6 12h2.4M19 12h2.4M4.4 19.6l1.7-1.7M17.9 6.1l1.7-1.7"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.6"/><path d="M20 20l-4-4"/></symbol>
+  <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="M14.5 6l-6 6 6 6"/></symbol>
+  <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="M6 9.5l6 6 6-6"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.6"/><rect x="13" y="4" width="7" height="7" rx="1.6"/><rect x="4" y="13" width="7" height="7" rx="1.6"/><rect x="13" y="13" width="7" height="7" rx="1.6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.4 4.4L19 7.3"/></symbol>
+  <symbol id="i-comment" viewBox="0 0 24 24"><path d="M20 11.6a7.4 7.4 0 01-10.7 6.6L4.4 19.6l1.4-4.9A7.4 7.4 0 1120 11.6z"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 7.6V12l3 1.9"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v5.2c0 4.4-3 7.4-7 8.8-4-1.4-7-4.4-7-8.8V6z"/><path d="M9 12l2.1 2.1L15.2 10"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M15 3l6 6-3 1-3.5 3.5L14 20l-2-2M9.5 9.5L3.5 15.5l2 2 6-6"/></symbol>
+  <symbol id="i-dots" viewBox="0 0 24 24"><circle cx="5.5" cy="12" r="1.5" style="fill:currentColor;stroke:none"/><circle cx="12" cy="12" r="1.5" style="fill:currentColor;stroke:none"/><circle cx="18.5" cy="12" r="1.5" style="fill:currentColor;stroke:none"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
+  <symbol id="i-film" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2.2"/><path d="M8 5v14M16 5v14M3.5 9.5H8M3.5 14.5H8M16 9.5h4.5M16 14.5h4.5"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M21 3.5L10.2 14.3M21 3.5l-6.7 17-3.1-7.2L4 10.2z"/></symbol>
+</svg>
+
+<div class="frame">
+  <!-- ===================== SIDEBAR (idêntica aos Frames 1–2) ===================== -->
+  <aside class="sb">
+    <div class="brand">
+      <div class="brand-mark"><svg class="ic"><use href="#i-logo"/></svg></div>
+      <div class="brand-txt">
+        <div class="brand-name">Agenda ID Seven</div>
+        <div class="brand-sub"><span class="brand-sync"></span> sincronizado</div>
+      </div>
+    </div>
+    <button class="newtask"><svg class="ic"><use href="#i-plus"/></svg> Nova tarefa</button>
+
+    <div class="sb-scroll">
+      <div class="nav-label">Workspace</div>
+      <a class="nav-item"><svg class="ic"><use href="#i-star"/></svg> Minhas Prioridades</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-sun"/></svg> Hoje</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-calendar"/></svg> Agenda</a>
+      <a class="nav-item active"><svg class="ic"><use href="#i-list"/></svg> Tarefas</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-users"/></svg> Equipe</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-user"/></svg> Perfil</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-chart"/></svg> Executivo</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-doc"/></svg> Relatórios</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-bell"/></svg> Notificações <span class="nav-badge">9+</span></a>
+      <div class="nav-label">Sistema</div>
+      <a class="nav-item"><svg class="ic"><use href="#i-gear"/></svg> Configurações</a>
+    </div>
+
+    <div class="sb-user">
+      <span class="av av-46 u-indigo p-ary">AC</span>
+      <div class="sb-user-txt">
+        <div class="sb-user-name">Arydyjany Carlôto</div>
+        <div class="sb-user-role"><span class="udot"></span> CEO · admin</div>
+      </div>
+      <svg class="ic ic-sm chev"><use href="#i-chevron-down"/></svg>
+    </div>
+  </aside>
+
+  <!-- ===================== MAIN ===================== -->
+  <div class="main">
+    <header class="hd">
+      <button class="hd-back"><svg class="ic"><use href="#i-chevron-left"/></svg></button>
+      <div class="hd-title">
+        <span class="hd-eye"><svg class="ic"><use href="#i-users"/></svg></span>
+        <div class="tl"><b>Social Medias</b><span>Cada Social Media em um quadro próprio — sem misturar</span></div>
+      </div>
+      <div class="hd-right">
+        <div class="sla">
+          <span class="sla-ic"><svg class="ic"><use href="#i-shield"/></svg></span>
+          <div class="sla-tx"><span class="sla-k"><span class="livedot"></span> MONITOR SLA • AO VIVO</span><span class="sla-v">Tudo em dia</span></div>
+        </div>
+        <button class="hd-bell"><svg class="ic"><use href="#i-bell"/></svg><span class="dot"></span></button>
+      </div>
+    </header>
+
+    <div class="tb">
+      <label class="search"><svg class="ic"><use href="#i-search"/></svg><input placeholder="Buscar tarefas, clientes, responsáveis..."><span class="kbd">⌘ K</span></label>
+      <div class="tabs">
+        <button class="tab"><svg class="ic"><use href="#i-user"/></svg> Meu quadro</button>
+        <button class="tab"><svg class="ic"><use href="#i-eye"/></svg> Cliente</button>
+        <button class="tab"><svg class="ic"><use href="#i-grid"/></svg> Designers</button>
+        <button class="tab on"><svg class="ic"><use href="#i-users"/></svg> Social Medias</button>
+        <button class="tab"><svg class="ic"><use href="#i-grid"/></svg> Setores</button>
+      </div>
+    </div>
+
+    <!-- Faixa real de seleção (f354SocialStrip + autoload): quadro da Tatiana -->
+    <div class="fr">
+      <span class="fr-lab">Quadros de Social Media:</span>
+      <button class="rchip on"><span class="av av-30 u-rose p-tat">TG</span> Tatiana <span class="ct">14</span></button>
+      <span class="fr-ctx"><b>Fluxo operacional</b> · 14 tarefas · <span class="late">1 em atraso</span></span>
+    </div>
+
+    <div class="stage">
+      <section class="board">
+
+        <!-- A FAZER (2) -->
+        <div class="col s-afz">
+          <div class="col-h"><span class="col-dot"></span><span class="col-nm">A Fazer</span><span class="col-ct">2</span><button class="col-add"><svg class="ic"><use href="#i-plus"/></svg></button></div>
+          <div class="col-body">
+            <article class="card own-rose">
+              <div class="crow"><span class="cli"><span class="nm">Café do Centro</span></span><span class="tag t-afz"><span class="d"></span>A Fazer</span></div>
+              <div class="card-title">Cronograma Editorial Outubro</div>
+              <div class="eyeline"><span class="l"><svg class="ic"><use href="#i-calendar"/></svg> Prazo 28/08</span><b class="sl-az">Em prazo</b></div>
+              <div class="nxt"><span class="k">→</span><span class="v">Criar e enviar ao cliente</span></div>
+              <div class="card-foot"><div class="stack"><span class="av av-32 u-rose p-tat">TG</span></div><div class="foot-r"><span class="meta"><svg class="ic"><use href="#i-doc"/></svg> 16 temas</span></div></div>
+            </article>
+            <article class="card own-rose">
+              <div class="crow"><span class="cli"><span class="nm">GreenLife</span></span><span class="tag t-afz"><span class="d"></span>A Fazer</span></div>
+              <div class="card-title">Roteiros Reels Setembro</div>
+              <div class="eyeline"><span class="l"><svg class="ic"><use href="#i-calendar"/></svg> Prazo 30/08</span><b class="sl-az">Em prazo</b></div>
+              <div class="nxt"><span class="k">→</span><span class="v">Criar e enviar ao cliente</span></div>
+              <div class="card-foot"><div class="stack"><span class="av av-32 u-rose p-tat">TG</span></div><div class="foot-r"><span class="meta"><svg class="ic"><use href="#i-doc"/></svg> 8 roteiros</span></div></div>
+            </article>
+          </div>
+        </div>
+
+        <!-- EM ANDAMENTO (8 — scroll-peek) -->
+        <div class="col s-and">
+          <div class="col-h"><span class="col-dot"></span><span class="col-nm">Em andamento</span><span class="col-ct">8</span><button class="col-add"><svg class="ic"><use href="#i-plus"/></svg></button></div>
+          <div class="col-body">
+            <article class="card own-rose">
+              <div class="crow"><span class="cli"><span class="nm">Startup Lab</span></span><span class="tag t-tem"><span class="d"></span>Aprovação dos temas</span></div>
+              <div class="card-title">Cronograma Editorial Setembro</div>
+              <div class="eyeline"><span class="l"><svg class="ic"><use href="#i-eye"/></svg> Visualizado às 11:05</span><b>há 8h</b></div>
+              <div class="prog"><div class="prog-top"><span class="k">Fluxo</span><span class="v">2 de 9</span></div><div class="prog-bar"><i style="width:22%"></i></div></div>
+              <div class="nxt"><span class="k">→</span><span class="v">Aguardar feedback do cliente</span></div>
+              <div class="card-foot"><div class="stack"><span class="av av-32 u-rose p-tat">TG</span><span class="av av-32 u-violet p-mie">MC</span></div><div class="foot-r"><span class="meta"><svg class="ic"><use href="#i-doc"/></svg> 14 temas</span></div></div>
+            </article>
+            <article class="card own-rose sel">
+              <div class="crow"><span class="cli"><span class="nm">Sunset Wear</span></span><span class="tag t-leg"><span class="d"></span>Legendas e posts</span></div>
+              <div class="card-title">Cronograma Feed &amp; Stories</div>
+              <div class="eyeline done"><span class="l"><svg class="ic"><use href="#i-check"/></svg> Designer entregou</span><b class="sl-ok">13/08</b></div>
+              <div class="prog"><div class="prog-top"><span class="k">Fluxo</span><span class="v">6 de 9</span></div><div class="prog-bar"><i style="width:66%"></i></div></div>
+              <div class="nxt"><span class="k">→</span><span class="v">Adicionar legendas e posts</span></div>
+              <div class="card-foot"><div class="stack"><span class="av av-32 u-rose p-tat">TG</span><span class="av av-32 u-teal p-fel">FT</span></div><div class="foot-r"><span class="meta"><svg class="ic"><use href="#i-doc"/></svg> 12 temas · 7 legendas</span></div></div>
+            </article>
+            <article class="card own-rose">
+              <div class="crow"><span class="cli"><span class="nm">Bold Brands</span></span><span class="tag t-env"><span class="d"></span>Envio ao designer</span></div>
+              <div class="card-title">Campanha Lançamento Primavera</div>
+              <div class="eyeline done"><span class="l"><svg class="ic"><use href="#i-check"/></svg> Temas aprovados</span><b class="sl-ok">12/08</b></div>
+              <div class="prog"><div class="prog-top"><span class="k">Fluxo</span><span class="v">3 de 9</span></div><div class="prog-bar"><i style="width:33%"></i></div></div>
+              <div class="nxt"><span class="k">→</span><span class="v">Enviar ao designer</span></div>
+              <div class="card-foot"><div class="stack"><span class="av av-32 u-rose p-tat">TG</span></div><div class="foot-r"><span class="meta"><svg class="ic"><use href="#i-doc"/></svg> 10 temas</span></div></div>
+            </article>
+            <article class="card own-rose">
+              <div class="crow"><span class="cli"><span class="nm">TechOne</span></span><span class="tag t-dsg"><span class="d"></span>Designer em produção</span></div>
+              <div class="card-title">Vídeo Institucional Nova Marca</div>
+              <div class="eyeline"><span class="l"><svg class="ic"><use href="#i-calendar"/></svg> Prazo 22/08</span><b class="sl-az">Em prazo</b></div>
+              <div class="nxt"><span class="k">→</span><span class="v">Aguardar entrega do designer</span></div>
+              <div class="card-foot"><div class="stack"><span class="av av-32 u-rose p-tat">TG</span><span class="av av-32 u-teal p-fel">FT</span></div><div class="foot-r"><span class="meta"><svg class="ic"><use href="#i-film"/></svg> 8 vídeos</span></div></div>
+            </article>
+          </div>
+        </div>
+
+        <!-- REVISÃO (2) -->
+        <div class="col s-drev">
+          <div class="col-h"><span class="col-dot"></span><span class="col-nm">Revisão</span><span class="col-ct">2</span><button class="col-add"><svg class="ic"><use href="#i-plus"/></svg></button></div>
+          <div class="col-body">
+            <article class="card own-rose">
+              <div class="crow"><span class="cli"><span class="nm">Café do Centro</span></span><span class="tag t-aju"><span class="d"></span>Ajuste do cliente</span></div>
+              <div class="card-title">Posts Carrossel Agosto</div>
+              <div class="eyeline"><span class="l"><svg class="ic"><use href="#i-comment"/></svg> Ajuste solicitado</span><b>há 6h</b></div>
+              <div class="nxt"><span class="k">→</span><span class="v">Corrigir e reenviar ao cliente</span></div>
+              <div class="card-foot"><div class="stack"><span class="av av-32 u-rose p-tat">TG</span></div><div class="foot-r"><span class="meta"><svg class="ic"><use href="#i-doc"/></svg> 8 temas</span></div></div>
+            </article>
+            <article class="card own-rose">
+              <div class="crow"><span class="cli"><span class="nm">Sunset Wear</span></span><span class="tag t-aju"><span class="d"></span>Ajuste do cliente</span></div>
+              <div class="card-title">Campanha Black Friday Teaser</div>
+              <div class="eyeline late"><span class="l"><svg class="ic"><use href="#i-clock"/></svg> Prazo 14/08</span><b class="sl-ve">Atrasada</b></div>
+              <div class="nxt"><span class="k">→</span><span class="v">Corrigir e reenviar ao cliente</span></div>
+              <div class="card-foot"><div class="stack"><span class="av av-32 u-rose p-tat">TG</span><span class="av av-32 u-teal p-fel">FT</span></div><div class="foot-r"><span class="meta"><svg class="ic"><use href="#i-doc"/></svg> 6 temas</span></div></div>
+            </article>
+          </div>
+        </div>
+
+        <!-- FINALIZADO (2) -->
+        <div class="col s-ent">
+          <div class="col-h"><span class="col-dot"></span><span class="col-nm">Finalizado</span><span class="col-ct">2</span><button class="col-add"><svg class="ic"><use href="#i-plus"/></svg></button></div>
+          <div class="col-body">
+            <article class="card own-rose">
+              <div class="crow"><span class="cli"><span class="nm">Café do Centro</span></span><span class="tag t-ok"><span class="d"></span>Concluído final</span></div>
+              <div class="card-title">Cronograma Editorial Julho</div>
+              <div class="eyeline done"><span class="l"><svg class="ic"><use href="#i-check"/></svg> Aprovação final</span><b class="sl-ok">05/08/2026</b></div>
+              <div class="nxt"><span class="k">→</span><span class="v">Tarefa encerrada</span></div>
+              <div class="card-foot"><div class="stack"><span class="av av-32 u-rose p-tat">TG</span><span class="av av-32 u-teal p-fel">FT</span></div><div class="foot-r"><span class="meta"><svg class="ic"><use href="#i-doc"/></svg> 12 temas</span></div></div>
+            </article>
+            <article class="card own-rose">
+              <div class="crow"><span class="cli"><span class="nm">MovOn</span></span><span class="tag t-ok"><span class="d"></span>Concluído final</span></div>
+              <div class="card-title">Roteiros YouTube Julho</div>
+              <div class="eyeline done"><span class="l"><svg class="ic"><use href="#i-check"/></svg> Aprovação final</span><b class="sl-ok">01/08/2026</b></div>
+              <div class="nxt"><span class="k">→</span><span class="v">Tarefa encerrada</span></div>
+              <div class="card-foot"><div class="stack"><span class="av av-32 u-rose p-tat">TG</span></div><div class="foot-r"><span class="meta"><svg class="ic"><use href="#i-doc"/></svg> 6 roteiros</span></div></div>
+            </article>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ===================== DRAWER (anatomia congelada · eixo Social Media) ===================== -->
+      <aside class="drawer">
+        <div class="dr-h">
+          <div class="dr-h-top">
+            <span class="dr-status"><span class="d"></span> Em andamento</span>
+            <span class="sp"></span>
+            <button class="dr-ib"><svg class="ic"><use href="#i-pin"/></svg></button>
+            <button class="dr-ib"><svg class="ic"><use href="#i-dots"/></svg></button>
+            <button class="dr-ib"><svg class="ic"><use href="#i-x"/></svg></button>
+          </div>
+          <div class="dr-title"><b>Cronograma Feed &amp; Stories</b></div>
+          <div class="dr-client">Cliente · <b>Sunset Wear</b></div>
+          <div class="dr-chips">
+            <span class="dr-chip ch-ind"><svg class="ic"><use href="#i-doc"/></svg> Legendas e posts</span>
+            <span class="dr-chip"><svg class="ic"><use href="#i-check"/></svg> Designer entregou</span>
+          </div>
+        </div>
+        <div class="dr-body">
+          <div>
+            <div class="dr-sec-k">Responsável atual</div>
+            <div class="dr-resp u-rose"><span class="av av-48 u-rose p-tat">TG</span><div><div class="nm">Tatiana Gomes</div><div class="sub"><span class="idot"></span> Social media</div></div></div>
+          </div>
+          <div>
+            <div class="dr-sec-k">Entrega do designer</div>
+            <div class="dr-when"><svg class="ic"><use href="#i-check"/></svg> 13/08/2026 às 17:45 <span class="mut">· por Felipe</span></div>
+          </div>
+          <div>
+            <div class="dr-sec-k">Prazo e SLA</div>
+            <div class="dr-when"><svg class="ic"><use href="#i-clock"/></svg> 20/08/2026 às 18:00</div>
+            <div class="dr-sub"><b class="ok">Em prazo</b> — faltam 5 dias para o envio final</div>
+          </div>
+          <div>
+            <div class="dr-sec-k">Conteúdo <span class="cnt">12 itens</span></div>
+            <div class="file"><span class="file-ic"><svg class="ic"><use href="#i-doc"/></svg></span><div class="file-tx"><div class="nm">Temas e legendas</div><div class="sz">12 temas · 7 legendas preenchidas</div></div><span class="dl"><svg class="ic"><use href="#i-eye"/></svg></span></div>
+          </div>
+          <div>
+            <div class="dr-sec-k">Linha do tempo</div>
+            <div class="tl"><div class="tl-rail"><span class="tl-now"><svg class="ic"><use href="#i-clock"/></svg></span><span class="tl-l"></span></div><div class="tl-b"><div class="ev">Aguardando legenda / posts</div><div class="who">Etapa atual — com a Social Media</div></div></div>
+            <div class="tl"><div class="tl-rail"><span class="av av-30 u-teal p-fel">FT</span><span class="tl-l"></span></div><div class="tl-b"><div class="ev">Designer entregou</div><div class="who">Felipe Teodozio</div><div class="dt">13/08/2026 · 17:45</div></div></div>
+            <div class="tl"><div class="tl-rail"><span class="av av-30 u-rose p-tat">TG</span></div><div class="tl-b"><div class="ev">Enviado ao designer</div><div class="who">Tatiana Gomes</div><div class="dt">11/08/2026 · 10:20</div></div></div>
+          </div>
+        </div>
+        <div class="dr-foot">
+          <button class="dr-cta"><svg class="ic"><use href="#i-eye"/></svg> Ver detalhes completos</button>
+          <button class="dr-more"><svg class="ic"><use href="#i-dots"/></svg></button>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+</body>
+</html>
