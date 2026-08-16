@@ -20,6 +20,46 @@ Firestore seguem intocáveis. Toda nova superfície deve ser comparada à V10 an
 - **Títulos longos**: máximo visual controlado — line-height fixo (1.45) + line-clamp 2; nunca
   cards desproporcionais.
 
+## FRAME 7B — NOVA TAREFA · ETAPA 2 DADOS (candidata) · `proposta-c-frame7b-novatarefa-dados.html`
+**Status dos anteriores:** FRAME 7A · Setor = **APROVADO / GOLDEN** — estrutura do wizard
+CONGELADA (container 920/radius 18/sh-2, stepper, header global, footer, âncora vertical,
+sidebar, canvas). 7B troca apenas o miolo pela etapa Dados real e define a foundation
+**C1 — Forms & Controls**.
+
+**Auditoria read-only (stepDados 11342+, Cronograma/isCron):**
+- Grupos e labels LITERAIS: Identificação ("Nome do cronograma" + placeholder real "Ex.:
+  Cronograma de junho"; "Cliente / Empresa" + pill real "obrigatório" — clientRequired:true) ·
+  Atribuição ("Responsável (opcional)" com assigneeField = botão-picker avatar+nome que abre o
+  sheet "Responsável"; helper REAL: "Opcional nesta etapa. O designer final é definido depois,
+  em 'Enviar ao designer' — é aí que começa o SLA do designer."; "Etapa" = chips STATUS reais
+  A Fazer #9BA0AB · Em andamento #F59E0B · Revisão #60A5FA · Concluído #34D399) · Período do
+  cronograma (Data/Hora de início, Data/Hora de término — pares reais) · Prazo final &
+  prioridade (Data/Hora limite + switchrow real "Prioridade alta"/"Destaca a tarefa nos
+  quadros").
+- SEM subtipo na Dados (subtypes só no Briefing e NÃO p/ Cronograma — F3.5.5D usa quantidade);
+  SEM select nativo; SEM quantidade nesta etapa (Briefing). Defaults reais do newForm:
+  status:'afazer' (chip default), priority:false, datas vazias, assignee null.
+- Validação REAL (stepNext f.step===1): "Para Cronograma o cliente é obrigatório." + "Informe o
+  título." — alerts no clique; Próximo nunca desabilita e não há erro inline no real ⇒ nenhum
+  erro inline inventado. Footer real da etapa 2: Voltar (ghost) + Próximo.
+
+**Composição:** stepper com 3 estados (Setor CONCLUÍDA = check verde tint + kicker; Dados ATUAL
+= gradiente; futuras hairline; conector percorrido verde) — check+label+peso, nunca só cor.
+Corpo em 2 colunas de GRUPOS (esq 1–2, dir 3–4) preservando ordem/agrupamento reais (o real é
+coluna única com scroll interno — decisão de apresentação p/ mostrar todos os controles; a
+implementação pode manter coluna única). Preenchimento realista: "Cronograma de Setembro" ·
+Sunset Wear · Tatiana Gomes · A Fazer · 01/09→30/09/2026 · limite 25/08 18:00 · Prioridade ON.
+C1 definida: field label 13/600 tx-2 sentence-case; section 11/700 uppercase; input h46 r12
+hairline #DFE3EB, valor 14/520; FOCUS demonstrado no "Nome do cronograma" (ring brand 1.5 +
+halo 16%); data/hora com ícone leading 16 tx-3; picker de pessoa com avatar+chevron; chips com
+dot na cor (acessível); toggle 46×28 ON=brand sólido (gradiente é só CTA); pill "obrigatório"
+âmbar (padrão real); contratos error/disabled/transições documentados no cabeçalho.
+
+**Fixes de render:** símbolo i-clock ausente no sprite herdado do 7A (horas sem ícone) →
+adicionado; chips de Etapa quebravam em 2 linhas → compactados (h32/font 12/gaps) para 1 linha.
+Fotos reais locais indisponíveis nesta sessão (recortes temporários perdidos com o container;
+nunca versionados) — avatares com fallback REAL de iniciais do app.
+
 ## FRAME 7A — NOVA TAREFA · ETAPA 1 SETOR (candidata) · `proposta-c-frame7a-novatarefa-setor.html`
 **Status dos anteriores:** FRAME 6 · Detalhes completos = **LAYOUT APROVADO / GOLDEN** (com V10,
 Cliente, Designers, Social Medias e Setores — 6 Golden). FRAME 7A abre o wizard real de Nova
