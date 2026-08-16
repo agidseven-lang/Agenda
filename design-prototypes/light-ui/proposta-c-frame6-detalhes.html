@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, initial-scale=1">
+<title>Agenda ID Seven — Proposta C — FRAME 6 · Detalhes completos</title>
+<link rel="stylesheet" href="_fonts.css">
+<link rel="stylesheet" href="_team-photos.css">
+<style>
+/* ============================================================
+   AGENDA ID SEVEN · LIGHT UI · FRAME 6 — DETALHES COMPLETOS · 1920×1080
+   DESIGN PROTOTYPE (não é produção). Detail view premium/editorial da tarefa —
+   composição própria de página (P0 do Master Surface Map), sobre a fundação
+   congelada dos Golden Frames 1–5 (tokens, sidebar, header, tipografia, grid
+   4/8, raios, sombras, chips, avatares, timeline, CTA idênticos).
+   ▸ FIDELIDADE (auditoria read-only no Desktop 1.0.246):
+     · Superfície real: renderClientView (rota state.clientView) — HERO com
+       status, cliente, responsável, resumo EDITORIAL POR CONTEÚDO (tema /
+       legenda / Feed / Story / situação derivada briefing→legenda→produção→
+       completo), observações internas, resposta do cliente — + opPanelBlock
+       ("Próxima ação" + LINHA DO TEMPO OPERACIONAL de 10 etapas, det-tl).
+     · ESTÁGIO SIMULADO (realisticamente complexo, recomendação do owner):
+       Cronograma em LEGENDAS/POSTS após entrega do designer
+       (operationalCol='aguardando_legenda'; designer entregou; envio FINAL
+       ainda NÃO ocorreu). Mesma tarefa do Frame 4 (continuidade do universo).
+     · CONTRATOS F3.5.6A preservados (sem regressão):
+       THEMES ≠ FINAL/CAPTIONS (rodadas separadas; a rodada final aparece como
+       "ainda não enviada", sem carimbo — flowSentToClientSignal);
+       token/link ≠ envio confirmado; visualizou ≠ aprovou;
+       DESIGNER ENTREGOU ≠ CONCLUÍDO (status segue Em andamento);
+       aprovação final = única conclusão real (isTaskCompleted).
+     · SLA real (kbv2SlaLocal): "Em prazo" azul — bola INTERNA (Social);
+       espera externa pausaria o SLA (externalWaitOf) — não é o caso aqui.
+     · Timeline = 10 marcos canônicos reais (taskTimeline) com estados
+       done (carimbo real) / ATUAL (sem carimbo — honestidade H13) /
+       pendente (sem data) / condicional ("Cliente pediu ajuste", optional).
+     · Ações REAIS do estágio: primária "Legendas e artes"
+       (renderProductionModal); administrativas Editar prazo · Mover status ·
+       Remover (destrutiva). Pós-conclusão (H16/H17) essas ações operacionais
+       SOMEM e Remover permanece administrativa — registrado, não simulado aqui.
+     · Nenhuma função inventada; conteúdo fictício, estrutura/estados reais.
+   ▸ MICROCONTRATOS: foto do Miercohévisk = recorte temporário (implementação
+     real usa a foto cadastrada via photoOf → avatar()); títulos line-clamp;
+     header global idêntico; _team-photos.css LOCAL-ONLY (gitignored).
+   ▸ RESPONSIVIDADE: arquitetura em 2 colunas com lateral fixa 400px — em
+     1366×768/125% a lateral empilha abaixo da principal (validação futura).
+   ============================================================ */
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+svg{display:block}
+
+:root{
+  --canvas:#F5F6F9; --surface:#FFFFFF; --surface-2:#FAFBFD; --sunk:#F1F4F8;
+  --hair:#E8EBF1; --hair-2:#EFF1F6;
+  --tx-1:#14181F; --tx-2:#4B5364; --tx-3:#767E8D; --tx-4:#A8AFBC;
+  --sb-1:#252B3D; --sb-2:#1B2031; --sb-tx:#D0D5E1; --sb-dim:#9299AC; --sb-faint:#727990;
+  --sb-active:rgba(255,255,255,.065); --sb-hover:rgba(255,255,255,.04);
+  --brand:#5B7CFA; --grad:linear-gradient(135deg,#6E5EF3,#9A6BF5);
+  --blue:#3B82F6; --blue-ink:#2563EB;
+  --orange:#F59E0B; --violet:#8B5CF6; --green:#22A06B; --green-ink:#12784C; --red:#EF4444;
+  --op-leg:#5B6CFF; --op-and:#F59E0B; --op-ok:#10B981; --sec-cron:#34D399;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-pill:999px;
+  --sh-1:0 0 0 1px var(--hair),0 1px 2px rgba(19,24,38,.04),0 5px 14px rgba(19,24,38,.035);
+  --sh-2:0 0 0 1px var(--hair),0 2px 6px rgba(19,24,38,.06),0 16px 34px rgba(19,24,38,.085);
+}
+.u-indigo{--u:#5B6CF0}.u-violet{--u:#8A5CF6}.u-teal{--u:#12A69B}.u-rose{--u:#E85D8C}.u-cyan{--u:#12A7C4}
+
+body{font-family:'Inter',-apple-system,'Segoe UI',Roboto,sans-serif;color:var(--tx-1);background:var(--canvas);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-feature-settings:"cv05" 1,"cv11" 1}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.ic-sm{width:15px;height:15px}.ic-14{width:14px;height:14px;stroke-width:1.8}
+
+.av{position:relative;width:32px;height:32px;border-radius:50%;flex:none;display:grid;place-items:center;
+  font-weight:600;font-size:11px;letter-spacing:.01em;line-height:1;
+  color:color-mix(in srgb,var(--u) 74%,#26303f);
+  background-color:color-mix(in srgb,var(--u) 15%,#fff);
+  background-image:radial-gradient(120% 120% at 50% 22%,color-mix(in srgb,var(--u) 20%,#fff),color-mix(in srgb,var(--u) 12%,#fff));
+  background-size:cover;background-position:center;background-repeat:no-repeat;
+  box-shadow:0 0 0 2px #fff,0 0 0 3.5px color-mix(in srgb,var(--u) 46%,#fff),0 1px 3px rgba(19,24,38,.16)}
+.av-24{width:24px;height:24px;font-size:9px}.av-30{width:30px;height:30px;font-size:10.5px}
+.av-40{width:40px;height:40px;font-size:13px}.av-46{width:46px;height:46px;font-size:15.5px}
+
+.frame{width:1920px;height:1080px;overflow:hidden;position:relative;background:var(--canvas);display:grid;grid-template-columns:284px 1fr;grid-template-rows:1080px;font-size:13.5px;isolation:isolate}
+.frame::after{content:"";position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 0 1px rgba(19,24,38,.05);z-index:60}
+
+/* ===== SIDEBAR (idêntica aos Golden) ===== */
+.sb{background:linear-gradient(180deg,var(--sb-1),var(--sb-2));color:var(--sb-tx);display:flex;flex-direction:column;min-height:0;overflow:hidden;padding:0 0 12px}
+.brand{display:flex;align-items:center;gap:14px;padding:30px 24px 22px}
+.brand-mark{width:46px;height:46px;border-radius:14px;flex:none;background:linear-gradient(140deg,#5B7CFA,#6E5EF3);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px rgba(94,110,243,.4),inset 0 1px 0 rgba(255,255,255,.24)}
+.brand-mark .ic{width:24px;height:24px;stroke-width:1.9;color:#fff}
+.brand-txt{min-width:0;flex:1}
+.brand-name{font-family:'InterTight';font-weight:700;font-size:18px;color:#F5F7FB;letter-spacing:-.014em;line-height:1.14}
+.brand-sub{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--sb-faint);margin-top:4px}
+.brand-sync{width:6px;height:6px;border-radius:50%;background:#33D6A6;box-shadow:0 0 0 3px rgba(51,214,166,.15)}
+.newtask{margin:0 20px 20px;height:48px;border-radius:13px;background:var(--grad);color:#fff;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:9px;box-shadow:0 8px 20px rgba(110,94,243,.34)}
+.newtask .ic{width:18px;height:18px;stroke-width:2.1}
+.sb-scroll{flex:1;overflow:hidden;padding:0 14px;display:flex;flex-direction:column}
+.nav-label{font-size:10.5px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--sb-faint);padding:18px 14px 10px}
+.nav-item{display:flex;align-items:center;gap:13px;height:42px;padding:0 14px;border-radius:11px;color:var(--sb-tx);position:relative;font-size:14px;font-weight:450;line-height:1}
+.nav-item .ic{color:var(--sb-dim);width:19px;height:19px}
+.nav-item.active{background:var(--sb-active);color:#F7F9FC;font-weight:560;box-shadow:inset 0 0 0 1px rgba(255,255,255,.055)}
+.nav-item.active .ic{color:#B7C1FF}
+.nav-item.active::before{content:"";position:absolute;left:-14px;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;background:linear-gradient(180deg,#7C8CFF,#6E5EF3)}
+.nav-badge{margin-left:auto;height:20px;min-width:20px;padding:0 7px;border-radius:var(--r-pill);background:#EF4444;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.sb-user{margin-top:12px;padding:20px 24px 10px;display:flex;align-items:center;gap:14px;box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+.sb-user-txt{min-width:0;flex:1}
+.sb-user-name{font-size:14px;font-weight:600;color:#F3F6FB;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-user-role{font-size:12px;color:var(--sb-faint);margin-top:3px;display:flex;align-items:center;gap:6px}
+.udot{width:6px;height:6px;border-radius:50%;background:#33D6A6}
+.sb-user .chev{color:var(--sb-faint)}
+
+/* ===== MAIN: header global 92 + página ===== */
+.main{display:grid;grid-template-rows:92px 1fr;min-width:0;min-height:0;overflow:hidden;background:var(--canvas)}
+.hd{display:flex;align-items:center;gap:18px;padding:0 34px;background:var(--surface);box-shadow:0 1px 0 var(--hair-2)}
+.hd-back{width:42px;height:42px;border-radius:var(--r-md);display:flex;align-items:center;justify-content:center;color:var(--tx-2);box-shadow:inset 0 0 0 1px var(--hair)}
+.hd-title{display:flex;align-items:center;gap:16px}
+.hd-eye{width:46px;height:46px;border-radius:14px;flex:none;background:color-mix(in srgb,var(--sec-cron) 15%,#fff);display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--sec-cron) 28%,#fff)}
+.hd-eye .ic{width:22px;height:22px;color:#12925F}
+.hd-title .tl{display:flex;flex-direction:column;line-height:1.08}
+.hd-title .tl b{font-family:'InterTight';font-weight:700;font-size:26px;letter-spacing:-.024em;color:var(--tx-1)}
+.hd-title .tl span{font-size:13.5px;color:var(--tx-3);margin-top:4px}
+.hd-right{margin-left:auto;display:flex;align-items:center;gap:14px}
+.sla{display:flex;align-items:center;gap:12px;height:50px;padding:0 19px 0 14px;border-radius:14px;background:linear-gradient(180deg,#F1FBF7,#E8F8F0);box-shadow:inset 0 0 0 1px #CBEEDD}
+.sla-ic{width:34px;height:34px;border-radius:10px;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(18,80,54,.16)}
+.sla-ic .ic{width:18px;height:18px;color:var(--green)}
+.sla-tx{display:flex;flex-direction:column;line-height:1.22}
+.sla-k{font-size:9.5px;font-weight:800;letter-spacing:.06em;color:#3E9C74;display:flex;align-items:center;gap:5px}
+.livedot{width:6px;height:6px;border-radius:50%;background:#22C58A;box-shadow:0 0 0 3px rgba(34,197,138,.2)}
+.sla-v{font-size:14px;font-weight:650;color:#115E3D}
+.hd-bell{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;color:var(--tx-2);box-shadow:inset 0 0 0 1px var(--hair);position:relative}
+.hd-bell .ic{width:20px;height:20px}
+.hd-bell .dot{position:absolute;top:12px;right:13px;width:8px;height:8px;border-radius:50%;background:#7C6BF5;box-shadow:0 0 0 2px var(--surface)}
+
+/* ===== PÁGINA DE DETALHES ===== */
+.page{min-height:0;overflow:hidden;padding:26px 32px 28px;display:grid;grid-template-rows:auto 1fr;gap:22px}
+
+/* HERO da tarefa */
+.hero{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--sh-1);padding:24px 28px 22px;display:flex;gap:28px;align-items:flex-start}
+.hero-l{flex:1;min-width:0}
+.hero-chips{display:flex;align-items:center;gap:9px;margin-bottom:13px}
+.hchip{display:inline-flex;align-items:center;gap:7px;height:26px;padding:0 11px;border-radius:8px;font-size:11.5px;font-weight:650;letter-spacing:.01em;color:var(--ck,#4B5364);background:color-mix(in srgb,var(--cc,#98A0AE) 8%,#fff);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--cc,#98A0AE) 18%,#fff)}
+.hchip .d{width:7px;height:7px;border-radius:50%;background:var(--cc)}
+.hc-and{--cc:#F59E0B;--ck:#B45309}
+.hc-leg{--cc:#5B6CFF;--ck:#4353D8}
+.hc-sla{--cc:#3B82F6;--ck:#2563EB}
+.hc-sec{--cc:#34D399;--ck:#12784C}
+.hero-title{font-family:'InterTight';font-weight:700;font-size:29px;letter-spacing:-.026em;line-height:1.16;color:var(--tx-1)}
+.hero-sub{margin-top:8px;font-size:14.5px;color:var(--tx-3)}
+.hero-sub b{color:var(--tx-1);font-weight:600}
+.hero-next{margin-top:15px;display:flex;align-items:center;gap:11px;padding:12px 15px;border-radius:12px;background:color-mix(in srgb,var(--op-leg) 5%,#fff);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--op-leg) 14%,#fff);max-width:640px}
+.hero-next .nk{font-size:10.5px;font-weight:800;letter-spacing:.08em;color:#4353D8;flex:none}
+.hero-next .nv{font-size:14px;font-weight:600;color:var(--tx-1)}
+.hero-r{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:14px}
+.hero-resp{display:flex;align-items:center;gap:13px}
+.hero-resp .m{text-align:right}
+.hero-resp .k{font-size:10.5px;font-weight:800;letter-spacing:.08em;color:var(--tx-3)}
+.hero-resp .nm{font-size:15px;font-weight:620;color:var(--tx-1);margin-top:3px}
+.hero-resp .rl{font-size:12.5px;color:var(--tx-3);margin-top:2px}
+.hero-acts{display:flex;align-items:center;gap:10px}
+.cta{height:48px;padding:0 22px;border-radius:13px;background:var(--grad);color:#fff;font-size:14px;font-weight:650;display:flex;align-items:center;gap:10px;box-shadow:0 8px 20px rgba(110,94,243,.28)}
+.cta .ic{width:18px;height:18px}
+.ib{width:48px;height:48px;border-radius:13px;display:flex;align-items:center;justify-content:center;color:var(--tx-3);box-shadow:inset 0 0 0 1px var(--hair)}
+
+/* corpo 2 colunas */
+.cols{display:grid;grid-template-columns:1fr 354px 332px;gap:22px;min-height:0;overflow:hidden}
+.colL,.colM,.colR{display:flex;flex-direction:column;gap:20px;min-height:0;overflow:hidden}
+.colM .adm{margin-top:auto}
+.panel{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--sh-1);padding:20px 24px}
+.p-k{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--tx-3);display:flex;align-items:center;margin-bottom:14px}
+.p-k .cnt{margin-left:auto;color:var(--tx-4);font-weight:600;letter-spacing:.02em;text-transform:none;font-size:12px}
+
+/* OPERAÇÃO — painel operacional premium (3 células) */
+.op{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0}
+.op>div{padding:2px 18px 2px 0;border-right:1px solid var(--hair-2)}
+.op>div+div{padding-left:18px}
+.op>div:last-child{border-right:0;padding-right:0}
+.op .ok{font-size:10.5px;font-weight:800;letter-spacing:.08em;color:var(--tx-3);margin-bottom:9px}
+.op .line{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;color:var(--tx-1)}
+.op .line .ic{width:16px;height:16px}
+.op .line.done .ic{color:var(--green)}
+.op .line.pend{color:var(--tx-3);font-weight:500}
+.op .line.pend .dd{width:8px;height:8px;border-radius:50%;box-shadow:inset 0 0 0 1.6px #C6CBD6;flex:none}
+.op .sub{font-size:12px;color:var(--tx-3);margin-top:4px;padding-left:24px}
+
+/* CONTEÚDOS — item editorial (tema/legenda/feed/story/situação) */
+.it{display:flex;gap:14px;padding:12px 16px;border-radius:13px;background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--hair)}
+.it+.it{margin-top:11px}
+.it-n{width:30px;height:30px;border-radius:9px;flex:none;display:flex;align-items:center;justify-content:center;background:#fff;box-shadow:inset 0 0 0 1px var(--hair);font-size:12px;font-weight:700;color:var(--tx-2)}
+.it-m{flex:1;min-width:0}
+.it-t{font-size:14.5px;font-weight:640;color:var(--tx-1);line-height:1.3}
+.it-leg{font-size:12.5px;color:var(--tx-2);margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.it-leg.miss{color:var(--tx-4);font-style:italic}
+.it-tags{display:flex;align-items:center;gap:7px;margin-top:9px}
+.mtag{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px;border-radius:6px;font-size:10px;font-weight:700;letter-spacing:.03em;color:var(--tx-2);background:#fff;box-shadow:inset 0 0 0 1px var(--hair)}
+.mtag .ic{width:12px;height:12px}
+.mtag.ok{color:var(--green-ink)}.mtag.ok .ic{color:var(--green)}
+.mtag.pend{color:#B45309;background:color-mix(in srgb,#F59E0B 7%,#fff);box-shadow:inset 0 0 0 1px color-mix(in srgb,#F59E0B 22%,#fff)}
+.it-st{flex:none;align-self:flex-start}
+.stag{display:inline-flex;align-items:center;height:23px;padding:0 10px;border-radius:6px;font-size:10px;font-weight:700;letter-spacing:.03em;color:var(--tx-2);background:color-mix(in srgb,var(--tgc,#98A0AE) 6%,#fff);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--tgc,#98A0AE) 14%,#fff)}
+.stag .d{width:6px;height:6px;border-radius:50%;margin-right:7px;background:var(--tgc)}
+.st-ok{--tgc:#10B981}.st-leg{--tgc:#5B6CFF}.st-parc{--tgc:#F59E0B}
+
+/* LATERAL — equipe / prazos / timeline */
+.tm{display:flex;align-items:center;gap:12px}
+.tm+.tm{margin-top:13px}
+.tm .m{flex:1;min-width:0}
+.tm .nm{font-size:13.5px;font-weight:620;color:var(--tx-1)}
+.tm .rl{font-size:11.5px;color:var(--tx-3);margin-top:2px}
+.tm .tg{flex:none;font-size:10px;font-weight:700;letter-spacing:.04em;height:21px;padding:0 9px;border-radius:var(--r-pill);display:inline-flex;align-items:center;color:#4353D8;background:color-mix(in srgb,#5B6CFF 8%,#fff);box-shadow:inset 0 0 0 1px color-mix(in srgb,#5B6CFF 20%,#fff)}
+.tm .tg.done{color:var(--green-ink);background:color-mix(in srgb,var(--green) 8%,#fff);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--green) 18%,#fff)}
+.dtr{display:flex;align-items:baseline;gap:8px;font-size:13px}
+.dtr+.dtr{margin-top:9px}
+.dtr .k{color:var(--tx-3);flex:none;width:92px}
+.dtr .v{color:var(--tx-1);font-weight:600}
+.dtr .v .mut{color:var(--tx-3);font-weight:450}
+.dtr .v b.az{color:#2563EB;font-weight:650}
+.dtr .vsub{font-size:12px;color:var(--tx-3);font-weight:450;margin-top:2px}
+.cresp{display:flex;gap:12px;padding:14px 15px;border-radius:13px;background:color-mix(in srgb,var(--green) 6%,#fff);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--green) 20%,#fff)}
+.cresp .ci{width:34px;height:34px;border-radius:10px;flex:none;display:grid;place-items:center;color:var(--green-ink);background:color-mix(in srgb,var(--green) 13%,#fff)}
+.cresp .ci .ic{width:16px;height:16px;stroke-width:2.2}
+.cresp .ct{font-size:13.5px;font-weight:680;color:var(--green-ink)}
+.cresp .cn{font-size:12.5px;color:var(--tx-2);margin-top:4px;line-height:1.5}
+.cresp .cd{font-size:11.5px;color:var(--tx-3);margin-top:6px}
+
+/* timeline operacional completa (10 etapas) — compacta */
+.tlx{position:relative;padding-left:2px}
+.tl{position:relative;display:flex;gap:12px;padding-bottom:16px}
+.tl:last-child{padding-bottom:0}
+.tl-rail{position:relative;display:flex;justify-content:center;width:26px;flex:none}
+.tl-l{position:absolute;top:26px;bottom:-4px;width:2px;background:var(--hair-2);border-radius:2px}
+.tl:last-child .tl-l{display:none}
+.nd{width:22px;height:22px;border-radius:50%;flex:none;display:grid;place-items:center;background:color-mix(in srgb,var(--green) 12%,#fff);box-shadow:0 0 0 2px #fff,0 0 0 3px color-mix(in srgb,var(--green) 38%,#fff)}
+.nd .ic{width:11px;height:11px;color:var(--green-ink);stroke-width:2.6}
+.nd.cur{width:26px;height:26px;background:color-mix(in srgb,var(--op-leg) 13%,#fff);box-shadow:0 0 0 2px #fff,0 0 0 3.5px color-mix(in srgb,var(--op-leg) 42%,#fff)}
+.nd.cur .ic{width:13px;height:13px;color:#4353D8;stroke-width:2}
+.nd.pnd{background:#fff;box-shadow:0 0 0 2px #fff,inset 0 0 0 1.6px #C6CBD6}
+.nd.cond{background:#fff;box-shadow:0 0 0 2px #fff,inset 0 0 0 1.4px #E2C89B}
+.tl-b{min-width:0;padding-top:1px}
+.tl-b .ev{font-size:13px;font-weight:620;color:var(--tx-1);line-height:1.3}
+.tl-b .mt{font-size:11.5px;color:var(--tx-3);margin-top:2px;display:flex;align-items:center;gap:6px}
+.tl-b .mt .a{display:inline-flex;align-items:center;gap:5px}
+.tl.pnd .ev{color:var(--tx-3);font-weight:500}
+.tl.cond .ev{color:var(--tx-4);font-weight:500}
+.tl.cur .ev{font-weight:650}
+.tl.cur .mt{color:#4353D8;font-weight:600}
+
+/* ações administrativas */
+.adm{display:flex;align-items:center;gap:8px}
+.abtn{height:38px;padding:0 12px;border-radius:11px;font-size:12px;font-weight:600;color:var(--tx-2);box-shadow:inset 0 0 0 1px var(--hair);display:inline-flex;align-items:center;gap:7px;background:var(--surface);white-space:nowrap}
+.abtn .ic{width:15px;height:15px;color:var(--tx-3)}
+.abtn.danger{color:#C43D3D}
+.abtn.danger .ic{color:#D96A6A}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-logo" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><path d="M8.5 9.5h7M8.5 13h7M8.5 16.5h4"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.6l2.55 5.17 5.7.83-4.13 4.02.98 5.68L12 16.98 6.9 19.3l.98-5.68L3.75 9.6l5.7-.83z"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.5h17M8 3.3v3.4M16 3.3v3.4"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8.5 6.5h11M8.5 12h11M8.5 17.5h11"/><path d="M4.4 6.5h.02M4.4 12h.02M4.4 17.5h.02"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9.2" cy="8.2" r="3.3"/><path d="M3.6 19.2a5.6 5.6 0 0111.2 0"/><path d="M15.8 5.4a3.1 3.1 0 010 5.7M17.4 19.2a5.3 5.3 0 00-2.1-4.2"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.4"/><path d="M5.6 20a6.4 6.4 0 0112.8 0"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 4v16h16"/><path d="M8 16.5v-3M12 16.5V9M16 16.5v-5.5"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 24 24"><path d="M6.2 3.4h6.6l4.9 4.9V19.6a1.2 1.2 0 01-1.2 1.2H6.2A1.2 1.2 0 015 19.6V4.6a1.2 1.2 0 011.2-1.2z"/><path d="M12.6 3.6V8.4h4.8M8.6 13h6.8M8.6 16.4h4.8"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6.6 10.2a5.4 5.4 0 0110.8 0c0 4.6 1.9 5.8 1.9 5.8H4.7s1.9-1.2 1.9-5.8z"/><path d="M10.2 19.4a2 2 0 003.6 0"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.1"/><path d="M12 2.6v2.4M12 19v2.4M4.4 4.4l1.7 1.7M17.9 17.9l1.7 1.7M2.6 12h2.4M19 12h2.4M4.4 19.6l1.7-1.7M17.9 6.1l1.7-1.7"/></symbol>
+  <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="M14.5 6l-6 6 6 6"/></symbol>
+  <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="M6 9.5l6 6 6-6"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.4 4.4L19 7.3"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 7.6V12l3 1.9"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v5.2c0 4.4-3 7.4-7 8.8-4-1.4-7-4.4-7-8.8V6z"/><path d="M9 12l2.1 2.1L15.2 10"/></symbol>
+  <symbol id="i-dots" viewBox="0 0 24 24"><circle cx="5.5" cy="12" r="1.5" style="fill:currentColor;stroke:none"/><circle cx="12" cy="12" r="1.5" style="fill:currentColor;stroke:none"/><circle cx="18.5" cy="12" r="1.5" style="fill:currentColor;stroke:none"/></symbol>
+  <symbol id="i-film" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2.2"/><path d="M8 5v14M16 5v14M3.5 9.5H8M3.5 14.5H8M16 9.5h4.5M16 14.5h4.5"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2.4"/><circle cx="9" cy="10" r="1.8"/><path d="M4.5 17.5l4.6-4.6 3.4 3.4 3-3 4 4"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M21 3.5L10.2 14.3M21 3.5l-6.7 17-3.1-7.2L4 10.2z"/></symbol>
+  <symbol id="i-comment" viewBox="0 0 24 24"><path d="M20 11.6a7.4 7.4 0 01-10.7 6.6L4.4 19.6l1.4-4.9A7.4 7.4 0 1120 11.6z"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M14.5 5.5l4 4L8 20H4v-4z"/><path d="M12.5 7.5l4 4"/></symbol>
+  <symbol id="i-move" viewBox="0 0 24 24"><path d="M5 9l-2.5 3L5 15M19 9l2.5 3L19 15M9 5l3-2.5L15 5M9 19l3 2.5 3-2.5M12 4v16M4 12h16"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 7h15M9.5 7V4.8h5V7M6.5 7l1 13h9l1-13M10 10.5v6M14 10.5v6"/></symbol>
+  <symbol id="i-pen" viewBox="0 0 24 24"><path d="M4 20l4.5-1L20 7.5a2.1 2.1 0 00-3-3L5.5 16z"/></symbol>
+</svg>
+
+<div class="frame">
+  <aside class="sb">
+    <div class="brand">
+      <div class="brand-mark"><svg class="ic"><use href="#i-logo"/></svg></div>
+      <div class="brand-txt">
+        <div class="brand-name">Agenda ID Seven</div>
+        <div class="brand-sub"><span class="brand-sync"></span> sincronizado</div>
+      </div>
+    </div>
+    <button class="newtask"><svg class="ic"><use href="#i-plus"/></svg> Nova tarefa</button>
+    <div class="sb-scroll">
+      <div class="nav-label">Workspace</div>
+      <a class="nav-item"><svg class="ic"><use href="#i-star"/></svg> Minhas Prioridades</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-sun"/></svg> Hoje</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-calendar"/></svg> Agenda</a>
+      <a class="nav-item active"><svg class="ic"><use href="#i-list"/></svg> Tarefas</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-users"/></svg> Equipe</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-user"/></svg> Perfil</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-chart"/></svg> Executivo</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-doc"/></svg> Relatórios</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-bell"/></svg> Notificações <span class="nav-badge">9+</span></a>
+      <div class="nav-label">Sistema</div>
+      <a class="nav-item"><svg class="ic"><use href="#i-gear"/></svg> Configurações</a>
+    </div>
+    <div class="sb-user">
+      <span class="av av-46 u-indigo p-ary">AC</span>
+      <div class="sb-user-txt">
+        <div class="sb-user-name">Arydyjany Carlôto</div>
+        <div class="sb-user-role"><span class="udot"></span> CEO · admin</div>
+      </div>
+      <svg class="ic ic-sm chev"><use href="#i-chevron-down"/></svg>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="hd">
+      <button class="hd-back"><svg class="ic"><use href="#i-chevron-left"/></svg></button>
+      <div class="hd-title">
+        <span class="hd-eye"><svg class="ic"><use href="#i-doc"/></svg></span>
+        <div class="tl"><b>Detalhes da tarefa</b><span>Cronograma · Sunset Wear</span></div>
+      </div>
+      <div class="hd-right">
+        <div class="sla">
+          <span class="sla-ic"><svg class="ic"><use href="#i-shield"/></svg></span>
+          <div class="sla-tx"><span class="sla-k"><span class="livedot"></span> MONITOR SLA • AO VIVO</span><span class="sla-v">Tudo em dia</span></div>
+        </div>
+        <button class="hd-bell"><svg class="ic"><use href="#i-bell"/></svg><span class="dot"></span></button>
+      </div>
+    </header>
+
+    <div class="page">
+      <!-- HERO -->
+      <section class="hero">
+        <div class="hero-l">
+          <div class="hero-chips">
+            <span class="hchip hc-and"><span class="d"></span> Em andamento</span>
+            <span class="hchip hc-leg"><span class="d"></span> Aguardando legendas e posts</span>
+            <span class="hchip hc-sla"><span class="d"></span> Em prazo</span>
+            <span class="hchip hc-sec"><span class="d"></span> Cronograma</span>
+          </div>
+          <div class="hero-title">Cronograma Feed &amp; Stories</div>
+          <div class="hero-sub">Cliente · <b>Sunset Wear</b> &nbsp;·&nbsp; Enviado por <b>Miercohévisk</b> em 11/08/2026</div>
+          <div class="hero-next"><span class="nk">PRÓXIMA AÇÃO</span><span class="nv">Adicionar legendas e posts e reenviar ao cliente</span></div>
+        </div>
+        <div class="hero-r">
+          <div class="hero-resp">
+            <div class="m">
+              <div class="k">RESPONSÁVEL AGORA</div>
+              <div class="nm">Tatiana Gomes</div>
+              <div class="rl">Social media</div>
+            </div>
+            <span class="av av-46 u-rose p-tat">TG</span>
+          </div>
+          <div class="hero-acts">
+            <button class="cta"><svg class="ic"><use href="#i-pen"/></svg> Legendas e artes</button>
+            <button class="ib"><svg class="ic"><use href="#i-dots"/></svg></button>
+          </div>
+        </div>
+      </section>
+
+      <div class="cols">
+        <!-- COLUNA PRINCIPAL -->
+        <div class="colL">
+          <section class="panel">
+            <div class="p-k">Operação</div>
+            <div class="op">
+              <div>
+                <div class="ok">FLUXO DO CLIENTE</div>
+                <div class="line done"><svg class="ic"><use href="#i-check"/></svg> Temas aprovados</div>
+                <div class="sub">Rodada de temas · 12/08/2026</div>
+                <div class="line pend" style="margin-top:9px"><span class="dd"></span> Rodada final ainda não enviada</div>
+              </div>
+              <div>
+                <div class="ok">FLUXO DO DESIGNER</div>
+                <div class="line done"><svg class="ic"><use href="#i-check"/></svg> Designer entregou</div>
+                <div class="sub">Felipe Teodozio · 13/08 às 17:45</div>
+              </div>
+              <div>
+                <div class="ok">RESPONSABILIDADE</div>
+                <div class="line"><svg class="ic" style="color:#E85D8C"><use href="#i-user"/></svg> Com a equipe · Social Media</div>
+                <div class="sub">SLA interno ativo · Em prazo</div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel" style="flex:1;min-height:0;overflow:hidden">
+            <div class="p-k">Conteúdos <span class="cnt">12 temas · 7 legendas preenchidas · 5 pendentes</span></div>
+            <div class="it">
+              <div class="it-n">01</div>
+              <div class="it-m">
+                <div class="it-t">Lançamento da coleção nos Stories</div>
+                <div class="it-leg">Legenda · “A nova coleção chegou: peças leves para dias quentes, com…”</div>
+                <div class="it-tags">
+                  <span class="mtag ok"><svg class="ic"><use href="#i-image"/></svg> Feed 1080×1440</span>
+                  <span class="mtag ok"><svg class="ic"><use href="#i-film"/></svg> Story 1080×1920</span>
+                </div>
+              </div>
+              <div class="it-st"><span class="stag st-ok"><span class="d"></span>Completo</span></div>
+            </div>
+            <div class="it">
+              <div class="it-n">02</div>
+              <div class="it-m">
+                <div class="it-t">Bastidores do ensaio de campanha</div>
+                <div class="it-leg">Legenda · “Um dia de set com a equipe: cores, luz natural e muito…”</div>
+                <div class="it-tags">
+                  <span class="mtag ok"><svg class="ic"><use href="#i-image"/></svg> Feed 1080×1440</span>
+                  <span class="mtag pend"><svg class="ic"><use href="#i-film"/></svg> Story pendente</span>
+                </div>
+              </div>
+              <div class="it-st"><span class="stag st-parc"><span class="d"></span>Produção parcial</span></div>
+            </div>
+            <div class="it">
+              <div class="it-n">03</div>
+              <div class="it-m">
+                <div class="it-t">Look da semana com provador virtual</div>
+                <div class="it-leg miss">Legenda · ainda não preenchida</div>
+                <div class="it-tags">
+                  <span class="mtag ok"><svg class="ic"><use href="#i-image"/></svg> Feed 1080×1440</span>
+                  <span class="mtag pend"><svg class="ic"><use href="#i-film"/></svg> Story pendente</span>
+                </div>
+              </div>
+              <div class="it-st"><span class="stag st-leg"><span class="d"></span>Aguardando legenda</span></div>
+            </div>
+            <div class="it">
+              <div class="it-n">04</div>
+              <div class="it-m">
+                <div class="it-t">Depoimento de cliente — prova social</div>
+                <div class="it-leg miss">Legenda · ainda não preenchida</div>
+                <div class="it-tags"><span class="mtag ok"><svg class="ic"><use href="#i-image"/></svg> Feed 1080×1440</span><span class="mtag pend"><svg class="ic"><use href="#i-image"/></svg> Story pendente</span></div>
+              </div>
+              <div class="it-st"><span class="stag st-leg"><span class="d"></span>Aguardando legenda</span></div>
+            </div>
+            <div style="text-align:center;font-size:12px;color:var(--tx-4);padding-top:13px">+ 8 conteúdos neste cronograma</div>
+          </section>
+        </div>
+
+        <!-- LATERAL CONTEXTUAL -->
+        <div class="colM">
+          <section class="panel">
+            <div class="p-k">Equipe da tarefa</div>
+            <div class="tm"><span class="av av-40 u-rose p-tat">TG</span><div class="m"><div class="nm">Tatiana Gomes</div><div class="rl">Social media · responsável agora</div></div><span class="tg">AGORA</span></div>
+            <div class="tm"><span class="av av-40 u-teal p-fel">FT</span><div class="m"><div class="nm">Felipe Teodozio</div><div class="rl">Designer · entregou em 13/08</div></div><span class="tg done">ENTREGUE</span></div>
+            <div class="tm"><span class="av av-40 u-violet p-mie">MC</span><div class="m"><div class="nm">Miercohévisk Carlôto</div><div class="rl">CEO · enviou os temas em 11/08</div></div></div>
+          </section>
+
+          <section class="panel">
+            <div class="p-k">Prazos e SLA</div>
+            <div class="dtr"><span class="k">Prazo final</span><span class="v">20/08/2026 às 18:00<div class="vsub"><b class="az">Em prazo</b> · faltam 4 dias</div></span></div>
+            <div class="dtr"><span class="k">Início</span><span class="v">11/08/2026</span></div>
+            <div class="dtr"><span class="k">Criado em</span><span class="v">08/08/2026 <span class="mut">· por Tatiana</span></span></div>
+            <div class="dtr"><span class="k">Atualizado</span><span class="v">hoje às 09:12</span></div>
+          </section>
+
+          <section class="panel">
+            <div class="p-k">Resposta do cliente <span class="cnt">Rodada de temas</span></div>
+            <div class="cresp">
+              <span class="ci"><svg class="ic"><use href="#i-check"/></svg></span>
+              <div style="min-width:0">
+                <div class="ct">Aprovado pelo cliente</div>
+                <div class="cn">“Temas certeiros — só reforcem a cor da coleção nova nos Stories.”</div>
+                <div class="cd">12/08/2026 · 10:26 · Sunset Wear</div>
+              </div>
+            </div>
+          </section>
+
+          <div class="adm">
+            <button class="abtn"><svg class="ic"><use href="#i-edit"/></svg> Editar prazo</button>
+            <button class="abtn"><svg class="ic"><use href="#i-move"/></svg> Mover status</button>
+            <span style="flex:1"></span>
+            <button class="abtn danger"><svg class="ic"><use href="#i-trash"/></svg> Remover</button>
+          </div>
+        </div>
+
+        <div class="colR">
+          <section class="panel" style="flex:1;min-height:0;overflow:hidden">
+            <div class="p-k" style="font-size:10.5px;white-space:nowrap">Linha do tempo operacional <span class="cnt" style="white-space:nowrap">6 de 9 etapas</span></div>
+            <div class="tlx">
+              <div class="tl"><div class="tl-rail"><span class="nd"><svg class="ic"><use href="#i-check"/></svg></span><span class="tl-l"></span></div><div class="tl-b"><div class="ev">Criado</div><div class="mt"><span class="a"><span class="av av-24 u-rose p-tat">T</span> Tatiana</span> · 08/08 · 14:02</div></div></div>
+              <div class="tl"><div class="tl-rail"><span class="nd"><svg class="ic"><use href="#i-check"/></svg></span><span class="tl-l"></span></div><div class="tl-b"><div class="ev">Enviado ao cliente</div><div class="mt"><span class="a"><span class="av av-24 u-violet p-mie">M</span> Miercohévisk</span> · 11/08 · 09:40</div></div></div>
+              <div class="tl"><div class="tl-rail"><span class="nd"><svg class="ic"><use href="#i-check"/></svg></span><span class="tl-l"></span></div><div class="tl-b"><div class="ev">Temas aprovados</div><div class="mt">Cliente · 12/08 · 10:26</div></div></div>
+              <div class="tl"><div class="tl-rail"><span class="nd"><svg class="ic"><use href="#i-check"/></svg></span><span class="tl-l"></span></div><div class="tl-b"><div class="ev">Enviado ao designer</div><div class="mt"><span class="a"><span class="av av-24 u-rose p-tat">T</span> Tatiana</span> · 12/08 · 11:05</div></div></div>
+              <div class="tl"><div class="tl-rail"><span class="nd"><svg class="ic"><use href="#i-check"/></svg></span><span class="tl-l"></span></div><div class="tl-b"><div class="ev">Designer em produção</div><div class="mt"><span class="a"><span class="av av-24 u-teal p-fel">F</span> Felipe</span> · 13/08 · 09:20</div></div></div>
+              <div class="tl"><div class="tl-rail"><span class="nd"><svg class="ic"><use href="#i-check"/></svg></span><span class="tl-l"></span></div><div class="tl-b"><div class="ev">Designer entregou</div><div class="mt"><span class="a"><span class="av av-24 u-teal p-fel">F</span> Felipe</span> · 13/08 · 17:45</div></div></div>
+              <div class="tl cur"><div class="tl-rail"><span class="nd cur"><svg class="ic"><use href="#i-clock"/></svg></span><span class="tl-l"></span></div><div class="tl-b"><div class="ev">Aguardando legenda / posts</div><div class="mt">Etapa atual — com a Social Media</div></div></div>
+              <div class="tl pnd"><div class="tl-rail"><span class="nd pnd"></span><span class="tl-l"></span></div><div class="tl-b"><div class="ev">Enviado para aprovação final</div></div></div>
+              <div class="tl cond"><div class="tl-rail"><span class="nd cond"></span><span class="tl-l"></span></div><div class="tl-b"><div class="ev">Cliente pediu ajuste · condicional</div></div></div>
+              <div class="tl pnd"><div class="tl-rail"><span class="nd pnd"></span></div><div class="tl-b"><div class="ev">Aprovado final / Concluído</div></div></div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

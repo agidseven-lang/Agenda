@@ -20,6 +20,56 @@ Firestore seguem intocáveis. Toda nova superfície deve ser comparada à V10 an
 - **Títulos longos**: máximo visual controlado — line-height fixo (1.45) + line-clamp 2; nunca
   cards desproporcionais.
 
+## FRAME 6 — DETALHES COMPLETOS DA TAREFA (candidata) · `proposta-c-frame6-detalhes.html`
+**Status dos anteriores:** FRAME 5 · Setores = **LAYOUT APROVADO / GOLDEN** (com V10, Cliente,
+Designers e Social Medias). FRAME 6 é a primeira superfície de página inteira (P0 do Master
+Surface Map): a tela aberta por "Ver detalhes completos".
+
+**Auditoria read-only (renderer real 1.0.246):**
+- **Superfície real**: `renderClientView` (9913, rota `state.clientView`) + `opPanelBlock` (8848,
+  painel "Próxima ação" + "Linha do tempo operacional" det-tl) + blocos do detalhe: "Resposta do
+  cliente" (`det-cresp`, labels reais `clientReviewLabel` = Aprovado pelo cliente `#34D399` /
+  Revisão solicitada `#F59E0B` / Edição solicitada `#A78BFA`, nota entre aspas + carimbo + autor),
+  "Designer" (avatar + cargo + chip Recebido/Em produção/Concluído), resumo editorial por conteúdo
+  (`cvw-ed-*`: tema, legenda ou "ainda não preenchida", media Feed 1080×1440 / Story 1080×1920
+  presente ou pendente — `pendingLegend`/`pendingFeed`/`pendingStory`), checklist, ações
+  `data-clientact`.
+- **Estágio simulado**: `aguardando_legenda` — Cronograma APÓS a entrega do designer ("Aguardando
+  legendas e posts" `#5B6CFF`; `nextActionShort` = "Adicionar legendas e posts"). NÃO é conclusão.
+- **Contratos F3.5.6A preservados**: rodada de temas aprovada ≠ aprovação final (FLUXO DO CLIENTE
+  mostra "Temas aprovados · Rodada de temas" done + "Rodada final ainda não enviada" pendente);
+  designer entregou ≠ tarefa concluída (timeline segue em aberto); espera externa ≠ SLA da equipe
+  (bola está COM A EQUIPE aqui, logo "SLA interno ativo · Em prazo" é legítimo); marcos honestos
+  H13 (só nó done tem carimbo; atual sem data; pendentes vazios; "Cliente pediu ajuste" tracejado
+  âmbar marcado `condicional`).
+- **Pós-conclusão (H16/H17) documentado no cabeçalho do HTML**: neste estado H16/H17 esconderia
+  "Legendas e artes", "Enviar ao cliente", "Editar prazo" e "Mover status"; "Remover" permanece
+  (administrativa). O frame retrata o estágio ATIVO, então todas aparecem.
+
+**Composição (detail view editorial, não modal técnico):** sidebar + header globais Golden (header
+"Detalhes da tarefa · Cronograma · Sunset Wear" + voltar + monitor SLA + sino). HERO: chips (Em
+andamento · Aguardando legendas e posts · Em prazo · Cronograma) → título 29px Inter Tight →
+"Cliente · Sunset Wear · Enviado por Miercohévisk em 11/08/2026" → bloco PRÓXIMA AÇÃO (tint
+índigo, sem banner gritante); à direita RESPONSÁVEL AGORA (Tatiana 46px rose) + CTA gradiente
+"Legendas e artes" (ação primária real da fase) + menu "⋯". Corpo em 3 colunas (1fr/354/332):
+**ESQ** painel OPERAÇÃO (3 células: FLUXO DO CLIENTE com rodada aprovada + rodada final pendente ·
+FLUXO DO DESIGNER entregue com carimbo · RESPONSABILIDADE "Com a equipe · Social Media") + painel
+CONTEÚDOS (12 temas · 7 legendas · 5 pendentes; 4 itens com estados reais distintos — Completo /
+Produção parcial / Aguardando legenda ×2, media ok vs pendente por item + "+ 8 conteúdos");
+**MEIO** EQUIPE DA TAREFA (Tatiana AGORA · Felipe ENTREGUE · Miercohévisk enviou os temas) +
+PRAZOS E SLA (prazo final em destaque + "Em prazo · faltam 4 dias", início, criado, atualizado) +
+RESPOSTA DO CLIENTE ("Aprovado pelo cliente" + nota + 12/08 · 10:26 · Sunset Wear) + ações
+administrativas discretas ancoradas (Editar prazo · Mover status · Remover danger); **DIR** LINHA
+DO TEMPO OPERACIONAL completa (10 nós: 6 done com mini-avatar do ator + carimbo, atual índigo
+"Etapa atual — com a Social Media" SEM data, 2 pendentes vazios, condicional âmbar tracejado).
+
+**Fixes de render:** lateral única de 400px não comportava a timeline completa (cortava no 4º nó)
+→ corpo passou a 3 colunas com a timeline em coluna própria; "faltam 4d" quebrando → sublinha
+própria "Em prazo · faltam 4 dias"; botões administrativos quebrando em 2 linhas → padding/fonte
+compactos + nowrap; header da timeline em 2 linhas → fonte 10.5 + nowrap; símbolo inexistente
+`#i-img` no item 04 → `#i-image`. Responsividade preparada (arquitetura tolera 1366×768/125%:
+colunas colapsáveis, hero flex, timeline independente) — só 1920×1080 renderizado, por mandato.
+
 ## FRAME 5 — SETORES (candidata) · `proposta-c-frame5-setores.html`
 **Status dos anteriores:** FRAME 4 · Social Medias = **LAYOUT APROVADO / GOLDEN** (com V10, Cliente
 e Designers). FRAME 5 aplica o DS congelado à tela Setores REAL — redesign VISUAL apenas.

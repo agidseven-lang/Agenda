@@ -170,3 +170,73 @@ congelado). Nenhuma implementação foi iniciada nesta fase.
 ---
 *Levantamento 100% read-only sobre 1.0.246; nenhuma linha de produção alterada; nenhum mockup
 novo gerado; Golden Frames intocados.*
+
+
+---
+
+# CHECKPOINT DE CONSISTÊNCIA (executado por ordem do owner)
+
+## 1) Matriz fechada — 30 superfícies, cada uma EXATAMENTE uma vez
+| # | Superfície | Função real | Golden? | Golden | Classe | Prior. | Mockup? | Frames | Obs |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | Meu quadro | renderPersonBoard(self) | SIM | F1 | GOLDEN | — | feito | 1 | aprovado |
+| 2 | Cliente | renderClientFlowBoard | SIM | F2 | GOLDEN | — | feito | 1 | aprovado |
+| 3 | Designers | renderDesigner* | SIM | F3 | GOLDEN | — | feito | 1 | aprovado |
+| 4 | Social Medias | renderSocial* | SIM | F4 | GOLDEN | — | feito | 1 | aprovado |
+| 5 | Setores | renderBoard | SIM | F5 | GOLDEN | — | feito | 1 | aprovado |
+| 6 | Detalhes completos | renderClientView + opPanelBlock | NÃO | — | **A** | P0 | SIM | 1 (F6) | rota dedicada |
+| 7 | Nova tarefa (wizard) | renderForm | NÃO | — | **A** | P0 | SIM | 1 (F7) | 4 passos reais |
+| 8 | Agenda | renderAgenda | NÃO | — | **A** | P0 | SIM | 1 (F8) | calendário mensal |
+| 9 | Central de Notificações | renderNotifCentral | NÃO | — | **A** | P1 | SIM | 1 (F9) | lista+filtros |
+| 10 | Executivo | renderExecPanel | NÃO | — | **A** | P1 | SIM | 1 (F10) | KPIs reais |
+| 11 | Relatórios | renderReports | NÃO | — | **A** | P1 | SIM | 1 (F11) | tabela+export |
+| 12 | Login | renderLogin | NÃO | — | **A** | P1 | SIM | 1 (F12) | porta de entrada |
+| 13 | Modal Legendas e artes | renderProductionModal | NÃO | — | **A** | P1 | SIM | 1 (F13) | RTE+uploads |
+| 14 | Notificação externa premium | bgnotify.html | NÃO | — | **A futura** | P2 | futuro | 1 (F14a) | contrato congelado; GO próprio |
+| 15 | Lembrete central SLA | slareminder.html | NÃO | — | **A futura** | P2 | futuro | 1 (F14b) | contrato congelado |
+| 16 | Check-in de execução | janela F3.5.4Q | NÃO | — | **A futura** | P2 | futuro | 1 (F14c) | contrato congelado |
+| 17 | Minhas Prioridades | renderPrioridades | NÃO | — | **B** | P1 | não | — | lista de cards DS |
+| 18 | Hoje | renderHoje | NÃO | — | **B** | P1 | não | — | stat-tiles no DS |
+| 19 | Hub Tarefas / quadros por pessoa | renderHub/renderRoleBoards/personBoard(outros) | parcial | padrões F1–F5 | **B** | P1 | não | — | faixas Golden |
+| 20 | Equipe | renderEquipe | NÃO | — | **B** | P1 | não | — | ver decisão 2 |
+| 21 | Perfil | renderPerfil | NÃO | — | **B** | P2 | não | — | |
+| 22 | Configurações | renderConfig | NÃO | — | **B (+C1)** | P1 | não | — | ver decisão 3 |
+| 23 | Team session (renovação) | F3.5.6A-H9/H10 (estados inline) | NÃO | — | **C** | P1 | spec | — | entra na C6 |
+| 24 | Atualizador | Config Atualizações + updMaybeToast | NÃO | — | **C** | P2 | spec | — | C6 |
+| 25 | Toasts internos | notifShowToast/flashToast | NÃO | — | **C** | P1 | spec | — | C6 |
+| 26 | Modais/diálogos (conjunto core) | modalRoot ×8 (del-sheet, evento, designer/prazo, confirmações) | NÃO | — | **C** | P0 | spec | — | C2 |
+| 27 | Menus contextuais/dropdowns | card menus, selects exec-fl (menu nativo Electron fora do CSS) | NÃO | — | **C** | P1 | spec | — | C3 |
+| 28 | Empty states | emptyState() | NÃO | — | **C** | P1 | spec | — | C4 |
+| 29 | Loading/splash | auth splash/prewarm/"Carregando…" | NÃO | — | **C** | P1 | spec | — | C5 |
+| 30 | Client Portal | Worker renderClientHtml | NÃO | — | **TRILHA SEPARADA** | — | não agora | — | decisão visual própria |
+
+**Contagem fechada (soma = 30, sem dupla contagem):**
+GOLDEN **5** · A **8** (F6–F13) · A-futura gated **3** (F14a–c) · B **6** · C **7** · Trilha separada **1**.
+Nota: C1 (Forms), C7 (Tabela) e C8 (Estados de interação) são SPECS de fundação extraídas de
+superfícies A/B — não são superfícies próprias e por isso não somam na matriz; C2–C6 correspondem
+às superfícies classe C acima.
+
+## 2) Decisão EQUIPE (provada pelo código)
+`renderEquipe` (linhas 10260–10270) tem ~11 linhas: lista ordenada de cards com avatar 42 + nome +
+"(você)" + cargo + "· admin" + pill Ativo/Pendente, em grid `d-team`. **Não existem** no código:
+ações por usuário, edição, convite/criação, detalhe de usuário, filtros ou permissões editáveis.
+→ **Decisão: B confirmada** (grid de cards 100% composto por componentes Golden: avatar
+photo-ready + ring, pills, cards). Nenhum Component Spec adicional além dos já planejados.
+
+## 3) Decisão CONFIGURAÇÕES (provada pelo código)
+`renderConfig` (10334+) é **uma única página** com seções empilhadas (não há sub-rotas/subpáginas):
+Gerenciamento de Conta · Privacidade e Segurança · Preferências de Notificação (+Diagnóstico) ·
+Produtividade (toggle) · Bandeja · Inicialização com o Windows (toggle) · Acompanhamento de
+execução (Check-ins) · Acessibilidade e Aparência · Desempenho e Dados · Idioma e Região ·
+Administração · Atualizações · Sessão · Sobre — todas compostas de `settrow`/toggle/pill/ação.
+→ **Decisão: B (shell da página) + C1 obrigatória** (settrow, toggle, select, linhas de
+diagnóstico entram na spec C1/C6; a spec C1 incluirá uma seção de Configurações renderizada como
+amostra aplicada). Subáreas triviais (Sobre/versão) = D. **Não** precisa de frame A próprio: zero
+composição nova além de rows — mas a página NÃO será migrada antes da C1 aprovada.
+
+## 4) REGRA DE IMPLEMENTAÇÃO (corrigida por ordem do owner)
+**NENHUM Light UI entra em produção até o DESIGN estar COMPLETO.** Implementação só poderá
+começar quando: todos os Frames classe A prioritários aprovados; C1–C8 aprovados; foundations
+congeladas; responsividade mínima validada (1366×768 + 125% nos frames marcados); Master Surface
+Map sem pendências; e o owner declarar explicitamente **DESIGN COMPLETO**. A recomendação
+anterior (começar após F6–F8 + C1/C2) está **revogada**.
