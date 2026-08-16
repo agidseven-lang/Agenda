@@ -20,6 +20,46 @@ Firestore seguem intocáveis. Toda nova superfície deve ser comparada à V10 an
 - **Títulos longos**: máximo visual controlado — line-height fixo (1.45) + line-clamp 2; nunca
   cards desproporcionais.
 
+## FRAME 7A — NOVA TAREFA · ETAPA 1 SETOR (candidata) · `proposta-c-frame7a-novatarefa-setor.html`
+**Status dos anteriores:** FRAME 6 · Detalhes completos = **LAYOUT APROVADO / GOLDEN** (com V10,
+Cliente, Designers, Social Medias e Setores — 6 Golden). FRAME 7A abre o wizard real de Nova
+tarefa (P0) e inicia a foundation **C1 — Forms & Controls**.
+
+**Auditoria read-only (renderer real 1.0.246):**
+- **Paradigma real**: `renderForm()` (11314) é SUPERFÍCIE DEDICADA — `render()` (5125) troca o
+  conteúdo por `.form-wrap` (card max-width 980, centrado, radius 18, footer sticky) com
+  sidebar/nav visíveis. NÃO é modal; preservado como card-superfície no canvas, sem overlay/blur.
+- **Etapas reais**: `STEPS=['Setor','Dados','Briefing','Revisão']`. Título "Nova tarefa"
+  ("Editar tarefa" em edição); subtítulo = label do setor (senão "Selecione o setor"); label real
+  da etapa: **"Escolha o setor"**. Stepper real: círculos numerados, atual/concluída = accent,
+  conector accent quando percorrido.
+- **Setores na criação** = `SECTORS.filter(!descontinuado)`, ordem real: Edição de vídeos
+  (#60A5FA, movie, "Cortes, legendas e exportação"; key interna edicao_midia) · Cronograma
+  (#34D399, calendar, "Planejamento de publicações") · Edição de Cards (#F472B6, image, "Criação
+  de cards avulsos" — gated `canCreateCards()` p/ Social/Admin; usuário CEO·admin ⇒ visível).
+  Descontinuados (71C7/F3.5.5E) fora da criação: Copywriting, Roteiro, Programação de posts.
+- **Seleção real**: `data-fsector` seta o setor (reset subtype/contents/checklist) e re-renderiza;
+  seleção única; não avança sozinho. Selecionado real = fundo withAlpha(.12) + borda na cor +
+  pastilha withAlpha(.18) + ✓ na cor. **Validação real**: `stepNext()` → alert('Escolha o
+  setor.') — o Próximo NÃO fica disabled (nenhum disabled inventado; frame retrata pós-seleção).
+- **Botões reais**: só "Próximo" na etapa 1 (Voltar nasce na etapa 2, `f.step>0`); fechar = X
+  (data-form="close"). Subtipo não aparece nesta etapa.
+
+**Composição:** sidebar + header globais Golden (header "Nova tarefa · Etapa 1 de 4 · Cronograma",
+pastilha + índigo brand — o subtítulo real do form elevado ao header global, sem duplicação);
+card do wizard 920px centro óptico com sh-2: stepper premium (atual = círculo gradiente + kicker
+"ETAPA ATUAL" + label 700; futuras = círculo hairline numerado + label tx-3; conectores hairline;
+X no canto) → "ESCOLHA O SETOR" (label C1 11/700/uppercase) → 3 option cards C1 (ícone 24 em
+pastilha 52 tintada, título 16/650, descrição 13, radius 14, hairline; Cronograma SELECIONADO:
+tint 7% + ring 1.5 na cor + ✓ disco verde) → footer hairline com "Próximo →" gradiente Golden
+(primário único). Contratos C1 iniciados e documentados no cabeçalho (labels, option card,
+primário, focus ring, disabled futuro, transições 140ms).
+
+**Fixes de render:** centro óptico (stage padding-top 96→168); kicker "A SEGUIR" repetido 3×
+removido (futuros = número+label, menos ruído); nota de rodapé "Setor selecionado · Cronograma"
+removida (duplicava o subtítulo real do header). Fotos: wizard não requer fotos; rodapé da
+sidebar usa fallback de iniciais (fotos locais NUNCA versionadas — _team-photos.css local-only).
+
 ## FRAME 6 — DETALHES COMPLETOS DA TAREFA (candidata) · `proposta-c-frame6-detalhes.html`
 **Status dos anteriores:** FRAME 5 · Setores = **LAYOUT APROVADO / GOLDEN** (com V10, Cliente,
 Designers e Social Medias). FRAME 6 é a primeira superfície de página inteira (P0 do Master
