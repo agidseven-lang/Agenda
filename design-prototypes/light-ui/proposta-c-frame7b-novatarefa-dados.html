@@ -3,12 +3,29 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=1920, initial-scale=1">
-<title>Agenda ID Seven — Proposta C — FRAME 7B · Nova tarefa · Etapa 2 Dados</title>
+<title>Agenda ID Seven — Proposta C — FRAME 7B V2 · Nova tarefa · Etapa 2 Dados</title>
 <link rel="stylesheet" href="_fonts.css">
 <link rel="stylesheet" href="_team-photos.css">
 <style>
 /* ============================================================
-   AGENDA ID SEVEN · LIGHT UI · FRAME 7B — NOVA TAREFA · ETAPA 2 DADOS · 1920×1080
+   AGENDA ID SEVEN · LIGHT UI · FRAME 7B V2 — NOVA TAREFA · ETAPA 2 DADOS · 1920×1080
+   V2 CIRÚRGICA (layout/arquitetura do 7B preservados 100%). Correções:
+   (1) datas demonstrativas coerentes — Data limite 30/09/2026 ≥ início;
+   (2) chip selecionado afirmativo — check no lugar do dot + ring 62% + tint
+       12% + sombra 18% (indicador de forma além da cor);
+   (3) default real priority:false — toggle OFF legível (trilho #CDD3DE com
+       hairline interna; OFF ≠ disabled);
+   (4) "(opcional)" em tx-3 12.5px (secundário e legível);
+   (5) focus C1 refinado — border 1.5px #6E5EF3 (roxo Golden) + halo 2.5px
+       11% (sem neon);
+   (6) surface da Prioridade alinhada à família dos inputs (fundo branco +
+       hairline #E4E8EF, sem card-dentro-de-card).
+   Auditoria de reconfirmação (12 pontos) OK sem divergência: status:'afazer'
+   e priority:false no newForm (11082); cliente obrigatório + título
+   (stepNext 12665); Responsável opcional isCron; quantidade só no Briefing
+   (cronQtyOf gate step===2); subtipo fora da Dados (data-fsub só 11459);
+   pares data/hora reais; 4 STATUS; footer Voltar+Próximo; validação por
+   alert (sem inline); Próximo sempre clicável.
    DESIGN PROTOTYPE (não é produção). Continuidade literal do wizard Golden 7A
    (container/stepper/header/footer/sidebar/canvas CONGELADOS) — define a
    foundation C1 (Forms & Controls) com os campos REAIS da etapa Dados.
@@ -214,12 +231,12 @@ body{font-family:'Inter',-apple-system,'Segoe UI',Roboto,sans-serif;color:var(--
 .fg+.fg{margin-top:24px}
 .fgh{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--tx-3);margin-bottom:14px}
 .flb{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--tx-2);margin-bottom:7px}
-.flb .opt{font-weight:500;color:var(--tx-4);font-size:12px}
+.flb .opt{font-weight:500;color:var(--tx-3);font-size:12.5px}
 .req{font-size:9.5px;font-weight:800;letter-spacing:.04em;color:#B45309;background:color-mix(in srgb,#F59E0B 12%,#fff);padding:2.5px 8px;border-radius:var(--r-pill)}
 .fld+.fld{margin-top:15px}
 .in{position:relative;display:flex;align-items:center;height:46px;border-radius:12px;background:var(--surface);box-shadow:inset 0 0 0 1px #DFE3EB}
 .in input{border:0;outline:0;background:none;font:inherit;color:var(--tx-1);font-size:14px;font-weight:520;width:100%;padding:0 14px}
-.in.fo{box-shadow:inset 0 0 0 1.5px var(--brand),0 0 0 3px color-mix(in srgb,var(--brand) 16%,transparent)}
+.in.fo{box-shadow:inset 0 0 0 1.5px #6E5EF3,0 0 0 2.5px color-mix(in srgb,#6E5EF3 11%,transparent)}
 .in .lead{width:16px;height:16px;color:var(--tx-3);margin-left:13px;flex:none}
 .in.icd input{padding-left:10px}
 .pair{display:grid;grid-template-columns:1.35fr 1fr;gap:12px}
@@ -232,13 +249,14 @@ body{font-family:'Inter',-apple-system,'Segoe UI',Roboto,sans-serif;color:var(--
 .chips{display:flex;gap:7px;flex-wrap:wrap}
 .chp{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10.5px;border-radius:var(--r-pill);font-size:12px;font-weight:600;color:var(--tx-3);background:var(--surface);box-shadow:inset 0 0 0 1px var(--hair);white-space:nowrap}
 .chp .d{width:6.5px;height:6.5px;border-radius:50%;background:var(--cc)}
-.chp.sel{color:var(--ck);background:color-mix(in srgb,var(--cc) 10%,#fff);box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--cc) 45%,#fff);font-weight:700}
-.c-afa{--cc:#9BA0AB;--ck:#4B5364}.c-and{--cc:#F59E0B;--ck:#B45309}.c-rev{--cc:#60A5FA;--ck:#2563EB}.c-ok{--cc:#34D399;--ck:#12784C}
-.swrow{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 15px;border-radius:12px;background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--hair)}
+.chp.sel{color:var(--ck);background:color-mix(in srgb,var(--cc) 12%,#fff);box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--cc) 62%,#fff),0 1px 4px color-mix(in srgb,var(--cc) 18%,transparent);font-weight:700}
+.chp.sel .ck-ic{width:12.5px;height:12.5px;stroke-width:3;color:var(--ck)}
+.c-afa{--cc:#8E95A3;--ck:#3F4756}.c-and{--cc:#F59E0B;--ck:#B45309}.c-rev{--cc:#60A5FA;--ck:#2563EB}.c-ok{--cc:#34D399;--ck:#12784C}
+.swrow{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 15px;border-radius:12px;background:var(--surface);box-shadow:inset 0 0 0 1px #E4E8EF}
 .swrow .st{font-size:13.5px;font-weight:620;color:var(--tx-1)}
 .swrow .ss{font-size:12px;color:var(--tx-3);margin-top:2px}
-.sw{width:46px;height:28px;border-radius:var(--r-pill);background:#D6DAE3;position:relative;flex:none}
-.sw::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(19,24,38,.25)}
+.sw{width:46px;height:28px;border-radius:var(--r-pill);background:#CDD3DE;box-shadow:inset 0 0 0 1px #C2C8D4;position:relative;flex:none}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1.5px 4px rgba(19,24,38,.28),0 0 0 .5px rgba(19,24,38,.06)}
 .sw.on{background:var(--brand)}
 .sw.on::after{left:21px}
 </style>
@@ -375,7 +393,7 @@ body{font-family:'Inter',-apple-system,'Segoe UI',Roboto,sans-serif;color:var(--
                 <div class="fld">
                   <div class="flb">Etapa</div>
                   <div class="chips">
-                    <span class="chp c-afa sel"><span class="d"></span> A Fazer</span>
+                    <span class="chp c-afa sel"><svg class="ic ck-ic"><use href="#i-check"/></svg> A Fazer</span>
                     <span class="chp c-and"><span class="d"></span> Em andamento</span>
                     <span class="chp c-rev"><span class="d"></span> Revisão</span>
                     <span class="chp c-ok"><span class="d"></span> Concluído</span>
@@ -419,7 +437,7 @@ body{font-family:'Inter',-apple-system,'Segoe UI',Roboto,sans-serif;color:var(--
                   <div class="pair">
                     <div>
                       <div class="flb">Data limite</div>
-                      <div class="in icd"><svg class="ic lead"><use href="#i-calendar"/></svg><input value="25/08/2026"></div>
+                      <div class="in icd"><svg class="ic lead"><use href="#i-calendar"/></svg><input value="30/09/2026"></div>
                     </div>
                     <div>
                       <div class="flb">Hora limite</div>
@@ -433,7 +451,7 @@ body{font-family:'Inter',-apple-system,'Segoe UI',Roboto,sans-serif;color:var(--
                       <div class="st">Prioridade alta</div>
                       <div class="ss">Destaca a tarefa nos quadros</div>
                     </div>
-                    <span class="sw on"></span>
+                    <span class="sw"></span>
                   </div>
                 </div>
               </div>

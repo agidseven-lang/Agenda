@@ -55,6 +55,15 @@ halo 16%); data/hora com ícone leading 16 tx-3; picker de pessoa com avatar+che
 dot na cor (acessível); toggle 46×28 ON=brand sólido (gradiente é só CTA); pill "obrigatório"
 âmbar (padrão real); contratos error/disabled/transições documentados no cabeçalho.
 
+**V2 (refinamento cirúrgico, layout preservado 100%):** (1) datas demonstrativas coerentes —
+Data limite 30/09/2026 (= término; limite ≥ início); (2) chip selecionado afirmativo — check no
+lugar do dot + ring 62% + tint 12% + microssombra (indicador de forma além da cor; "A Fazer" com
+ink #3F4756); (3) default real `priority:false` — toggle OFF com trilho #CDD3DE + hairline
+interna e knob branco sombreado (disponível, não disabled); (4) "(opcional)" em tx-3/12.5px;
+(5) focus C1 refinado — border 1.5px #6E5EF3 (roxo Golden) + halo 2.5px 11%, sem neon;
+(6) surface da Prioridade na família dos inputs (fundo branco + hairline #E4E8EF). Auditoria de
+reconfirmação (12 pontos) OK sem divergência antes da edição.
+
 **Fixes de render:** símbolo i-clock ausente no sprite herdado do 7A (horas sem ícone) →
 adicionado; chips de Etapa quebravam em 2 linhas → compactados (h32/font 12/gaps) para 1 linha.
 Fotos reais locais indisponíveis nesta sessão (recortes temporários perdidos com o container;
