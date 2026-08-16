@@ -20,6 +20,43 @@ Firestore seguem intocáveis. Toda nova superfície deve ser comparada à V10 an
 - **Títulos longos**: máximo visual controlado — line-height fixo (1.45) + line-clamp 2; nunca
   cards desproporcionais.
 
+## FRAME 5 — SETORES (candidata) · `proposta-c-frame5-setores.html`
+**Status dos anteriores:** FRAME 4 · Social Medias = **LAYOUT APROVADO / GOLDEN** (com V10, Cliente
+e Designers). FRAME 5 aplica o DS congelado à tela Setores REAL — redesign VISUAL apenas.
+
+**Auditoria read-only (renderer real 1.0.246):**
+- **Superfície real**: a aba "Setores" abre o HUB de setores (`data-board="hub"`); escolher um
+  setor abre `renderBoard()` — header real "Quadro de <Setor>" + descrição do setor + toolbar com
+  busca e chip **"Minhas tarefas"** (filtro real `boardMine`).
+- **Setores ATIVOS reais** (`SECTORS`, excluindo `descontinuado:true` / retirados F3.5.5E —
+  Copywriting, Roteiro e Programação de posts permanecem só para histórico e o quadro retirado
+  nunca abre): **Cronograma** `#34D399` "Planejamento de publicações" (calendar) · **Edição de
+  vídeos** `#60A5FA` "Cortes, legendas e exportação" (movie) · **Edição de Cards** `#F472B6`
+  "Criação de cards avulsos" (image).
+- **Colunas REAIS = `STATUS`**: A Fazer `#9BA0AB` · Em andamento `#F59E0B` · Revisão `#60A5FA` ·
+  Concluído `#34D399` — bucket do EIXO OPERACIONAL (`flowBoardCol('social')`), ordenação por
+  prazo, contadores por coluna.
+- **Ajuste do cliente real**: `pendingClientItems` (contagem de conteúdos marcados p/ correção na
+  FASE atual) + marco `ajuste` da `taskTimeline` em estado ATTENTION (nó âmbar, carimbo real do
+  pedido). Demais dados reais herdados dos frames Golden: estágios `OPERATIONAL_COLS` no chip,
+  `nextActionShort`, espera externa pausando SLA (`externalWaitOf`), `taskDeadline`,
+  trilho "Fluxo N de 9", conteúdo `kbv2ContentSlot`.
+- **Quadro de setor é MULTI-RESPONSÁVEL**: faixa lateral varia por tarefa (responsável primário).
+
+**Composição:** sidebar/header/busca/subnav idênticos (Setores ativo); header com contexto real do
+quadro aberto ("Quadro de Cronograma · Planejamento de publicações", ícone calendar verde do
+setor); linha 3 = hub real como chips de setor (ícone tintado + label + contagem: Cronograma 13
+ativo · Edição de vídeos 7 · Edição de Cards 5) + chip real "Minhas tarefas" à direita; Kanban 4
+colunas reais (2/6/2/3; scroll-peek onde contador > visíveis); faixas multi-responsável
+(rose/indigo/violet/cyan/teal); estados diversos (preparação, aprovação dos temas com espera
+externa, handoff, legendas, designer em produção no peek, ajuste ×2, concluído final ×3).
+Card selecionado em REVISÃO ("Cronograma Institucional Agosto" · GreenLife · ajuste do cliente)
+abre o drawer congelado: status Revisão → título → cliente → chips ("Ajuste do cliente" +
+"2 itens em correção") → RESPONSÁVEL (Boaz 48px, Editor, cyan) → AJUSTE DO CLIENTE (solicitado
+há 5h · 2 conteúdos nesta fase) → PRAZO E SLA ("Em prazo — faltam 4 dias para o reenvio") →
+CONTEÚDO (10 temas · 10 legendas) → LINHA DO TEMPO (marco de ajuste em ATTENTION âmbar com
+carimbo real + envio + criação) → CTA. SEM dashboard/ranking/KPI. Zero fotos versionadas.
+
 ## FRAME 4 — SOCIAL MEDIAS (candidata) · `proposta-c-frame4-socialmedias.html`
 **Status dos anteriores:** FRAME 3 · Designers = **LAYOUT APROVADO / GOLDEN** (junto com V10 e
 Cliente). FRAME 4 aplica o DS congelado à tela Social Medias REAL — redesign VISUAL apenas.
