@@ -1,3 +1,8 @@
+> **ATUALIZAÇÃO (checkpoint formal):** FRAME 7 — Nova tarefa (wizard 4 passos Setor→Dados→Briefing→Revisão)
+> = **GOLDEN / CONGELADO** (7A `ea485c2` · 7B V2 `5d2b10d` · 7C `7361f92` · 7D V2 `755eee6`). A classe A
+> "Nova tarefa" passa de pendente a ENTREGUE (4 frames). Foundation **C1 = GOLDEN PARCIAL** — ver
+> `C1-FORMS-CONTROLS-CONTRACT.md`. Golden agora = 6 (F1–F6) + Frame 7 (4 sub-frames).
+
 # AGENDA ID SEVEN — LIGHT UI · MASTER SURFACE MAP
 
 **Fase:** auditoria read-only + inventário + classificação + planejamento visual.

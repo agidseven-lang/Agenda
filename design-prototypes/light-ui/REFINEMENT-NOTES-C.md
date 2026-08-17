@@ -1,3 +1,15 @@
+# ▶ CHECKPOINT FORMAL — FRAME 7 (Nova tarefa) = GOLDEN / CONGELADO
+Decisão do owner: o wizard completo **Setor → Dados → Briefing → Revisão** é a referência Golden
+oficial da superfície NOVA TAREFA. Nenhum Frame 7 pode ser redesenhado sem autorização explícita.
+- 7A Setor `ea485c2` · 7B V2 Dados `5d2b10d` · 7C Briefing `7361f92` · 7D V2 Revisão `755eee6`.
+- **C1 — Forms & Controls = GOLDEN PARCIAL / FOUNDATION OFICIAL** (29 componentes congelados; estados
+  disabled/error/saving/upload/checkbox/radio/multi-select/table ainda pendentes). Contrato completo:
+  `C1-FORMS-CONTROLS-CONTRACT.md`.
+- Precedente de fidelidade: "Enviar para o cliente" (real, `canSendToClient`) incluído por decisão do
+  owner. Dívida semântica registrada: rótulo "Subtipo" = "12 conteúdos" (legado real, não corrigir no mockup).
+
+---
+
 # Proposta C — Refinamento Profissional · Light UI (1920×1080)
 
 **Status:** **FRAME 1 · Meu quadro · V10 = LAYOUT APROVADO / GOLDEN VISUAL REFERENCE** (decisão do
