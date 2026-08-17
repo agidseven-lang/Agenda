@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, initial-scale=1">
+<title>Agenda ID Seven — Proposta C — FRAME 9 · Notificações · Central</title>
+<link rel="stylesheet" href="_fonts.css">
+<link rel="stylesheet" href="_team-photos.css">
+<style>
+/* ============================================================
+   AGENDA ID SEVEN · LIGHT UI · FRAME 9 — NOTIFICAÇÕES (CENTRAL) · 1920×1080
+   DESIGN PROTOTYPE (não é produção). Central de Notificações REAL redesenhada
+   no Design System Golden (Frames 1–8 + C1). NÃO é uma nova central.
+   ▸ FIDELIDADE (auditoria read-only no Desktop 1.0.246 — renderNotifCentral
+     5734 + ncRow 5726 + notifHistory* 5641+; + auditor paralelo p/ CSS):
+     · Rota real: state.tab==='notificacoes' → renderNotifCentral em #content
+       (shell global). Tela ADITIVA, 100% LOCAL/READ-SIDE.
+     · FONTE REAL: localStorage 'idseven.notif.history.v1' (NÃO Firestore,
+       NÃO web push, NÃO o modal SLA, NÃO o toast). É o HISTÓRICO deduplicado
+       (dedupKey) de TODAS as notificações que dispararam — "mesmo depois que
+       o toast some". Retenção 300 itens / 30 dias. Rodapé literal preservado.
+     · Campos reais do registro: eventId, eventType, taskId, taskTitle,
+       clientName, actorName/Avatar, responsibleName/Avatar, notificationType,
+       etapa, status, title, subtitle, body, context, severity, createdAt,
+       deep (='detail/'+taskId), read.
+     · Header real: sino + "Notificações" + "Central e histórico · local" +
+       badge "N não lidas" + ações "Marcar todas" (check) e "Limpar histórico"
+       (trash, danger — confirm() real, local, não afeta Firestore).
+     · Toolbar real (só se há itens): busca "Buscar por título, tarefa ou
+       cliente…" + 4 SELECTS reais — Tipo (Atribuição/Fluxo/SLA/Sistema),
+       Severidade (Crítico/Atenção/Sucesso/Info), Designer (nomes dinâmicos),
+       Cliente (nomes dinâmicos). Cada um com opção "…: Todos".
+     · AGRUPAMENTO real por dia (ncDayLabel): "Hoje" / "Ontem" / DD/MM/AAAA.
+     · TIPOS reais (notifTypeLabel por eventType): SLA (sla_*/operational_block)
+       · Fluxo (flow_*) · Atribuição (assign) · Sistema (resto). Cores tipo
+       (ncTypeHex): Atribuição #7C83FF · Fluxo #7FA6FF · SLA #F2A93B · Sistema
+       #8B94A6 → no Light UI: índigo/azul/âmbar/cinza.
+     · SEVERIDADES reais (ncSev, faixa lateral nc-acc): critical #FF6B61 ·
+       warning #F2A93B · success #37D196 · info #7FA6FF · default #8B94A6 →
+       Light UI: #EF4444/#F59E0B/#34D399/#60A5FA/#9CA3AF. Selo CRÍTICO só
+       quando severity=critical E (sla_critical|operational_block).
+     · ncRow real: faixa lateral (severidade) + avatar 40 (responsável OU
+       ator; foto→foto, senão iniciais) + [badge de tipo + título + CRÍTICO?]
+       + subtítulo (subtitle OU "cliente · tarefa") + contexto (na cor da
+       severidade) + [hora HH:MM + dot não-lida + "Abrir tarefa →" se deep].
+     · UNREAD real: campo booleano `read`; unread = !read (classe .unread);
+       contagem = notifHistoryUnread; dot próprio (nc-ur). Clicar na linha:
+       notifHistoryMarkRead + abre DETALHE INLINE (notifDetailId) + atualiza
+       badge. "Abrir tarefa" (deep) navega ao Detalhes da tarefa (F6).
+     · SINO do header (shell Golden) + badge da nav "Notificações" =
+       notifHistoryUnread (nc-navbadge; 9+ se >9). Mesma contagem. O sino NÃO
+       é redesenhado (componente Golden do shell).
+     · EMPTY real: "Nenhuma notificação por aqui" / "Alertas de SLA, fluxo,
+       atribuições e ações importantes aparecem aqui — mesmo depois que o
+       toast some." (e "Nada encontrado" p/ filtros). Não é o cenário (há
+       itens). LOADING/ERRO: a captura é passiva; sem skeleton/spinner/banner.
+   ▸ CENÁRIO: estado operacional rico — 4 não lidas + leituras, tipos SLA/
+     Fluxo/Atribuição/Sistema, severidades variadas, atores diferentes,
+     horários diferentes, 2 grupos (Hoje/Ontem). Dados fictícios; tipos e
+     comportamento REAIS. O DETALHE INLINE existe mas não é aberto (estado de
+     lista = mais escaneável; documentado).
+   ▸ LAYOUT: a central real é coluna centrada (nc-wrap max-width 1040). Light
+     UI mantém a coluna focada tipo "inbox" (~1200 centrada) — legibilidade e
+     densidade; laterais = canvas limpo. Não vira feed/timeline/action-center.
+   ▸ C1: reutiliza busca/ícones/avatares/tipografia/botões Golden. NOVO
+     contrato REAL validado aqui: SELECT nativo estilizado (nc-fl) + list row
+     + unread/read + bulk actions (Marcar todas/Limpar) + agrupamento por dia
+     + destructive action (Limpar histórico) + empty state (documentado).
+   ▸ RESPONSIVIDADE: lista com scroll interno (min-height:0). Em 1366×768/125%
+     a coluna reduz e rola; header/toolbar compactos. Só 1920×1080 renderizado.
+   ▸ FOTOS: avatares com fallback real de iniciais (fotos locais indisponíveis;
+     nunca versionadas). _team-photos.css LOCAL-ONLY (gitignored).
+   ============================================================ */
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+svg{display:block}
+
+:root{
+  --canvas:#F5F6F9; --surface:#FFFFFF; --surface-2:#FAFBFD; --sunk:#F1F4F8;
+  --hair:#E8EBF1; --hair-2:#EFF1F6;
+  --tx-1:#14181F; --tx-2:#4B5364; --tx-3:#767E8D; --tx-4:#A8AFBC;
+  --sb-1:#252B3D; --sb-2:#1B2031; --sb-tx:#D0D5E1; --sb-dim:#9299AC; --sb-faint:#727990;
+  --sb-active:rgba(255,255,255,.065); --sb-hover:rgba(255,255,255,.04);
+  --brand:#5B7CFA; --grad:linear-gradient(135deg,#6E5EF3,#9A6BF5);
+  --blue:#3B82F6; --blue-ink:#2563EB;
+  --orange:#F59E0B; --violet:#8B5CF6; --green:#22A06B; --green-ink:#12784C; --red:#EF4444;
+  --sv-crit:#EF4444; --sv-warn:#F59E0B; --sv-succ:#34D399; --sv-info:#60A5FA; --sv-sys:#9CA3AF;
+  --tp-atr:#6E5EF3; --tp-flx:#60A5FA; --tp-sla:#F59E0B; --tp-sis:#9CA3AF;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-pill:999px;
+  --sh-1:0 0 0 1px var(--hair),0 1px 2px rgba(19,24,38,.04),0 5px 14px rgba(19,24,38,.035);
+  --sh-2:0 0 0 1px var(--hair),0 2px 6px rgba(19,24,38,.06),0 16px 34px rgba(19,24,38,.085);
+}
+.u-indigo{--u:#5B6CF0}.u-violet{--u:#8A5CF6}.u-teal{--u:#12A69B}.u-rose{--u:#E85D8C}.u-cyan{--u:#12A7C4}.u-amber{--u:#D68A1E}.u-slate{--u:#8792A6}
+
+body{font-family:'Inter',-apple-system,'Segoe UI',Roboto,sans-serif;color:var(--tx-1);background:var(--canvas);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-feature-settings:"cv05" 1,"cv11" 1}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.ic-sm{width:15px;height:15px}
+
+.av{position:relative;width:32px;height:32px;border-radius:50%;flex:none;display:grid;place-items:center;
+  font-weight:600;font-size:11px;letter-spacing:.01em;line-height:1;
+  color:color-mix(in srgb,var(--u) 74%,#26303f);
+  background-color:color-mix(in srgb,var(--u) 15%,#fff);
+  background-image:radial-gradient(120% 120% at 50% 22%,color-mix(in srgb,var(--u) 20%,#fff),color-mix(in srgb,var(--u) 12%,#fff));
+  background-size:cover;background-position:center;background-repeat:no-repeat;
+  box-shadow:0 0 0 2px #fff,0 0 0 3.5px color-mix(in srgb,var(--u) 46%,#fff),0 1px 3px rgba(19,24,38,.16)}
+.av-40{width:40px;height:40px;font-size:13px}
+.av-46{width:46px;height:46px;font-size:15.5px}
+
+.frame{width:1920px;height:1080px;overflow:hidden;position:relative;background:var(--canvas);display:grid;grid-template-columns:284px 1fr;grid-template-rows:1080px;font-size:13.5px;isolation:isolate}
+.frame::after{content:"";position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 0 1px rgba(19,24,38,.05);z-index:60}
+
+/* ===== SIDEBAR (idêntica aos Golden) ===== */
+.sb{background:linear-gradient(180deg,var(--sb-1),var(--sb-2));color:var(--sb-tx);display:flex;flex-direction:column;min-height:0;overflow:hidden;padding:0 0 12px}
+.brand{display:flex;align-items:center;gap:14px;padding:30px 24px 22px}
+.brand-mark{width:46px;height:46px;border-radius:14px;flex:none;background:linear-gradient(140deg,#5B7CFA,#6E5EF3);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px rgba(94,110,243,.4),inset 0 1px 0 rgba(255,255,255,.24)}
+.brand-mark .ic{width:24px;height:24px;stroke-width:1.9;color:#fff}
+.brand-txt{min-width:0;flex:1}
+.brand-name{font-family:'InterTight';font-weight:700;font-size:18px;color:#F5F7FB;letter-spacing:-.014em;line-height:1.14}
+.brand-sub{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--sb-faint);margin-top:4px}
+.brand-sync{width:6px;height:6px;border-radius:50%;background:#33D6A6;box-shadow:0 0 0 3px rgba(51,214,166,.15)}
+.newtask{margin:0 20px 20px;height:48px;border-radius:13px;background:var(--grad);color:#fff;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:9px;box-shadow:0 8px 20px rgba(110,94,243,.34)}
+.newtask .ic{width:18px;height:18px;stroke-width:2.1}
+.sb-scroll{flex:1;overflow:hidden;padding:0 14px;display:flex;flex-direction:column}
+.nav-label{font-size:10.5px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--sb-faint);padding:18px 14px 10px}
+.nav-item{display:flex;align-items:center;gap:13px;height:42px;padding:0 14px;border-radius:11px;color:var(--sb-tx);position:relative;font-size:14px;font-weight:450;line-height:1}
+.nav-item .ic{color:var(--sb-dim);width:19px;height:19px}
+.nav-item.active{background:var(--sb-active);color:#F7F9FC;font-weight:560;box-shadow:inset 0 0 0 1px rgba(255,255,255,.055)}
+.nav-item.active .ic{color:#B7C1FF}
+.nav-item.active::before{content:"";position:absolute;left:-14px;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;background:linear-gradient(180deg,#7C8CFF,#6E5EF3)}
+.nav-badge{margin-left:auto;height:20px;min-width:20px;padding:0 7px;border-radius:var(--r-pill);background:#EF4444;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.sb-user{margin-top:12px;padding:20px 24px 10px;display:flex;align-items:center;gap:14px;box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+.sb-user-txt{min-width:0;flex:1}
+.sb-user-name{font-size:14px;font-weight:600;color:#F3F6FB;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-user-role{font-size:12px;color:var(--sb-faint);margin-top:3px;display:flex;align-items:center;gap:6px}
+.udot{width:6px;height:6px;border-radius:50%;background:#33D6A6}
+.sb-user .chev{color:var(--sb-faint)}
+
+/* ===== MAIN ===== */
+.main{display:grid;grid-template-rows:92px 1fr;min-width:0;min-height:0;overflow:hidden;background:var(--canvas)}
+.hd{display:flex;align-items:center;gap:18px;padding:0 34px;background:var(--surface);box-shadow:0 1px 0 var(--hair-2)}
+.hd-title{display:flex;align-items:center;gap:16px}
+.hd-eye{width:46px;height:46px;border-radius:14px;flex:none;background:color-mix(in srgb,var(--brand) 13%,#fff);display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--brand) 26%,#fff)}
+.hd-eye .ic{width:22px;height:22px;color:#4E63D8;stroke-width:2}
+.hd-title .tl{display:flex;flex-direction:column;line-height:1.08}
+.hd-title .tl b{font-family:'InterTight';font-weight:700;font-size:26px;letter-spacing:-.024em;color:var(--tx-1)}
+.hd-title .tl span{font-size:13.5px;color:var(--tx-3);margin-top:4px}
+.hd-right{margin-left:auto;display:flex;align-items:center;gap:14px}
+.sla{display:flex;align-items:center;gap:12px;height:50px;padding:0 19px 0 14px;border-radius:14px;background:linear-gradient(180deg,#F1FBF7,#E8F8F0);box-shadow:inset 0 0 0 1px #CBEEDD}
+.sla-ic{width:34px;height:34px;border-radius:10px;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(18,80,54,.16)}
+.sla-ic .ic{width:18px;height:18px;color:var(--green)}
+.sla-tx{display:flex;flex-direction:column;line-height:1.22}
+.sla-k{font-size:9.5px;font-weight:800;letter-spacing:.06em;color:#3E9C74;display:flex;align-items:center;gap:5px}
+.livedot{width:6px;height:6px;border-radius:50%;background:#22C58A;box-shadow:0 0 0 3px rgba(34,197,138,.2)}
+.sla-v{font-size:14px;font-weight:650;color:#115E3D}
+.hd-bell{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;color:var(--tx-2);box-shadow:inset 0 0 0 1px var(--hair);position:relative}
+.hd-bell .ic{width:20px;height:20px}
+.hd-bell .dot{position:absolute;top:11px;right:12px;height:16px;min-width:16px;padding:0 4px;border-radius:9px;background:#EF4444;color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px var(--surface)}
+
+/* ===== CENTRAL DE NOTIFICAÇÕES ===== */
+.page{min-height:0;overflow:hidden;display:flex;justify-content:center}
+.nc{width:1200px;display:grid;grid-template-rows:auto auto 1fr;min-height:0;padding:24px 24px 0}
+
+/* linha de ações */
+.nc-top{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.nc-unread{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 13px;border-radius:var(--r-pill);font-size:12.5px;font-weight:700;color:#B23636;background:color-mix(in srgb,#EF4444 9%,#fff);box-shadow:inset 0 0 0 1px color-mix(in srgb,#EF4444 20%,#fff)}
+.nc-unread .d{width:7px;height:7px;border-radius:50%;background:#EF4444}
+.nc-act{margin-left:auto;display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 15px;border-radius:11px;font-size:13px;font-weight:600;color:var(--tx-2);box-shadow:inset 0 0 0 1px var(--hair);background:var(--surface)}
+.nc-act .ic{width:15px;height:15px;color:var(--tx-3)}
+.nc-act.danger{color:#C43D3D}.nc-act.danger .ic{color:#D96A6A}
+
+/* toolbar: busca + selects */
+.nc-tb{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.nc-search{position:relative;display:flex;align-items:center;height:44px;flex:1;min-width:0;border-radius:12px;background:var(--surface);box-shadow:inset 0 0 0 1px #DFE3EB}
+.nc-search .lead{width:17px;height:17px;color:var(--tx-3);margin-left:14px;flex:none}
+.nc-search input{border:0;outline:0;background:none;font:inherit;font-size:14px;color:var(--tx-1);width:100%;padding:0 14px 0 10px}
+.nc-search input::placeholder{color:var(--tx-3)}
+.nc-fl{position:relative;display:inline-flex;align-items:center;height:44px;padding:0 36px 0 15px;border-radius:12px;background:var(--surface);box-shadow:inset 0 0 0 1px #DFE3EB;font-size:13px;font-weight:600;color:var(--tx-2);white-space:nowrap}
+.nc-fl::after{content:"";position:absolute;right:14px;top:50%;width:9px;height:9px;border-right:1.6px solid var(--tx-3);border-bottom:1.6px solid var(--tx-3);transform:translateY(-70%) rotate(45deg)}
+
+/* lista */
+.nc-list{min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:6px;padding-bottom:8px}
+.nc-day{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--tx-4);margin:12px 2px 6px}
+.nc-day:first-child{margin-top:0}
+.nc-row{display:flex;align-items:stretch;gap:13px;background:var(--surface-2);border-radius:14px;box-shadow:inset 0 0 0 1px var(--hair);padding:13px 15px 13px 0;position:relative}
+.nc-row.unread{background:var(--surface);box-shadow:var(--sh-1)}
+.nc-acc{width:4px;border-radius:var(--r-pill);flex:none;background:var(--ac,var(--hair));align-self:stretch;margin-left:11px}
+.nc-row.read .nc-acc{opacity:.5}
+.nc-mid{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;padding:1px 0}
+.nc-l1{display:flex;align-items:center;gap:9px;min-width:0}
+.nc-type{flex:none;font-size:9.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;padding:3px 9px;border-radius:7px;color:var(--tpk);background:color-mix(in srgb,var(--tpc) 13%,#fff)}
+.nc-ti{font-size:14px;font-weight:600;color:var(--tx-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.nc-row.unread .nc-ti{font-weight:700;color:var(--tx-1)}
+.nc-crit{flex:none;font-size:9px;font-weight:800;letter-spacing:.05em;padding:2px 7px;border-radius:6px;color:#fff;background:#EF4444}
+.nc-sub{font-size:12.5px;color:var(--tx-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nc-ctx{font-size:12px;font-weight:600;color:var(--cx);margin-top:1px}
+.nc-right{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:7px;padding:1px 0}
+.nc-time{font-size:12px;font-weight:600;color:var(--tx-4);font-variant-numeric:tabular-nums}
+.nc-open{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:650;color:#4353D8}
+.nc-open .ic{width:13px;height:13px}
+.nc-ur{width:9px;height:9px;border-radius:50%;background:#EF4444;box-shadow:0 0 0 3px color-mix(in srgb,#EF4444 14%,#fff)}
+.tp-atr{--tpc:#6E5EF3;--tpk:#4E45C4}.tp-flx{--tpc:#60A5FA;--tpk:#2563EB}.tp-sla{--tpc:#F59E0B;--tpk:#B45309}.tp-sis{--tpc:#9CA3AF;--tpk:#5B6472}
+.sv-crit{--ac:#EF4444;--cx:#C4302B}.sv-warn{--ac:#F59E0B;--cx:#B45309}.sv-succ{--ac:#34D399;--cx:#12784C}.sv-info{--ac:#60A5FA;--cx:#2563EB}.sv-sys{--ac:#9CA3AF;--cx:#5B6472}
+
+/* rodapé disclaimer */
+.nc-foot{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--tx-4);padding:12px 2px 18px}
+.nc-foot i{width:6px;height:6px;border-radius:50%;background:#33D6A6;flex:none;font-style:normal}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-logo" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><path d="M8.5 9.5h7M8.5 13h7M8.5 16.5h4"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.6l2.55 5.17 5.7.83-4.13 4.02.98 5.68L12 16.98 6.9 19.3l.98-5.68L3.75 9.6l5.7-.83z"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.5h17M8 3.3v3.4M16 3.3v3.4"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8.5 6.5h11M8.5 12h11M8.5 17.5h11"/><path d="M4.4 6.5h.02M4.4 12h.02M4.4 17.5h.02"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9.2" cy="8.2" r="3.3"/><path d="M3.6 19.2a5.6 5.6 0 0111.2 0"/><path d="M15.8 5.4a3.1 3.1 0 010 5.7M17.4 19.2a5.3 5.3 0 00-2.1-4.2"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.4"/><path d="M5.6 20a6.4 6.4 0 0112.8 0"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 4v16h16"/><path d="M8 16.5v-3M12 16.5V9M16 16.5v-5.5"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 24 24"><path d="M6.2 3.4h6.6l4.9 4.9V19.6a1.2 1.2 0 01-1.2 1.2H6.2A1.2 1.2 0 015 19.6V4.6a1.2 1.2 0 011.2-1.2z"/><path d="M12.6 3.6V8.4h4.8M8.6 13h6.8M8.6 16.4h4.8"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6.6 10.2a5.4 5.4 0 0110.8 0c0 4.6 1.9 5.8 1.9 5.8H4.7s1.9-1.2 1.9-5.8z"/><path d="M10.2 19.4a2 2 0 003.6 0"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.1"/><path d="M12 2.6v2.4M12 19v2.4M4.4 4.4l1.7 1.7M17.9 17.9l1.7 1.7M2.6 12h2.4M19 12h2.4M4.4 19.6l1.7-1.7M17.9 6.1l1.7-1.7"/></symbol>
+  <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="M6 9.5l6 6 6-6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.4 4.4L19 7.3"/></symbol>
+  <symbol id="i-check2" viewBox="0 0 24 24"><path d="M2.5 12.5l5 5 6-6M12.5 12.5l1.5 1.5M22 6.5l-6.5 6.5"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 7h15M9.5 7V4.8h5V7M6.5 7l1 13h9l1-13M10 10.5v6M14 10.5v6"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v5.2c0 4.4-3 7.4-7 8.8-4-1.4-7-4.4-7-8.8V6z"/><path d="M9 12l2.1 2.1L15.2 10"/></symbol>
+  <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M4.5 12h15M13.5 6l6 6-6 6"/></symbol>
+</svg>
+
+<div class="frame">
+  <aside class="sb">
+    <div class="brand">
+      <div class="brand-mark"><svg class="ic"><use href="#i-logo"/></svg></div>
+      <div class="brand-txt">
+        <div class="brand-name">Agenda ID Seven</div>
+        <div class="brand-sub"><span class="brand-sync"></span> sincronizado</div>
+      </div>
+    </div>
+    <button class="newtask"><svg class="ic"><use href="#i-plus"/></svg> Nova tarefa</button>
+    <div class="sb-scroll">
+      <div class="nav-label">Workspace</div>
+      <a class="nav-item"><svg class="ic"><use href="#i-star"/></svg> Minhas Prioridades</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-sun"/></svg> Hoje</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-calendar"/></svg> Agenda</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-list"/></svg> Tarefas</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-users"/></svg> Equipe</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-user"/></svg> Perfil</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-chart"/></svg> Executivo</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-doc"/></svg> Relatórios</a>
+      <a class="nav-item active"><svg class="ic"><use href="#i-bell"/></svg> Notificações <span class="nav-badge">4</span></a>
+      <div class="nav-label">Sistema</div>
+      <a class="nav-item"><svg class="ic"><use href="#i-gear"/></svg> Configurações</a>
+    </div>
+    <div class="sb-user">
+      <span class="av av-46 u-indigo p-ary">AC</span>
+      <div class="sb-user-txt">
+        <div class="sb-user-name">Arydyjany Carlôto</div>
+        <div class="sb-user-role"><span class="udot"></span> CEO · admin</div>
+      </div>
+      <svg class="ic ic-sm chev"><use href="#i-chevron-down"/></svg>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="hd">
+      <div class="hd-title">
+        <span class="hd-eye"><svg class="ic"><use href="#i-bell"/></svg></span>
+        <div class="tl"><b>Notificações</b><span>Central e histórico · local</span></div>
+      </div>
+      <div class="hd-right">
+        <div class="sla">
+          <span class="sla-ic"><svg class="ic"><use href="#i-shield"/></svg></span>
+          <div class="sla-tx"><span class="sla-k"><span class="livedot"></span> MONITOR SLA • AO VIVO</span><span class="sla-v">Tudo em dia</span></div>
+        </div>
+        <button class="hd-bell"><svg class="ic"><use href="#i-bell"/></svg><span class="dot">4</span></button>
+      </div>
+    </header>
+
+    <div class="page">
+      <div class="nc">
+        <!-- ações: não lidas + Marcar todas + Limpar histórico -->
+        <div class="nc-top">
+          <span class="nc-unread"><span class="d"></span> 4 não lidas</span>
+          <button class="nc-act"><svg class="ic"><use href="#i-check2"/></svg> Marcar todas</button>
+          <button class="nc-act danger"><svg class="ic"><use href="#i-trash"/></svg> Limpar histórico</button>
+        </div>
+
+        <!-- busca + 4 selects reais -->
+        <div class="nc-tb">
+          <div class="nc-search"><svg class="ic lead"><use href="#i-search"/></svg><input placeholder="Buscar por título, tarefa ou cliente…"></div>
+          <span class="nc-fl">Tipo: Todos</span>
+          <span class="nc-fl">Severidade: Todos</span>
+          <span class="nc-fl">Designer: Todos</span>
+          <span class="nc-fl">Cliente: Todos</span>
+        </div>
+
+        <!-- lista agrupada por dia -->
+        <div class="nc-list">
+          <div class="nc-day">Hoje</div>
+
+          <div class="nc-row unread sv-crit">
+            <span class="nc-acc"></span>
+            <span class="av av-40 u-cyan p-boa" style="align-self:center">BM</span>
+            <div class="nc-mid">
+              <div class="nc-l1"><span class="nc-type tp-sla">SLA</span><span class="nc-ti">Prazo encerrado</span><span class="nc-crit">CRÍTICO</span></div>
+              <div class="nc-sub">Sunset Wear · Corte final do Reels institucional</div>
+              <div class="nc-ctx">Prazo vencido há 20 min · responsável Boaz Macêdo</div>
+            </div>
+            <div class="nc-right"><span class="nc-time">07:55</span><span class="nc-open">Abrir tarefa <svg class="ic"><use href="#i-arrow-right"/></svg></span><span class="nc-ur"></span></div>
+          </div>
+
+          <div class="nc-row unread sv-warn">
+            <span class="nc-acc"></span>
+            <span class="av av-40 u-rose p-tat" style="align-self:center">TG</span>
+            <div class="nc-mid">
+              <div class="nc-l1"><span class="nc-type tp-sla">SLA</span><span class="nc-ti">Prazo próximo — faltam 30 min</span></div>
+              <div class="nc-sub">Sunset Wear · Cronograma Feed &amp; Stories</div>
+              <div class="nc-ctx">Adicionar legendas e posts e reenviar ao cliente</div>
+            </div>
+            <div class="nc-right"><span class="nc-time">09:12</span><span class="nc-open">Abrir tarefa <svg class="ic"><use href="#i-arrow-right"/></svg></span><span class="nc-ur"></span></div>
+          </div>
+
+          <div class="nc-row unread sv-succ">
+            <span class="nc-acc"></span>
+            <span class="av av-40 u-violet p-mie" style="align-self:center">MC</span>
+            <div class="nc-mid">
+              <div class="nc-l1"><span class="nc-type tp-flx">Fluxo</span><span class="nc-ti">Cliente aprovou os temas</span></div>
+              <div class="nc-sub">Sunset Wear · Cronograma de Setembro</div>
+            </div>
+            <div class="nc-right"><span class="nc-time">08:20</span><span class="nc-open">Abrir tarefa <svg class="ic"><use href="#i-arrow-right"/></svg></span><span class="nc-ur"></span></div>
+          </div>
+
+          <div class="nc-row unread sv-info">
+            <span class="nc-acc"></span>
+            <span class="av av-40 u-teal p-fel" style="align-self:center">FT</span>
+            <div class="nc-mid">
+              <div class="nc-l1"><span class="nc-type tp-atr">Atribuição</span><span class="nc-ti">Você recebeu uma tarefa</span></div>
+              <div class="nc-sub">Edição de vídeos · Reels institucional — corte 30s</div>
+              <div class="nc-ctx">Enviada por Tatiana Gomes</div>
+            </div>
+            <div class="nc-right"><span class="nc-time">08:47</span><span class="nc-open">Abrir tarefa <svg class="ic"><use href="#i-arrow-right"/></svg></span><span class="nc-ur"></span></div>
+          </div>
+
+          <div class="nc-row read sv-info">
+            <span class="nc-acc"></span>
+            <span class="av av-40 u-teal p-fel" style="align-self:center">FT</span>
+            <div class="nc-mid">
+              <div class="nc-l1"><span class="nc-type tp-flx">Fluxo</span><span class="nc-ti">Designer entregou</span></div>
+              <div class="nc-sub">Sunset Wear · Cronograma Feed &amp; Stories</div>
+            </div>
+            <div class="nc-right"><span class="nc-time">07:30</span><span class="nc-open">Abrir tarefa <svg class="ic"><use href="#i-arrow-right"/></svg></span></div>
+          </div>
+
+          <div class="nc-row read sv-sys">
+            <span class="nc-acc"></span>
+            <span class="av av-40 u-slate" style="align-self:center"><svg class="ic ic-sm"><use href="#i-shield"/></svg></span>
+            <div class="nc-mid">
+              <div class="nc-l1"><span class="nc-type tp-sis">Sistema</span><span class="nc-ti">Nova versão instalada — 1.0.246</span></div>
+              <div class="nc-sub">Atualização aplicada automaticamente</div>
+            </div>
+            <div class="nc-right"><span class="nc-time">07:02</span></div>
+          </div>
+
+          <div class="nc-day">Ontem</div>
+
+          <div class="nc-row read sv-succ">
+            <span class="nc-acc"></span>
+            <span class="av av-40 u-rose p-tat" style="align-self:center">TG</span>
+            <div class="nc-mid">
+              <div class="nc-l1"><span class="nc-type tp-flx">Fluxo</span><span class="nc-ti">Tarefa concluída</span></div>
+              <div class="nc-sub">Sunset Wear · Card institucional de setembro</div>
+            </div>
+            <div class="nc-right"><span class="nc-time">18:40</span><span class="nc-open">Abrir tarefa <svg class="ic"><use href="#i-arrow-right"/></svg></span></div>
+          </div>
+
+          <div class="nc-row read sv-info">
+            <span class="nc-acc"></span>
+            <span class="av av-40 u-cyan p-boa" style="align-self:center">BM</span>
+            <div class="nc-mid">
+              <div class="nc-l1"><span class="nc-type tp-atr">Atribuição</span><span class="nc-ti">Você recebeu uma tarefa</span></div>
+              <div class="nc-sub">Edição de Cards · Lote — 5 cards</div>
+            </div>
+            <div class="nc-right"><span class="nc-time">16:15</span><span class="nc-open">Abrir tarefa <svg class="ic"><use href="#i-arrow-right"/></svg></span></div>
+          </div>
+
+          <div class="nc-row read sv-warn">
+            <span class="nc-acc"></span>
+            <span class="av av-40 u-rose p-tat" style="align-self:center">TG</span>
+            <div class="nc-mid">
+              <div class="nc-l1"><span class="nc-type tp-flx">Fluxo</span><span class="nc-ti">Cliente pediu ajuste</span></div>
+              <div class="nc-sub">Sunset Wear · Cronograma Institucional Agosto</div>
+              <div class="nc-ctx">2 conteúdos em correção</div>
+            </div>
+            <div class="nc-right"><span class="nc-time">11:30</span><span class="nc-open">Abrir tarefa <svg class="ic"><use href="#i-arrow-right"/></svg></span></div>
+          </div>
+
+          <div class="nc-row read sv-warn">
+            <span class="nc-acc"></span>
+            <span class="av av-40 u-teal p-fel" style="align-self:center">FT</span>
+            <div class="nc-mid">
+              <div class="nc-l1"><span class="nc-type tp-sla">SLA</span><span class="nc-ti">Prazo próximo — faltam 2 h</span></div>
+              <div class="nc-sub">Edição de vídeos · Reels institucional — corte 30s</div>
+            </div>
+            <div class="nc-right"><span class="nc-time">09:40</span><span class="nc-open">Abrir tarefa <svg class="ic"><use href="#i-arrow-right"/></svg></span></div>
+          </div>
+        </div>
+
+        <div class="nc-foot"><i></i>Histórico LOCAL (localStorage) · read-only · dedup · retenção 300 itens / 30 dias · não grava no Firestore</div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -174,3 +174,20 @@ Controles REAIS da Agenda que começam a estabelecer contrato (ainda não formal
 - **Empty state** (`.empty`): caixa de ícone 64 + título 15/800 + sub 12.5 (documentado; não
   renderizado no Frame 8 pois o dia tem compromissos).
 Congelam formalmente quando o owner aprovar o Frame 8.
+
+
+## 11 · NOVOS CANDIDATOS observados na CENTRAL (Frame 9 — a congelar no checkpoint respectivo)
+Controles REAIS da Central de Notificações que começam a estabelecer contrato:
+- **Select nativo estilizado** (`nc-fl`): h44, radius 12, surface + hairline #DFE3EB, valor 13/600
+  tx-2, chevron próprio à direita. Valida o pendente "select nativo estilizado" — a Central é a
+  primeira superfície REAL com `<select>`.
+- **Notification list row** (`nc-row`): faixa de severidade (4px) + avatar 40 + [badge de tipo +
+  título + selo CRÍTICO] + subtítulo + contexto (cor da severidade) + hora + dot de não-lida +
+  "Abrir tarefa →". Não-lida = surface branca + sombra + 700 + dot; lida = surface-2 + 600
+  (legível, ≠ disabled).
+- **Unread/read state**: booleano `read`; indicador combinado (peso + surface + dot), nunca só cor.
+- **Bulk actions**: "Marcar todas" (ghost) e "Limpar histórico" (ghost danger — destructive com
+  confirm() real).
+- **Day grouping**: rótulo 11/700 uppercase tx-4 (Hoje/Ontem/data).
+- **Empty state** (documentado, não renderizado): ícone + título + subtítulo.
+Congelam formalmente quando o owner aprovar o Frame 9.

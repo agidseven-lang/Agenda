@@ -10,6 +10,49 @@ oficial da superfície NOVA TAREFA. Nenhum Frame 7 pode ser redesenhado sem auto
 
 ---
 
+## FRAME 9 — NOTIFICAÇÕES · CENTRAL (candidata) · `proposta-c-frame9-notificacoes.html`
+**Status:** Frames 1–8 GOLDEN. FRAME 9 aplica o DS Golden à Central de Notificações REAL
+(renderNotifCentral 5734) — próxima superfície do Master Surface Map.
+
+**Auditoria read-only dupla (leitura direta + auditor paralelo p/ CSS, 1.0.246):**
+- Rota `state.tab==='notificacoes'` → renderNotifCentral em #content (shell global). Tela ADITIVA,
+  100% LOCAL/READ-SIDE. **FONTE = localStorage 'idseven.notif.history.v1'** (NÃO Firestore, NÃO
+  web push, NÃO o modal SLA, NÃO o toast) — HISTÓRICO deduplicado (dedupKey) de tudo que
+  notificou, "mesmo depois que o toast some"; retenção 300 itens/30 dias. Rodapé literal.
+- Campos: eventId, eventType, taskId, taskTitle, clientName, actor/responsible Name+Avatar,
+  etapa, status, title, subtitle, body, context, severity, createdAt, deep (='detail/'+taskId),
+  read (booleano).
+- Header real: sino + "Notificações" + "Central e histórico · local" + badge "N não lidas" +
+  "Marcar todas" (check) + "Limpar histórico" (trash danger, confirm() local). Toolbar (só com
+  itens): busca "Buscar por título, tarefa ou cliente…" + 4 SELECTS (Tipo Atribuição/Fluxo/SLA/
+  Sistema · Severidade Crítico/Atenção/Sucesso/Info · Designer · Cliente). Agrupamento por dia
+  (ncDayLabel: Hoje/Ontem/DD-MM-AAAA).
+- TIPOS (notifTypeLabel): SLA (sla_*/operational_block) · Fluxo (flow_*) · Atribuição (assign) ·
+  Sistema (resto). SEVERIDADES (ncSev, faixa lateral): critical/warning/success/info/default.
+  Selo CRÍTICO só em critical+sla_critical|operational_block. ncRow: faixa severidade + avatar 40
+  (responsável ou ator) + [badge tipo + título + CRÍTICO] + subtítulo (subtitle | cliente·tarefa)
+  + contexto (cor da severidade) + [hora HH:MM + dot não-lida + "Abrir tarefa →" se deep].
+- UNREAD = !read (booleano); contagem notifHistoryUnread. Clique na linha = marca lida + abre
+  DETALHE INLINE (notifDetailId) + atualiza badge; "Abrir tarefa" (deep) → Detalhes da tarefa
+  (F6). Sino do header + badge da nav "Notificações" = mesma contagem (o sino é shell Golden, não
+  redesenhado). EMPTY real ("Nenhuma notificação por aqui" / "Nada encontrado") documentado, não
+  é o cenário. Sem loading/skeleton/erro observáveis (captura passiva).
+
+**Composição:** shell + header globais Golden (título "Notificações" + "Central e histórico ·
+local"; SLA + sino do shell; badge do sino e da nav = 4). Coluna focada tipo "inbox" (~1200
+centrada — o real é nc-wrap max-width 1040 centrado; mantida a coluna legível, laterais = canvas
+limpo). Linha de ações (4 não lidas · Marcar todas · Limpar histórico) + toolbar (busca + 4
+selects) + lista agrupada Hoje (6: 4 não lidas + 2 lidas) / Ontem (4 lidas) + rodapé disclaimer.
+Cor = accent (faixa de severidade + badge de tipo + dot), nunca card inteiro pintado; não-lida =
+surface branca + sombra + título 700 + dot; lida = surface-2 + 600 tx-2 (legível, ≠ disabled).
+
+**C1 / novos contratos REAIS validados aqui:** SELECT nativo estilizado (nc-fl: h44, chevron,
+hairline) · notification list row (faixa+avatar+tipo+título+sub+contexto+hora+dot+deep) ·
+unread/read · bulk actions (Marcar todas / Limpar histórico) · destructive action (Limpar) ·
+agrupamento por dia · empty state (documentado). Reutiliza busca/ícones/avatares/tipografia.
+Decisões de formatação: nenhuma alteração de função; dados fictícios, tipos/comportamento reais.
+Fotos: fallback real de iniciais.
+
 ## FRAME 8 — AGENDA (candidata) · `proposta-c-frame8-agenda.html`
 **Status:** Frames 1–7 GOLDEN. FRAME 8 aplica o DS Golden à superfície AGENDA REAL (renderAgenda
 6084) — próxima superfície do Master Surface Map (P0).
