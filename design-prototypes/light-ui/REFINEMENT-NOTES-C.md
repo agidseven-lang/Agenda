@@ -10,6 +10,51 @@ oficial da superfície NOVA TAREFA. Nenhum Frame 7 pode ser redesenhado sem auto
 
 ---
 
+## FRAME 8 — AGENDA (candidata) · `proposta-c-frame8-agenda.html`
+**Status:** Frames 1–7 GOLDEN. FRAME 8 aplica o DS Golden à superfície AGENDA REAL (renderAgenda
+6084) — próxima superfície do Master Surface Map (P0).
+
+**Auditoria read-only (renderAgenda + eventCard + calendarGrid + openEventDetail, 1.0.246; +
+auditor paralelo p/ CSS/detalhe):**
+- Rota `state.tab==='agenda'` → renderAgenda em #content (shell global, sem subnav própria,
+  board-mode removido). Dados = state.events (Firestore 'events', tempo real). Campos: type,
+  title, client, location, date, start/end, ownerId, by, notes, status, done/startedAt/cancelledAt.
+- Duas vistas reais: **Mês** (calendarGrid 6×7 + lista do dia selecionado) e **Agenda/lista**
+  (buckets Atrasados/Hoje/Próximos). Frame retrata a vista MÊS (padrão agView='month').
+- Toolbar real: toggle Mês/Agenda · busca "Buscar compromisso…" (filtra title+client) · "Novo
+  compromisso" (primária real) · "Mostrar cancelados" (toggle) · chips de TIPO Todos+TYPES
+  (Gravação #EF4444 · Fotografia #F59E0B · Reunião #60A5FA · Edição #A78BFA · Outro #9CA3AF) ·
+  nav de mês (Hoje/‹/›).
+- calendarGrid: 42 células (semana começa DOMINGO), até 4 dots por dia na cor do TIPO; estados
+  agcell dim/today/sel. Ago/2026 (dia 1 = sábado; dia 17 = segunda = hoje = selecionado — real:
+  agSel nasce = hoje). eventCard: faixa = cor do RESPONSÁVEL (identity; vermelho se atrasado) +
+  data (DOW/dd/MÊS) + hora start—end + status pill (Agendado #60A5FA / Em andamento #F59E0B /
+  Finalizado #34D399 / Cancelado #F87171 com dot) + título line-clamp 2 + cliente (person) +
+  local (place) + rodapé avatar+nome+TAG do tipo.
+- Interação real: clicar no card → openEventDetail (MODAL centrado, não drawer — tipo/status/
+  quando/grid Cliente-Local-Responsável-Criado por-Tipo-Status/Observações/Linha do tempo/ações
+  Iniciar·Finalizar·Cancelar·Editar·Excluir-admin). Clicar em dia → agSel. ‹/› → mês. O modal
+  NÃO é renderizado (superfície limpa; contrato próprio = C2 Modais). Empty state real:
+  emptyState('calendar','Dia livre','…') — não é o caso.
+
+**Composição:** shell + header globais Golden (título "Agenda" + "Compromissos da equipe · em
+tempo real"; SLA + sino do shell congelado). Toolbar (segmented Mês/Agenda · busca · Novo
+compromisso primário) + linha de filtros de tipo + Mostrar cancelados. Corpo **widescreen** = os
+DOIS componentes reais lado a lado: calendário (1fr, mês Agosto/2026 com nav Hoje/‹/›, DOW, grid
+6×7 com dots, hoje/selecionado) | painel do dia (424px, "Segunda, 17 de agosto · 3 compromissos"
++ 3 eventCards reais). O real é coluna única empilhada — arranjo lado a lado é decisão de
+apresentação p/ widescreen (mesma lógica/dados/ordenação; já aprovada nos F6/7B).
+
+**C1 / novos candidatos a foundation validados pela Agenda REAL:** segmented view switcher
+(Mês/Agenda), calendar grid cell (default/dim/today/selected + dots), event/list card (rail=
+responsável, data, hora, status pill, tipo tag), busca com ícone leading, chips de tipo com dot,
+empty state (documentado, não renderizado). Reutiliza input/chips/primário/avatares/ícones Golden.
+
+**Decisões de formatação (registradas, sem alterar função):** header do dia usa o dia da semana
+por extenso ("Segunda, 17 de agosto") por legibilidade editorial — o real `.sect` usa dayShort
+abreviado ("seg, 17 de agosto"); mesmo dado, escolha de formatação. Fotos: fallback real de
+iniciais.
+
 # Proposta C — Refinamento Profissional · Light UI (1920×1080)
 
 **Status:** **FRAME 1 · Meu quadro · V10 = LAYOUT APROVADO / GOLDEN VISUAL REFERENCE** (decisão do

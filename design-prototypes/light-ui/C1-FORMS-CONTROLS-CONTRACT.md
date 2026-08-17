@@ -160,3 +160,17 @@ dívida para uma fase FUNCIONAL posterior — **nunca** alterada só no mockup.
 Usuário com foto cadastrada → foto real (runtime `photoOf → avatar()`); sem foto → iniciais. Mocks
 podem materializar fotos local-only/read-only. **ZERO** fotos pessoais versionadas (nem JPG/PNG/
 base64/`data:image`/assets pessoais). `_team-photos.css` LOCAL-ONLY (gitignored).
+
+## 10 · NOVOS CANDIDATOS observados na AGENDA (Frame 8 — a congelar no checkpoint da Agenda)
+Controles REAIS da Agenda que começam a estabelecer contrato (ainda não formalmente congelados):
+- **Segmented view switcher** (Mês/Agenda): track sunk, item ativo = surface branca + sh-1 + tx-1;
+  inativo tx-3. Alternativa premium ao par de chips accent do real.
+- **Calendar grid cell** (`.agcell`): radius 11, surface-2 + hairline; número topo + dots (cor do
+  tipo); estados dim (transparente, tx-4) / today (ring brand) / selected (gradiente Golden + branco).
+- **Event/list card** (`.evc`): faixa lateral = responsável (identity), bloco de data, hora tabular,
+  status pill (dot + tint), título line-clamp 2, meta cliente/local, rodapé avatar+nome+tag de tipo.
+- **Busca com ícone leading**: input h44 + ícone search 17 tx-3.
+- **Type filter chip com dot**: chip com dot na cor do tipo; selecionado = tint + ring na cor.
+- **Empty state** (`.empty`): caixa de ícone 64 + título 15/800 + sub 12.5 (documentado; não
+  renderizado no Frame 8 pois o dia tem compromissos).
+Congelam formalmente quando o owner aprovar o Frame 8.
