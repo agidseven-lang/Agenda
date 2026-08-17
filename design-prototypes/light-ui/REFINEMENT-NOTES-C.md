@@ -20,6 +20,46 @@ Firestore seguem intocáveis. Toda nova superfície deve ser comparada à V10 an
 - **Títulos longos**: máximo visual controlado — line-height fixo (1.45) + line-clamp 2; nunca
   cards desproporcionais.
 
+## FRAME 7D — NOVA TAREFA · ETAPA 4 REVISÃO (candidata) · `proposta-c-frame7d-novatarefa-revisao.html`
+**Status dos anteriores:** 7A, 7B V2 e 7C = **GOLDEN / CONGELADOS**. 7D fecha o wizard com a etapa
+Revisão REAL do Cronograma (checkpoint da C1 vem depois, com o owner).
+
+**Auditoria read-only (stepReview 11503 + saveTask 11841, 1.0.246):**
+- rev-head: badge do setor + "Revisão da tarefa" + "Confira os dados abaixo antes de criar a
+  tarefa." (literais). rev-card: nome + cliente (svg place) + chips [status stOf('afazer')="A
+  Fazer" #9BA0AB **dotc — formato REAL do review, não o check-chip do 7B** · priority false →
+  "Prioridade normal" soft (não disabled) · sub.label "12 conteúdos" soft] + rev-grid revItem
+  (Início · Término · Prazo final · Setor · "Subtipo"="12 conteúdos" — rótulo legado REAL) +
+  rev-resp (avatar + "Responsável" + Tatiana Gomes + Social media + botão REAL "Editar",
+  data-formgoto=resp).
+- CONTEÚDOS: rev-sec-h + rev-count = filled.length+" / "+contentCount = "2 / 12" (SÓ preenchidos,
+  filter tema||legenda); rev-content = número + tema (rteInlineDisplay, negrito real) + legenda.
+  Vazios não aparecem; nenhum preenchido → emptyline. rev-quick "Editar dados"/"Editar briefing"
+  (data-formgoto 1/2).
+- NÃO aparecem na revisão (e não inventados): Período de referência, Canais (só no Briefing —
+  f.fields não é lido em stepReview); Link/Observações/checklist (cronograma não tem).
+- **"Enviar para o cliente" — REAL** (canSendToClient TRUE aqui: cronograma + cliente + ≥1
+  conteúdo + canSeeAll/admin): bloco rev-send no CORPO (abaixo do quick-edit), botão full-width
+  com gradiente próprio real (#5B6CFF→#22D3EE→#10B981, semântica WhatsApp) + hint literal.
+  **Divergência vs a lista "NÃO INVENTAR" reportada ao owner e resolvida: INCLUIR fiel** — a regra
+  proíbe FABRICAR função inexistente, não autoriza esconder função real; não é o CTA principal.
+- BOTÃO FINAL (footer-nav): step 3 ⇒ "Salvar tarefa" (_saveLbl). Footer = "Voltar" (ghost) +
+  "Salvar tarefa" (primário, gradiente Golden). SAVE real (saveTask): anti-duplo-clique f._saving,
+  validações finais por alert, read-back, sucesso → volta ao quadro do setor SEM toast/detalhe
+  automático; erro por alert mantém o form aberto. Estado saving do rev-send existe mas não
+  renderizado (frame = estado ANTES do clique, conforme mandato).
+
+**Composição:** estrutura 7A/7B/7C congelada (âncora, card 920, stepper com 3 CONCLUÍDAS +
+Revisão ATUAL, footer). Continuidade: Cronograma de Setembro · Sunset Wear · A Fazer · Prioridade
+normal · 12 conteúdos · início/término/prazo · Tatiana Gomes · 2/12 conteúdos (Conteúdo 1 com
+texto demonstrado no 7C; Conteúdo 2 tema). C1 checkpoint: read-only summary card, summary rows,
+chips com dotc, ação Editar secundária, action block distinto (send). Cabe no viewport sem scroll
+(overflow-y:auto real só rola quando excede — aqui não excede).
+
+**Fixes de render:** símbolos i-place/i-grid/i-edit/i-send adicionados ao sprite; card alto
+empurrava o rodapé p/ fora → espaçamentos compactados (stepper/body/footer/rev-*) até Voltar +
+Salvar tarefa ficarem visíveis, sem scroll inventado. Fotos: fallback real de iniciais.
+
 ## FRAME 7C — NOVA TAREFA · ETAPA 3 BRIEFING (candidata) · `proposta-c-frame7c-novatarefa-briefing.html`
 **Status dos anteriores:** 7A e 7B V2 = **GOLDEN / CONGELADOS**. 7C avança o mesmo wizard para o
 Briefing REAL do Cronograma e expande a C1.
