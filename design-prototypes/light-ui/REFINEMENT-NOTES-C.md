@@ -20,6 +20,39 @@ Firestore seguem intocáveis. Toda nova superfície deve ser comparada à V10 an
 - **Títulos longos**: máximo visual controlado — line-height fixo (1.45) + line-clamp 2; nunca
   cards desproporcionais.
 
+## FRAME 7C — NOVA TAREFA · ETAPA 3 BRIEFING (candidata) · `proposta-c-frame7c-novatarefa-briefing.html`
+**Status dos anteriores:** 7A e 7B V2 = **GOLDEN / CONGELADOS**. 7C avança o mesmo wizard para o
+Briefing REAL do Cronograma e expande a C1.
+
+**Auditoria read-only dupla (leitura direta + 4 auditores paralelos, 1.0.246):**
+- Ramo real do cronograma (stepBriefing 11443–11458): label "Quantidade de temas" + [−][N][+]
+  real (vqty; − disabled quando ≤1; input number central, placeholder "Ex.: 10"); cronQtyOf:
+  inteiro ≥1, teto CRON_QTY_MAX=500 (toast literal ao exceder); erro INLINE REAL cqErr
+  ("Informe uma quantidade inteira igual ou superior a 1.", role=alert, hidden por padrão —
+  aparece no commit inválido ou no Próximo sem quantidade, com foco de volta ao campo);
+  REDUZIR quantidade com conteúdos preenchidos abre modal real de confirmação de corte
+  (openCronShrinkConfirm).
+- curSub p/ cronograma = synthCronSub (subtipo SINTÉTICO, F3.5.5D): banner formTitle
+  "Cronograma — 12 conteúdos" + fields sintéticos "Período de referência" (text, ph "Ex.:
+  Junho/2026") e "Canais" (choice ÚNICA Instagram/Facebook/YouTube/WhatsApp) + contentCount=N.
+- "Conteúdos do cronograma (12)" + N content-cards accordion REAIS: dot cinza/verde (fill =
+  tema||legenda), "Conteúdo N", ▲/▼, UM aberto por vez (toggle data-content; default todos
+  fechados e vazios); corpo com Tema/Legenda em rteField (EDITOR RICO real F3.5.5C) —
+  TOOLBAR REAL reproduzida botão a botão (undo/redo · ¶▾ · A▾ · N/I/S/tachado/X₂/X² ·
+  cor/marca-texto · listas · alinhamentos · recuos · link/hr/limpar) e VISÍVEL SÓ COM FOCO
+  (.rte:focus-within — Tema focado com toolbar + ring C1; Legenda em repouso sem toolbar).
+- Cronograma no Briefing NÃO tem: checklist (Reprovação 1.0.137), Link/anexo, Observações
+  (gate !isClientSector), subtipo/Periodicidade, upload, select, checkbox, radio, maxlength,
+  botão adicionar/remover conteúdo. Temas/legendas NÃO são obrigatórios ao avançar.
+- Navegação: Voltar = apenas step−1 (estado preservado); Próximo com único gate = quantidade;
+  scroll interno REAL (.scr overflow-y:auto) — peek honesto do Conteúdo 3 + scrollbar fina.
+
+**Composição:** estrutura 7A/7B congelada (âncora, card 920, stepper com Setor+Dados CONCLUÍDAS
+e Briefing ATUAL, footer Voltar/Próximo); cenário contínuo: 12 temas · Setembro/2026 ·
+Instagram · Conteúdos 1–2 preenchidos, 1 aberto no editor. C1 ampliada: quantity stepper,
+banner sintético, chips choice única, accordion com estado de preenchimento, editor rico
+focado/repouso; contrato de erro inline sq-err documentado (não simulado — quantidade válida).
+
 ## FRAME 7B — NOVA TAREFA · ETAPA 2 DADOS (candidata) · `proposta-c-frame7b-novatarefa-dados.html`
 **Status dos anteriores:** FRAME 7A · Setor = **APROVADO / GOLDEN** — estrutura do wizard
 CONGELADA (container 920/radius 18/sh-2, stepper, header global, footer, âncora vertical,
