@@ -10,6 +10,64 @@ oficial da superfície NOVA TAREFA. Nenhum Frame 7 pode ser redesenhado sem auto
 
 ---
 
+## FRAME 11 — RELATÓRIOS DE ATRASO (candidata) · `proposta-c-frame11-relatorios.html`
+**Status:** Frames 1–10 GOLDEN. FRAME 11 aplica o DS Golden à superfície RELATÓRIOS real
+(`renderReports` 5600) — NÃO é BI/dashboard novo. **Não declarado Golden** (decisão do owner).
+
+**Auditoria read-only dupla (leitura direta + auditor paralelo, 1.0.246):**
+- Rota `state.tab==='relatorios'` → `renderReports` em #content (shell global). **GATE = igual ao
+  Executivo:** `priTabVisible` só oculta 'prioridades'; 'relatorios' está SEMPRE na nav — sem gate de
+  admin. Escopo por `visibleTasks(u)` (canSeeAll → tudo). Arydyjany CEO·admin ⇒ total. READ-ONLY **e
+  EXPORTÁVEL** (download LOCAL; não grava Firestore).
+- **Diferença Executivo × Relatórios (provada):** Executivo = snapshot AO VIVO (o que precisa de ação
+  agora). Relatórios = ANÁLISE DE ATRASO no período + EXPORTAÇÃO. Fonte = `slaExecReports` (5567) que
+  REUSA `slaExecAggregate` + deriva `execPeriodBuckets`/reincidentes/histórico/taskRows.
+- **Pipeline real:** `reportsFilter` (execApplyFilters + soAtrasados + concluidas) → `slaExecAggregate`
+  → KPIs (`atrasoMedio` = média overdueMin; `pctNoPrazo` = conclNoPrazo/concl; `reincidentes` = tasks
+  lc≥2; `criticas` = totais.critico).
+- **Toolbar:** período segmentado (Hoje/7 dias/30 dias/Tudo) + 5 selects (Designer/Cliente/Tipo/Status
+  SLA + **Conclusão** Todas/Só concluídas/Não concluídas) + toggle **"Só atrasados"** (`rep-tg`, OFF por
+  padrão) + **Exportar CSV / Exportar JSON** (`rep-exp`). Export real = `execDownload` (Blob/browser):
+  `relatorio-atraso-AAAA-MM-DD.csv` (`;` UTF-8 de `R.taskRows`) e `.json` (objeto completo). SEM
+  IPC/Electron/Firestore/PDF/XLSX/imprimir/e-mail/agendar.
+- **Componentes reais:** 4 KPIs (execKpi) · **"Atrasos por período" = GRÁFICO DE BARRAS** (`rep-pbars`;
+  `execPeriodBuckets` conta OVERDUE por dia do PRAZO final; cor ≥4 vermelho / ≥2 laranja / senão azul;
+  label MM-DD via `day.slice(5)`) · "Atrasos por designer" (tabela `execDesRow`) · laterais
+  cliente/tipo (mini-list) · "Tarefas críticas" + "Reincidentes em atraso" (mini-list) · **"Histórico
+  resumido por tarefa"** (tabela + **linha do tempo de SLA** `rep-tl`, passos coloridos por
+  `repStepColor`). Empty real "Sem dados no período" (não é o caso).
+
+**DÍVIDA FUNCIONAL registrada (precedente "Subtipo", NÃO corrigir no mockup):**
+1. **NOVA (do próprio renderReports):** a tabela "Atrasos por designer" tem `<thead>` de **5 colunas**
+   (Designer/Atrasadas/Críticas/Atraso méd./% no prazo) mas reusa `execDesRow`, que emite **7 células**
+   (Designer/Carga/%noPrazo/Lar/Atr/Crít/Atraso méd) → **desalinhamento header×linha em produção.** O
+   mockup mostra as **7 colunas REAIS** que as linhas contêm (contrato Golden do F10) e registra o
+   header de 5 como dívida.
+2. **Herdadas do F10:** `criticasRecentes` inclui overdue NÃO-crítico (por isso o card "Tarefas
+   críticas", com sub real "atraso > 10 min", lista itens de 9 e 7 min — dívida fielmente exposta);
+   bases de contagem `ativas` × `d.state`.
+
+**Coerência matemática do cenário (fictício; estrutura/fórmulas reais; totais FECHAM):**
+- Designers: Felipe (carga 15, lar 1, atr 2, crít 1, méd 9, %82 azul) + Boaz (12, 2, 1, 1, méd 16, %69
+  laranja) + Marina (8, 0, 1, 0, méd 5, %93 verde). Somas: laranja 3, atras 4, crít 2 ⇒ **overdue 6**.
+- `atrasoMedio` = round((24+15+9+7+5+4)/6) = round(64/6) = **11 min**. Por designer: Felipe
+  (15+9+4)/3=9; Boaz (24+7)/2=15,5→16; Marina 5. `pctNoPrazo` global = round(42/52)=**81%**.
+- Cliente (soma atras = overdue 6, crít = 2): Sunset(3;2crít)+GreenLife(2)+Bold(1). Tipo (soma 6):
+  Cronograma3+Ed.vídeos2+Ed.Cards1. **Barras** (overdue por dia do prazo) somam **6** = overdue.
+  Reincidentes 3 (lc≥2), Críticas 2 (>10 min). Tudo fecha.
+
+**Composição (adaptação de apresentação — precedente F8/F10):** o `renderReports` real é 1 coluna com
+scroll; para caber em **1920×1080 sem scroll inventado** os cards são reagrupados em **masonry
+widescreen** (esquerda 1.52fr = gráfico + tabela de designer + histórico; direita 1fr = cliente + tipo
++ críticas + reincidentes). Conteúdo dos cards é 100% fiel; só o arranjo se adapta. "Tarefas críticas"
+mostra **4 de 6** overdue por espaço (decisão de mockup, não rótulo de UI). Cabe no viewport; rodapé
+disclaimer visível.
+
+**C1 / novos candidatos (§13):** bar chart time-series (`rep-pbars`), SLA timeline row (`rep-tl` +
+`repStepColor`), toggle chip (`rep-tg`, OFF/ON), export contextual action (`rep-exp` — verde,
+secundária, NÃO compete com CTA), grid de KPI 4-col. Reutiliza (F10) KPI card, dense data table, pct
+cell, sev pill, mini-list, select, período segmentado. Fotos: fallback real de iniciais (FT/BM/MA).
+
 ## FRAME 10 — EXECUTIVO (candidata) · `proposta-c-frame10-executivo.html`
 **Status:** Frames 1–9 GOLDEN. FRAME 10 aplica o DS Golden ao Painel Executivo REAL
 (renderExecPanel 5523) — NÃO é dashboard inventado.

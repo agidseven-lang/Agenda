@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, initial-scale=1">
+<title>Agenda ID Seven — Proposta C — FRAME 11 · Relatórios</title>
+<link rel="stylesheet" href="_fonts.css">
+<link rel="stylesheet" href="_team-photos.css">
+<style>
+/* ============================================================
+   AGENDA ID SEVEN · LIGHT UI · FRAME 11 — RELATÓRIOS · 1920×1080
+   DESIGN PROTOTYPE (não é produção). Superfície RELATÓRIOS real redesenhada no
+   Design System Golden (Frames 1–10 + C1). NÃO é BI/dashboard novo.
+   ▸ FIDELIDADE (auditoria read-only 1.0.246 — renderReports 5600 +
+     slaExecReports 5567 + slaExecAggregate 5455 + execPeriodBuckets 5560 +
+     execDesRow 5521 + repStepColor 5599 + toCSV/execDownload + auditor par.):
+     · Rota state.tab==='relatorios' → renderReports em #content (shell
+       global). GATE = mesmo do Executivo: priTabVisible só oculta
+       'prioridades'; 'relatorios' sempre na nav. Escopo por visibleTasks(u)
+       (canSeeAll ADMIN/MANAGER → tudo). Arydyjany CEO·admin ⇒ total. READ-ONLY
+       + EXPORTÁVEL (download local; não grava no Firestore).
+     · Título "Relatórios de Atraso" + "Operacional · read-only · exportável".
+     · DIFERENÇA Executivo × Relatórios (provada): EXECUTIVO = snapshot AO VIVO
+       do SLA (o que precisa de ação agora: Ativas/No prazo/Laranja/Atrasadas/
+       Críticas + distribuição + ranking por risco + próximos vencimentos).
+       RELATÓRIOS = ANÁLISE DE ATRASO no período + EXPORTAÇÃO: Atraso médio /
+       % entrega no prazo / Reincidentes / Críticas; gráfico de barras por dia;
+       atrasos por designer/cliente/tipo; reincidentes (≥2 atrasos); HISTÓRICO
+       por tarefa (linha do tempo de SLA derivada de history); CSV/JSON.
+     · Fonte: state.tasks (via visibleTasks) → slaExecReports (reusa
+       slaExecAggregate + execPeriodBuckets/reincidentes/historico/taskRows).
+     · Período: Hoje/7 dias/30 dias/Tudo. Filtros: Designer/Cliente/Tipo/
+       Status SLA + CONCLUSÃO (Todas/Só concluídas/Não concluídas) + toggle
+       "Só atrasados". EXPORTAÇÃO real: "Exportar CSV" e "Exportar JSON"
+       (rep-exp) → execDownload Blob/browser (relatorio-atraso-AAAA-MM-DD.csv/
+       .json; CSV `;` UTF-8 de R.taskRows [tarefa;cliente;tipo;designer;
+       status_sla;atraso_min;reincidencias;prazo;concluida]; JSON = objeto
+       completo). SEM IPC/Electron/Firestore/PDF/XLSX/imprimir/e-mail/agendar.
+     · KPIs reais (execKpi Golden): Atraso médio (min) · % entrega no prazo
+       (conclNoPrazo/concl) · Reincidentes (≥2 atrasos) · Críticas (>10 min).
+     · "Atrasos por período" = GRÁFICO DE BARRAS real (rep-pbars, contagem de
+       overdue por dia; cor ≥4 vermelho/≥2 laranja/senão azul; label MM-DD).
+     · "Atrasos por designer" (tabela execDesRow Golden) + laterais cliente/
+       tipo (mini-list). "Tarefas críticas" + "Reincidentes em atraso"
+       (mini-list). "Histórico resumido por tarefa" (tabela + rep-tl linha do
+       tempo: passos coloridos por repStepColor).
+     · Empty real "Sem dados no período selecionado" (R.count===0) — não é o
+       caso. Loading/erro: sem skeleton/spinner/banner (deriva de snapshot).
+       Exportação vazia gera arquivo só com cabeçalho (comportamento real).
+   ▸ DÍVIDA FUNCIONAL registrada (precedente Subtipo; NÃO corrigir): a tabela
+     "Atrasos por designer" no renderReports tem HEADER de 5 colunas
+     (Designer/Atrasadas/Críticas/Atraso méd./% no prazo) mas reusa execDesRow
+     que emite 7 células (Designer/Carga/%noPrazo/Lar/Atr/Crít/Atraso méd) —
+     DESALINHAMENTO header×linha em produção. Também herda as dívidas do F10
+     (bases de ativas × distribuição; nome de criticasRecentes). O mockup
+     representa a tabela com as 7 colunas REAIS que as linhas contêm (contrato
+     Golden do F10), registrando o header buggy como dívida.
+   ▸ CENÁRIO (fictício; estrutura/fórmulas reais; totais FECHAM): designers
+     Felipe (atras 2, crít 1, %82 azul, méd 9) + Boaz (atras 1, crít 1, %69
+     laranja, méd 16) + Marina (atras 1, crít 0, %93 verde, méd 5) → laranja 3,
+     atras 4, crít 2 ⇒ overdue 6. Clientes Sunset(3;2crít)+GreenLife(2)+Bold(1)
+     e tipos Cronograma3+Ed.vídeos2+Ed.Cards1 fecham em overdue 6; barras (por
+     dia do prazo final) somam 6; críticas 2 (>10 min); reincidentes 3 (lc≥2).
+     KPIs: Atraso médio 11 min (64/6) · % no prazo 81% (42/52) · Reincidentes 3
+     · Críticas 2. Datas 11–17/08/2026. "Tarefas críticas": 4 de 6 p/ caber.
+   ▸ C1: reutiliza (congelados no F10) KPI card, dense data table, numeric
+     alignment, pct cell, sev pill, mini-list, select, período segmentado.
+     NOVOS candidatos: bar chart (time-series), SLA timeline row, toggle chip,
+     export contextual action (secundária, não compete), CSV/JSON.
+   ▸ FOTOS: avatares fallback real de iniciais (fotos locais indisponíveis).
+   ============================================================ */
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+svg{display:block}
+:root{
+  --canvas:#F5F6F9; --surface:#FFFFFF; --surface-2:#FAFBFD; --sunk:#F1F4F8;
+  --hair:#E8EBF1; --hair-2:#EFF1F6;
+  --tx-1:#14181F; --tx-2:#4B5364; --tx-3:#767E8D; --tx-4:#A8AFBC;
+  --sb-1:#252B3D; --sb-2:#1B2031; --sb-tx:#D0D5E1; --sb-dim:#9299AC; --sb-faint:#727990;
+  --sb-active:rgba(255,255,255,.065);
+  --brand:#5B7CFA; --grad:linear-gradient(135deg,#6E5EF3,#9A6BF5);
+  --green:#22A06B;
+  --sv-azul:#60A5FA; --sv-azuli:#2563EB; --sv-laranja:#F59E0B; --sv-laranjai:#B45309;
+  --sv-verm:#EF4444; --sv-vermi:#C4302B; --sv-crit:#E11D48; --sv-criti:#B10E38; --sv-verde:#34D399; --sv-verdei:#12784C;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-pill:999px;
+  --sh-1:0 0 0 1px var(--hair),0 1px 2px rgba(19,24,38,.04),0 5px 14px rgba(19,24,38,.035);
+  --sh-2:0 0 0 1px var(--hair),0 2px 6px rgba(19,24,38,.06),0 16px 34px rgba(19,24,38,.085);
+}
+.u-indigo{--u:#5B6CF0}.u-teal{--u:#12A69B}.u-rose{--u:#E85D8C}.u-cyan{--u:#12A7C4}
+body{font-family:'Inter',-apple-system,'Segoe UI',Roboto,sans-serif;color:var(--tx-1);background:var(--canvas);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-feature-settings:"cv05" 1,"cv11" 1}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.ic-sm{width:15px;height:15px}
+.av{position:relative;border-radius:50%;flex:none;display:grid;place-items:center;font-weight:600;letter-spacing:.01em;line-height:1;
+  color:color-mix(in srgb,var(--u) 74%,#26303f);background-color:color-mix(in srgb,var(--u) 15%,#fff);
+  background-image:radial-gradient(120% 120% at 50% 22%,color-mix(in srgb,var(--u) 20%,#fff),color-mix(in srgb,var(--u) 12%,#fff));
+  background-size:cover;background-position:center;box-shadow:0 0 0 2px #fff,0 0 0 3.5px color-mix(in srgb,var(--u) 46%,#fff),0 1px 3px rgba(19,24,38,.16)}
+.av-24{width:24px;height:24px;font-size:9px}.av-46{width:46px;height:46px;font-size:15.5px}
+.frame{width:1920px;height:1080px;overflow:hidden;position:relative;background:var(--canvas);display:grid;grid-template-columns:284px 1fr;grid-template-rows:1080px;font-size:13.5px;isolation:isolate}
+.frame::after{content:"";position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 0 1px rgba(19,24,38,.05);z-index:60}
+/* sidebar */
+.sb{background:linear-gradient(180deg,var(--sb-1),var(--sb-2));color:var(--sb-tx);display:flex;flex-direction:column;min-height:0;overflow:hidden;padding:0 0 12px}
+.brand{display:flex;align-items:center;gap:14px;padding:30px 24px 22px}
+.brand-mark{width:46px;height:46px;border-radius:14px;flex:none;background:linear-gradient(140deg,#5B7CFA,#6E5EF3);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px rgba(94,110,243,.4),inset 0 1px 0 rgba(255,255,255,.24)}
+.brand-mark .ic{width:24px;height:24px;stroke-width:1.9;color:#fff}
+.brand-name{font-family:'InterTight';font-weight:700;font-size:18px;color:#F5F7FB;letter-spacing:-.014em;line-height:1.14}
+.brand-sub{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--sb-faint);margin-top:4px}
+.brand-sync{width:6px;height:6px;border-radius:50%;background:#33D6A6;box-shadow:0 0 0 3px rgba(51,214,166,.15)}
+.newtask{margin:0 20px 20px;height:48px;border-radius:13px;background:var(--grad);color:#fff;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:9px;box-shadow:0 8px 20px rgba(110,94,243,.34)}
+.newtask .ic{width:18px;height:18px;stroke-width:2.1}
+.sb-scroll{flex:1;overflow:hidden;padding:0 14px;display:flex;flex-direction:column}
+.nav-label{font-size:10.5px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--sb-faint);padding:18px 14px 10px}
+.nav-item{display:flex;align-items:center;gap:13px;height:42px;padding:0 14px;border-radius:11px;color:var(--sb-tx);position:relative;font-size:14px;font-weight:450;line-height:1}
+.nav-item .ic{color:var(--sb-dim);width:19px;height:19px}
+.nav-item.active{background:var(--sb-active);color:#F7F9FC;font-weight:560;box-shadow:inset 0 0 0 1px rgba(255,255,255,.055)}
+.nav-item.active .ic{color:#B7C1FF}
+.nav-item.active::before{content:"";position:absolute;left:-14px;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;background:linear-gradient(180deg,#7C8CFF,#6E5EF3)}
+.nav-badge{margin-left:auto;height:20px;min-width:20px;padding:0 7px;border-radius:var(--r-pill);background:#EF4444;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.sb-user{margin-top:12px;padding:20px 24px 10px;display:flex;align-items:center;gap:14px;box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+.sb-user-name{font-size:14px;font-weight:600;color:#F3F6FB}
+.sb-user-role{font-size:12px;color:var(--sb-faint);margin-top:3px;display:flex;align-items:center;gap:6px}
+.udot{width:6px;height:6px;border-radius:50%;background:#33D6A6}
+.sb-user .chev{margin-left:auto;color:var(--sb-faint)}
+/* main + header */
+.main{display:grid;grid-template-rows:92px 1fr;min-width:0;min-height:0;overflow:hidden;background:var(--canvas)}
+.hd{display:flex;align-items:center;gap:18px;padding:0 34px;background:var(--surface);box-shadow:0 1px 0 var(--hair-2)}
+.hd-title{display:flex;align-items:center;gap:16px}
+.hd-eye{width:46px;height:46px;border-radius:14px;flex:none;background:color-mix(in srgb,var(--brand) 13%,#fff);display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--brand) 26%,#fff)}
+.hd-eye .ic{width:22px;height:22px;color:#4E63D8;stroke-width:2}
+.hd-title .tl{display:flex;flex-direction:column;line-height:1.08}
+.hd-title .tl b{font-family:'InterTight';font-weight:700;font-size:26px;letter-spacing:-.024em;color:var(--tx-1)}
+.hd-title .tl span{font-size:13.5px;color:var(--tx-3);margin-top:4px;display:flex;align-items:center;gap:7px}
+.hd-title .tl .live{width:7px;height:7px;border-radius:50%;background:#22C58A;box-shadow:0 0 0 3px rgba(34,197,138,.18)}
+.hd-right{margin-left:auto;display:flex;align-items:center;gap:14px}
+.sla{display:flex;align-items:center;gap:12px;height:50px;padding:0 19px 0 14px;border-radius:14px;background:linear-gradient(180deg,#F1FBF7,#E8F8F0);box-shadow:inset 0 0 0 1px #CBEEDD}
+.sla-ic{width:34px;height:34px;border-radius:10px;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(18,80,54,.16)}
+.sla-ic .ic{width:18px;height:18px;color:var(--green)}
+.sla-tx{display:flex;flex-direction:column;line-height:1.22}
+.sla-k{font-size:9.5px;font-weight:800;letter-spacing:.06em;color:#3E9C74;display:flex;align-items:center;gap:5px}
+.livedot{width:6px;height:6px;border-radius:50%;background:#22C58A;box-shadow:0 0 0 3px rgba(34,197,138,.2)}
+.sla-v{font-size:14px;font-weight:650;color:#115E3D}
+.hd-bell{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;color:var(--tx-2);box-shadow:inset 0 0 0 1px var(--hair);position:relative}
+.hd-bell .ic{width:20px;height:20px}
+.hd-bell .dot{position:absolute;top:12px;right:13px;width:8px;height:8px;border-radius:50%;background:#7C6BF5;box-shadow:0 0 0 2px var(--surface)}
+/* ===== RELATÓRIOS (reusa base Executivo Golden) ===== */
+.page{min-height:0;overflow:hidden;display:flex;justify-content:center}
+.ex{width:1360px;padding:18px 24px 0;display:flex;flex-direction:column;min-height:0}
+/* toolbar: período + filtros */
+.ex-tools{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.seg{display:inline-flex;background:var(--sunk);border-radius:11px;padding:3px;gap:2px}
+.seg button{height:34px;padding:0 15px;border-radius:9px;font-size:12.5px;font-weight:600;color:var(--tx-3)}
+.seg button.on{background:var(--surface);color:var(--tx-1);font-weight:650;box-shadow:0 1px 2px rgba(19,24,38,.06),0 0 0 1px var(--hair)}
+.ex-fls{margin-left:auto;display:flex;gap:9px}
+.ex-fl{position:relative;display:inline-flex;align-items:center;height:40px;padding:0 34px 0 14px;border-radius:11px;background:var(--surface);box-shadow:inset 0 0 0 1px #DFE3EB;font-size:12.5px;font-weight:600;color:var(--tx-2);white-space:nowrap}
+.ex-fl::after{content:"";position:absolute;right:13px;top:50%;width:8px;height:8px;border-right:1.6px solid var(--tx-3);border-bottom:1.6px solid var(--tx-3);transform:translateY(-70%) rotate(45deg)}
+/* alerta */
+.ex-alert{display:flex;align-items:center;gap:11px;padding:11px 15px;border-radius:13px;font-size:13.5px;color:var(--sv-criti);background:color-mix(in srgb,var(--sv-crit) 7%,#fff);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--sv-crit) 24%,#fff);margin-bottom:14px}
+.ex-alert .ic{width:18px;height:18px;color:var(--sv-crit)}
+.ex-alert b{font-weight:750}
+/* KPIs */
+.ex-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:13px;margin-bottom:14px}
+.kpi{position:relative;background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--sh-1);padding:15px 16px 14px;overflow:hidden}
+.kpi-bar{position:absolute;left:0;top:0;bottom:0;width:3.5px;background:var(--kc)}
+.kpi-l{font-size:12px;font-weight:600;color:var(--tx-3)}
+.kpi-v{font-family:'InterTight';font-size:30px;font-weight:700;line-height:1.1;margin-top:7px;color:var(--kc,var(--tx-1));letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.kpi-h{font-size:11px;color:var(--tx-4);margin-top:3px}
+.k-neutral{--kc:var(--tx-1)}.k-azul{--kc:var(--sv-azuli)}.k-laranja{--kc:var(--sv-laranjai)}.k-verm{--kc:var(--sv-vermi)}.k-crit{--kc:var(--sv-criti)}
+/* cards */
+.card{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--sh-1);padding:16px 18px}
+.card-h{display:flex;align-items:center;gap:8px;margin-bottom:13px}
+.card-h b{font-size:14px;font-weight:700;color:var(--tx-1)}
+.card-sub{font-size:11.5px;color:var(--tx-4);margin-left:auto}
+/* distribuição */
+.dbar{display:flex;height:16px;border-radius:8px;overflow:hidden;gap:2px}
+.dbar>div{border-radius:4px}
+.dleg{display:flex;gap:20px;margin-top:12px;flex-wrap:wrap}
+.lg{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--tx-3)}
+.lg i{width:9px;height:9px;border-radius:3px}
+.lg b{color:var(--tx-1);font-weight:700;margin-left:1px}
+/* grid ranking + laterais */
+.ex-grid{display:grid;grid-template-columns:1fr 400px;gap:14px;margin:14px 0}
+.ex-col{display:flex;flex-direction:column;gap:14px}
+/* tabela ranking */
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{font-size:10.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--tx-4);text-align:left;padding:0 10px 9px;border-bottom:1px solid var(--hair)}
+.tbl th.c,.tbl td.c{text-align:center}
+.tbl td{padding:11px 10px;border-bottom:1px solid var(--hair-2);font-size:13.5px;color:var(--tx-2);font-variant-numeric:tabular-nums}
+.tbl tr:last-child td{border-bottom:0}
+.dz{display:flex;align-items:center;gap:9px}
+.dz b{font-size:13.5px;font-weight:650;color:var(--tx-1)}
+.pcell{display:flex;align-items:center;gap:9px}
+.ptrack{width:74px;height:6px;border-radius:4px;background:var(--sunk);overflow:hidden}
+.ptrack>div{height:100%;border-radius:4px}
+.pcell span{font-size:12.5px;font-weight:700;font-variant-numeric:tabular-nums}
+.pill{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:22px;padding:0 7px;border-radius:7px;font-size:12px;font-weight:750;color:var(--pk);background:color-mix(in srgb,var(--pc) 14%,#fff)}
+.p-lar{--pc:#F59E0B;--pk:#B45309}.p-atr{--pc:#EF4444;--pk:#C4302B}.p-crit{--pc:#E11D48;--pk:#B10E38}.p-verde{--pc:#34D399;--pk:#12784C}
+/* mini-list */
+.ml{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--hair-2)}
+.ml:last-child{border-bottom:0}
+.ml-k{flex:1;min-width:0;display:flex;align-items:center;gap:8px;font-size:13px;color:var(--tx-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ml-k i{width:7px;height:7px;border-radius:50%;flex:none}
+.ml-v{flex:none;font-size:12.5px;font-weight:650;font-variant-numeric:tabular-nums}
+.critbox{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--sv-crit) 26%,#fff),0 5px 14px rgba(225,29,72,.06)}
+.card-hot{font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--sv-criti);margin-left:auto}
+/* rodapé */
+.ex-foot{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--tx-4);padding:12px 2px 14px}
+.ex-foot i{width:6px;height:6px;border-radius:50%;background:#33D6A6;flex:none}
+/* ===== RELATÓRIOS — componentes novos (candidatos C1 §13) ===== */
+.ex-kpis.k4{grid-template-columns:repeat(4,1fr)}
+/* export contextual (verde, secundária — não compete com CTA) */
+.rep-exp{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 15px;border-radius:11px;font-size:12.5px;font-weight:700;color:var(--green);background:color-mix(in srgb,var(--green) 8%,#fff);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--green) 30%,#fff)}
+.rep-exp .ic{width:15px;height:15px;stroke-width:2.1;color:var(--green)}
+/* toggle chip "Só atrasados" (OFF por padrão) */
+.rep-tg{display:inline-flex;align-items:center;gap:9px;height:40px;padding:0 14px;border-radius:11px;font-size:12.5px;font-weight:600;color:var(--tx-2);background:var(--surface);box-shadow:inset 0 0 0 1px #DFE3EB}
+.rep-tg .box{width:15px;height:15px;border-radius:5px;box-shadow:inset 0 0 0 1.6px #C7CDD8;background:#fff;flex:none}
+.rep-tg.on{color:var(--sv-vermi);background:color-mix(in srgb,var(--sv-verm) 8%,#fff);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--sv-verm) 34%,#fff)}
+.rep-tg.on .box{background:var(--sv-verm);box-shadow:none}
+/* filtros linha 2 */
+.rep-filters{display:flex;align-items:center;gap:9px;margin-bottom:13px;flex-wrap:wrap}
+/* masonry widescreen (adaptação de apresentação — cards do renderReports reagrupados) */
+.rep-cols{display:grid;grid-template-columns:1.52fr 1fr;gap:13px;align-items:start}
+.rep-col{display:flex;flex-direction:column;gap:13px;min-width:0}
+.rep-col .card{padding:14px 16px}
+/* gráfico de barras — "Atrasos por período" (rep-pbars) */
+.rep-pbars{display:flex;align-items:flex-end;gap:16px;height:118px;padding:6px 6px 0;border-bottom:1px solid var(--hair-2)}
+.rep-pb{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;height:100%}
+.rep-pbcol{flex:1;width:100%;display:flex;align-items:flex-end;justify-content:center}
+.rep-pbfill{width:62%;border-radius:7px 7px 0 0;min-height:6px;box-shadow:inset 0 1px 0 rgba(255,255,255,.35)}
+.rep-pbn{font-size:12.5px;font-weight:750;color:var(--tx-1);font-variant-numeric:tabular-nums}
+.rep-pbn.z{color:var(--tx-4);font-weight:600}
+.rep-pbl{font-size:11px;color:var(--tx-4);font-variant-numeric:tabular-nums}
+/* linha do tempo de SLA (histórico) — rep-tl */
+.rep-tl{display:flex;align-items:center;flex-wrap:wrap;gap:2px}
+.rep-tlstep{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--tx-2);white-space:nowrap}
+.rep-tlstep i{width:8px;height:8px;border-radius:50%;flex:none;box-shadow:0 0 0 2px #fff}
+.rep-tlsep{width:16px;height:1.5px;background:var(--hair);margin:0 2px;flex:none}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-logo" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><path d="M8.5 9.5h7M8.5 13h7M8.5 16.5h4"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.6l2.55 5.17 5.7.83-4.13 4.02.98 5.68L12 16.98 6.9 19.3l.98-5.68L3.75 9.6l5.7-.83z"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.5h17M8 3.3v3.4M16 3.3v3.4"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8.5 6.5h11M8.5 12h11M8.5 17.5h11"/><path d="M4.4 6.5h.02M4.4 12h.02M4.4 17.5h.02"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9.2" cy="8.2" r="3.3"/><path d="M3.6 19.2a5.6 5.6 0 0111.2 0"/><path d="M15.8 5.4a3.1 3.1 0 010 5.7M17.4 19.2a5.3 5.3 0 00-2.1-4.2"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.4"/><path d="M5.6 20a6.4 6.4 0 0112.8 0"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 4v16h16"/><path d="M8 16.5v-3M12 16.5V9M16 16.5v-5.5"/></symbol>
+  <symbol id="i-gauge" viewBox="0 0 24 24"><path d="M4.5 18a8 8 0 1115 0"/><path d="M12 14l4-4"/><circle cx="12" cy="14" r="1.3" style="fill:currentColor;stroke:none"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 24 24"><path d="M6.2 3.4h6.6l4.9 4.9V19.6a1.2 1.2 0 01-1.2 1.2H6.2A1.2 1.2 0 015 19.6V4.6a1.2 1.2 0 011.2-1.2z"/><path d="M12.6 3.6V8.4h4.8M8.6 13h6.8M8.6 16.4h4.8"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6.6 10.2a5.4 5.4 0 0110.8 0c0 4.6 1.9 5.8 1.9 5.8H4.7s1.9-1.2 1.9-5.8z"/><path d="M10.2 19.4a2 2 0 003.6 0"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.1"/><path d="M12 2.6v2.4M12 19v2.4M4.4 4.4l1.7 1.7M17.9 17.9l1.7 1.7M2.6 12h2.4M19 12h2.4M4.4 19.6l1.7-1.7M17.9 6.1l1.7-1.7"/></symbol>
+  <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="M6 9.5l6 6 6-6"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v5.2c0 4.4-3 7.4-7 8.8-4-1.4-7-4.4-7-8.8V6z"/><path d="M9 12l2.1 2.1L15.2 10"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 7.6V12l3 1.9"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3.5v11.5M7.5 10.5l4.5 4.5 4.5-4.5M5 20.5h14"/></symbol>
+</svg>
+<div class="frame">
+  <aside class="sb">
+    <div class="brand"><div class="brand-mark"><svg class="ic"><use href="#i-logo"/></svg></div><div><div class="brand-name">Agenda ID Seven</div><div class="brand-sub"><span class="brand-sync"></span> sincronizado</div></div></div>
+    <button class="newtask"><svg class="ic"><use href="#i-plus"/></svg> Nova tarefa</button>
+    <div class="sb-scroll">
+      <div class="nav-label">Workspace</div>
+      <a class="nav-item"><svg class="ic"><use href="#i-star"/></svg> Minhas Prioridades</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-sun"/></svg> Hoje</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-calendar"/></svg> Agenda</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-list"/></svg> Tarefas</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-users"/></svg> Equipe</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-user"/></svg> Perfil</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-gauge"/></svg> Executivo</a>
+      <a class="nav-item active"><svg class="ic"><use href="#i-doc"/></svg> Relatórios</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-bell"/></svg> Notificações <span class="nav-badge">9+</span></a>
+      <div class="nav-label">Sistema</div>
+      <a class="nav-item"><svg class="ic"><use href="#i-gear"/></svg> Configurações</a>
+    </div>
+    <div class="sb-user"><span class="av av-46 u-indigo p-ary">AC</span><div><div class="sb-user-name">Arydyjany Carlôto</div><div class="sb-user-role"><span class="udot"></span> CEO · admin</div></div><svg class="ic ic-sm chev"><use href="#i-chevron-down"/></svg></div>
+  </aside>
+  <div class="main">
+    <header class="hd">
+      <div class="hd-title"><span class="hd-eye"><svg class="ic"><use href="#i-doc"/></svg></span><div class="tl"><b>Relatórios de Atraso</b><span><span class="live"></span>Operacional · read-only · exportável</span></div></div>
+      <div class="hd-right">
+        <div class="sla"><span class="sla-ic"><svg class="ic"><use href="#i-shield"/></svg></span><div class="sla-tx"><span class="sla-k"><span class="livedot"></span> MONITOR SLA • AO VIVO</span><span class="sla-v">Tudo em dia</span></div></div>
+        <button class="hd-bell"><svg class="ic"><use href="#i-bell"/></svg><span class="dot"></span></button>
+      </div>
+    </header>
+    <div class="page">
+      <div class="ex">
+        <!-- toolbar linha 1: período segmentado + EXPORTAÇÃO real (rep-exp: CSV/JSON via download local) -->
+        <div class="ex-tools">
+          <div class="seg"><button>Hoje</button><button class="on">7 dias</button><button>30 dias</button><button>Tudo</button></div>
+          <span style="flex:1"></span>
+          <button class="rep-exp"><svg class="ic"><use href="#i-download"/></svg> Exportar CSV</button>
+          <button class="rep-exp"><svg class="ic"><use href="#i-download"/></svg> Exportar JSON</button>
+        </div>
+        <!-- toolbar linha 2: 5 filtros reais (Designer/Cliente/Tipo/Status SLA/Conclusão) + toggle "Só atrasados" (OFF por padrão) -->
+        <div class="rep-filters">
+          <span class="ex-fl">Designer: Todos</span>
+          <span class="ex-fl">Cliente: Todos</span>
+          <span class="ex-fl">Tipo: Todos</span>
+          <span class="ex-fl">Status SLA: Todos</span>
+          <span class="ex-fl">Conclusão: Todas</span>
+          <span class="rep-tg"><span class="box"></span> Só atrasados</span>
+        </div>
+        <!-- KPIs reais (4): Atraso médio · % entrega no prazo · Reincidentes · Críticas -->
+        <div class="ex-kpis k4">
+          <div class="kpi k-laranja"><span class="kpi-bar"></span><div class="kpi-l">Atraso médio</div><div class="kpi-v">11 min</div><div class="kpi-h">no período</div></div>
+          <div class="kpi k-azul"><span class="kpi-bar"></span><div class="kpi-l">% entrega no prazo</div><div class="kpi-v">81%</div><div class="kpi-h">concluídas no prazo</div></div>
+          <div class="kpi k-verm"><span class="kpi-bar"></span><div class="kpi-l">Reincidentes</div><div class="kpi-v">3</div><div class="kpi-h">&#8805; 2 atrasos</div></div>
+          <div class="kpi k-crit"><span class="kpi-bar"></span><div class="kpi-l">Críticas</div><div class="kpi-v">2</div><div class="kpi-h">atraso &gt; 10 min</div></div>
+        </div>
+        <!-- masonry widescreen (adaptação de apresentação): esquerda = gráfico + tabelas · direita = listas -->
+        <div class="rep-cols">
+          <div class="rep-col">
+            <!-- GRÁFICO DE BARRAS — Atrasos por período (execPeriodBuckets: overdue por dia do prazo; soma=6; cor >=4 verm / >=2 laranja / senão azul) -->
+            <div class="card"><div class="card-h"><b>Atrasos por período</b><span class="card-sub">7 dias · por prazo final</span></div>
+              <div class="rep-pbars">
+                <div class="rep-pb"><div class="rep-pbcol"><div class="rep-pbfill" style="height:6%;background:var(--sv-azul)"></div></div><div class="rep-pbn z">0</div><div class="rep-pbl">11-08</div></div>
+                <div class="rep-pb"><div class="rep-pbcol"><div class="rep-pbfill" style="height:50%;background:var(--sv-azul)"></div></div><div class="rep-pbn">1</div><div class="rep-pbl">12-08</div></div>
+                <div class="rep-pb"><div class="rep-pbcol"><div class="rep-pbfill" style="height:50%;background:var(--sv-azul)"></div></div><div class="rep-pbn">1</div><div class="rep-pbl">13-08</div></div>
+                <div class="rep-pb"><div class="rep-pbcol"><div class="rep-pbfill" style="height:50%;background:var(--sv-azul)"></div></div><div class="rep-pbn">1</div><div class="rep-pbl">14-08</div></div>
+                <div class="rep-pb"><div class="rep-pbcol"><div class="rep-pbfill" style="height:50%;background:var(--sv-azul)"></div></div><div class="rep-pbn">1</div><div class="rep-pbl">15-08</div></div>
+                <div class="rep-pb"><div class="rep-pbcol"><div class="rep-pbfill" style="height:6%;background:var(--sv-azul)"></div></div><div class="rep-pbn z">0</div><div class="rep-pbl">16-08</div></div>
+                <div class="rep-pb"><div class="rep-pbcol"><div class="rep-pbfill" style="height:100%;background:var(--sv-laranja)"></div></div><div class="rep-pbn">2</div><div class="rep-pbl">17-08</div></div>
+              </div>
+            </div>
+            <!-- TABELA — Atrasos por designer (execDesRow: 7 células REAIS; header real do renderReports=5 -> DÍVIDA registrada) -->
+            <div class="card"><div class="card-h"><b>Atrasos por designer</b><span class="card-sub">3 · por risco</span></div>
+              <table class="tbl">
+                <thead><tr><th>Designer</th><th class="c">Carga</th><th>% no prazo</th><th class="c">Lar.</th><th class="c">Atr.</th><th class="c">Crít.</th><th class="c">Atraso méd.</th></tr></thead>
+                <tbody>
+                  <tr><td><div class="dz"><span class="av av-24 u-teal p-fel">FT</span><b>Felipe</b></div></td><td class="c">15</td><td><div class="pcell"><div class="ptrack"><div style="width:82%;background:var(--sv-azul)"></div></div><span style="color:var(--sv-azuli)">82%</span></div></td><td class="c"><span class="pill p-lar">1</span></td><td class="c"><span class="pill p-atr">2</span></td><td class="c"><span class="pill p-crit">1</span></td><td class="c" style="color:var(--tx-3)">9 min</td></tr>
+                  <tr><td><div class="dz"><span class="av av-24 u-cyan p-boa">BM</span><b>Boaz</b></div></td><td class="c">12</td><td><div class="pcell"><div class="ptrack"><div style="width:69%;background:var(--sv-laranja)"></div></div><span style="color:var(--sv-laranjai)">69%</span></div></td><td class="c"><span class="pill p-lar">2</span></td><td class="c"><span class="pill p-atr">1</span></td><td class="c"><span class="pill p-crit">1</span></td><td class="c" style="color:var(--tx-3)">16 min</td></tr>
+                  <tr><td><div class="dz"><span class="av av-24 u-rose p-mar">MA</span><b>Marina</b></div></td><td class="c">8</td><td><div class="pcell"><div class="ptrack"><div style="width:93%;background:var(--sv-verde)"></div></div><span style="color:var(--sv-verdei)">93%</span></div></td><td class="c"><span class="pill p-lar">0</span></td><td class="c"><span class="pill p-atr">1</span></td><td class="c"><span class="pill p-crit">0</span></td><td class="c" style="color:var(--tx-3)">5 min</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <!-- TABELA — Histórico resumido por tarefa (linha do tempo de SLA · rep-tl · repStepColor) -->
+            <div class="card"><div class="card-h"><b>Histórico resumido por tarefa</b><span class="card-sub">linha do tempo de SLA · derivado de history</span></div>
+              <table class="tbl">
+                <thead><tr><th>Tarefa</th><th>Responsável</th><th class="c">Atrasos</th><th>Linha do tempo</th></tr></thead>
+                <tbody>
+                  <tr><td>Corte final do Reels institucional</td><td style="color:var(--tx-3)">Boaz</td><td class="c"><span class="pill p-crit">3&#215;</span></td><td><div class="rep-tl"><span class="rep-tlstep"><i style="background:#8B94A6"></i>enviado</span><span class="rep-tlsep"></span><span class="rep-tlstep"><i style="background:var(--sv-azul)"></i>produção</span><span class="rep-tlsep"></span><span class="rep-tlstep"><i style="background:var(--sv-laranja)"></i>revisão</span><span class="rep-tlsep"></span><span class="rep-tlstep"><i style="background:var(--sv-verm)"></i>atraso</span><span class="rep-tlsep"></span><span class="rep-tlstep"><i style="background:var(--sv-crit)"></i>crítico</span></div></td></tr>
+                  <tr><td>Card institucional de setembro</td><td style="color:var(--tx-3)">Boaz</td><td class="c"><span class="pill p-lar">2&#215;</span></td><td><div class="rep-tl"><span class="rep-tlstep"><i style="background:var(--sv-azul)"></i>produção</span><span class="rep-tlsep"></span><span class="rep-tlstep"><i style="background:var(--sv-verm)"></i>atraso</span><span class="rep-tlsep"></span><span class="rep-tlstep"><i style="background:var(--sv-laranja)"></i>revisão</span><span class="rep-tlsep"></span><span class="rep-tlstep"><i style="background:var(--sv-verm)"></i>atraso</span></div></td></tr>
+                  <tr><td>Campanha primavera — Feed</td><td style="color:var(--tx-3)">Felipe</td><td class="c"><span class="pill p-lar">2&#215;</span></td><td><div class="rep-tl"><span class="rep-tlstep"><i style="background:var(--sv-azul)"></i>produção</span><span class="rep-tlsep"></span><span class="rep-tlstep"><i style="background:var(--sv-laranja)"></i>revisão</span><span class="rep-tlsep"></span><span class="rep-tlstep"><i style="background:var(--sv-verm)"></i>atraso</span><span class="rep-tlsep"></span><span class="rep-tlstep"><i style="background:var(--sv-crit)"></i>crítico</span></div></td></tr>
+                  <tr><td>Reels de lançamento</td><td style="color:var(--tx-3)">Felipe</td><td class="c"><span class="pill p-verde">1&#215;</span></td><td><div class="rep-tl"><span class="rep-tlstep"><i style="background:var(--sv-azul)"></i>produção</span><span class="rep-tlsep"></span><span class="rep-tlstep"><i style="background:var(--sv-laranja)"></i>revisão</span><span class="rep-tlsep"></span><span class="rep-tlstep"><i style="background:var(--sv-verm)"></i>atraso</span></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="rep-col">
+            <!-- Atrasos por cliente (mini-list; soma atras = 6 overdue; crít = 2) -->
+            <div class="card"><div class="card-h"><b>Atrasos por cliente</b></div>
+              <div class="ml"><span class="ml-k"><i style="background:var(--sv-crit)"></i>Sunset Wear</span><span class="ml-v" style="color:var(--sv-criti)">2 crít · 3 atrasos</span></div>
+              <div class="ml"><span class="ml-k"><i style="background:var(--sv-verm)"></i>GreenLife</span><span class="ml-v" style="color:var(--sv-vermi)">2 atrasos</span></div>
+              <div class="ml"><span class="ml-k"><i style="background:var(--sv-verm)"></i>Bold Brand</span><span class="ml-v" style="color:var(--sv-vermi)">1 atraso</span></div>
+            </div>
+            <!-- Atrasos por tipo (mini-list; soma = 6 overdue) -->
+            <div class="card"><div class="card-h"><b>Atrasos por tipo</b></div>
+              <div class="ml"><span class="ml-k"><i style="background:var(--sv-laranja)"></i>Cronograma</span><span class="ml-v" style="color:var(--sv-laranjai)">3 atrasos</span></div>
+              <div class="ml"><span class="ml-k"><i style="background:var(--sv-laranja)"></i>Edição de vídeos</span><span class="ml-v" style="color:var(--sv-laranjai)">2 atrasos</span></div>
+              <div class="ml"><span class="ml-k"><i style="background:var(--sv-laranja)"></i>Edição de Cards</span><span class="ml-v" style="color:var(--sv-laranjai)">1 atraso</span></div>
+            </div>
+            <!-- Tarefas críticas (criticasRecentes = overdue, crít-first; 4 de 6 exibidas p/ caber — dívida F10: inclui overdue não-crítico) -->
+            <div class="card"><div class="card-h"><b>Tarefas críticas</b><span class="card-sub">atraso &gt; 10 min</span></div>
+              <div class="ml"><span class="ml-k"><i style="background:var(--sv-crit)"></i>Sunset Wear · Corte final do Reels</span><span class="ml-v" style="color:var(--sv-criti)">24 min · Boaz</span></div>
+              <div class="ml"><span class="ml-k"><i style="background:var(--sv-crit)"></i>Sunset Wear · Campanha primavera</span><span class="ml-v" style="color:var(--sv-criti)">15 min · Felipe</span></div>
+              <div class="ml"><span class="ml-k"><i style="background:var(--sv-verm)"></i>Sunset Wear · Reels de lançamento</span><span class="ml-v" style="color:var(--sv-vermi)">9 min · Felipe</span></div>
+              <div class="ml"><span class="ml-k"><i style="background:var(--sv-verm)"></i>GreenLife · Card institucional</span><span class="ml-v" style="color:var(--sv-vermi)">7 min · Boaz</span></div>
+            </div>
+            <!-- Reincidentes em atraso (>= 2 atrasos; cor lc>=3 crít / senão laranja) -->
+            <div class="card"><div class="card-h"><b>Reincidentes em atraso</b><span class="card-sub">≥ 2 atrasos</span></div>
+              <div class="ml"><span class="ml-k"><i style="background:var(--sv-crit)"></i>Sunset Wear · Corte final do Reels</span><span class="ml-v" style="color:var(--sv-criti)">3&#215; · Boaz</span></div>
+              <div class="ml"><span class="ml-k"><i style="background:var(--sv-laranja)"></i>GreenLife · Card institucional</span><span class="ml-v" style="color:var(--sv-laranjai)">2&#215; · Boaz</span></div>
+              <div class="ml"><span class="ml-k"><i style="background:var(--sv-laranja)"></i>Sunset Wear · Campanha primavera</span><span class="ml-v" style="color:var(--sv-laranjai)">2&#215; · Felipe</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="ex-foot"><i></i>Derivado do snapshot ao vivo · read-only · exportação LOCAL (CSV/JSON via download) · não grava no Firestore</div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -208,3 +208,26 @@ Componentes REAIS do Painel Executivo (SLA & Produtividade):
 - **Executive alert banner**: tint crítico 7% + microborder 24% + ícone + texto (não gigante).
 - **Period segmented**: track sunk, item ativo surface + sh-1 (reforça o de F8).
 Congelam formalmente quando o owner aprovar o Frame 10.
+
+## 13 · NOVOS CANDIDATOS observados nos RELATÓRIOS (Frame 11 — a congelar no checkpoint respectivo)
+Componentes REAIS do `renderReports` (Relatórios de Atraso · read-only · exportável):
+- **Bar chart (time-series)** `rep-pbars`: colunas flex align-end, altura fixa (~118px) + hairline de
+  base; barra `rep-pbfill` largura ~62%, radius topo 7, `min-height` 6px; número (`rep-pbn`, tabular,
+  atenuado em zero) acima e label MM-DD (`rep-pbl`) abaixo. Cor da barra por faixa de contagem
+  (≥4 vermelho / ≥2 laranja / senão azul). Sem eixo/grid pesado; sem gradiente/3D.
+- **SLA timeline row** `rep-tl`: sequência de passos (`rep-tlstep` = dot 8px com anel branco + rótulo
+  11.5 tx-2) separados por hairline `rep-tlsep` 16×1.5; cor do dot por `repStepColor` (enviado cinza /
+  produção azul / revisão laranja / atraso vermelho / crítico crítico / concluído verde). `flex-wrap`
+  permitido. Vive dentro da célula "Linha do tempo" da dense table.
+- **Toggle chip** `rep-tg`: chip h40 com quadradinho 15px (`.box`); OFF = outline hair + tx-2 + box
+  vazio; ON = tint vermelho 8% + microborder 34% + ink `sv-vermi` + box preenchido. É filtro binário
+  ("Só atrasados"), NÃO um switch iOS.
+- **Export contextual action** `rep-exp`: botão VERDE secundário (tint green 8% + microborder 30% + ink
+  `--green`, ícone download 15px). **Regra de hierarquia (reforça F7D):** ação contextual/secundária —
+  em superfície read-only não existe CTA primário; os dois export coexistem sem competir. Nunca gradiente
+  de marca (isso é do "Nova tarefa"/"Salvar tarefa").
+- **Serialização/entrega:** CSV (`;` UTF-8) e JSON via `execDownload` (Blob) — download LOCAL do
+  browser; sem rede/IPC/Firestore. Nomes `relatorio-atraso-AAAA-MM-DD.{csv,json}`.
+- **Grid de KPI 4-col** (`.ex-kpis.k4`): variação do KPI card do F10 (4 em vez de 5).
+Reutiliza integralmente (do F10): KPI card, dense data table, pct cell, sev pill, mini-list, select,
+period segmented. Congelam formalmente quando o owner aprovar o Frame 11 (ainda NÃO Golden).
