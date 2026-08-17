@@ -10,6 +10,50 @@ oficial da superfície NOVA TAREFA. Nenhum Frame 7 pode ser redesenhado sem auto
 
 ---
 
+## FRAME 10 — EXECUTIVO (candidata) · `proposta-c-frame10-executivo.html`
+**Status:** Frames 1–9 GOLDEN. FRAME 10 aplica o DS Golden ao Painel Executivo REAL
+(renderExecPanel 5523) — NÃO é dashboard inventado.
+
+**Auditoria read-only dupla (leitura direta + auditor paralelo, 1.0.246):**
+- Rota `state.tab==='exec'` → renderExecPanel em #content (shell global). **GATE:** priTabVisible só
+  oculta 'prioridades'; 'exec' está SEMPRE na nav — **sem gate de admin/CEO na aba**. O acesso real
+  é por ESCOPO de dados: `visibleTasks(u)` (canSeeAll = ADMIN/MANAGER → lista inteira; operacional →
+  só suas tarefas). Arydyjany CEO·admin ⇒ agregado total. Tela READ-ONLY.
+- Título "Painel Executivo" + "SLA & Produtividade · tempo real · read-only". Período segmentado
+  (Hoje/7 dias/30 dias/Tudo) + 4 selects (Designer/Cliente/Tipo/Status SLA). Fonte = state.tasks
+  via slaExecAggregate (resolveTaskDisplayState/isTaskCompleted/designerSla). Só tasks — nada de
+  receita/NPS/health/metas/forecast.
+- KPIs reais (execKpi): Ativas · No prazo (+%) · Alerta laranja · Atrasadas · Críticas. Distribuição
+  (execDistBar). Ranking de designers (tabela execDesRow: Designer/Carga/%noPrazo[execPctCell]/Lar./
+  Atr./Crít.[pills]/Atraso méd.; ordem por execRiskScore=crít*3+atr*2+lar). Clientes críticos /
+  Tipos com mais atraso / Próximos vencimentos / Tarefas críticas recentes (execMiniList). Alert
+  real se critico>0. Empty real "Sem dados no período" (não é o caso). Ações = só período+filtros
+  (re-render); sem exportar (isso é F11 Relatórios).
+- Setores ATIVOS reais (Cronograma, Edição de vídeos); designers reais (Felipe, Boaz). Cores por
+  severidade (execSevHex) remapeadas ao Light UI (azul/laranja/vermelho/crítico distintos).
+
+**DÍVIDA FUNCIONAL registrada (precedente "Subtipo", não corrigir no mockup):** no código real
+`ativas` conta `hasSla && !done`, enquanto `prazo/laranja/atras/critico` contam por `d.state` sobre
+TODA a lista — bases de contagem diferentes; o hint "% do total" (prazo/ativas) mistura as bases e
+pode não fechar/passar de 100%. Também: `criticasRecentes` inclui overdue NÃO-crítico (nome
+enganoso). O cenário do mockup é um snapshot VÁLIDO onde as bases coincidem (24 = 16+3+3+2), sem
+contradizer o código.
+
+**Coerência matemática do cenário (fictício; estrutura/fórmulas reais):** ativas 24 = 16+3+3+2;
+%noPrazo = round(16/24)=67%. Designers somam: carga 14+10=24, laranja 1+2=3, atras 2+1=3, crít
+1+1=2. Overdue total 5 = Sunset(3,1crít)+GreenLife(2,1crít) = Cronograma3+Ed.vídeos2. Críticas =
+atraso >10min (22/14); atrasadas ≤10min (8/5). Todos os totais fecham.
+
+**Composição:** shell + header globais Golden (título "Painel Executivo" + subtítulo live; SLA +
+sino). Coluna centrada (real exec-wrap 1340). Toolbar (período segmentado + 4 selects) + alerta +
+5 KPIs + distribuição + grid(ranking 1fr | laterais 400px) + grid2(vencimentos | críticas critbox)
++ rodapé disclaimer. Cabe no viewport sem scroll. Cor = accent (bar/pill/dot), nunca card pintado.
+
+**C1 / novos contratos REAIS validados aqui:** KPI/metric card (accent bar + valor editorial +
+hint), distribution bar + legend, **data table** (numeric alignment, header, pills), pct progress
+cell, sev pill, ranking row, mini-list k/v, executive alert banner, period segmented (reforça F8).
+Reutiliza select, avatares, tipografia, ícones. Fotos: fallback real de iniciais.
+
 ## FRAME 9 — NOTIFICAÇÕES · CENTRAL (candidata) · `proposta-c-frame9-notificacoes.html`
 **Status:** Frames 1–8 GOLDEN. FRAME 9 aplica o DS Golden à Central de Notificações REAL
 (renderNotifCentral 5734) — próxima superfície do Master Surface Map.

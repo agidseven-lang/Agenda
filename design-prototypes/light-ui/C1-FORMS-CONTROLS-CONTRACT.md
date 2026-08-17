@@ -191,3 +191,20 @@ Controles REAIS da Central de Notificações que começam a estabelecer contrato
 - **Day grouping**: rótulo 11/700 uppercase tx-4 (Hoje/Ontem/data).
 - **Empty state** (documentado, não renderizado): ícone + título + subtítulo.
 Congelam formalmente quando o owner aprovar o Frame 9.
+
+
+## 12 · NOVOS CANDIDATOS observados no EXECUTIVO (Frame 10 — a congelar no checkpoint respectivo)
+Componentes REAIS do Painel Executivo (SLA & Produtividade):
+- **KPI / metric card**: surface branca radius 16, faixa de accent lateral 3.5px na cor semântica,
+  label 12/600 tx-3, valor InterTight 30/700 na cor, hint 11 tx-4. Nunca 64px/gradiente/glow.
+- **Distribution bar + legend**: barra empilhada h16 (larguras % por segmento) + legenda dot+label+
+  contagem. Cores por severidade.
+- **Data table (dense)**: header 10.5/700 uppercase tx-4 com hairline; linhas 13.5 tx-2, hairline
+  suave; alinhamento numérico central (`.c`); célula de designer avatar 24 + 1º nome.
+- **Pct progress cell**: track sunk 74×6 + fill na cor por faixa (≥90 verde/≥75 azul/≥60 laranja/
+  senão vermelho) + % à direita.
+- **Severity pill**: min 24×22, tint 14% + ink na cor (laranja/vermelho/crítico).
+- **Executive mini-list**: item (dot + texto) ... valor colorido; hairline entre linhas.
+- **Executive alert banner**: tint crítico 7% + microborder 24% + ícone + texto (não gigante).
+- **Period segmented**: track sunk, item ativo surface + sh-1 (reforça o de F8).
+Congelam formalmente quando o owner aprovar o Frame 10.
