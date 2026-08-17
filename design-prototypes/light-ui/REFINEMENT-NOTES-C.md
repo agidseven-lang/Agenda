@@ -56,6 +56,16 @@ texto demonstrado no 7C; Conteúdo 2 tema). C1 checkpoint: read-only summary car
 chips com dotc, ação Editar secundária, action block distinto (send). Cabe no viewport sem scroll
 (overflow-y:auto real só rola quando excede — aqui não excede).
 
+**V2 (correção cirúrgica de hierarquia — layout/estrutura preservados 100%):** único ajuste =
+peso visual das ações. "Enviar para o cliente" rebaixado de CTA-forte (full-width, gradiente
+#5B6CFF→#22D3EE→#10B981 + glow) para **SECONDARY CONTEXTUAL ACTION**: surface clara (tint
+azul-ciano/verde ~7-8%), microborder #12B39A, ícone/texto em accent verde (#1E7A66/#12A08A), sem
+glow, largura contida à esquerda — função/texto/ícone/hint/posição/gate canSendToClient
+intactos. "Salvar tarefa" permanece o CTA primário Golden (gradiente roxo) no rodapé, sem
+aumento. Hairline (rev-actions-sep) separa a zona de ações contextuais do rodapé. Microcontrato
+C1 novo: PRIMARY ACTION (conclui a jornada, gradiente Golden) × SECONDARY CONTEXTUAL ACTION
+(ação real no corpo, refinada, sem competir). Tudo o mais do 7D inalterado.
+
 **Fixes de render:** símbolos i-place/i-grid/i-edit/i-send adicionados ao sprite; card alto
 empurrava o rodapé p/ fora → espaçamentos compactados (stepper/body/footer/rev-*) até Voltar +
 Salvar tarefa ficarem visíveis, sem scroll inventado. Fotos: fallback real de iniciais.

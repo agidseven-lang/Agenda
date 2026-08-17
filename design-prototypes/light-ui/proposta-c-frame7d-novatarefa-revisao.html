@@ -271,12 +271,15 @@ body{font-family:'Inter',-apple-system,'Segoe UI',Roboto,sans-serif;color:var(--
 .rev-content-t b{font-weight:760}
 .rev-content-l{font-size:13px;color:var(--tx-3);margin-top:5px;line-height:1.5}
 .rev-quick{display:flex;gap:10px;margin-top:13px;flex-wrap:wrap}
+.rev-actions-sep{height:1px;background:var(--hair);margin:16px 0 0}
 .rev-edit2{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 16px;border-radius:11px;background:var(--surface);box-shadow:inset 0 0 0 1px var(--hair);color:var(--tx-2);font-size:13px;font-weight:600}
 .rev-edit2 .ic{width:16px;height:16px;color:var(--tx-3)}
-.rev-send{margin-top:13px}
-.rev-send-btn{width:100%;height:50px;border-radius:13px;display:flex;align-items:center;justify-content:center;gap:10px;font-size:14.5px;font-weight:650;color:#fff;background:linear-gradient(135deg,#5B6CFF 0%,#22D3EE 55%,#10B981 100%);box-shadow:0 10px 24px -10px rgba(34,211,238,.5),inset 0 1px 0 rgba(255,255,255,.22)}
-.rev-send-btn .ic{width:18px;height:18px}
-.rev-send-hint{font-size:12px;color:var(--tx-3);margin-top:7px;text-align:center}
+.rev-send{margin-top:14px}
+.rev-send{display:flex;flex-direction:column;align-items:flex-start}
+.rev-send-btn{height:46px;padding:0 20px;border-radius:12px;display:inline-flex;align-items:center;gap:10px;font-size:14px;font-weight:600;color:#1E7A66;background:linear-gradient(135deg,color-mix(in srgb,#5B6CFF 7%,#fff),color-mix(in srgb,#10B981 8%,#fff));box-shadow:inset 0 0 0 1px color-mix(in srgb,#12B39A 34%,#fff)}
+.rev-send-btn .ic{color:#12A08A}
+.rev-send-btn .ic{width:17px;height:17px}
+.rev-send-hint{font-size:12px;color:var(--tx-3);margin-top:8px;text-align:left;padding-left:2px}
 .qty{display:flex;align-items:center;gap:9px}
 .qty .qb{width:42px;height:42px;border-radius:12px;background:var(--surface);box-shadow:inset 0 0 0 1px #DFE3EB;font-size:19px;font-weight:700;color:var(--tx-2);display:flex;align-items:center;justify-content:center}
 .qty .qv{width:96px;height:42px;border-radius:12px;background:var(--surface);box-shadow:inset 0 0 0 1px #DFE3EB;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:var(--tx-1)}
@@ -465,6 +468,8 @@ body{font-family:'Inter',-apple-system,'Segoe UI',Roboto,sans-serif;color:var(--
             <button class="rev-edit2"><svg class="ic"><use href="#i-edit"/></svg> Editar dados</button>
             <button class="rev-edit2"><svg class="ic"><use href="#i-doc"/></svg> Editar briefing</button>
           </div>
+
+          <div class="rev-actions-sep"></div>
 
           <div class="rev-send">
             <button class="rev-send-btn"><svg class="ic"><use href="#i-send"/></svg> Enviar para o cliente</button>
