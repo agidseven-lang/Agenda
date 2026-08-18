@@ -10,6 +10,71 @@ oficial da superfície NOVA TAREFA. Nenhum Frame 7 pode ser redesenhado sem auto
 
 ---
 
+## FRAME 13 — MODAL "LEGENDAS E ARTES" (candidata) · `proposta-c-frame13-modal-legendas-artes.html`
+**Status:** Frames 1–12 GOLDEN. FRAME 13 = último Frame A prioritário do Master Surface Map —
+modal REAL de produção (`renderProductionModal` 9221) no DS Golden, sobreposto ao **Frame 6 Golden
+intacto** (mesma tarefa Sunset Wear no estágio 'Aguardando legendas e posts', de onde o CTA real
+"Legendas e artes" abre o modal). **Não declarado Golden; Frames A NÃO declarados completos.**
+
+**Reauditoria read-only (1.0.246):** openProductionModal 9204 / artBox 9210 / renderProductionModal
+9221 / prodCollect+saveProduction 9252–9286 / ikUpload 9192 / handlers 9239–9251 + 12449–12450 /
+CSS real 383–389, 1230–1231, 1714–1750, 1952–1971 / gates 6630–6674 (pendências) + 8642 (hero).
+
+**Abertura/gate real:** CTA "Legendas e artes" (`data-prodopen`) no hero do Detalhes, estágio
+`designer_entregou` (owner social; único estado com a action `prod`). `openProductionModal`:
+**isTaskCompleted ⇒ BLOQUEADO** com toast "Esta tarefa já foi concluída e não pode ser reenviada."
+(F3.5.6A-H16, zero write; fail-safe mesmo com botão oculto). Sem gate de papel no handler —
+disponibilidade é por FASE. `state._prod` = cópia temporária de `cronContents` (nada grava até Salvar).
+
+**Estrutura real do modal:** `#modalRoot` → `.modal-back` (desktop centrado, rgba(6,7,11,.62) +
+**blur 3px REAL**) → `.sheet.pr-sheet` (max-width 680, radius 18, max-height 88vh) com **X**, ícone
+âmbar film (`.pr-ic`), título **"Legendas e artes"**, sub literal "Preencha a legenda e anexe as
+artes de cada conteúdo. Feed **1080×1440** e Story **1080×1920**. Depois reenvie ao cliente pelo
+mesmo link." → `.pr-list` (**todos os conteúdos EMPILHADOS; scroll real 56vh**, scrollTop preservado
+1.0.110; SEM tabs/accordion/prev-próximo/contador) → footer `.sp-actions`.
+
+**Card por conteúdo:** nº (`.pr-n`) + **TEMA READ-ONLY** no header (`.pr-tema` via rteInlineDisplay;
+"(sem tema)" se vazio) → label "Legenda" + **RTE Golden real** (`rteField 'prod|i|legenda'`,
+placeholder "Escreva a legenda deste conteúdo…"; toolbar só no foco — contrato F7C) → `.pr-arts`
+(grid 2 col) com `artBox` Feed e Story: label "Feed · 1080 × 1440"/"Story · 1080 × 1920";
+vazio = `.pr-drop` tracejado "Anexar Feed/Story" (label + input file oculto `accept="image/*"` —
+**só clique; SEM drag-and-drop/clipboard/progress**); anexado = `.pr-thumb` (img cover,
+**aspect-ratio CSS real 1080/1440 e 1080/1920**) + **X remover** (`data-prodclear`); SEMPRE input
+`.pr-url` "ou cole a URL da arte…" (**alternativa real por URL**). Upload real = **ImageKit**
+(`ikUpload`, folder `/cronogramas/{taskId}`, useUniqueFileName); loading/erro por **toast**:
+"Enviando arte…" / "Arte anexada." / "Falha no upload. Cole a URL da arte como alternativa.".
+
+**Footer real (3 ações literais):** "Cancelar" (ghost) · "**Salvar**" (ghost + check, contextual) ·
+"**Salvar e reenviar ao cliente**" (primária `.sp-go`). **SALVAR ≠ ENVIAR (provado):** Salvar grava
+`cronContents` + pendências recalculadas (`pendingLegend/Feed/Story`) + `pendingSocialReview` +
+history `social_producao`, fecha o modal e toast "Produção salva. Reflete no link do cliente.";
+"Salvar e reenviar" TAMBÉM só **prepara** (`cronStatus:'ready_for_final_client_review'`,
+`finalApprovalRequired`, `clientApprovalPhase:'final'` — **sem afirmar envio**, H13: o evento de
+envio só é gravado na confirmação real via Worker) e **abre openSendClientModal**. Fecha otimista e
+grava async (sem loading/disabled nos botões). Salvar NUNCA conclui: pendências bloqueiam
+`isFullyComplete` (entrega do designer ≠ conclusão). Modal é **interno** (zero ações de cliente).
+
+**Estado demonstrado (1, rico):** conteúdo 1 parcialmente preenchido — tema read-only, legenda
+preenchida (RTE sem foco), **Feed anexado** (arte sintética CSS + X + URL fictícia
+`https://exemplo.cdn/...`) e **Story vazio** (drop tracejado + URL placeholder); scrollbar da lista
+indica o conteúdo 2 abaixo (estrutura de pilha real; card 2 existe no DOM, clipado pelo scroll).
+
+**DÍVIDAS/REGISTROS (não corrigir):** dimensões 1080×1440/1080×1920 são **orientação editorial**
+(aspect-ratio visual; **nenhuma validação funcional** de dimensão/tamanho — só `accept="image/*"`);
+upload sem progress (toasts); botões de salvar **sem disabled/loading** (double-submit possível —
+fecha antes do await); `.pr-url` aceita qualquer texto (sem validação de host); sem estado por
+conteúdo (completo/incompleto) DENTRO do modal — as pendências vivem na tarefa (F6 mostra).
+
+**Adaptações de apresentação (documentadas):** backdrop real .62 → véu 46% + blur 3px (real)
+calibrado ao tema claro; gradiente de envio do `.sp-go` (azul→teal→verde real) → **CTA primário
+Golden** (`--grad`) conforme contrato PRIMARY do DS; sombras/raio pelo DS. Estrutura, ordem e
+literais 100% reais; arte demo 100% sintética (nenhuma foto/material de cliente/URL real).
+
+**C1 reutilizados:** RTE Golden (F7C), labels uppercase de micro-seção, hairlines, surface-2 card,
+CTA primário gradiente, ghost buttons, radius/sombras/tipografia. **Novos candidatos (§15):**
+modal/dialog + backdrop, sticky-footer de modal (adaptação visual), file drop tracejado, image
+thumbnail com aspect-ratio real, remove-file chip, URL fallback input, scrollbar de lista interna.
+
 ## FRAME 12 — LOGIN (candidata) · `proposta-c-frame12-login.html`
 **Status:** Frames 1–11 GOLDEN. FRAME 12 aplica o DS Golden à superfície REAL de autenticação —
 NÃO é landing/marketing/onboarding; NÃO cria novo sistema de auth. **Não declarado Golden.**

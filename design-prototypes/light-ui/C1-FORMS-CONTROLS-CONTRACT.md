@@ -258,3 +258,31 @@ Componentes REAIS da superfície de autenticação (renderLogin/#login — stand
   rede) — o login NUNCA aparece antes de negativa real de sessão.
 Pendentes/dívidas anotadas no F12: Enter não submete (div sem form); recovery é stub nesta build.
 Congelam formalmente quando o owner aprovar o Frame 12 (ainda NÃO Golden).
+
+## 15 · NOVOS CANDIDATOS observados no MODAL "LEGENDAS E ARTES" (Frame 13 — a congelar no checkpoint)
+Primeiro contrato de MODAL/DIALOG do Light UI (não havia foundation nomeada — candidato novo,
+sem conflito). Componentes REAIS do renderProductionModal:
+- **Modal/dialog (sheet)**: surface branca, width até 680 (real), radius 18, sombra elevada
+  (hairline + 24/70 + 44/96), padding ~24×26, header centrado (ícone-selo + título InterTight
+  20/700 + sub 13 tx-3 com termos em bold), X no topo-direito (34px, hairline, target ≥34).
+- **Backdrop**: véu escuro + **blur 3px (REAL do produto)** — no tema claro véu ~46%; contextualiza
+  a superfície de origem sem disputar (F6 legível atrás). Clique fora/Esc = fechar (real).
+- **Lista interna rolável**: pilha vertical de cards (surface-2 + hairline, radius 14) com scroll
+  próprio (real 56vh) e scrollbar fina visível; header/footer do modal sempre utilizáveis
+  (sticky por estrutura — adaptação visual documentada, comportamento real preservado).
+- **File drop (clique)**: área tracejada 1.5px (#CBD2DE), radius 12, ícone plus 22 + rótulo 12/700
+  ("Anexar Feed/Story"); **aspect-ratio REAL da mídia** (1080/1440, 1080/1920) como forma do
+  controle. SÓ clique (sem drag-and-drop — fiel ao código).
+- **Image thumbnail**: radius 12, hairline, img cover no aspect real; **remove-chip** X 26px
+  (fundo escuro 60%, canto sup-dir, title "Remover") — destructive contextual distinguível.
+- **URL fallback input**: input compacto h34, radius 9, 11.5px, placeholder "ou cole a URL da
+  arte…" — alternativa real ao upload; truncamento em 1 linha.
+- **Footer de 3 ações**: SECONDARY ghost ("Cancelar") · CONTEXTUAL ghost+ícone ("Salvar") ·
+  PRIMARY Golden gradiente ("Salvar e reenviar ao cliente", flex maior) — hierarquia real
+  preservada (a primária do modal é o reenvio; Salvar é contextual).
+- **Selo de ícone do modal** (`.pr-ic`): 54px radius 15, tint âmbar 13% + ink âmbar — categoria
+  visual da ação (produção), padrão para selos de modal.
+- **Read-only reference no card**: tema exibido como TÍTULO do card (nunca editável no modal) —
+  contrato "referência ≠ campo".
+Dívidas anotadas no F13 (não corrigir): sem validação de dimensão/tamanho; sem progress; botões
+sem loading/disabled; URL sem validação. Congelam quando o owner aprovar o Frame 13 (NÃO Golden).
