@@ -1,4 +1,20 @@
-> **ATUALIZAÇÃO (checkpoint formal):** FRAME 7 — Nova tarefa (wizard 4 passos Setor→Dados→Briefing→Revisão)
+> ## ★ CHECKPOINT GLOBAL DO DESIGN (decisão do owner)
+> **FRAMES A PRIORITÁRIOS 1–13 = GOLDEN / CONGELADOS.** Commits finais:
+> F1 V10 `e7107e3` · F2 `45721bc` · F3 `b5842bc` · F4 `66d9a6a` · F5 `c0c83f4` · F6 `9644d94` ·
+> F7 (7A `ea485c2` · 7B `c0cb413` · 7B V2 `5d2b10d` · 7C `7361f92` · 7D `e18d9f7` · 7D V2 `755eee6` ·
+> checkpoint `f5d1909`) · F8 `96fd7d3` · F9 `8173940` · F10 `9de9a6b` · F11 `efb264a` ·
+> F12 `6e52905` · F13 `32103bd`. Higiene auditada: 31 commits, todos exclusivamente em
+> `design-prototypes/light-ui/`; zero produção; zero binário versionado; `_avatars.css` =
+> ilustrações sintéticas licenciadas (DiceBear micah CC BY 4.0, sem fotos reais);
+> `_team-photos.css` local-only (gitignored); zero segredo/credencial.
+> **Isto NÃO é Design Completo**: C1 = GOLDEN PARCIAL; C2–C8 = nomeadas abaixo (§F) porém sem
+> contrato dedicado; superfícies B = specs pendentes; responsividade validada SOMENTE em
+> 1920×1080; A-futuras (F14a–c) gated. Sequência de fechamento: `DESIGN-CLOSURE-ROADMAP.md`.
+> **Implementação Light UI = NÃO AUTORIZADA** (regra da seção 4 permanece).
+> A contagem/estado abaixo neste banner substitui as células desatualizadas das matrizes
+> históricas: **GOLDEN 13 · A-futura gated 3 · B 6 · C 7 · Trilha separada 1 = 30.**
+
+> **ATUALIZAÇÃO (checkpoint formal, histórico):** FRAME 7 — Nova tarefa (wizard 4 passos Setor→Dados→Briefing→Revisão)
 > = **GOLDEN / CONGELADO** (7A `ea485c2` · 7B V2 `5d2b10d` · 7C `7361f92` · 7D V2 `755eee6`). A classe A
 > "Nova tarefa" passa de pendente a ENTREGUE (4 frames). Foundation **C1 = GOLDEN PARCIAL** — ver
 > `C1-FORMS-CONTROLS-CONTRACT.md`. Golden agora = 6 (F1–F6) + Frame 7 (4 sub-frames).
@@ -11,8 +27,10 @@
 + janelas auxiliares (`bgnotify.html`, `slareminder.html`) + Worker (portal do cliente).
 **Zero alteração de produção. Zero mockup gerado nesta fase. Golden Frames 1–5 congelados.**
 
-Golden congelados (fonte visual da verdade):
-F1 Meu quadro V10 · F2 Cliente · F3 Designers · F4 Social Medias · F5 Setores.
+Golden congelados (fonte visual da verdade) — ATUALIZADO no checkpoint global:
+F1 Meu quadro V10 · F2 Cliente · F3 Designers · F4 Social Medias · F5 Setores · F6 Detalhes ·
+F7 Nova tarefa (7A/7B V2/7C/7D V2) · F8 Agenda · F9 Central de Notificações · F10 Executivo ·
+F11 Relatórios · F12 Login (standalone) · F13 Modal Legendas e artes.
 
 ---
 
@@ -66,6 +84,9 @@ filtra DADOS por papel (não muda composição). Nenhum frame extra por cargo.
 ---
 
 ## B. MATRIZ MESTRE A/B/C/D
+> **Nota do checkpoint global:** esta matriz é o plano HISTÓRICO pré-F6. As linhas classe **A**
+> (Detalhes…Modal) foram TODAS entregues e aprovadas — estado vigente na "Matriz fechada" (§1
+> do Checkpoint de Consistência, atualizada) e no banner do topo. Mantida para rastreabilidade.
 
 Classes: **A** mockup próprio obrigatório · **B** reutiliza Golden · **C** component spec
 transversal · **D** apenas tokens.
@@ -133,6 +154,23 @@ picker de designer/prazo) → **C3 — Menus/Dropdowns/Popovers** → **C4 — E
 **C5 — Loading/Skeleton/Splash** → **C6 — Toasts & Erros inline (+banner update/team session)** →
 **C7 — Tabela** → **C8 — Estados de interação & stat-tile** (hover/selected/focus/scrollbar).
 
+### F.1 · ESTADO REAL DAS FOUNDATIONS (checkpoint global — auditado, sem inventar)
+Esta seção §F é a **fonte formal da taxonomia C1–C8** (nomes acima, definidos na fase de
+inventário). Estado após F1–F13:
+| Cn | Nome formal (fonte: este §F) | Estado | Evidência visual Golden | Falta |
+|---|---|---|---|---|
+| C1 | Forms & Controles | **GOLDEN PARCIAL** (contrato dedicado) | F7 (29 comp.) + promoções F8–F13 (§10–15 do contrato) | estados §3 do contrato (disabled/erro/saving/destructive/checkbox-radio/validação) |
+| C2 | Modais & Sheets | NOMEADA · **âncora Golden F13** (modal denso real) + sheet de evento documentado (F8) | F13 `32103bd` | contrato dedicado; del-sheet destrutivo e picker designer/prazo sem prova visual |
+| C3 | Menus/Dropdowns/Popovers | NOMEADA · parcial | selects estilizados F9 (nc-fl) / F10–F11 (exec-fl) | contrato; menus de card/popovers sem prova (menu nativo Electron fora do CSS) |
+| C4 | Empty States | NOMEADA · documentada | `emptyState()` real documentado em F8/F9/F11 (não renderizado) | contrato + 1 prova visual |
+| C5 | Loading/Skeleton/Splash | NOMEADA · documentada | splash de restauração documentado (F12); "sem skeleton sistemático" no real | contrato + decidir skeleton |
+| C6 | Toasts & Erros inline | NOMEADA · parcial | banner err/ok do login (F12, candidato) + toasts reais documentados (F13 upload) | contrato + prova visual do toast/banner |
+| C7 | Tabela | NOMEADA · **provada** | dense data table F10/F11 (execDesRow 7 col, pct cell, pills) | contrato dedicado (paginação NÃO existe no real — não inventar) |
+| C8 | Estados de interação & stat-tile | NOMEADA · parcial | focus/selected/OFF etc. congelados via C1 §2 | stat-tile (Hoje) sem prova; hover real; scrollbar spec |
+Nenhuma outra foundation nomeada existe nos documentos; **não criar códigos novos** sem decisão
+do owner. O modal do F13 pertence à **C2** (corrigida a nota do F13 que dizia "sem foundation
+nomeada" — o nome já existia neste §F).
+
 ## G. FUNDAÇÃO LIGHT (congelar antes de implementar)
 Tokens de cor (canvas/surface/surface-2/sunk/hairlines/tx-1..4/sb-*/brand/grad/status/eixos
 cliente-designer-social-operacional já provados nos Golden) · tipografia Inter + Inter Tight
@@ -151,11 +189,10 @@ scrollbars · skeleton · transições (drawer/scrim 0.18–0.2s; reduced-motion
 | Wizard/modais | baixo (sheets roláveis) | baixo | ok | ok | médio | não |
 | Config/Perfil/Equipe | baixo | baixo | ok | ok | baixo | não |
 
-## I. ORDEM PROPOSTA DOS PRÓXIMOS FRAMES (somente classe A; nenhum gerado)
-**F6** Detalhes completos da tarefa → **F7** Nova tarefa (wizard, passo Briefing) →
-**F8** Agenda (mensal) → **F9** Central de Notificações → **F10** Executivo →
-**F11** Relatórios → **F12** Login → **F13** Modal Legendas e artes →
-(**F14** janelas premium Light — P2, somente com GO específico; contrato funcional congelado).
+## I. ORDEM DOS FRAMES A — ✔ CONCLUÍDA (checkpoint global)
+**F6 → F13 = todos entregues e GOLDEN** (commits no banner do topo). Restante desta trilha:
+(**F14a–c** janelas premium Light — P2, somente com GO específico do owner; contrato funcional
+congelado; FORA do caminho crítico do fechamento do design salvo decisão contrária).
 
 ## J. ORDEM DOS COMPONENT SPECS
 C1 → C2 (antes de F7/F13) → C3 → C4 → C5 → C6 → C7 (antes de F10/F11) → C8.
@@ -189,14 +226,14 @@ novo gerado; Golden Frames intocados.*
 | 3 | Designers | renderDesigner* | SIM | F3 | GOLDEN | — | feito | 1 | aprovado |
 | 4 | Social Medias | renderSocial* | SIM | F4 | GOLDEN | — | feito | 1 | aprovado |
 | 5 | Setores | renderBoard | SIM | F5 | GOLDEN | — | feito | 1 | aprovado |
-| 6 | Detalhes completos | renderClientView + opPanelBlock | NÃO | — | **A** | P0 | SIM | 1 (F6) | rota dedicada |
-| 7 | Nova tarefa (wizard) | renderForm | NÃO | — | **A** | P0 | SIM | 1 (F7) | 4 passos reais |
-| 8 | Agenda | renderAgenda | NÃO | — | **A** | P0 | SIM | 1 (F8) | calendário mensal |
-| 9 | Central de Notificações | renderNotifCentral | NÃO | — | **A** | P1 | SIM | 1 (F9) | lista+filtros |
-| 10 | Executivo | renderExecPanel | NÃO | — | **A** | P1 | SIM | 1 (F10) | KPIs reais |
-| 11 | Relatórios | renderReports | NÃO | — | **A** | P1 | SIM | 1 (F11) | tabela+export |
-| 12 | Login | renderLogin | NÃO | — | **A** | P1 | SIM | 1 (F12) | porta de entrada |
-| 13 | Modal Legendas e artes | renderProductionModal | NÃO | — | **A** | P1 | SIM | 1 (F13) | RTE+uploads |
+| 6 | Detalhes completos | renderClientView + opPanelBlock | SIM | F6 | **GOLDEN** | — | feito | 1 | `9644d94` |
+| 7 | Nova tarefa (wizard) | renderForm | SIM | F7 (7A–7D) | **GOLDEN** | — | feito | 4 | `ea485c2`/`5d2b10d`/`7361f92`/`755eee6` + `f5d1909` |
+| 8 | Agenda | renderAgenda | SIM | F8 | **GOLDEN** | — | feito | 1 | `96fd7d3` |
+| 9 | Central de Notificações | renderNotifCentral | SIM | F9 | **GOLDEN** | — | feito | 1 | `8173940` |
+| 10 | Executivo | renderExecPanel | SIM | F10 | **GOLDEN** | — | feito | 1 | `9de9a6b` |
+| 11 | Relatórios | renderReports | SIM | F11 | **GOLDEN** | — | feito | 1 | `efb264a` |
+| 12 | Login | renderLogin | SIM | F12 | **GOLDEN** | — | feito | 1 | `6e52905` · standalone SEM shell |
+| 13 | Modal Legendas e artes | renderProductionModal | SIM | F13 | **GOLDEN** | — | feito | 1 | `32103bd` · âncora C2 |
 | 14 | Notificação externa premium | bgnotify.html | NÃO | — | **A futura** | P2 | futuro | 1 (F14a) | contrato congelado; GO próprio |
 | 15 | Lembrete central SLA | slareminder.html | NÃO | — | **A futura** | P2 | futuro | 1 (F14b) | contrato congelado |
 | 16 | Check-in de execução | janela F3.5.4Q | NÃO | — | **A futura** | P2 | futuro | 1 (F14c) | contrato congelado |
@@ -215,8 +252,8 @@ novo gerado; Golden Frames intocados.*
 | 29 | Loading/splash | auth splash/prewarm/"Carregando…" | NÃO | — | **C** | P1 | spec | — | C5 |
 | 30 | Client Portal | Worker renderClientHtml | NÃO | — | **TRILHA SEPARADA** | — | não agora | — | decisão visual própria |
 
-**Contagem fechada (soma = 30, sem dupla contagem):**
-GOLDEN **5** · A **8** (F6–F13) · A-futura gated **3** (F14a–c) · B **6** · C **7** · Trilha separada **1**.
+**Contagem fechada (soma = 30, sem dupla contagem) — ATUALIZADA no checkpoint global:**
+GOLDEN **13** (F1–F13) · A **0** pendentes · A-futura gated **3** (F14a–c) · B **6** · C **7** · Trilha separada **1**.
 Nota: C1 (Forms), C7 (Tabela) e C8 (Estados de interação) são SPECS de fundação extraídas de
 superfícies A/B — não são superfícies próprias e por isso não somam na matriz; C2–C6 correspondem
 às superfícies classe C acima.

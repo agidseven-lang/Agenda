@@ -1,3 +1,53 @@
+# ★ CHECKPOINT GLOBAL DO DESIGN — FRAMES A 1–13 = GOLDEN / CONGELADOS
+Decisão do owner. Commits finais: F1 `e7107e3` · F2 `45721bc` · F3 `b5842bc` · F4 `66d9a6a` ·
+F5 `c0c83f4` · F6 `9644d94` · F7 `ea485c2`/`c0cb413`/`5d2b10d`/`7361f92`/`e18d9f7`/`755eee6`
+(+checkpoint `f5d1909`) · F8 `96fd7d3` · F9 `8173940` · F10 `9de9a6b` · F11 `efb264a` ·
+F12 `6e52905` · F13 `32103bd`. **NÃO é Design Completo; implementação segue NÃO AUTORIZADA.**
+Fechamento: `DESIGN-CLOSURE-ROADMAP.md`. Taxonomia de foundations = `MASTER-SURFACE-MAP.md` §F/F.1
+(C1 Forms · C2 Modais & Sheets · C3 Menus · C4 Empty · C5 Loading · C6 Toasts/Erros · C7 Tabela ·
+C8 Interação/stat-tile — nomes formais; nenhuma nova sem decisão do owner).
+
+## Contratos GLOBAIS congelados neste checkpoint
+- **SHELL GOLDEN**: sidebar petróleo 284px (brand + Nova tarefa gradiente + nav com badge +
+  cartão do usuário) · header global 92px (título/subtítulo, Monitor SLA verde, sino) · canvas
+  #F5F6F9 · Inter/InterTight · ícones stroke 1.7 · grid 4/8 · raios/sombras Golden.
+  **Exceção formal: LOGIN É STANDALONE (F12) — sem shell na implementação futura.**
+- **FOTO/AVATAR**: com foto cadastrada → foto real do runtime (`photoOf → avatar()`); sem foto →
+  fallback de iniciais. Mocks podem materializar localmente; **NUNCA versionar foto pessoal**
+  (`_team-photos.css` gitignored; `_avatars.css` versionado = ilustrações sintéticas DiceBear
+  micah CC BY 4.0, sem fotos reais — auditado neste checkpoint).
+- **CÓDIGO = FONTE DA VERDADE**: "não inventar" = não criar função inexistente; **não** autoriza
+  esconder função real. Divergência ⇒ AUDITAR → PARAR → REPORTAR → OWNER DECIDE → DESENHAR.
+  Precedentes: "Enviar para o cliente" (7D) · export CSV/JSON (F11) · modal real (F13).
+- **SALVAR ≠ ENVIAR AO CLIENTE** (microcontrato crítico do F13, válido em todo o produto):
+  preparar/salvar nunca afirma envio; envio só na confirmação real (Worker).
+
+## DÍVIDAS FUNCIONAIS CONSOLIDADAS (registradas nos frames; NÃO corrigir no design)
+| Frame | Dívida (fonte real) | Registro |
+|---|---|---|
+| F7 (7D) | Rótulo legado "Subtipo" = "12 conteúdos" (`stepReview`) | C1 §8 |
+| F9 | Rodapé da Central em linguagem técnica (localStorage/retenção literal) — fiel ao real; melhoria de UX-writing fica para fase funcional | registrado NESTE checkpoint (antes só "rodapé literal") |
+| F10 | Bases de contagem divergentes: `ativas` (hasSla&&!done) × distribuição (`d.state`); hint "% do total" mistura bases | notas F10 |
+| F10/F11 | `criticasRecentes` inclui overdue NÃO-crítico (nome enganoso; "Tarefas críticas" lista itens <10min) | notas F10/F11 |
+| F11 | `<thead>` 5 colunas × `execDesRow` 7 células — desalinhamento header×linha em produção | notas F11 |
+| F12 | Recovery = STUB nesta build (telas existem; endpoints de reset não são chamados — banners "não tocado nesta prévia") | notas F12 |
+| F12 | Enter NÃO submete o login (#loginForm é div, sem form/keydown) | notas F12 |
+| F12 | `wp_team_jwt` (JWT de equipe escopado TTL 12h) em localStorage — deliberado/documentado; NÃO é o token de sessão (esse fica no main) | notas F12 (registro de arquitetura) |
+| F13 | Dimensões Feed/Story apenas editoriais (sem validação funcional); sem limite de tamanho/formato além de `image/*` | notas F13 |
+| F13 | Upload sem progress (só toasts); botões de salvar sem disabled/loading (double-submit possível); `.pr-url` sem validação | notas F13 |
+Nenhuma dívida é bloqueio do design; todas pertencem a fase FUNCIONAL futura decidida pelo owner.
+
+## RESPONSIVIDADE / ACESSIBILIDADE — estado honesto
+- **Validado visualmente**: SOMENTE 1920×1080 (todos os F1–F13). 1366×768 e Windows 125% =
+  requisitos documentados (C1 §5; media query real do login registrada no F12) — **NÃO validados**.
+  Matriz de revalidação: `MASTER-SURFACE-MAP.md` §H (boards/detalhes/agenda/exec-relatórios = SIM).
+- **Acessibilidade**: requisitos congelados como SPEC (C1 §6: contraste, foco visível, cor nunca
+  único indicador, targets, labels, keyboard, disabled ≠ OFF). **Nada implementado/validado** —
+  estamos em design. Focus trap de modal: NÃO comprovado no código real — não é contrato; decisão
+  fica para a spec C2/implementação.
+
+---
+
 # ▶ CHECKPOINT FORMAL — FRAME 7 (Nova tarefa) = GOLDEN / CONGELADO
 Decisão do owner: o wizard completo **Setor → Dados → Briefing → Revisão** é a referência Golden
 oficial da superfície NOVA TAREFA. Nenhum Frame 7 pode ser redesenhado sem autorização explícita.

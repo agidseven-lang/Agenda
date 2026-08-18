@@ -1,9 +1,22 @@
 # C1 — FORMS & CONTROLS · DESIGN CONTRACT (Light UI)
 
+> **★ CHECKPOINT GLOBAL (decisão do owner):** os frames-fonte F8–F13 foram aprovados como
+> GOLDEN; portanto os candidatos das seções **§10 (F8) · §11 (F9) · §12 (F10) · §13 (F11) ·
+> §14 (F12) · §15 (F13)** ficam **PROMOVIDOS a GOLDEN** com seus frames (prova visual +
+> aprovação). Itens antes pendentes em §3 agora COBERTOS por frames posteriores: select nativo
+> estilizado (F9 `nc-fl`), table control (F10/F11 dense table — **paginação não existe no real**),
+> file upload/preview/remove/URL (F13), password input + reveal (F12). §3 permanece a lista dos
+> AINDA sem prova. C1 segue **GOLDEN PARCIAL** até esses estados serem demonstrados.
+> Correção de taxonomia: os componentes de MODAL do §15 pertencem à foundation **C2 — Modais &
+> Sheets** (nome formal já definido no `MASTER-SURFACE-MAP.md` §F; a nota original do F13 dizendo
+> "sem foundation nomeada" estava incorreta). O §15 permanece aqui como registro de origem;
+> o contrato dedicado da C2 usará o F13 como âncora Golden.
+
 **Status:** GOLDEN PARCIAL / FOUNDATION OFICIAL. Congelado a partir do wizard **Nova tarefa**
-(FRAME 7 completo, aprovado pelo owner). Fonte funcional auditada: Desktop **1.0.246**. Branch de
-design: `design/f356b-light-ui-mockups`. Este documento **não** altera produção — apenas registra
-os contratos visuais já aprovados. Sobrepõe-se aos tokens congelados dos Golden Frames 1–6.
+(FRAME 7 completo, aprovado pelo owner) e AMPLIADO pelas promoções F8–F13 (banner acima). Fonte
+funcional auditada: Desktop **1.0.246**. Branch de design: `design/f356b-light-ui-mockups`. Este
+documento **não** altera produção — apenas registra os contratos visuais já aprovados.
+Sobrepõe-se aos tokens congelados dos Golden Frames 1–6.
 
 Frames-fonte (não redesenhar sem autorização do owner):
 - FRAME 7A · Setor — `proposta-c-frame7a-novatarefa-setor.html` — commit `ea485c2`
@@ -92,13 +105,18 @@ componente inexistente. Existem no produto e ainda precisam aparecer:
 - **destructive confirmation** (ex.: modal de corte de quantidade `openCronShrinkConfirm`; e o
   "Remover" administrativo do Detalhes — F6);
 - **checkbox / radio** (o real `checklistHtml` usa checkbox em outros setores; cronograma não);
-- **file upload** (existe só na tela de produção "Legendas e artes" — F13, não no wizard);
-- **select nativo estilizado** (o real não usa `<select>` no wizard — usa chips choice);
+- ~~file upload~~ → **COBERTO no F13** (§15: drop, thumb, remove, URL fallback — Golden);
+- ~~select nativo estilizado~~ → **COBERTO no F9** (§11 `nc-fl`) e F10/F11 (`exec-fl`);
 - **multi-select** (canais é choice ÚNICA no real — multi não comprovado);
-- **table control / pagination** (superfícies de lista — Relatórios/Notificações, ainda não vistas);
+- ~~table control~~ → **COBERTO no F10/F11** (§12–13 dense table); **paginação NÃO existe no
+  real** (listas cortam por slice/scroll) — não inventar;
 - **success state** (o real volta ao quadro sem toast — a ausência é o contrato; nada a desenhar).
 
-**Conclusão:** C1 = **GOLDEN PARCIAL**, não 100% concluída.
+**Conclusão (pós-checkpoint global):** C1 = **GOLDEN PARCIAL**. Restam sem prova visual:
+**disabled genérico · error inline genérico · saving/loading · validation summary (real =
+`alert()`) · destructive confirmation (del-sheet) · checkbox/radio · multi-select (inexistente
+no real — provavelmente sai do escopo por decisão do owner)**. Fechar via etapa R2 do
+`DESIGN-CLOSURE-ROADMAP.md` (1 frame de estados sobre superfícies reais).
 
 ---
 
