@@ -10,7 +10,71 @@ oficial da superfície NOVA TAREFA. Nenhum Frame 7 pode ser redesenhado sem auto
 
 ---
 
-## FRAME 11 — RELATÓRIOS DE ATRASO (candidata) · `proposta-c-frame11-relatorios.html`
+## FRAME 12 — LOGIN (candidata) · `proposta-c-frame12-login.html`
+**Status:** Frames 1–11 GOLDEN. FRAME 12 aplica o DS Golden à superfície REAL de autenticação —
+NÃO é landing/marketing/onboarding; NÃO cria novo sistema de auth. **Não declarado Golden.**
+
+**Auditoria read-only (1.0.246): renderer (renderLogin 3151, doLogin 2929, logout 3035, boot
+F3.5.4V-H1 12695, static #login 2686, CSS 70–128) + main (auth.ts, auth-core.ts, preload.ts,
+main.ts 661–688).**
+
+**Arquitetura real (P0, pertence ao relatório — não à UI):**
+- Login **SERVER-SIDE via processo main**: renderer chama `desktopAPI.authLogin(identifier,password)`
+  (contextBridge) → IPC `auth-login` → auth-core → **POST `loginUser`** (Cloud Run,
+  `{identifier,password}`). Servidor faz match **e-mail OU telefone**, valida senha, barra
+  pendente/removido/excluído (`user_inactive`) e aplica **rate-limit**. Renderer **não** lê a coleção
+  `users`, **não** vê pass/salt/hash, **não** verifica senha; recebe SÓ `{ok,user público,error}`.
+- **Token confinado ao main**: memória + `userData/session.json` (mode 0600, escrita atômica
+  tmp+rename). NUNCA vai a renderer/localStorage/log. `contextIsolation:true`, `nodeIntegration:false`.
+- **Boot** = máquina de estados com **SPLASH "Restaurando sessão…"** como padrão; `authSelf`
+  (POST `getUserSelf` Bearer) restaura; login SÓ em negativa real (`no_session`/`expired`,
+  401 JSON **confirmado 2×**) ou escape manual ("Entrar manualmente" após 3 tentativas). Erro de
+  rede mantém splash + retry backoff 3s→60s (offline ≠ logout). Auto-login legítimo = essa restauração.
+- **Logout** = `authLogout` (main **apaga session.json**, provado por diag `wipe`) + limpa
+  `wp_uid`/`wp_name`/`wp_team_jwt` + unsubscribe snapshots → reabrir pede login. **Fechar no X =
+  bandeja** (`window.close→hide(tray)`), ≠ logout. Pós-login: `startApp` → tab inicial **'hoje'**,
+  `subscribeData` (roster via **usersPublic** allowlist), render, `sessionLogin` (presença).
+
+**Estrutura visual real (literais exatos):** standalone **sem shell** (sem sidebar/topbar/SLA/sino);
+brand (logo oficial PNG + h1 "ID Seven" + sub "Desktop · Paridade APK") → título "Entrar" →
+subtítulo "Acesse sua agenda e tarefas da equipe" → `#loginBanner` (vazio no default) → form:
+label+placeholder **"E-mail ou WhatsApp"** (`inputmode=email`) · **"Senha"** (`type=password`,
+toggle TEXTUAL **"Mostrar"/"Ocultar"** dentro do campo — não é ícone) · CTA **"Entrar"** ·
+txtbtn **"Esqueci minha senha"** · nota **"Cadastro interno desativado. Solicite acesso ao
+administrador."** → vfooter (pill "Desktop" + "ID Seven", **sem número de versão**). Sem
+"Lembrar-me"/social/biometria/QR/PIN/SSO/captcha/2FA/criar conta (não existem). **Erro real =
+banner form-level** (`.banner.err`) em `#loginBanner`; literais: "E-mail/WhatsApp ou senha
+incorretos." / "Conta inativa ou aguardando aprovação." / "Muitas tentativas. Aguarde alguns
+minutos e tente de novo." / "Preencha e-mail/WhatsApp e senha." / "Sem conexão com o servidor de
+login...". **Loading real**: botão disabled + spinner substitui o texto. Responsivo real:
+`@media(max-height:660px)` compacta p/ 1366×768 @125% sem scroll.
+
+**Estado demonstrado:** pronto para entrada — identifier preenchido com conta FICTÍCIA
+`teste@idseven.com.br` + **foco Golden C1** (ring #6E5EF3 + halo 11% + caret); senha mascarada
+(glifos "•" — nenhuma senha real/documentada); toggle "Mostrar"; sem banner (default).
+
+**DÍVIDAS FUNCIONAIS registradas (precedente Subtipo; NÃO corrigir):**
+1. **RECOVERY = STUB nesta build**: o link "Esqueci minha senha" e as telas forgot (e-mail →
+   código 6 dígitos + nova senha) EXISTEM, mas "Enviar código"/"Criar nova senha" **não chamam
+   endpoint** — banners literais dizem que o backend de reset (Cloud Functions de produção) "não é
+   tocado nesta prévia/homologação. Use sua senha atual para entrar." Link real; fluxo além dele =
+   placeholder deliberado.
+2. **Enter NÃO submete o login**: `#loginForm` é `<div>` (sem `<form>`/keydown no login principal;
+   só o modal de team-session tem Enter). Dívida de teclado/a11y.
+3. **`wp_team_jwt` em localStorage**: JWT de EQUIPE escopado (Worker `/team/session`, TTL 12h,
+   emitido pós-login com a senha usada SÓ nessa chamada HTTPS) — deliberado/documentado; NÃO é o
+   token de sessão do auth. Registro de arquitetura, não bug.
+
+**Adaptações de apresentação (documentadas):** campos reais ficam soltos no fundo escuro → no
+Light UI a coluna vira **card Golden** branco (sh-2, 464px) sobre canvas com véu radial ≤4%
+(precedente F8/F10/F11). Marca: real usa o PNG oficial (base64 `--logo`); mockup usa o
+**brand-mark Golden** dos Frames 1–11 (asset binário não copiado). h1 real é accent → DS usa tx-1;
+labels reais uppercase 11px → C1 Golden 13/600 sentence-case (literais preservados).
+
+**C1 reutilizados:** text input h46/r12/ring #DFE3EB, label 13/600, focus #6E5EF3+halo, primary
+CTA gradiente h48/r13 (único por tela), link/txt action, radius/sombras/tipografia Golden.
+**Novos candidatos (§14):** password input + reveal textual, form-level error banner (err/ok),
+auth card standalone, brand block, version footer pill, splash de restauração (documentado).
 **Status:** Frames 1–10 GOLDEN. FRAME 11 aplica o DS Golden à superfície RELATÓRIOS real
 (`renderReports` 5600) — NÃO é BI/dashboard novo. **Não declarado Golden** (decisão do owner).
 

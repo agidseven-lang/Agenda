@@ -231,3 +231,30 @@ Componentes REAIS do `renderReports` (Relatórios de Atraso · read-only · expo
 - **Grid de KPI 4-col** (`.ex-kpis.k4`): variação do KPI card do F10 (4 em vez de 5).
 Reutiliza integralmente (do F10): KPI card, dense data table, pct cell, sev pill, mini-list, select,
 period segmented. Congelam formalmente quando o owner aprovar o Frame 11 (ainda NÃO Golden).
+
+## 14 · NOVOS CANDIDATOS observados no LOGIN (Frame 12 — a congelar no checkpoint respectivo)
+Componentes REAIS da superfície de autenticação (renderLogin/#login — standalone, sem shell):
+- **Password input + reveal TEXTUAL**: mesma família do text input Golden (h46/r12/ring #DFE3EB),
+  `type=password`, valor mascarado (glifos •, letter-spacing .14em); botão de revelar é **texto**
+  "Mostrar"/"Ocultar" (12.5/700 brand) DENTRO do campo à direita, target ≥34px, padding-right no
+  input p/ não sobrepor. Não é ícone de olho; sem caps-lock warn/strength meter (não existem).
+- **Form-level error banner** (`.banner`): largura total, radius 12, padding 12×14, 13/500;
+  `err` = tint vermelho ~12% + ink; `ok` = tint verde ~12% + ink. Posição REAL: `#loginBanner`
+  entre subtítulo e form (não é inline por campo, não é toast, não é modal). Literais de erro do
+  doLogin preservados. Estado default = SEM banner.
+- **Auth card standalone**: superfície de entrada SEM shell (sem sidebar/topbar/SLA/sino) —
+  card Golden branco (sh-2, ~464px, radius 18) centrado no canvas com véu radial da marca ≤4%;
+  identidade vem de marca+tipografia+inputs+CTA, não do shell. Única tela onde o CTA primário
+  convive sem footer de wizard.
+- **Brand block (login)**: brand-mark Golden + h1 InterTight 25/700 + sub 13 tx-3 — literais
+  reais "ID Seven" / "Desktop · Paridade APK". (No produto real o logo é o PNG oficial via
+  CSS var `--logo`; o protótipo não copia o asset binário.)
+- **Version footer pill** (`.vfooter`): pill tint brand 12% + ink (11/800, radius pill) com
+  literal "Desktop" + linha "ID Seven" 11 tx-4. SEM número de versão (fiel ao real).
+- **Loading de submit (documentado, não desenhado)**: botão disabled (opacity .6) + spinner
+  20px substitui o texto — contrato real de `loading(btn,on)`; previne double-submit.
+- **Splash de restauração (documentado, não desenhado)**: estado padrão do boot ("Restaurando
+  sessão…" + spinner accent; hint com "Tentar novamente · Entrar manualmente" após 3 falhas de
+  rede) — o login NUNCA aparece antes de negativa real de sessão.
+Pendentes/dívidas anotadas no F12: Enter não submete (div sem form); recovery é stub nesta build.
+Congelam formalmente quando o owner aprovar o Frame 12 (ainda NÃO Golden).
