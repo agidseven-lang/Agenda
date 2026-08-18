@@ -51,7 +51,8 @@ de fechamento.
 - **Imagem?** NÃO (F13 + R2 já são as provas; nova imagem só se o owner exigir sheet de evento).
 - **Owner approval?** SIM. **Fechamento:** C2 congelada com âncoras citadas.
 
-## R4 · C7 — TABELA · SPEC CONSOLIDADA ▶ ENTREGUE (aguarda avaliação do owner)
+## R4 · C7 — TABELA · SPEC CONSOLIDADA ✔ APROVADO PELO OWNER (GO)
+> **C7 = FOUNDATION OFICIAL / GOLDEN** (commit `2516426`); âncoras F10+F11; sem gap visual.
 > **Status:** `C7-TABLE-CONTRACT.md` criado (documental, ZERO imagem): inventário integral =
 > **3 tabelas reais** (Ranking F10 7×7; Atrasos F11 5×7 — dívida re-provada; Histórico F11 4×4
 > com timeline hospedada); 1 família/2 composições; tokens real→Light; interações inexistentes
@@ -64,7 +65,14 @@ de fechamento.
 - **Artefato:** seção C7 formal (dentro do C1-CONTRACT ou arquivo próprio — decisão editorial).
 - **Dependência:** R1. **Imagem?** NÃO. **Owner approval?** SIM. **Fechamento:** C7 congelada.
 
-## R5 · C3/C4/C5/C6 — SPECS DOCUMENTAIS
+## R5 · C3/C4/C5/C6 — SPECS DOCUMENTAIS ▶ ENTREGUE (aguarda avaliação do owner)
+> **Status:** 4 contracts criados (documental, ZERO imagem): `C3-MENUS-POPOVERS` (2 famílias:
+> evd-menu ancorado + card menus portal; SELECT C1 ≠ MENU; Electron nativo fora) ·
+> `C4-EMPTY-STATES` (1 linguagem/3 escalas; SEM CTA; initial ≠ no-results) · `C5-LOADING-SPLASH`
+> (4 famílias; skeleton/progress INEXISTENTES) · `C6-TOASTS-ERRORS` (7 canais; C6 USA C1;
+> nativos = dívida). **Gaps visuais registrados:** C3 (menus abertos) + C6 (toast premium) →
+> UMA "Transversal Anatomy Board" futura OPCIONAL (owner decide). C4/C5 sem gap.
+> **C3–C6 NÃO declaradas concluídas**; R6 não iniciado.
 - **Objetivo:** contratos de Menus/Dropdowns (C3 — selects provados F9/F10/F11; card menus e
   popovers mapeados; menu NATIVO Electron registrado fora do CSS), Empty States (C4 —
   `emptyState()` real; 1 amostra visual pode ser incluída no frame R2 para prova), Loading/

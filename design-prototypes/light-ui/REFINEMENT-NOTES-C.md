@@ -1,3 +1,23 @@
+# ▶ R5 — C3/C4/C5/C6 · CONSOLIDAÇÃO DOCUMENTAL (aguarda owner)
+Fase read-only, ZERO imagem. 4 foundation contracts criados a partir da auditoria integral:
+- **C3 Menus/Popovers**: evd-menu real (role=menu, ancorado ACIMA do trigger, min-w 220, item
+  danger) + card menus ⋯ (`.tcv4-menu`/`.kbv2-menu` = PORTAL no body; fecham por scroll/resize/
+  Escape/re-render/ação). SELECT C1 ≠ MENU; Electron nativo fora do CSS. **GAP visual** (nenhum
+  menu aberto provado) → Anatomy Board opcional.
+- **C4 Empty States**: 10 empties reais inventariados; 1 linguagem/3 escalas (padrão emptyState ·
+  grande nc-empty/exec-empty · linha emptyline/mini); **ZERO CTA em todo o produto**; initial ≠
+  no-results REAL na Central; anchor R2 "Dia livre"; sem gap.
+- **C5 Loading/Splash**: 4 famílias (processing button [anchor R2] · full splash F12 · inline
+  status/settrow "Carregando…" · toast de progresso→C6); **skeleton e progress bar INEXISTENTES**;
+  único `aria-busy` real = "Salvando cronograma…"; sem gap.
+- **C6 Toasts/Errors**: **7 canais reais** (flashToast singleton 2.6s sem stack · toast premium
+  interno COM stack/severidade/avatar/X focus-visible/CTA deep/agrupamento · inline error C1 ·
+  banner form-level · status line · alert() ×34 · confirm() ×2); **C6 USA C1**; nativos =
+  dívida registrada (não redesenhar como toast). **GAP parcial** (toast premium) → mesma board.
+C7 marcada FOUNDATION OFICIAL (GO do owner à R4). **C3–C6 aguardam avaliação; R6 não iniciado.**
+
+---
+
 # ▶ R4 — C7 TABELA · CONSOLIDAÇÃO DOCUMENTAL (aguarda owner)
 Fase read-only, ZERO imagem. `C7-TABLE-CONTRACT.md` criado. Auditoria integral: **exatamente 3
 `<table>` reais** no renderer (Ranking de designers F10 · Atrasos por designer F11 · Histórico

@@ -161,11 +161,11 @@ inventário). Estado após F1–F13:
 |---|---|---|---|---|
 | C1 | Forms & Controles | **GOLDEN / COMPLETA no escopo real** (R2 aprovada `3c06c26`) | F7 + §10–16 do contrato (prancha R2 = prova dos estados) | — (exclusões formais: radio/multi-select/paginação/skeleton/validation-summary NÃO existem) |
 | C2 | Modais & Sheets | **FOUNDATION OFICIAL / GOLDEN DOCUMENTAL (R3 aprovada `f9fe31a`)**: `C2-MODALS-SHEETS-CONTRACT.md` | F13 `32103bd` + del-sheet (R2 `3c06c26`) | gaps visuais do §17 ficam a critério do owner (fase curta opcional) |
-| C3 | Menus/Dropdowns/Popovers | NOMEADA · parcial | selects estilizados F9 (nc-fl) / F10–F11 (exec-fl) | contrato; menus de card/popovers sem prova (menu nativo Electron fora do CSS) |
-| C4 | Empty States | NOMEADA · documentada | `emptyState()` real documentado em F8/F9/F11 (não renderizado) | contrato + 1 prova visual |
-| C5 | Loading/Skeleton/Splash | NOMEADA · documentada | splash de restauração documentado (F12); "sem skeleton sistemático" no real | contrato + decidir skeleton |
-| C6 | Toasts & Erros inline | NOMEADA · parcial | banner err/ok do login (F12, candidato) + toasts reais documentados (F13 upload) | contrato + prova visual do toast/banner |
-| C7 | Tabela | **CONSOLIDADA DOCUMENTALMENTE (R4 — aguarda owner)**: `C7-TABLE-CONTRACT.md` (3 tabelas reais = taxonomia completa; 1 família/2 composições; sorting/paginação/seleção/row-action INEXISTENTES; LIST ≠ TABLE) | F10 `9de9a6b` + F11 `efb264a` — **sem gap visual** | aprovação do owner |
+| C3 | Menus/Dropdowns/Popovers | **CONSOLIDADA DOCUMENTALMENTE (R5 — aguarda owner)**: `C3-MENUS-POPOVERS-CONTRACT.md` (evd-menu ancorado + card menus PORTAL; SELECT C1 ≠ MENU) | — (nenhum menu aberto nos Frames) | **GAP VISUAL** (menus abertos) → Anatomy Board opcional, owner decide |
+| C4 | Empty States | **CONSOLIDADA DOCUMENTALMENTE (R5 — aguarda owner)**: `C4-EMPTY-STATES-CONTRACT.md` (1 linguagem/3 escalas; SEM CTA em todo o produto; initial ≠ no-results real na Central) | R2 "Dia livre" `3c06c26` | sem gap material |
+| C5 | Loading/Skeleton/Splash | **CONSOLIDADA DOCUMENTALMENTE (R5 — aguarda owner)**: `C5-LOADING-SPLASH-CONTRACT.md` (4 famílias; SKELETON/PROGRESS = INEXISTENTES, fora do escopo; único aria-busy = rev-send) | R2 processing button `3c06c26` + splash F12 (doc) | sem gap material |
+| C6 | Toasts & Erros inline | **CONSOLIDADA DOCUMENTALMENTE (R5 — aguarda owner)**: `C6-TOASTS-ERRORS-CONTRACT.md` (7 canais reais; C6 USA C1; alert() ×34 e confirm() ×2 nativos = dívida registrada) | R2 inline/banner + F12/F13 | **GAP PARCIAL** (toast premium interno) → mesma Anatomy Board opcional |
+| C7 | Tabela | **FOUNDATION OFICIAL / GOLDEN (R4 aprovada `2516426`)**: `C7-TABLE-CONTRACT.md` | F10 `9de9a6b` + F11 `efb264a` — sem gap visual | — |
 | C8 | Estados de interação & stat-tile | NOMEADA · parcial | focus/selected/OFF etc. congelados via C1 §2 | stat-tile (Hoje) sem prova; hover real; scrollbar spec |
 Nenhuma outra foundation nomeada existe nos documentos; **não criar códigos novos** sem decisão
 do owner. O modal do F13 pertence à **C2** (corrigida a nota do F13 que dizia "sem foundation
