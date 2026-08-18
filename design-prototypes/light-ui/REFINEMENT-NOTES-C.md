@@ -1,3 +1,15 @@
+# ▶ R3 — C2 MODAIS & SHEETS · CONSOLIDAÇÃO DOCUMENTAL (aguarda owner)
+Fase read-only, ZERO imagem. `C2-MODALS-SHEETS-CONTRACT.md` criado: inventário integral do
+renderer (20 modais/sheets em `#modalRoot` + `ts-auth-back` e `slaedit-ov` próprios), taxonomia
+real (Confirmation · Form · Selection · Detail · Production/Workflow), tokens (larguras 420–1240,
+88vh, blur 3px, z-60/90), **C2 CONSOME C1**, hierarquia PRIMARY/SECONDARY/CONTEXTUAL/DESTRUCTIVE,
+close comprovado×ausente (SEM Esc/backdrop-close no modalRoot — atributos órfãos registrados),
+a11y: **trap de Tab + role=dialog + retorno de foco REAIS em evd/det** (corrige registro do R1),
+dívidas e gaps visuais (§17). C1 marcada GOLDEN/COMPLETA no escopo real (GO do owner ao R2).
+Nenhuma superfície nova; A-futuras intocadas. **C2 aguarda avaliação; R4 não iniciado.**
+
+---
+
 # ▶ R2 — C1 COMPLETION · ESTADOS REAIS (prancha entregue; aguarda owner)
 `r2-c1-completion-estados.html` — **prancha de contratos** (spec board 1920×1080; não é tela do
 produto, não é Frame A). Fecha visualmente as pendências do C1 §3 com estados 100% reais da

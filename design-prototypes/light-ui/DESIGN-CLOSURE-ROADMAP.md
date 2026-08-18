@@ -18,7 +18,9 @@ de fechamento.
 - **Dependência:** aprovação F13 (dada). **Imagem?** NÃO. **Owner approval?** SIM (do relatório).
 - **Fechamento:** owner aceita o checkpoint (GO para R2).
 
-## R2 · C1 COMPLETION — FRAME DE ESTADOS ▶ ENTREGUE (aguarda avaliação do owner)
+## R2 · C1 COMPLETION — FRAME DE ESTADOS ✔ APROVADO PELO OWNER (GO)
+> **C1 = GOLDEN / COMPLETA no escopo real do produto** (commit `3c06c26`). Exclusões formais
+> permanentes: radio · multi-select · paginação · skeleton · validation summary (inexistentes).
 > **Status:** prancha `r2-c1-completion-estados.html` entregue (spec board 1920×1080). Estados
 > reais provados + exclusões formais auditadas (validation summary = `alert()` nativo · radio ·
 > multi-select · paginação · skeleton — inexistentes). Candidatos registrados no C1 §16.
@@ -33,7 +35,12 @@ de fechamento.
 - **Dependência:** R1. **Imagem?** SIM (1). **Owner approval?** SIM.
 - **Fechamento:** C1 sem pendências no escopo ratificado ⇒ **C1 = GOLDEN COMPLETA**.
 
-## R3 · C2 — MODAIS & SHEETS · DESIGN CONTRACT
+## R3 · C2 — MODAIS & SHEETS · DESIGN CONTRACT ▶ ENTREGUE (aguarda avaliação do owner)
+> **Status:** `C2-MODALS-SHEETS-CONTRACT.md` criado (documental, ZERO imagem nova): inventário
+> integral (20 modais/sheets reais + exclusões), taxonomia de 5 famílias + 2 containers próprios,
+> tokens, scroll/header/footer/close, a11y comprovado×requirement (trap real em evd/det — corrige
+> o registro do R1), dívidas e gaps visuais (§17). Âncoras: F13 + del-sheet R2. Nenhuma
+> superfície nova (30/30 intacto). **C2 NÃO declarada concluída**; R4 não iniciado.
 - **Objetivo:** contrato dedicado da C2 com âncora no F13 Golden (sheet 680/r18, backdrop+blur 3px
   real, lista interna rolável, footer 3 ações, selo de ícone, X) + anatomia dos demais modais
   reais (del-sheet destrutivo [prova visual vem do R2], sheet de evento da Agenda [documentado no

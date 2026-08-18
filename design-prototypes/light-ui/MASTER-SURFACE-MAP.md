@@ -71,7 +71,7 @@ Dispatcher real: `render()` (5088–5150). A sidebar dos Golden bate 1:1 com a n
 | 23 | Notificação externa premium | `bgnotify.html` + `bgNotify.ts`/`notificationGrouping.ts` | janela Electron TOPMOST (F3.5.5E-H2/H3/H4) — **contrato funcional congelado** |
 | 24 | Lembrete central SLA | `slareminder.html` + `slaReminder*.ts` | modal central amarelo/vermelho + decisões do responsável (F3.5.4L/P) — **congelado** |
 | 25 | Check-in de execução | fluxo F3.5.4Q (janela de check-in idle) | decisões de check-in — **congelado** |
-| 26 | Modais/diálogos (conjunto) | `modalRoot` em 2713/10197 (del-sheet)/10544/11215/11294/12104/12634/12985 | remover (del-sheet), sheet de evento da Agenda, escolha de designer/prazo, confirmações de fluxo, produção, check-in |
+| 26 | Modais/diálogos (conjunto) | **inventário INTEGRAL (R3): 20 modais/sheets** — ver `C2-MODALS-SHEETS-CONTRACT.md` §3 (a lista parcial anterior de linhas foi superada) | 5 famílias reais + 2 containers próprios (ts-auth/slaedit); del-sheet, evento (form+detail), designer/prazo, mover, responsável, produção (F13), envio ao cliente, credenciais, shrink, Conta/Segurança/Sobre |
 | 27 | Menus contextuais | `closeCardMenus`, dropdowns `exec-fl`, `editContextMenu.ts` (menu NATIVO Electron de edição/colagem) | menus de card, selects/filtros, popovers; o menu nativo não é CSS |
 | 28 | Empty states | `emptyState(ic,t,s)` 6080 (padrão único) | coluna vazia, sem notificações, sem resultados, cronograma não encontrado |
 | 29 | Loading | auth splash (V-H1), "Carregando…" (Config), prewarm | sem skeleton sistemático hoje |
@@ -159,8 +159,8 @@ Esta seção §F é a **fonte formal da taxonomia C1–C8** (nomes acima, defini
 inventário). Estado após F1–F13:
 | Cn | Nome formal (fonte: este §F) | Estado | Evidência visual Golden | Falta |
 |---|---|---|---|---|
-| C1 | Forms & Controles | **GOLDEN PARCIAL** (contrato dedicado) | F7 (29 comp.) + promoções F8–F13 (§10–15 do contrato) | estados §3 do contrato (disabled/erro/saving/destructive/checkbox-radio/validação) |
-| C2 | Modais & Sheets | NOMEADA · **âncora Golden F13** (modal denso real) + sheet de evento documentado (F8) | F13 `32103bd` | contrato dedicado; del-sheet destrutivo e picker designer/prazo sem prova visual |
+| C1 | Forms & Controles | **GOLDEN / COMPLETA no escopo real** (R2 aprovada `3c06c26`) | F7 + §10–16 do contrato (prancha R2 = prova dos estados) | — (exclusões formais: radio/multi-select/paginação/skeleton/validation-summary NÃO existem) |
+| C2 | Modais & Sheets | **CONSOLIDADA DOCUMENTALMENTE (R3 — aguarda owner)**: `C2-MODALS-SHEETS-CONTRACT.md` (inventário 20 modais reais, 5 famílias + 2 containers próprios, tokens, close/a11y comprovado×requirement) | F13 `32103bd` + del-sheet (R2 `3c06c26`) | aprovação do owner; gaps visuais registrados no §17 do contrato (fase visual só se o owner pedir) |
 | C3 | Menus/Dropdowns/Popovers | NOMEADA · parcial | selects estilizados F9 (nc-fl) / F10–F11 (exec-fl) | contrato; menus de card/popovers sem prova (menu nativo Electron fora do CSS) |
 | C4 | Empty States | NOMEADA · documentada | `emptyState()` real documentado em F8/F9/F11 (não renderizado) | contrato + 1 prova visual |
 | C5 | Loading/Skeleton/Splash | NOMEADA · documentada | splash de restauração documentado (F12); "sem skeleton sistemático" no real | contrato + decidir skeleton |
