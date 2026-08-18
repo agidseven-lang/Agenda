@@ -35,7 +35,8 @@ de fechamento.
 - **Dependência:** R1. **Imagem?** SIM (1). **Owner approval?** SIM.
 - **Fechamento:** C1 sem pendências no escopo ratificado ⇒ **C1 = GOLDEN COMPLETA**.
 
-## R3 · C2 — MODAIS & SHEETS · DESIGN CONTRACT ▶ ENTREGUE (aguarda avaliação do owner)
+## R3 · C2 — MODAIS & SHEETS · DESIGN CONTRACT ✔ APROVADO PELO OWNER (GO)
+> **C2 = FOUNDATION OFICIAL / GOLDEN DOCUMENTAL** (commit `f9fe31a`); âncoras F13 + del-sheet R2.
 > **Status:** `C2-MODALS-SHEETS-CONTRACT.md` criado (documental, ZERO imagem nova): inventário
 > integral (20 modais/sheets reais + exclusões), taxonomia de 5 famílias + 2 containers próprios,
 > tokens, scroll/header/footer/close, a11y comprovado×requirement (trap real em evd/det — corrige
@@ -50,7 +51,13 @@ de fechamento.
 - **Imagem?** NÃO (F13 + R2 já são as provas; nova imagem só se o owner exigir sheet de evento).
 - **Owner approval?** SIM. **Fechamento:** C2 congelada com âncoras citadas.
 
-## R4 · C7 — TABELA · SPEC CONSOLIDADA
+## R4 · C7 — TABELA · SPEC CONSOLIDADA ▶ ENTREGUE (aguarda avaliação do owner)
+> **Status:** `C7-TABLE-CONTRACT.md` criado (documental, ZERO imagem): inventário integral =
+> **3 tabelas reais** (Ranking F10 7×7; Atrasos F11 5×7 — dívida re-provada; Histórico F11 4×4
+> com timeline hospedada); 1 família/2 composições; tokens real→Light; interações inexistentes
+> registradas (sorting/paginação/seleção/row-action/hover/zebra/sticky); empty inline por
+> colspan (literais); regra LIST ≠ TABLE; **sem gap visual** (F10+F11 cobrem tudo).
+> **C7 NÃO declarada concluída**; R5 não iniciado.
 - **Objetivo:** consolidar a dense data table provada em F10/F11 (header 10.5/700 uppercase,
   linhas 13.5, alinhamento numérico, pct cell, sev pill, avatar cell; SEM paginação — não existe
   no real; truncamentos por slice/scroll documentados como contrato).

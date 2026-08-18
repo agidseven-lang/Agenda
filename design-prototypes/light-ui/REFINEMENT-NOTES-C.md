@@ -1,3 +1,20 @@
+# ▶ R4 — C7 TABELA · CONSOLIDAÇÃO DOCUMENTAL (aguarda owner)
+Fase read-only, ZERO imagem. `C7-TABLE-CONTRACT.md` criado. Auditoria integral: **exatamente 3
+`<table>` reais** no renderer (Ranking de designers F10 · Atrasos por designer F11 · Histórico
+resumido F11), todas `.exec-tbl` — âncoras Golden F10/F11 cobrem 100% (sem gap visual).
+Taxonomia: 1 família (dense data table) com 2 composições (métrica/ranking · histórico).
+Consolidados: anatomia (card contêiner; th 10.5/700 uppercase; td 13.5 hairline; densidade
+única), alinhamento numérico (.c centro + tabular-nums; % na pct cell; "min"/"—"), pct cell
+(track+fill+número SEMPRE; faixas ≥90/≥75/≥60), severity pill (valor sempre visível), person
+cell (avatar 24 + primeiro nome), timeline = componente F11 HOSPEDADO. Inexistências formais:
+sorting · paginação (reconfirmada) · row selection · row action/click · hover/zebra/sticky.
+Empty real = row colspan com literais ("Sem designers no período." etc.), sem emptyState().
+Regra formal **LIST ≠ TABLE** (mini-list/ncRow/infoline/settrow são listas). Dívida F11 thead
+5×7 re-provada (empty colspan=5 idem) — funcional, fora do redesign. C2 marcada GOLDEN
+documental (GO do owner à R3). **C7 aguarda avaliação; R5 não iniciado.**
+
+---
+
 # ▶ R3 — C2 MODAIS & SHEETS · CONSOLIDAÇÃO DOCUMENTAL (aguarda owner)
 Fase read-only, ZERO imagem. `C2-MODALS-SHEETS-CONTRACT.md` criado: inventário integral do
 renderer (20 modais/sheets em `#modalRoot` + `ts-auth-back` e `slaedit-ov` próprios), taxonomia

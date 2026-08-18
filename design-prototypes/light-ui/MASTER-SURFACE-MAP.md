@@ -160,12 +160,12 @@ inventário). Estado após F1–F13:
 | Cn | Nome formal (fonte: este §F) | Estado | Evidência visual Golden | Falta |
 |---|---|---|---|---|
 | C1 | Forms & Controles | **GOLDEN / COMPLETA no escopo real** (R2 aprovada `3c06c26`) | F7 + §10–16 do contrato (prancha R2 = prova dos estados) | — (exclusões formais: radio/multi-select/paginação/skeleton/validation-summary NÃO existem) |
-| C2 | Modais & Sheets | **CONSOLIDADA DOCUMENTALMENTE (R3 — aguarda owner)**: `C2-MODALS-SHEETS-CONTRACT.md` (inventário 20 modais reais, 5 famílias + 2 containers próprios, tokens, close/a11y comprovado×requirement) | F13 `32103bd` + del-sheet (R2 `3c06c26`) | aprovação do owner; gaps visuais registrados no §17 do contrato (fase visual só se o owner pedir) |
+| C2 | Modais & Sheets | **FOUNDATION OFICIAL / GOLDEN DOCUMENTAL (R3 aprovada `f9fe31a`)**: `C2-MODALS-SHEETS-CONTRACT.md` | F13 `32103bd` + del-sheet (R2 `3c06c26`) | gaps visuais do §17 ficam a critério do owner (fase curta opcional) |
 | C3 | Menus/Dropdowns/Popovers | NOMEADA · parcial | selects estilizados F9 (nc-fl) / F10–F11 (exec-fl) | contrato; menus de card/popovers sem prova (menu nativo Electron fora do CSS) |
 | C4 | Empty States | NOMEADA · documentada | `emptyState()` real documentado em F8/F9/F11 (não renderizado) | contrato + 1 prova visual |
 | C5 | Loading/Skeleton/Splash | NOMEADA · documentada | splash de restauração documentado (F12); "sem skeleton sistemático" no real | contrato + decidir skeleton |
 | C6 | Toasts & Erros inline | NOMEADA · parcial | banner err/ok do login (F12, candidato) + toasts reais documentados (F13 upload) | contrato + prova visual do toast/banner |
-| C7 | Tabela | NOMEADA · **provada** | dense data table F10/F11 (execDesRow 7 col, pct cell, pills) | contrato dedicado (paginação NÃO existe no real — não inventar) |
+| C7 | Tabela | **CONSOLIDADA DOCUMENTALMENTE (R4 — aguarda owner)**: `C7-TABLE-CONTRACT.md` (3 tabelas reais = taxonomia completa; 1 família/2 composições; sorting/paginação/seleção/row-action INEXISTENTES; LIST ≠ TABLE) | F10 `9de9a6b` + F11 `efb264a` — **sem gap visual** | aprovação do owner |
 | C8 | Estados de interação & stat-tile | NOMEADA · parcial | focus/selected/OFF etc. congelados via C1 §2 | stat-tile (Hoje) sem prova; hover real; scrollbar spec |
 Nenhuma outra foundation nomeada existe nos documentos; **não criar códigos novos** sem decisão
 do owner. O modal do F13 pertence à **C2** (corrigida a nota do F13 que dizia "sem foundation
