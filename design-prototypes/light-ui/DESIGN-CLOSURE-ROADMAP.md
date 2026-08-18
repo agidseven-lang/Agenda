@@ -18,7 +18,11 @@ de fechamento.
 - **Dependência:** aprovação F13 (dada). **Imagem?** NÃO. **Owner approval?** SIM (do relatório).
 - **Fechamento:** owner aceita o checkpoint (GO para R2).
 
-## R2 · C1 COMPLETION — FRAME DE ESTADOS (próximo passo recomendado)
+## R2 · C1 COMPLETION — FRAME DE ESTADOS ▶ ENTREGUE (aguarda avaliação do owner)
+> **Status:** prancha `r2-c1-completion-estados.html` entregue (spec board 1920×1080). Estados
+> reais provados + exclusões formais auditadas (validation summary = `alert()` nativo · radio ·
+> multi-select · paginação · skeleton — inexistentes). Candidatos registrados no C1 §16.
+> **C1 NÃO declarada completa**; critério de fechamento = aprovação do owner. R3 não iniciado.
 - **Objetivo:** demonstrar sobre superfícies REAIS da 1.0.246 os estados C1 ainda sem prova:
   **disabled genérico · error inline (`sq-err`/`cqErr`) · saving/loading ("Salvando cronograma…",
   anti-duplo-clique) · validation summary (real = `alert()` — representar fiel ou registrar

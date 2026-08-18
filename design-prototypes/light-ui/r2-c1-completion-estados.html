@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, initial-scale=1">
+<title>Agenda ID Seven — R2 · C1 Completion — Estados reais</title>
+<link rel="stylesheet" href="_fonts.css">
+<style>
+/* ============================================================
+   AGENDA ID SEVEN · LIGHT UI · R2 — C1 COMPLETION · SPEC BOARD · 1920×1080
+   PRANCHA DE CONTRATOS DO DESIGN SYSTEM (não é tela do produto; não é Frame A).
+   Fecha visualmente os estados C1 pendentes usando SOMENTE componentes/estados/
+   mensagens REAIS da Desktop 1.0.246. Zero invenção.
+   ▸ MATRIZ DE AUDITORIA (código real = fonte da verdade):
+     1 DISABLED — REAL: `.btn[disabled]{opacity:.6;pointer-events:none}` (107);
+       `−` do stepper no mínimo (wizard, opacity .4); rev-send disabled durante
+       salvar (11578). OFF ≠ DISABLED congelado ao lado do toggle OFF Golden.
+     2 ERRO INLINE — REAL: `.sq-err` (245) nos campos de quantidade `sqErr`/
+       `cqErr` (11442/11457), literal "Informe uma quantidade inteira igual ou
+       superior a 1.", `role="alert"`; trigger: valor não-inteiro/<1 (11279,
+       12669 — shrink rejeitado devolve foco ao campo).
+     3 VALIDATION SUMMARY — NÃO EXISTE no real: validação global do wizard usa
+       `alert()` nativo (34 usos; ex.: "Informe o título.", "Informe o
+       cliente.", "Selecione o setor."). Registrado e FORA do escopo C1.
+     4 SAVING/LOADING — REAL: Login `loading(btn,on)` (botão disabled + spinner
+       20px substitui o texto, 3180); rev-send `<button disabled aria-busy>`
+       "Salvando cronograma…" (11578); sheet de evento "Salvando…" + busy
+       (5950); Config linha "Carregando…" (10374). Splash "Restaurando
+       sessão…" pertence à C5 (registrado). SKELETON NÃO EXISTE.
+     5 DESTRUCTIVE CONFIRMATION — REAL: del-sheet `openDeleteConfirm` (10195):
+       ícone trash tint vermelho (del-ic 54/15, rgba(248,113,113,.14)), título
+       "Remover tarefa?", mensagem literal com <b>título</b> + "Não é possível
+       desfazer.", ações Cancelar (ghost) + "Remover tarefa" (`.btn-danger`
+       1481: tint #F87171 22 + border .45 + ink #F87171 + 800). Erro pós-ação
+       = alert. Sem loading no modal (fecha otimista). Estrutura completa do
+       modal = C2 (R3); aqui congela-se APENAS o estado destructive.
+     6 CHECKBOX — REAL: Config → Check-ins usa `<input type="checkbox">`
+       NATIVO com labels literais "Permitir “Responder em 10 minutos”" (checked
+       default) e "Observação obrigatória nas negativas" (unchecked default)
+       (10498–10499). O real não tem estilo custom → a prancha propõe a
+       REPRESENTAÇÃO C1 (box 18, radius 5, brand quando checked, check branco,
+       hairline quando não) fiel à semântica nativa. `checklistHtml` do wizard
+       é EDITOR (inputs de texto + remover + adicionar), não checkbox marcável.
+     7 RADIO — NÃO EXISTE (zero `type="radio"`; escolha única real = choice
+       chips Golden). FORA do escopo C1.
+     8 CONFIGURAÇÕES (amostra aplicada) — REAL: seção "Acompanhamento de
+       execução · Check-ins de execução do Designer" (10374/10480+): settrow
+       (icb 38/11 + título 14.5/800 + sub "Modo atual: <b>…</b>"), chips de
+       Modo (Desligado/Sombra/Ativo — selecionado = accent sólido), checkboxes,
+       linha de erro `#etMsg` vermelha, botão real "Salvar configuração" (chip
+       accent), gate "Somente administradores alteram esta configuração.",
+       estado "Carregando…" (settrow com clock). NÃO é redesenho da página.
+     9 EMPTY STATE — REAL: `emptyState(ic,t,s)` (6080; CSS 161–164: ebox 64/18
+       hairline + título 15/800 + sub 12.5; SEM CTA — fidelidade). Amostra:
+       Agenda dia sem compromissos → calendar · "Dia livre" · "Nenhum
+       compromisso para esta data." (6109). Consolidação C4 = R5.
+     10 STAT-TILE — REAL: Hoje `.stats > button.stat` (167–174): ic 20 accent,
+       valor 24/800, label 11.5 soft; variante `.accent` = fundo accent +
+       conteúdo branco; clicável (`data-tab`). Amostra única; consolidação C8
+       = R6.
+     FORM-LEVEL ERROR — reutilizado do Golden F12 (`.banner.err` do Login,
+       literal "E-mail/WhatsApp ou senha incorretos.") — contrato DISTINTO do
+       inline. MULTI-SELECT / PAGINAÇÃO / SKELETON — inexistentes (regravado).
+   ▸ NADA de Golden foi redesenhado: inputs/toggle/chips/CTA/stepper/banner
+     seguem os contratos congelados (C1 §1–2, F12, F7B/7C).
+   ▸ Prancha usa dados fictícios coerentes (Sunset Wear · Cronograma).
+   ============================================================ */
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+svg{display:block}
+:root{
+  --canvas:#F5F6F9; --surface:#FFFFFF; --surface-2:#FAFBFD; --sunk:#F1F4F8;
+  --hair:#E8EBF1; --hair-2:#EFF1F6;
+  --tx-1:#14181F; --tx-2:#4B5364; --tx-3:#767E8D; --tx-4:#A8AFBC;
+  --brand:#5B7CFA; --grad:linear-gradient(135deg,#6E5EF3,#9A6BF5);
+  --focus:#6E5EF3; --red:#EF4444; --red-ink:#C4302B; --green:#22A06B;
+  --r-md:12px; --r-lg:16px; --r-pill:999px;
+  --sh-1:0 0 0 1px var(--hair),0 1px 2px rgba(19,24,38,.04),0 5px 14px rgba(19,24,38,.035);
+}
+body{font-family:'Inter',-apple-system,'Segoe UI',Roboto,sans-serif;color:var(--tx-1);background:var(--canvas);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-feature-settings:"cv05" 1,"cv11" 1}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.frame{width:1920px;height:1080px;overflow:hidden;position:relative;background:var(--canvas);font-size:13.5px}
+.frame::after{content:"";position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 0 1px rgba(19,24,38,.05);z-index:60}
+/* ===== header editorial da prancha ===== */
+.hd{display:flex;align-items:flex-end;gap:22px;padding:36px 44px 24px}
+.hd-mark{width:50px;height:50px;border-radius:15px;background:linear-gradient(140deg,#5B7CFA,#6E5EF3);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px rgba(94,110,243,.34),inset 0 1px 0 rgba(255,255,255,.24)}
+.hd-mark .ic{width:26px;height:26px;stroke-width:1.9;color:#fff}
+.hd-t{display:flex;flex-direction:column;line-height:1.1}
+.hd-k{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#6E5EF3}
+.hd-t b{font-family:'InterTight';font-size:27px;font-weight:700;letter-spacing:-.022em;margin-top:5px}
+.hd-t span{font-size:13px;color:var(--tx-3);margin-top:5px}
+.hd-meta{margin-left:auto;text-align:right;font-size:11.5px;color:var(--tx-4);line-height:1.7}
+.hd-meta b{color:var(--tx-3);font-weight:700}
+/* ===== grid da prancha ===== */
+.board{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;padding:6px 44px 0;align-items:start}
+.col{display:flex;flex-direction:column;gap:18px;min-width:0}
+.g{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--sh-1);padding:20px 22px 18px}
+.g-k{display:flex;align-items:center;gap:9px;margin-bottom:3px}
+.g-k i{width:8px;height:8px;border-radius:3px;background:var(--gk,#6E5EF3);flex:none}
+.g-k b{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--tx-2)}
+.g-d{font-size:11.5px;color:var(--tx-4);margin:0 0 13px 17px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+/* legenda de amostra */
+.cap{font-size:10.5px;color:var(--tx-4);margin-top:7px;line-height:1.5}
+.cap b{color:var(--tx-3);font-weight:700}
+.sep{height:1px;background:var(--hair-2);margin:14px 0}
+/* ===== componentes Golden reutilizados (contratos C1 — NÃO redesenhados) ===== */
+.btn-p{height:44px;padding:0 20px;border-radius:13px;background:var(--grad);color:#fff;font-size:14/650;font-size:14px;font-weight:650;display:inline-flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 8px 20px rgba(110,94,243,.28)}
+.btn-s{height:44px;padding:0 18px;border-radius:13px;background:var(--surface);box-shadow:inset 0 0 0 1px #DFE3EB;color:var(--tx-2);font-size:14px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.is-disabled{opacity:.6;pointer-events:none}
+.spin{width:18px;height:18px;border-radius:50%;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;flex:none}
+.btn-p.load{min-width:150px}
+.tgl{width:46px;height:28px;border-radius:999px;position:relative;flex:none}
+.tgl.off{background:#CDD3DE;box-shadow:inset 0 0 0 1px #C2C9D6}
+.tgl.off::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(19,24,38,.25)}
+.qty{display:inline-flex;align-items:center;gap:8px}
+.qty .qb{width:42px;height:42px;border-radius:12px;background:var(--surface);box-shadow:inset 0 0 0 1px #DFE3EB;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600;color:var(--tx-2)}
+.qty .qb.min{opacity:.4;pointer-events:none}
+.qty .qv{width:96px;height:42px;border-radius:12px;background:var(--surface);box-shadow:inset 0 0 0 1px #DFE3EB;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700}
+.qty .qv.err{box-shadow:inset 0 0 0 1.5px var(--red),0 0 0 2.5px rgba(239,68,68,.1)}
+.lbl{display:block;font-size:13px;font-weight:600;color:var(--tx-2);margin-bottom:7px}
+/* erro inline REAL (sq-err → Light) */
+.sq-err{display:flex;align-items:flex-start;gap:7px;margin-top:9px;font-size:12.5px;color:var(--red-ink);background:color-mix(in srgb,var(--red) 8%,#fff);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--red) 25%,#fff);border-radius:9px;padding:8px 11px;line-height:1.45}
+.sq-err .ic{width:14px;height:14px;stroke-width:2;color:var(--red);margin-top:1px}
+/* banner form-level (Golden F12) */
+.banner-err{border-radius:12px;padding:12px 14px;font-size:13px;font-weight:500;color:var(--red-ink);background:color-mix(in srgb,var(--red) 12%,#fff)}
+/* registro de exclusão */
+.na{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 12px;border-radius:9px;background:var(--sunk);color:var(--tx-3);font-size:11.5px;font-weight:650}
+.na i{width:6px;height:6px;border-radius:50%;background:var(--tx-4)}
+/* destructive (del-sheet REAL → Light) */
+.del{width:100%;max-width:410px;margin:6px auto 0;background:var(--surface);border-radius:16px;box-shadow:0 0 0 1px var(--hair),0 10px 30px rgba(19,24,38,.12);padding:20px 22px 18px;text-align:center}
+.del-ic{width:52px;height:52px;border-radius:15px;background:color-mix(in srgb,var(--red) 13%,#fff);color:var(--red);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--red) 24%,#fff)}
+.del-ic .ic{width:25px;height:25px;stroke-width:1.8}
+.del-t{font-family:'InterTight';font-size:18.5px;font-weight:700;letter-spacing:-.01em}
+.del-m{font-size:13px;color:var(--tx-3);line-height:1.55;margin:8px 0 16px}
+.del-m b{color:var(--tx-2);font-weight:700}
+.del-a{display:flex;gap:11px}
+.del-a button{flex:1;height:44px;border-radius:12px;font-size:13.5px;font-weight:650}
+.btn-danger{background:color-mix(in srgb,var(--red) 12%,#fff);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--red) 42%,#fff);color:var(--red-ink);font-weight:750}
+/* checkbox (representação C1 da semântica nativa real) */
+.ck{display:flex;align-items:center;gap:10px;font-size:13.5px;color:var(--tx-1)}
+.ck .box{width:18px;height:18px;border-radius:5px;flex:none;display:flex;align-items:center;justify-content:center}
+.ck.on .box{background:var(--brand);box-shadow:0 1px 3px rgba(91,124,250,.4)}
+.ck.on .box .ic{width:12px;height:12px;stroke-width:2.6;color:#fff}
+.ck.off2 .box{background:var(--surface);box-shadow:inset 0 0 0 1.6px #C7CDD8}
+.ck.focus .box{box-shadow:inset 0 0 0 1.6px var(--focus),0 0 0 2.5px rgba(110,94,243,.11)}
+/* settrow (Config real → Light) */
+.settrow{display:flex;align-items:center;gap:13px;padding:12px 13px;border-radius:13px;background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--hair-2)}
+.settrow .icb{width:38px;height:38px;border-radius:11px;background:#fff;box-shadow:inset 0 0 0 1px var(--hair);display:flex;align-items:center;justify-content:center;color:#4E63D8;flex:none}
+.settrow .icb .ic{width:19px;height:19px}
+.settrow .sl{font-size:14px;font-weight:700}
+.settrow .ss{font-size:11.5px;color:var(--tx-3);margin-top:2px}
+.settrow .ss b{color:var(--tx-2)}
+.chip{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 13px;border-radius:999px;background:var(--surface);box-shadow:inset 0 0 0 1px var(--hair);font-size:12.5px;font-weight:600;color:var(--tx-2)}
+.chip.on{background:var(--brand);box-shadow:none;color:#fff;font-weight:700}
+.btn-save{height:36px;padding:0 15px;border-radius:10px;background:var(--grad);color:#fff;font-size:12.5px;font-weight:650;display:inline-flex;align-items:center;gap:7px;box-shadow:0 6px 16px rgba(110,94,243,.24)}
+/* empty (real → Light) */
+.empty{display:flex;flex-direction:column;align-items:center;text-align:center;padding:22px 10px 10px;gap:10px}
+.empty .ebox{width:60px;height:60px;border-radius:17px;background:var(--surface);box-shadow:inset 0 0 0 1px var(--hair);display:flex;align-items:center;justify-content:center;color:var(--tx-4)}
+.empty .ebox .ic{width:26px;height:26px}
+.empty .et{font-size:14.5px;font-weight:750;color:var(--tx-2)}
+.empty .es{font-size:12.5px;color:var(--tx-4);margin-top:-3px}
+/* stat-tile (real → Light) */
+.stat{flex:1;background:var(--surface);box-shadow:inset 0 0 0 1px var(--hair);border-radius:16px;padding:13px 14px;text-align:left}
+.stat .ic{width:19px;height:19px;color:#4E63D8}
+.stat .v{font-family:'InterTight';font-size:23px;font-weight:700;margin-top:7px}
+.stat .l{font-size:11.5px;color:var(--tx-3);margin-top:1px}
+.stat.accent{background:linear-gradient(140deg,#5B7CFA,#6E5EF3);box-shadow:0 8px 20px rgba(94,110,243,.3)}
+.stat.accent .ic,.stat.accent .v,.stat.accent .l{color:#fff}
+.stat.accent .l{opacity:.85}
+/* rodapé da prancha */
+.foot{display:flex;align-items:center;gap:14px;padding:26px 44px 0;font-size:11px;color:var(--tx-4)}
+.foot .na{height:26px;font-size:10.5px}
+.foot .end{margin-left:auto;text-align:right;line-height:1.6}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-logo" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><path d="M8.5 9.5h7M8.5 13h7M8.5 16.5h4"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M4.5 12l15-7.2L15.6 19l-4-4.6L4.5 12z"/><path d="M11.6 14.4l7.9-9.6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.6 4.6L19 7.5"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 8v5M12 16.4h.02"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 6.8h15M9.7 3.8h4.6M6.3 6.8l.9 12.4a1.6 1.6 0 001.6 1.5h6.4a1.6 1.6 0 001.6-1.5l.9-12.4M10 10.6v5.8M14 10.6v5.8"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.5h17M8 3.3v3.4M16 3.3v3.4"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6.6 10.2a5.4 5.4 0 0110.8 0c0 4.6 1.9 5.8 1.9 5.8H4.7s1.9-1.2 1.9-5.8z"/><path d="M10.2 19.4a2 2 0 003.6 0"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6"/></symbol>
+    <symbol id="i-x2" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8.5 6.5h11M8.5 12h11M8.5 17.5h11"/><path d="M4.4 6.5h.02M4.4 12h.02M4.4 17.5h.02"/></symbol>
+</svg>
+<div class="frame">
+  <div class="hd">
+    <div class="hd-mark"><svg class="ic"><use href="#i-logo"/></svg></div>
+    <div class="hd-t">
+      <span class="hd-k">R2 · Design Closure Roadmap — C1 Completion</span>
+      <b>C1 — Forms &amp; Controls · Estados reais</b>
+      <span>Prancha de contratos do Design System — estados pendentes comprovados na Desktop 1.0.246 · não é tela do produto</span>
+    </div>
+    <div class="hd-meta"><b>Light UI Golden</b> · Frames 1–13 congelados<br>branch design/f356b-light-ui-mockups · fonte 1.0.246</div>
+  </div>
+
+  <div class="board">
+    <!-- ===================== COLUNA A ===================== -->
+    <div class="col">
+      <div class="g" style="--gk:#6E5EF3">
+        <div class="g-k"><i></i><b>States · Default × Disabled × Loading</b></div>
+        <div class="g-d">Mesmo componente, estados reais lado a lado — nunca inventados.</div>
+        <div class="row">
+          <button class="btn-p"><svg class="ic"><use href="#i-send"/></svg> Salvar tarefa</button>
+          <button class="btn-p is-disabled"><svg class="ic"><use href="#i-send"/></svg> Salvar tarefa</button>
+          <button class="btn-p load" style="pointer-events:none"><span class="spin"></span></button>
+        </div>
+        <div class="cap"><b>Primary · default / disabled / loading</b> — origem: `.btn[disabled]` (opacity .6 real) · Login `loading(btn,on)`: disabled + spinner substitui o texto.</div>
+        <div class="sep"></div>
+        <div class="row">
+          <button class="btn-p is-disabled" style="pointer-events:none;flex:none"><svg class="ic"><use href="#i-send"/></svg> Salvando cronograma…</button>
+        </div>
+        <div class="cap"><b>Saving anti-duplo-clique</b> — origem: rev-send `disabled aria-busy` "Salvando cronograma…" (wizard, estado durante a gravação).</div>
+        <div class="sep"></div>
+        <div class="row">
+          <button class="btn-s">Voltar</button>
+          <button class="btn-s is-disabled">Voltar</button>
+        </div>
+        <div class="cap"><b>Secondary · default / disabled</b> — mesma regra de opacidade .6; texto permanece legível.</div>
+        <div class="sep"></div>
+        <div class="row" style="gap:14px">
+          <span class="tgl off"></span><span style="font-size:12.5px;color:var(--tx-2);font-weight:600">Toggle OFF (disponível)</span>
+          <span style="width:1px;height:26px;background:var(--hair)"></span>
+          <button class="btn-s is-disabled" style="height:38px">Ação disabled</button>
+        </div>
+        <div class="cap"><b>OFF ≠ DISABLED (contrato)</b> — OFF é escolha ativa do usuário (trilho cinza + knob pleno); disabled comunica indisponibilidade (opacity .6), nunca ilegível.</div>
+      </div>
+
+      <div class="g" style="--gk:#EF4444">
+        <div class="g-k"><i></i><b>Validation · Inline × Form-level</b></div>
+        <div class="g-d">Dois contratos distintos — ambos reais; nenhum “validation summary” existe.</div>
+        <label class="lbl">Quantidade de conteúdos</label>
+        <div class="qty">
+          <span class="qb min">−</span><span class="qv err">0</span><span class="qb">+</span>
+        </div>
+        <div class="sq-err" role="alert"><svg class="ic"><use href="#i-alert"/></svg><span>Informe uma quantidade inteira igual ou superior a 1.</span></div>
+        <div class="cap"><b>Inline error (campo)</b> — origem: `sq-err`/`cqErr` do Cronograma, literal real, `role="alert"`; trigger: valor não-inteiro ou &lt; 1; foco volta ao campo. `−` no mínimo = disabled real (opacity .4).</div>
+        <div class="sep"></div>
+        <div class="banner-err">E-mail/WhatsApp ou senha incorretos.</div>
+        <div class="cap"><b>Form-level error (banner)</b> — reutilizado do Golden F12 (`.banner.err`, Login). Contrato separado do inline.</div>
+        <div class="sep"></div>
+        <div class="row"><span class="na"><i></i>VALIDATION SUMMARY — não existe no real (validação global = `alert()` nativo: “Informe o título.” · “Informe o cliente.”)</span></div>
+      </div>
+    </div>
+
+    <!-- ===================== COLUNA B ===================== -->
+    <div class="col">
+      <div class="g" style="--gk:#E11D48">
+        <div class="g-k"><i></i><b>Destructive · Confirmation state</b></div>
+        <div class="g-d">Confirmação destrutiva real — estado congela aqui; anatomia completa do modal = C2 (R3).</div>
+        <div class="del">
+          <div class="del-ic"><svg class="ic"><use href="#i-trash"/></svg></div>
+          <div class="del-t">Remover tarefa?</div>
+          <div class="del-m">Esta ação removerá <b>Cronograma Feed &amp; Stories — Sunset Wear</b> do quadro e de todos os dispositivos (incluindo o celular). Não é possível desfazer.</div>
+          <div class="del-a"><button class="btn-s" style="height:44px">Cancelar</button><button class="btn-danger">Remover tarefa</button></div>
+        </div>
+        <div class="cap" style="text-align:center"><b>del-sheet · openDeleteConfirm</b> — título, mensagem e rótulos literais; danger = tint vermelho + ink 750 (nunca parece primary); Cancelar secundário; erro pós-ação = alert (real).</div>
+      </div>
+
+      <div class="g" style="--gk:#5B7CFA">
+        <div class="g-k"><i></i><b>Choice · Checkbox</b></div>
+        <div class="g-d">Semântica nativa real (Config · Check-ins) representada no DS — labels literais.</div>
+        <div style="display:flex;flex-direction:column;gap:11px">
+          <div class="ck on"><span class="box"><svg class="ic"><use href="#i-check"/></svg></span> Permitir “Responder em 10 minutos”</div>
+          <div class="ck off2"><span class="box"></span> Observação obrigatória nas negativas</div>
+          <div class="ck off2 focus"><span class="box"></span> <span>Observação obrigatória nas negativas <span style="color:var(--tx-4)">· focus</span></span></div>
+        </div>
+        <div class="cap"><b>Checked / unchecked / focus</b> — origem: `input type="checkbox"` nativo em Configurações (defaults reais: 1º checked, 2º unchecked). Estado ≠ só cor: box preenchido + check.</div>
+        <div class="sep"></div>
+        <label class="lbl" style="font-size:12.5px">Checklist (briefing de setor)</label>
+        <div class="row" style="gap:8px;flex-wrap:nowrap">
+          <span style="flex:1;height:42px;border-radius:12px;background:var(--surface);box-shadow:inset 0 0 0 1px #DFE3EB;display:flex;align-items:center;padding:0 13px;font-size:13.5px;color:var(--tx-1)">Ajustar contraste do fundo</span>
+          <span style="width:38px;height:38px;border-radius:10px;background:var(--surface);box-shadow:inset 0 0 0 1px var(--hair);display:flex;align-items:center;justify-content:center;color:var(--red)"><svg class="ic" style="width:15px;height:15px;stroke-width:2"><use href="#i-x2"/></svg></span>
+        </div>
+        <div class="row" style="margin-top:9px">
+          <span style="height:38px;padding:0 15px;border-radius:11px;background:color-mix(in srgb,var(--brand) 10%,#fff);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--brand) 22%,#fff);display:inline-flex;align-items:center;font-size:12.5px;font-weight:650;color:#4E63D8">+ Adicionar item</span>
+        </div>
+        <div class="cap"><b>Checklist = EDITOR, não checkbox</b> — origem: `checklistHtml` do wizard (input + remover + “+ Adicionar item”). A marcação “feito” não vive neste editor — distinção registrada.</div>
+        <div class="sep"></div>
+        <div class="row">
+          <span class="na"><i></i>RADIO — não existe no real (escolha única = choice chips Golden)</span>
+          <span class="na"><i></i>MULTI-SELECT — não existe (canais = escolha única)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== COLUNA C ===================== -->
+    <div class="col">
+      <div class="g" style="--gk:#22A06B">
+        <div class="g-k"><i></i><b>Applied sample · Configurações (recorte)</b></div>
+        <div class="g-d">C1 aplicada em contexto B real — seção “Acompanhamento de execução”. Não é redesenho da página.</div>
+        <div class="settrow">
+          <span class="icb"><svg class="ic"><use href="#i-bell"/></svg></span>
+          <div style="flex:1;min-width:0"><div class="sl">Check-ins de execução do Designer</div><div class="ss">Modo atual: <b>Sombra</b></div></div>
+        </div>
+        <div style="margin:12px 2px 0"><div class="ss" style="font-size:11px;color:var(--tx-4);font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-bottom:7px">Modo</div>
+          <div class="row" style="gap:7px"><span class="chip">Desligado</span><span class="chip on"><svg class="ic" style="width:13px;height:13px;stroke-width:2.4"><use href="#i-check"/></svg> Sombra</span><span class="chip">Ativo</span></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:9px;margin:13px 2px 0">
+          <div class="ck on" style="font-size:12.5px"><span class="box" style="width:17px;height:17px"><svg class="ic"><use href="#i-check"/></svg></span> Permitir “Responder em 10 minutos”</div>
+          <div class="ck off2" style="font-size:12.5px"><span class="box" style="width:17px;height:17px"></span> Observação obrigatória nas negativas</div>
+        </div>
+        <div class="row" style="margin-top:13px;gap:10px">
+          <button class="btn-save"><svg class="ic" style="width:14px;height:14px"><use href="#i-check"/></svg> Salvar configuração</button>
+          <span style="font-size:11.5px;color:var(--tx-4)">gate real: “Somente administradores alteram esta configuração.”</span>
+        </div>
+        <div class="cap"><b>settrow + chips de modo + checkboxes + ação real</b> — origem: `renderConfig` · execTrackCard (literais reais; selecionado = accent sólido + check; erro da seção = linha vermelha `#etMsg`; loading = linha “Carregando…”).</div>
+      </div>
+
+      <div class="g" style="--gk:#767E8D">
+        <div class="g-k"><i></i><b>Empty state · amostra real</b></div>
+        <div class="empty">
+          <span class="ebox"><svg class="ic"><use href="#i-calendar"/></svg></span>
+          <span class="et">Dia livre</span>
+          <span class="es">Nenhum compromisso para esta data.</span>
+        </div>
+        <div class="cap" style="text-align:center;margin-top:4px"><b>emptyState(ic, t, s)</b> — origem: Agenda (dia sem eventos). SEM CTA e sem ilustração (fidelidade). Consolidação C4 = R5.</div>
+      </div>
+
+      <div class="g" style="--gk:#F59E0B">
+        <div class="g-k"><i></i><b>Stat-tile · amostra real (→ C8)</b></div>
+        <div class="row" style="gap:10px">
+          <div class="stat accent"><svg class="ic"><use href="#i-sun"/></svg><div class="v">3</div><div class="l">Hoje</div></div>
+          <div class="stat"><svg class="ic"><use href="#i-list"/></svg><div class="v">12</div><div class="l">Tarefas</div></div>
+        </div>
+        <div class="cap"><b>.stat / .stat.accent</b> — origem: Hoje (tiles clicáveis `data-tab`; valor 800 + label). Consolidação C8 = R6.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <span class="na"><i></i>PAGINAÇÃO — não existe no real</span>
+    <span class="na"><i></i>SKELETON — não existe no real</span>
+    <span class="na"><i></i>Splash “Restaurando sessão…” → C5 (R5)</span>
+    <div class="end">Prancha de contrato de design · componentes Golden reutilizados sem redesenho · zero implementação<br><b style="color:var(--tx-3)">C1 aguarda avaliação do owner — não declarada completa</b></div>
+  </div>
+</div>
+</body>
+</html>

@@ -118,6 +118,10 @@ componente inexistente. Existem no produto e ainda precisam aparecer:
 no real — provavelmente sai do escopo por decisão do owner)**. Fechar via etapa R2 do
 `DESIGN-CLOSURE-ROADMAP.md` (1 frame de estados sobre superfícies reais).
 
+> **ATUALIZAÇÃO R2:** a prancha `r2-c1-completion-estados.html` fornece a PROVA VISUAL de todos os
+> itens acima que EXISTEM no real (ver §16). Os inexistentes (validation summary/radio/multi-select)
+> ficam formalmente FORA do escopo. Congelamento aguarda avaliação do owner — C1 ainda NÃO completa.
+
 ---
 
 ## 4 · TOKENS C1 CONSOLIDADOS (extraídos dos frames aprovados — não alterar)
@@ -304,3 +308,40 @@ sem conflito). Componentes REAIS do renderProductionModal:
   contrato "referência ≠ campo".
 Dívidas anotadas no F13 (não corrigir): sem validação de dimensão/tamanho; sem progress; botões
 sem loading/disabled; URL sem validação. Congelam quando o owner aprovar o Frame 13 (NÃO Golden).
+
+## 16 · R2 — C1 COMPLETION · ESTADOS REAIS (prancha `r2-c1-completion-estados.html` — aguarda owner)
+Prancha de contrato (spec board, não é tela) que fecha visualmente as pendências do §3 com
+componentes/estados/mensagens 100% reais da 1.0.246. Candidatos a congelar com a aprovação:
+- **Disabled genérico**: `.btn[disabled]` real (opacity .6, pointer-events none) aplicado a
+  primary e secondary; texto permanece legível. `−` do stepper no mínimo (opacity .4) reafirmado.
+- **Contrato OFF ≠ DISABLED**: toggle OFF (escolha ativa: trilho cinza + knob pleno) lado a lado
+  com ação disabled (indisponibilidade) — nunca ilegível, nunca confundíveis.
+- **Loading de submit**: Login `loading(btn,on)` — botão disabled + spinner 20px substitui o
+  texto (largura preservada). **Saving anti-duplo-clique**: rev-send `disabled aria-busy`
+  "Salvando cronograma…" (literal real com reticências). Linha "Carregando…" de Config citada.
+- **Inline error (campo)**: `sq-err`/`cqErr` — tint vermelho 8% + microborder 25% + ink, radius 9,
+  `role="alert"`, ícone 14; literal real "Informe uma quantidade inteira igual ou superior a 1.";
+  trigger valor não-inteiro/<1; foco volta ao campo; campo ganha ring vermelho de erro.
+- **Form-level error (banner)**: reutilizado do F12 (`.banner.err`) — contrato DISTINTO do inline.
+- **Destructive confirmation (estado)**: del-sheet real `openDeleteConfirm` — del-ic trash tint
+  vermelho 13% + ring 24%, título "Remover tarefa?", mensagem literal com `<b>item</b>` + "Não é
+  possível desfazer.", Cancelar (secondary) + "Remover tarefa" (`btn-danger`: tint 12% + microborder
+  42% + ink 750 — nunca parece primary). Anatomia completa do modal = C2 (R3).
+- **Checkbox (representação C1 da semântica nativa)**: real = `<input type="checkbox">` NATIVO em
+  Config·Check-ins (labels literais; defaults reais 1º checked/2º unchecked). DS: box 18 radius 5;
+  checked = brand + check branco; unchecked = hairline 1.6; focus = ring #6E5EF3 + halo. Estado
+  nunca só por cor (box preenchido + check).
+- **Checklist = EDITOR, não checkbox**: `checklistHtml` (input + remover vermelho + "+ Adicionar
+  item") — distinção registrada; marcação "feito" não vive no editor.
+- **Applied sample Configurações**: settrow (icb 38/11 + 14/700 + sub com `<b>`) + chips de modo
+  (selecionado = accent sólido + check) + checkboxes + ação real "Salvar configuração" + gate
+  admin literal + estados "Carregando…"/erro `#etMsg` citados.
+- **Empty state (amostra p/ C4)**: `emptyState()` — ebox 60/17 hairline + título 750 + sub;
+  literais "Dia livre"/"Nenhum compromisso para esta data."; SEM CTA/ilustração (fidelidade).
+- **Stat-tile (amostra p/ C8)**: `.stat`/`.stat.accent` do Hoje — ic + valor InterTight 700 +
+  label; accent = brand com conteúdo branco; clicável (`data-tab`).
+**EXCLUSÕES FORMAIS AUDITADAS (não existem no real — fora do escopo, nunca inventar):**
+validation summary (global = `alert()` nativo: "Informe o título." · "Informe o cliente." ·
+"Selecione o setor.") · radio (`type="radio"` = 0; escolha única = choice chips) · multi-select
+(canais = escolha única) · paginação (listas por slice/scroll) · skeleton (só splash/"Carregando…").
+Splash "Restaurando sessão…" permanece na C5 (R5). **NÃO declarar C1 completa até o owner aprovar.**

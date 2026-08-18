@@ -1,3 +1,24 @@
+# ▶ R2 — C1 COMPLETION · ESTADOS REAIS (prancha entregue; aguarda owner)
+`r2-c1-completion-estados.html` — **prancha de contratos** (spec board 1920×1080; não é tela do
+produto, não é Frame A). Fecha visualmente as pendências do C1 §3 com estados 100% reais da
+1.0.246; matriz de auditoria completa no header do arquivo e candidatos no **C1 §16**.
+- **Representados (com origem real):** primary/secondary default·disabled·loading (`.btn[disabled]`
+  opacity .6; Login `loading(btn,on)` spinner); "Salvando cronograma…" (rev-send `aria-busy`);
+  contrato **OFF ≠ DISABLED**; inline error real `sq-err`/`cqErr` (literal "Informe uma
+  quantidade inteira igual ou superior a 1.", `role=alert`, `−` no mínimo disabled);
+  form-level banner reutilizado do F12; **del-sheet** destrutivo completo (literais
+  "Remover tarefa?"/"Não é possível desfazer."/btn-danger); checkbox (semântica nativa de
+  Config·Check-ins → representação DS: checked/unchecked/focus); **checklist = editor** (não
+  checkbox — `checklistHtml`); amostra aplicada de Configurações (settrow + chips de modo +
+  checkboxes + "Salvar configuração" + gate admin); empty state real ("Dia livre", SEM CTA);
+  stat-tile real (amostra → C8).
+- **Exclusões formais auditadas (não existem — nunca inventar):** validation summary (global =
+  `alert()` nativo) · radio · multi-select · paginação · skeleton.
+- Nenhum contrato Golden redesenhado; nenhuma função inventada. **C1 NÃO declarada completa** —
+  aguarda avaliação do owner; R3 não iniciado.
+
+---
+
 # ★ CHECKPOINT GLOBAL DO DESIGN — FRAMES A 1–13 = GOLDEN / CONGELADOS
 Decisão do owner. Commits finais: F1 `e7107e3` · F2 `45721bc` · F3 `b5842bc` · F4 `66d9a6a` ·
 F5 `c0c83f4` · F6 `9644d94` · F7 `ea485c2`/`c0cb413`/`5d2b10d`/`7361f92`/`e18d9f7`/`755eee6`
