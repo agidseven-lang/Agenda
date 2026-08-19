@@ -2720,6 +2720,86 @@ body.light-ui.hc{--ink:#000000; --soft:#232936; --faint:#3E4657; --line:#8890A2;
    No-op no layout atual; os contêineres Golden da I2+ nascem com o guardrail. */
 body.light-ui.desktop.authed #app>*{min-width:0}
 body.light-ui .topbar>*{min-width:0}
+
+/* ============================================================================
+   LIGHT UI — CORE SHELL (I2) · sidebar + canvas autenticado + cluster do topo
+   Fontes: Golden F1 V10 (shell), C8 (ACTIVE nav), errata E6 (sb-faint′)/E8
+   (badge → danger-ink). Somente APRESENTAÇÃO de elementos REAIS — zero handler,
+   zero markup novo. Decisão auditada (registrada no report): o desktop real
+   OCULTA o .topbar por decisão de produto (1.0.140) e o título vive em cada
+   superfície ⇒ o header Golden 92px será materializado nas fases de surface;
+   o shell compartilhado real = sidebar + canvas + cluster flutuante (skin).
+   ========================================================================== */
+body.light-ui{--d-side:284px}
+
+/* ---- CANVAS: o desktop dark pinta background PRÓPRIO no body (radial navy) — sob light-ui, canvas Golden ---- */
+body.light-ui.desktop{background:var(--lui-canvas)}
+
+/* ---- SIDEBAR (Golden .sb → .nav real) ---- */
+body.light-ui.desktop .nav{
+  background:linear-gradient(180deg,var(--lui-sb-1),var(--lui-sb-2));
+  border-right:0;padding:0 14px 12px;gap:2px;
+}
+body.light-ui.desktop .nav .sb-brand{
+  gap:14px;padding:30px 10px 22px;border-bottom:0;margin-bottom:0;
+}
+body.light-ui.desktop .nav .sb-brand .logo.sm{
+  width:46px;height:46px;border-radius:14px;
+  box-shadow:0 8px 20px rgba(94,110,243,.4),inset 0 1px 0 rgba(255,255,255,.24);
+}
+body.light-ui.desktop .nav .sb-brand .nm{font-size:18px;font-weight:700;letter-spacing:-.014em;color:#F5F7FB;line-height:1.14}
+body.light-ui.desktop .nav .sb-brand .sy{font-size:12px;color:var(--lui-sb-faint);margin-top:4px}
+body.light-ui.desktop .nav .sb-brand .dot{background:#33D6A6;box-shadow:0 0 0 3px rgba(51,214,166,.15)}
+body.light-ui.desktop .nav .new-task-btn{
+  height:48px;margin:14px 6px 18px;border-radius:13px;border:0;
+  background:var(--lui-grad);box-shadow:var(--lui-grad-shadow);
+  font-size:14px;font-weight:650;gap:9px !important;
+}
+body.light-ui.desktop .nav .new-task-btn:hover{transform:translateY(-1px);filter:none;box-shadow:0 10px 24px rgba(110,94,243,.36)}
+body.light-ui.desktop .nav .new-task-btn .new-task-icon svg{width:18px;height:18px}
+body.light-ui.desktop .nav .sb-sect{font-size:10.5px;font-weight:700;letter-spacing:.15em;color:var(--lui-sb-dim);padding:18px 14px 10px}
+body.light-ui.desktop .nav button.sb-item{
+  gap:13px !important;height:42px;padding:0 14px !important;border-radius:11px;
+  color:var(--lui-sb-tx) !important;font-size:14px !important;font-weight:450 !important;
+}
+body.light-ui.desktop .nav button.sb-item span{font-size:14px !important;font-weight:450 !important}
+body.light-ui.desktop .nav button.sb-item svg{width:19px !important;height:19px !important;color:var(--lui-sb-dim)}
+body.light-ui.desktop .nav button.sb-item:hover{background:rgba(255,255,255,.04);color:#F7F9FC !important}
+body.light-ui.desktop .nav button.sb-item.on{
+  background:rgba(255,255,255,.065) !important;color:#F7F9FC !important;
+  font-weight:560 !important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.055);
+}
+body.light-ui.desktop .nav button.sb-item.on span{font-weight:560 !important}
+body.light-ui.desktop .nav button.sb-item.on svg{color:#B7C1FF}
+body.light-ui.desktop .nav button.sb-item.on::before{
+  left:-14px;top:10px;bottom:10px;height:auto;transform:none;
+  background:linear-gradient(180deg,#7C8CFF,#6E5EF3);
+}
+/* badge de contagem (elemento real .nc-navbadge) — errata E8: sólido c/ branco pequeno usa INK */
+body.light-ui.desktop .nav .nc-navbadge{
+  order:9;margin-left:auto;height:20px;min-width:20px;padding:0 7px;border-radius:var(--lui-r-pill);
+  background:var(--lui-danger-ink);color:#fff;font-size:11px;font-weight:700;
+  display:inline-flex;align-items:center;justify-content:center;
+}
+body.light-ui.desktop .nav .sb-user{
+  margin-top:auto;padding:16px 10px 8px;box-shadow:inset 0 1px 0 rgba(255,255,255,.06);
+}
+body.light-ui.desktop .nav .sb-user .su-n{font-size:14px;font-weight:600;color:#F3F6FB}
+body.light-ui.desktop .nav .sb-user .su-r{font-size:12px;color:var(--lui-sb-faint);margin-top:3px}
+body.light-ui.desktop .nav .sb-footer{font-size:10px;color:var(--lui-sb-faint)}
+
+/* ---- CANVAS AUTENTICADO ---- */
+/* Golden: canvas full-bleed com respiro próprio; superfícies definem suas larguras nas fases I3+ */
+body.light-ui.desktop #app > .content{padding:30px 32px 48px !important}
+body.light-ui.desktop #app > .content > *{max-width:none}
+
+/* ---- CLUSTER FLUTUANTE DO TOPO (elementos reais; skin de superfície apenas) ---- */
+body.light-ui .corner-avatar{box-shadow:0 0 0 2px rgba(91,124,250,.45)}
+body.light-ui .corner-avatar:hover{box-shadow:0 0 0 3px rgba(91,124,250,.35)}
+body.light-ui .slaib-bell{
+  background:var(--lui-surface);border:1px solid var(--lui-hair);color:var(--lui-tx-2);
+  box-shadow:var(--lui-sh-card);
+}
 </style>
 </head>
 <body>
