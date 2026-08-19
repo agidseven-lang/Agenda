@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>F1 — Meu Quadro · CARD GOLDEN RESTORATION · 1920×1080</title>
+<!--
+  AGENDA ID SEVEN · LIGHT UI · PROTÓTIPO ESTÁTICO (pós-freeze, mandato do owner)
+  Objetivo: restaurar o MODELO DE CARD dos prints 5/6 aprovados (card = resumo; drawer = detalhe).
+  Referência canônica: print 6 (frame Meu Quadro light). Skill auxiliar: UI UX Pro Max
+  (Minimalism & Swiss p/ SaaS · densidade dashboard · barra de progresso · disclosure progressiva),
+  SUBORDINADA à referência do owner. NÃO é o app real; reconciliação com dados reais só após GO.
+-->
+<style>
+:root{
+  --bg:#F7F8FA; --surface:#FFFFFF; --hair:#E8ECF2; --hair-2:#EEF1F6;
+  --tx1:#1A202C; --tx2:#4A5568; --tx3:#718096; --tx4:#A0AEC0;
+  --blue:#3B82F6; --blue-ink:#2563EB; --orange:#F59E0B; --violet:#8B5CF6;
+  --green:#22C55E; --green-ink:#16A34A; --red:#EF4444; --teal:#14B8A6; --pink:#EC4899;
+  --grad-cta:linear-gradient(90deg,#2E6BFF,#EC4899);
+  --sh-card:0 1px 2px rgba(23,25,35,.05),0 1px 3px rgba(23,25,35,.04);
+  --sh-panel:0 4px 16px rgba(23,25,35,.07);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{width:1920px;height:1080px;overflow:hidden;background:var(--bg);
+  font-family:Inter,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased;color:var(--tx1);display:flex}
+svg{display:block}
+.av{border-radius:50%;background-size:cover;flex:none;position:relative;overflow:hidden}
+.av::after{content:'';position:absolute;inset:0;background:
+  radial-gradient(circle at 50% 34%, rgba(255,246,235,.92) 0 21%, transparent 22.5%),
+  radial-gradient(ellipse 42% 30% at 50% 96%, rgba(255,246,235,.92) 0 99%, transparent 100%)}
+
+/* ══════════ SIDEBAR (shell claro aprovado — contexto) ══════════ */
+.sb{width:264px;height:100%;background:var(--surface);border-right:1px solid var(--hair);
+  display:flex;flex-direction:column;padding:18px 14px 14px;flex:none}
+.sb-brand{display:flex;align-items:center;gap:11px;padding:2px 6px 16px}
+.sb-mark{width:40px;height:40px;border-radius:50%;background:conic-gradient(from 210deg,#5B2EBC,#B01E8E,#5B2EBC);display:flex;align-items:center;justify-content:center}
+.sb-mark i{width:26px;height:26px;border-radius:50%;background:#3E8FB0;display:flex;align-items:center;justify-content:center;color:#fff;font-style:normal;font-weight:800;font-size:13px}
+.sb-nm{font-size:16.5px;font-weight:800;letter-spacing:-.015em}
+.sb-sync{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--tx3);margin-top:2px}
+.sb-sync i{width:6px;height:6px;border-radius:50%;background:#22C55E}
+.sb-new{height:42px;border-radius:12px;background:var(--grad-cta);color:#fff;font-size:13.5px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;gap:8px;margin:2px 4px 16px;box-shadow:0 8px 18px rgba(120,80,240,.25)}
+.sb-sect{font-size:9.5px;font-weight:800;letter-spacing:.14em;color:var(--tx4);padding:10px 12px 7px}
+.sb-it{display:flex;align-items:center;gap:11px;height:38px;padding:0 12px;border-radius:10px;font-size:13.5px;font-weight:500;color:var(--tx2)}
+.sb-it svg{width:17px;height:17px;stroke:var(--tx3);stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.sb-it.on{background:#E9F1FE;color:var(--blue-ink);font-weight:650}
+.sb-it.on svg{stroke:var(--blue-ink)}
+.sb-badge{margin-left:auto;background:#475569;color:#fff;font-size:10.5px;font-weight:700;height:18px;min-width:24px;padding:0 6px;border-radius:999px;display:flex;align-items:center;justify-content:center}
+.sb-user{margin-top:auto;display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--hair);border-radius:12px;background:#FAFBFD}
+.sb-user .av{width:34px;height:34px}
+.sb-user b{font-size:13px;display:block}
+.sb-user span{font-size:11.5px;color:var(--tx3)}
+.sb-user i{width:7px;height:7px;border-radius:50%;background:#22C55E;margin-left:auto;font-style:normal}
+.sb-ws{display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid var(--hair);border-radius:12px;margin-top:8px;font-size:12.5px;font-weight:650}
+.sb-ws span{color:var(--tx3);font-weight:500}
+.sb-ws svg{width:13px;height:13px;stroke:var(--tx3);stroke-width:2;fill:none;margin-left:auto}
+.sb-plan{padding:10px 12px;border:1px solid var(--hair);border-radius:12px;margin-top:8px}
+.sb-plan .r{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700}
+.sb-plan .r b{margin-left:auto;font-size:11.5px;color:var(--tx2)}
+.sb-plan .bar{height:6px;border-radius:99px;background:#EDF0F5;margin-top:8px;overflow:hidden}
+.sb-plan .bar i{display:block;height:100%;width:80%;border-radius:99px;background:var(--grad-cta)}
+
+/* ══════════ MAIN ══════════ */
+.main{flex:1;display:flex;flex-direction:column;min-width:0;padding:0 24px}
+.hd{height:76px;display:flex;align-items:center;gap:14px;flex:none}
+.hd-back{width:36px;height:36px;border-radius:10px;border:1px solid var(--hair);background:var(--surface);display:flex;align-items:center;justify-content:center}
+.hd-back svg{width:16px;height:16px;stroke:var(--tx2);stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.hd .av{width:42px;height:42px}
+.hd-t b{font-size:20px;font-weight:800;letter-spacing:-.02em;display:block;line-height:1.15}
+.hd-t span{font-size:12px;color:var(--tx3)}
+.hd-r{margin-left:auto;display:flex;align-items:center;gap:12px}
+.sla{display:flex;align-items:center;gap:10px;height:46px;padding:0 16px 0 10px;border-radius:12px;background:linear-gradient(180deg,#F1FBF7,#E9F8F0);box-shadow:inset 0 0 0 1px #CBEEDD}
+.sla-ic{width:30px;height:30px;border-radius:9px;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(18,80,54,.14)}
+.sla-ic svg{width:16px;height:16px;stroke:#16A34A;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.sla-k{font-size:9px;font-weight:800;letter-spacing:.07em;color:#12784C;display:flex;align-items:center;gap:5px}
+.sla-k i{width:5px;height:5px;border-radius:50%;background:#22C58A;box-shadow:0 0 0 3px rgba(34,197,138,.18)}
+.sla-v{font-size:13.5px;font-weight:700;color:#115E3D;margin-top:1px}
+.bell{width:42px;height:42px;border-radius:12px;border:1px solid var(--hair);background:var(--surface);display:flex;align-items:center;justify-content:center;position:relative}
+.bell svg{width:18px;height:18px;stroke:var(--tx2);stroke-width:1.9;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.bell i{position:absolute;top:9px;right:10px;width:7px;height:7px;border-radius:50%;background:var(--blue);box-shadow:0 0 0 2px #fff}
+.hd-av{width:40px;height:40px;border-radius:50%;box-shadow:0 0 0 2px rgba(124,92,255,.55)}
+
+/* toolbar */
+.tb{display:flex;align-items:center;gap:10px;flex:none;padding:2px 0 12px}
+.search{flex:0 1 540px;height:42px;border:1px solid var(--hair);border-radius:11px;background:var(--surface);
+  display:flex;align-items:center;gap:10px;padding:0 13px;color:var(--tx4);font-size:13.5px}
+.search svg{width:15px;height:15px;stroke:var(--tx3);stroke-width:2;fill:none;stroke-linecap:round}
+.kbd{margin-left:auto;font-size:10px;font-weight:700;color:var(--tx3);background:#F2F4F8;border:1px solid var(--hair);border-radius:6px;padding:2px 7px}
+.tabs{margin-left:auto;display:flex;gap:8px}
+.tab{display:flex;align-items:center;gap:7px;height:38px;padding:0 14px;border-radius:11px;border:1px solid var(--hair);background:var(--surface);font-size:12.5px;font-weight:650;color:var(--tx2)}
+.tab svg{width:15px;height:15px;stroke:currentColor;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.tab.on{background:var(--blue-ink);border-color:var(--blue-ink);color:#fff}
+
+/* filter row */
+.frow{display:flex;align-items:center;gap:9px;flex:none;padding:0 0 14px}
+.frow-k{font-size:12.5px;color:var(--tx3);margin-right:2px}
+.rchip{display:flex;align-items:center;gap:7px;height:34px;padding:0 12px 0 6px;border-radius:11px;border:1px solid var(--hair);background:var(--surface);font-size:12.5px;font-weight:700}
+.rchip .av{width:23px;height:23px}
+.rchip.c-blue{color:#2563EB}.rchip.c-blue .av{box-shadow:0 0 0 2px #6366F1}
+.rchip.c-purple{color:#7C3AED}.rchip.c-purple .av{box-shadow:0 0 0 2px #8B5CF6}
+.rchip.c-orange{color:#D97706}.rchip.c-orange .av{box-shadow:0 0 0 2px #F59E0B}
+.rchip.c-red{color:#DC2626}.rchip.c-red .av{box-shadow:0 0 0 2px #EF4444}
+.rchip.c-green{color:#16A34A}.rchip.c-green .av{box-shadow:0 0 0 2px #22C55E}
+.rchip.all{color:var(--tx2);padding:0 12px;gap:8px}
+.rchip.all svg{width:14px;height:14px;stroke:var(--tx3);stroke-width:1.8;fill:none}
+.rchip.all b{font-weight:700}
+.rchip.all .ch{width:11px;height:11px;stroke:var(--tx3);stroke-width:2}
+
+/* ══════════ BOARD ══════════ */
+.stage{flex:1;display:flex;gap:18px;min-height:0}
+.col{width:272px;flex:none;display:flex;flex-direction:column;min-height:0}
+.col-h{display:flex;align-items:center;gap:9px;padding:4px 4px 10px;position:relative}
+.col-h::after{content:'';position:absolute;left:0;right:0;bottom:0;height:3px;border-radius:3px;background:var(--c)}
+.col-dot{width:9px;height:9px;border-radius:50%;background:var(--c)}
+.col-nm{font-size:14px;font-weight:750;letter-spacing:-.01em}
+.col-ct{margin-left:auto;font-size:13px;font-weight:750;color:var(--tx2)}
+.col-body{display:flex;flex-direction:column;gap:12px;padding:14px 2px 0;min-height:0}
+.col-add{margin-top:12px;height:38px;border:1px solid var(--hair);border-radius:10px;background:var(--surface);
+  display:flex;align-items:center;justify-content:center;gap:7px;font-size:12.5px;font-weight:650;color:var(--c)}
+.col-add svg{width:14px;height:14px;stroke:var(--c);stroke-width:2;fill:none;stroke-linecap:round}
+.s-todo{--c:var(--blue)}.s-doing{--c:var(--orange)}.s-rev{--c:var(--violet)}.s-done{--c:var(--green)}
+
+/* ══════════ CARD — MODELO GOLDEN (prints 5/6) ══════════ */
+.card{background:var(--surface);border:1px solid var(--hair);border-radius:12px;box-shadow:var(--sh-card);padding:13px 14px 11px}
+.c-top{display:flex;gap:10px;align-items:flex-start;margin-bottom:8px}
+.c-title{font-size:13.5px;font-weight:750;line-height:1.35;letter-spacing:-.008em;flex:1;
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.c-mark{flex:none;margin-top:1px}
+.c-mark svg{width:15px;height:15px;stroke:var(--tx4);stroke-width:1.8;fill:none;stroke-linejoin:round}
+.c-check{flex:none;width:19px;height:19px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 5px rgba(34,197,94,.35)}
+.c-check svg{width:10px;height:10px;stroke:#fff;stroke-width:2.6;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.c-tag{display:inline-flex;align-items:center;height:19px;padding:0 8px;border-radius:5px;font-size:8.5px;font-weight:800;letter-spacing:.05em;margin-bottom:9px}
+.t-mkt{background:#E7F0FE;color:#2563EB}.t-social{background:#DFF6F2;color:#0F9488}
+.t-design{background:#EFEAFE;color:#7C3AED}.t-video{background:#FDE8E8;color:#DC2626}
+.t-crm{background:#DFF6F2;color:#0F9488}.t-traf{background:#E7F0FE;color:#2563EB}.t-rel{background:#EEF1F6;color:#64748B}
+.c-cli{margin-bottom:8px}
+.c-cli span{display:block;font-size:10px;color:var(--tx4);margin-bottom:1px}
+.c-cli b{font-size:12px;font-weight:650;color:var(--tx1)}
+.c-due{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:550;color:var(--tx2);margin-bottom:9px}
+.c-due svg{width:13px;height:13px;stroke:var(--tx3);stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.c-due.done{color:var(--green-ink)}
+.c-due.done svg{stroke:var(--green-ink)}
+.c-prog{display:flex;align-items:center;gap:9px;margin-bottom:10px}
+.c-bar{flex:1;height:4px;border-radius:99px;background:#EDF0F5;overflow:hidden}
+.c-bar i{display:block;height:100%;border-radius:99px;background:var(--c)}
+.c-pct{font-size:10.5px;font-weight:650;color:var(--tx3)}
+.c-foot{display:flex;align-items:center;padding-top:9px;border-top:1px solid var(--hair-2)}
+.stack{display:flex;align-items:center}
+.stack .av{width:22px;height:22px;box-shadow:0 0 0 2px #fff}
+.stack .av+.av{margin-left:-6px}
+.stack .more{width:22px;height:22px;border-radius:50%;background:#EDF0F5;color:var(--tx3);font-size:9px;font-weight:750;display:flex;align-items:center;justify-content:center;margin-left:-6px;box-shadow:0 0 0 2px #fff}
+.meta{margin-left:auto;display:flex;align-items:center;gap:11px}
+.meta span{display:flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--tx3)}
+.meta svg{width:13px;height:13px;stroke:var(--tx4);stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}
+
+/* rings por responsável (identificação = anel no avatar, como o print 6) */
+.r-ary{box-shadow:0 0 0 2px #6366F1,0 0 0 4px #fff !important}
+.r-bea{box-shadow:0 0 0 2px #0EA5E9,0 0 0 4px #fff !important}
+.r-cai{box-shadow:0 0 0 2px #F59E0B,0 0 0 4px #fff !important}
+.r-pau{box-shadow:0 0 0 2px #EC4899,0 0 0 4px #fff !important}
+.r-fel{box-shadow:0 0 0 2px #14B8A6,0 0 0 4px #fff !important}
+
+/* ══════════ PAINEL DE DETALHE (contexto — drawer é o detalhe) ══════════ */
+.panel{width:352px;flex:none;background:var(--surface);border:1px solid var(--hair);border-radius:14px;box-shadow:var(--sh-panel);
+  display:flex;flex-direction:column;padding:16px 18px 14px;min-height:0}
+.p-hd{display:flex;align-items:center;gap:8px;padding-bottom:12px}
+.p-hd .dot{width:9px;height:9px;border-radius:50%;background:var(--green)}
+.p-hd b{font-size:14px;font-weight:750}
+.p-hd .ic{margin-left:auto;display:flex;gap:6px}
+.p-hd .ic span{width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center}
+.p-hd .ic svg{width:14px;height:14px;stroke:var(--tx3);stroke-width:1.9;fill:none;stroke-linecap:round}
+.p-badges{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.p-badge{display:flex;align-items:center;gap:4px;height:22px;padding:0 9px;border-radius:6px;background:#E8F8EE;color:#16A34A;font-size:10px;font-weight:700}
+.p-badge svg{width:10px;height:10px;stroke:#16A34A;stroke-width:2.4;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.p-title{display:flex;gap:9px;margin-bottom:12px}
+.p-title svg{width:20px;height:20px;fill:#F6C344;stroke:#F6C344;flex:none;margin-top:1px}
+.p-title b{font-size:17.5px;font-weight:800;letter-spacing:-.015em;line-height:1.25}
+.p-cli{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.p-cli .sq{width:34px;height:34px;border-radius:9px;background:#E9F8F0;color:#16A34A;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center}
+.p-cli b{font-size:13px;display:block}
+.p-cli span{font-size:11px;color:var(--tx3)}
+.p-lab{font-size:10px;font-weight:800;letter-spacing:.08em;color:var(--tx4);margin:2px 0 8px}
+.p-resp{display:flex;align-items:center;gap:10px;margin-bottom:13px}
+.p-resp .av{width:32px;height:32px}
+.p-resp b{font-size:13px;display:block}
+.p-resp span{font-size:11px;color:var(--tx3)}
+.p-when{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--tx2);margin-bottom:14px}
+.p-when svg{width:14px;height:14px;stroke:var(--tx3);stroke-width:1.8;fill:none;stroke-linecap:round}
+.p-cont-h{display:flex;align-items:center;margin-bottom:8px}
+.p-cont-h span{margin-left:auto;font-size:10.5px;color:var(--tx3);font-weight:600}
+.p-file{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--hair);border-radius:10px;background:#FAFBFD;margin-bottom:14px}
+.p-file .fic{width:32px;height:34px;border-radius:7px;background:#FDE8E6;display:flex;align-items:center;justify-content:center;color:#DC2626;font-size:7px;font-weight:800}
+.p-file b{font-size:11.5px;font-weight:650;display:block}
+.p-file span{margin-left:auto;font-size:10.5px;color:var(--tx3)}
+.p-tl{flex:1;min-height:0}
+.p-tl-row{display:flex;gap:10px;padding-bottom:11px;position:relative}
+.p-tl-row::before{content:'';position:absolute;left:5px;top:14px;bottom:-2px;width:2px;background:var(--hair-2)}
+.p-tl-row:last-child::before{display:none}
+.p-tl-dot{width:12px;height:12px;border-radius:50%;flex:none;margin-top:2px;box-shadow:inset 0 0 0 3px #fff;position:relative;z-index:1}
+.p-tl-row b{font-size:11px;font-weight:700;color:var(--tx2);flex:none;width:64px}
+.p-tl-row span{font-size:11px;color:var(--tx2);line-height:1.4}
+.p-cta{display:flex;gap:8px;margin-top:10px}
+.p-cta .go{flex:1;height:42px;border-radius:11px;background:var(--grad-cta);color:#fff;font-size:12.5px;font-weight:750;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 8px 18px rgba(120,80,240,.28)}
+.p-cta .go svg{width:15px;height:15px;stroke:#fff;stroke-width:2;fill:none;stroke-linecap:round}
+.p-cta .more{width:42px;height:42px;border-radius:11px;border:1px solid var(--hair);background:var(--surface);color:var(--tx2);font-size:15px;font-weight:800;display:flex;align-items:center;justify-content:center}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sb">
+  <div class="sb-brand">
+    <div class="sb-mark"><i>a</i></div>
+    <div><div class="sb-nm">ID Seven</div><div class="sb-sync"><i></i>sincronizado</div></div>
+  </div>
+  <div class="sb-new">＋ Nova tarefa</div>
+  <div class="sb-sect">WORKSPACE</div>
+  <div class="sb-it"><svg viewBox="0 0 24 24"><path d="M12 3l2.7 5.6 6.3.9-4.5 4.3 1 6.2-5.5-3-5.5 3 1-6.2L3 9.5l6.3-.9z"/></svg>Minhas Prioridades</div>
+  <div class="sb-it"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>Hoje</div>
+  <div class="sb-it"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4M16 3v4M4 10h16M9 14h2M13 14h2"/></svg>Agenda</div>
+  <div class="sb-it on"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h7"/><circle cx="18" cy="15" r="0.5"/></svg>Tarefas</div>
+  <div class="sb-it"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20c.6-3.4 2.9-5 5.5-5s4.9 1.6 5.5 5"/><circle cx="17" cy="9" r="2.6"/><path d="M15.5 14.6c2.4.2 4.3 1.7 4.9 4.4"/></svg>Equipe</div>
+  <div class="sb-it"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.4"/><path d="M5.5 20c.7-3.7 3.2-5.5 6.5-5.5s5.8 1.8 6.5 5.5"/></svg>Perfil</div>
+  <div class="sb-it"><svg viewBox="0 0 24 24"><path d="M4 17l4-6 4 3 5-8 3 4"/><path d="M4 21h16"/></svg>Executivo</div>
+  <div class="sb-it"><svg viewBox="0 0 24 24"><path d="M5 21V10M12 21V4M19 21v-7"/></svg>Relatórios</div>
+  <div class="sb-it"><svg viewBox="0 0 24 24"><path d="M6.6 10a5.4 5.4 0 0110.8 0c0 4.6 1.9 5.7 1.9 5.7H4.7s1.9-1.1 1.9-5.7z"/><path d="M10.2 19a2 2 0 003.6 0"/></svg>Notificações<span class="sb-badge">9+</span></div>
+  <div class="sb-sect">SISTEMA</div>
+  <div class="sb-it"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 00-2-1.2L14.2 3h-4l-.4 2.6a7 7 0 00-2 1.2l-2.3-.9-2 3.4 2 1.5A7 7 0 005 12c0 .4 0 .8.1 1.2l-2 1.5 2 3.4 2.3-.9a7 7 0 002 1.2l.4 2.6h4l.4-2.6a7 7 0 002-1.2l2.3.9 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z"/></svg>Configurações</div>
+  <div class="sb-user"><span class="av r-ary" style="background-color:#6366F1"></span><div><b>Ardyjany Carló...</b><span>CEO · admin</span></div><i></i></div>
+  <div class="sb-ws"><b>ID Seven</b><span>· Agência</span><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>
+  <div class="sb-plan"><div class="r">👑 Plano Business<b>80%</b></div><div class="bar"><i></i></div></div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+  <!-- HEADER -->
+  <div class="hd">
+    <div class="hd-back"><svg viewBox="0 0 24 24"><path d="M14 6l-6 6 6 6"/></svg></div>
+    <span class="av hd-av" style="background-color:#8C6E5D"></span>
+    <div class="hd-t"><b>Meu quadro</b><span>CEO</span></div>
+    <div class="hd-r">
+      <div class="sla"><span class="sla-ic"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.4-2.9 8-7 10-4.1-2-7-5.6-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg></span>
+        <div><div class="sla-k"><i></i>MONITOR SLA · AO VIVO</div><div class="sla-v">Tudo em dia</div></div></div>
+      <div class="bell"><svg viewBox="0 0 24 24"><path d="M6.6 10a5.4 5.4 0 0110.8 0c0 4.6 1.9 5.7 1.9 5.7H4.7s1.9-1.1 1.9-5.7z"/><path d="M10.2 19a2 2 0 003.6 0"/></svg><i></i></div>
+      <span class="av hd-av" style="background-color:#8C6E5D"></span>
+    </div>
+  </div>
+
+  <!-- TOOLBAR -->
+  <div class="tb">
+    <div class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>Buscar tarefas...<span class="kbd">⌘K</span></div>
+    <div class="tabs">
+      <div class="tab on"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.4"/><path d="M5.5 20c.7-3.7 3.2-5.5 6.5-5.5s5.8 1.8 6.5 5.5"/></svg>Meu quadro</div>
+      <div class="tab"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"/><circle cx="12" cy="12" r="2.6"/></svg>Cliente</div>
+      <div class="tab"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9.5" cy="9.5" r="1.8"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg>Designers</div>
+      <div class="tab"><svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><circle cx="17" cy="10" r="2.5"/><path d="M3 19c.5-3 2.5-4.5 5-4.5s4.5 1.5 5 4.5M13.7 15c2 .2 3.7 1.4 4.2 3.8"/></svg>Social Mídias</div>
+      <div class="tab"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg>Setores</div>
+    </div>
+  </div>
+
+  <!-- FILTER ROW -->
+  <div class="frow">
+    <span class="frow-k">Filtrar por responsável:</span>
+    <div class="rchip c-blue"><span class="av" style="background-color:#8C6E5D"></span>Ardyjany</div>
+    <div class="rchip c-purple"><span class="av" style="background-color:#B08968"></span>Sunset</div>
+    <div class="rchip c-orange"><span class="av" style="background-color:#7D5A44"></span>MoveOn</div>
+    <div class="rchip c-red"><span class="av" style="background-color:#5C4033"></span>TechOne</div>
+    <div class="rchip c-green"><span class="av" style="background-color:#9C7B5E"></span>GreenLife</div>
+    <div class="rchip all"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg><b>Todos</b><svg class="ch" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>
+  </div>
+
+  <!-- BOARD -->
+  <div class="stage">
+
+    <!-- A FAZER -->
+    <div class="col s-todo">
+      <div class="col-h"><span class="col-dot"></span><span class="col-nm">A Fazer</span><span class="col-ct">8</span></div>
+      <div class="col-body">
+        <article class="card">
+          <div class="c-top"><div class="c-title">Campanha de Lançamento Novo Coleção Verão</div><span class="c-mark"><svg viewBox="0 0 24 24"><path d="M7 4h10v17l-5-3.5L7 21z"/></svg></span></div>
+          <span class="c-tag t-mkt">MARKETING</span>
+          <div class="c-cli"><span>Cliente</span><b>Sunset Wear</b></div>
+          <div class="c-due"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>Prazo 15/08/2026</div>
+          <div class="c-foot">
+            <div class="stack"><span class="av r-ary" style="background-color:#8C6E5D"></span><span class="av r-bea" style="background-color:#B08968"></span><span class="av r-cai" style="background-color:#7D5A44"></span><span class="more">+2</span></div>
+            <div class="meta"><span><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 10-3.2 6.4L20 20l-.6-3.2A7.9 7.9 0 0020 12z"/></svg>3</span><span><svg viewBox="0 0 24 24"><path d="M21 12.5l-8.5 8.5a5 5 0 01-7-7L14 5.5a3.4 3.4 0 014.8 4.8L10.5 18.5a1.7 1.7 0 01-2.4-2.4L16 8"/></svg>2</span></div>
+          </div>
+        </article>
+        <article class="card">
+          <div class="c-top"><div class="c-title">Criação de Conteúdo Redes Sociais Agosto</div><span class="c-mark"><svg viewBox="0 0 24 24"><path d="M7 4h10v17l-5-3.5L7 21z"/></svg></span></div>
+          <span class="c-tag t-social">SOCIAL MÍDIAS</span>
+          <div class="c-cli"><span>Cliente</span><b>Café do Centro</b></div>
+          <div class="c-due"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>Prazo 18/08/2026</div>
+          <div class="c-foot">
+            <div class="stack"><span class="av r-cai" style="background-color:#7D5A44"></span><span class="av r-pau" style="background-color:#6B4F3A"></span><span class="av r-fel" style="background-color:#8A5A3B"></span></div>
+            <div class="meta"><span><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 10-3.2 6.4L20 20l-.6-3.2A7.9 7.9 0 0020 12z"/></svg>2</span><span><svg viewBox="0 0 24 24"><path d="M21 12.5l-8.5 8.5a5 5 0 01-7-7L14 5.5a3.4 3.4 0 014.8 4.8L10.5 18.5a1.7 1.7 0 01-2.4-2.4L16 8"/></svg>1</span></div>
+          </div>
+        </article>
+        <article class="card">
+          <div class="c-top"><div class="c-title">Redesign Landing Page Produto X</div><span class="c-mark"><svg viewBox="0 0 24 24"><path d="M7 4h10v17l-5-3.5L7 21z"/></svg></span></div>
+          <span class="c-tag t-design">DESIGN</span>
+          <div class="c-cli"><span>Cliente</span><b>TechOne</b></div>
+          <div class="c-due"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>Prazo 20/08/2026</div>
+          <div class="c-foot">
+            <div class="stack"><span class="av r-ary" style="background-color:#8C6E5D"></span><span class="av r-bea" style="background-color:#B08968"></span><span class="av r-fel" style="background-color:#8A5A3B"></span></div>
+            <div class="meta"><span><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 10-3.2 6.4L20 20l-.6-3.2A7.9 7.9 0 0020 12z"/></svg>4</span><span><svg viewBox="0 0 24 24"><path d="M21 12.5l-8.5 8.5a5 5 0 01-7-7L14 5.5a3.4 3.4 0 014.8 4.8L10.5 18.5a1.7 1.7 0 01-2.4-2.4L16 8"/></svg>2</span></div>
+          </div>
+        </article>
+      </div>
+      <div class="col-add"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Adicionar tarefa</div>
+    </div>
+
+    <!-- EM ANDAMENTO -->
+    <div class="col s-doing">
+      <div class="col-h"><span class="col-dot"></span><span class="col-nm">Em andamento</span><span class="col-ct">6</span></div>
+      <div class="col-body">
+        <article class="card">
+          <div class="c-top"><div class="c-title">Vídeo Institucional Nova Identidade</div><span class="c-mark"><svg viewBox="0 0 24 24"><path d="M7 4h10v17l-5-3.5L7 21z"/></svg></span></div>
+          <span class="c-tag t-video">VÍDEO</span>
+          <div class="c-cli"><span>Cliente</span><b>MoveOn</b></div>
+          <div class="c-due"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>Prazo 12/08/2026</div>
+          <div class="c-prog"><div class="c-bar"><i style="width:65%"></i></div><span class="c-pct">65%</span></div>
+          <div class="c-foot">
+            <div class="stack"><span class="av r-cai" style="background-color:#7D5A44"></span><span class="av r-pau" style="background-color:#6B4F3A"></span><span class="more">+1</span></div>
+            <div class="meta"><span><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 10-3.2 6.4L20 20l-.6-3.2A7.9 7.9 0 0020 12z"/></svg>3</span><span><svg viewBox="0 0 24 24"><path d="M21 12.5l-8.5 8.5a5 5 0 01-7-7L14 5.5a3.4 3.4 0 014.8 4.8L10.5 18.5a1.7 1.7 0 01-2.4-2.4L16 8"/></svg>2</span></div>
+          </div>
+        </article>
+        <article class="card">
+          <div class="c-top"><div class="c-title">E-mail Marketing Newsletter Julho</div><span class="c-mark"><svg viewBox="0 0 24 24"><path d="M7 4h10v17l-5-3.5L7 21z"/></svg></span></div>
+          <span class="c-tag t-crm">CRM</span>
+          <div class="c-cli"><span>Cliente</span><b>GreenLife</b></div>
+          <div class="c-due"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>Prazo 12/08/2026</div>
+          <div class="c-prog"><div class="c-bar"><i style="width:40%"></i></div><span class="c-pct">40%</span></div>
+          <div class="c-foot">
+            <div class="stack"><span class="av r-fel" style="background-color:#8A5A3B"></span><span class="av r-ary" style="background-color:#8C6E5D"></span></div>
+            <div class="meta"><span><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 10-3.2 6.4L20 20l-.6-3.2A7.9 7.9 0 0020 12z"/></svg>1</span><span><svg viewBox="0 0 24 24"><path d="M21 12.5l-8.5 8.5a5 5 0 01-7-7L14 5.5a3.4 3.4 0 014.8 4.8L10.5 18.5a1.7 1.7 0 01-2.4-2.4L16 8"/></svg>0</span></div>
+          </div>
+        </article>
+        <article class="card">
+          <div class="c-top"><div class="c-title">UI Kit Dashboard Projeto Interno</div><span class="c-mark"><svg viewBox="0 0 24 24"><path d="M7 4h10v17l-5-3.5L7 21z"/></svg></span></div>
+          <span class="c-tag t-design">DESIGN</span>
+          <div class="c-cli"><span>Cliente</span><b>Arquato</b></div>
+          <div class="c-due"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>Prazo 19/08/2026</div>
+          <div class="c-prog"><div class="c-bar"><i style="width:70%"></i></div><span class="c-pct">70%</span></div>
+          <div class="c-foot">
+            <div class="stack"><span class="av r-bea" style="background-color:#B08968"></span><span class="av r-pau" style="background-color:#6B4F3A"></span><span class="av r-cai" style="background-color:#7D5A44"></span></div>
+            <div class="meta"><span><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 10-3.2 6.4L20 20l-.6-3.2A7.9 7.9 0 0020 12z"/></svg>2</span><span><svg viewBox="0 0 24 24"><path d="M21 12.5l-8.5 8.5a5 5 0 01-7-7L14 5.5a3.4 3.4 0 014.8 4.8L10.5 18.5a1.7 1.7 0 01-2.4-2.4L16 8"/></svg>3</span></div>
+          </div>
+        </article>
+      </div>
+      <div class="col-add"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Adicionar tarefa</div>
+    </div>
+
+    <!-- REVISÃO -->
+    <div class="col s-rev">
+      <div class="col-h"><span class="col-dot"></span><span class="col-nm">Revisão</span><span class="col-ct">4</span></div>
+      <div class="col-body">
+        <article class="card">
+          <div class="c-top"><div class="c-title">Anúncios Google Ads Campanha Q3</div><span class="c-mark"><svg viewBox="0 0 24 24"><path d="M7 4h10v17l-5-3.5L7 21z"/></svg></span></div>
+          <span class="c-tag t-traf">TRÁFEGO</span>
+          <div class="c-cli"><span>Cliente</span><b>StartUp Lab</b></div>
+          <div class="c-due"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>Prazo 11/08/2026</div>
+          <div class="c-prog"><div class="c-bar"><i style="width:80%"></i></div><span class="c-pct">80%</span></div>
+          <div class="c-foot">
+            <div class="stack"><span class="av r-ary" style="background-color:#8C6E5D"></span><span class="av r-cai" style="background-color:#7D5A44"></span><span class="more">+1</span></div>
+            <div class="meta"><span><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 10-3.2 6.4L20 20l-.6-3.2A7.9 7.9 0 0020 12z"/></svg>2</span><span><svg viewBox="0 0 24 24"><path d="M21 12.5l-8.5 8.5a5 5 0 01-7-7L14 5.5a3.4 3.4 0 014.8 4.8L10.5 18.5a1.7 1.7 0 01-2.4-2.4L16 8"/></svg>1</span></div>
+          </div>
+        </article>
+        <article class="card">
+          <div class="c-top"><div class="c-title">Layout Apresentação Comercial</div><span class="c-mark"><svg viewBox="0 0 24 24"><path d="M7 4h10v17l-5-3.5L7 21z"/></svg></span></div>
+          <span class="c-tag t-design">DESIGN</span>
+          <div class="c-cli"><span>Cliente</span><b>Bold Brands</b></div>
+          <div class="c-due"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>Prazo 09/08/2026</div>
+          <div class="c-prog"><div class="c-bar"><i style="width:75%"></i></div><span class="c-pct">75%</span></div>
+          <div class="c-foot">
+            <div class="stack"><span class="av r-bea" style="background-color:#B08968"></span><span class="av r-fel" style="background-color:#8A5A3B"></span></div>
+            <div class="meta"><span><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 10-3.2 6.4L20 20l-.6-3.2A7.9 7.9 0 0020 12z"/></svg>2</span><span><svg viewBox="0 0 24 24"><path d="M21 12.5l-8.5 8.5a5 5 0 01-7-7L14 5.5a3.4 3.4 0 014.8 4.8L10.5 18.5a1.7 1.7 0 01-2.4-2.4L16 8"/></svg>2</span></div>
+          </div>
+        </article>
+        <article class="card">
+          <div class="c-top"><div class="c-title">Plano de Conteúdo Setembro</div><span class="c-mark"><svg viewBox="0 0 24 24"><path d="M7 4h10v17l-5-3.5L7 21z"/></svg></span></div>
+          <span class="c-tag t-social">SOCIAL MÍDIAS</span>
+          <div class="c-cli"><span>Cliente</span><b>Café do Centro</b></div>
+          <div class="c-due"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>Prazo 14/08/2026</div>
+          <div class="c-prog"><div class="c-bar"><i style="width:60%"></i></div><span class="c-pct">60%</span></div>
+          <div class="c-foot">
+            <div class="stack"><span class="av r-pau" style="background-color:#6B4F3A"></span><span class="av r-ary" style="background-color:#8C6E5D"></span></div>
+            <div class="meta"><span><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 10-3.2 6.4L20 20l-.6-3.2A7.9 7.9 0 0020 12z"/></svg>1</span><span><svg viewBox="0 0 24 24"><path d="M21 12.5l-8.5 8.5a5 5 0 01-7-7L14 5.5a3.4 3.4 0 014.8 4.8L10.5 18.5a1.7 1.7 0 01-2.4-2.4L16 8"/></svg>1</span></div>
+          </div>
+        </article>
+      </div>
+      <div class="col-add"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Adicionar tarefa</div>
+    </div>
+
+    <!-- FINALIZADO -->
+    <div class="col s-done">
+      <div class="col-h"><span class="col-dot"></span><span class="col-nm">Finalizado</span><span class="col-ct">12</span></div>
+      <div class="col-body">
+        <article class="card" style="box-shadow:0 0 0 2px var(--green),var(--sh-card)">
+          <div class="c-top"><div class="c-title">Identidade Visual Marca Bold</div><span class="c-check"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></div>
+          <span class="c-tag t-design">DESIGN</span>
+          <div class="c-cli"><span>Cliente</span><b>Bold Brands</b></div>
+          <div class="c-due done"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 108-8"/><path d="M4 5v4h4"/><path d="M9.5 12.5l2 2 3.5-3.5"/></svg>Concluída em 07/08/2026</div>
+          <div class="c-foot">
+            <div class="stack"><span class="av r-ary" style="background-color:#8C6E5D"></span><span class="av r-bea" style="background-color:#B08968"></span></div>
+          </div>
+        </article>
+        <article class="card">
+          <div class="c-top"><div class="c-title">Posts Redes Sociais Julho</div><span class="c-check"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></div>
+          <span class="c-tag t-social">SOCIAL MÍDIAS</span>
+          <div class="c-cli"><span>Cliente</span><b>Café do Centro</b></div>
+          <div class="c-due done"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 108-8"/><path d="M4 5v4h4"/><path d="M9.5 12.5l2 2 3.5-3.5"/></svg>Concluída em 06/08/2026</div>
+          <div class="c-foot">
+            <div class="stack"><span class="av r-cai" style="background-color:#7D5A44"></span><span class="av r-pau" style="background-color:#6B4F3A"></span></div>
+          </div>
+        </article>
+        <article class="card">
+          <div class="c-top"><div class="c-title">Relatório de Resultados Junho</div><span class="c-check"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></div>
+          <span class="c-tag t-rel">RELATÓRIO</span>
+          <div class="c-cli"><span>Cliente</span><b>Sunset Wear</b></div>
+          <div class="c-due done"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 108-8"/><path d="M4 5v4h4"/><path d="M9.5 12.5l2 2 3.5-3.5"/></svg>Concluída em 05/08/2026</div>
+          <div class="c-foot">
+            <div class="stack"><span class="av r-fel" style="background-color:#8A5A3B"></span><span class="av r-ary" style="background-color:#8C6E5D"></span></div>
+          </div>
+        </article>
+      </div>
+      <div class="col-add"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Adicionar tarefa</div>
+    </div>
+
+    <!-- PAINEL DE DETALHE (drawer = detalhe; card = resumo) -->
+    <aside class="panel">
+      <div class="p-hd"><span class="dot"></span><b>Finalizado</b>
+        <div class="ic">
+          <span><svg viewBox="0 0 24 24"><path d="M9 4h6l1 7 2 2v2H6v-2l2-2zM12 15v5"/></svg></span>
+          <span><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg></span>
+          <span><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></span>
+        </div>
+      </div>
+      <div class="p-badges">
+        <span class="p-badge"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Concluída final</span>
+        <span class="p-badge"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Aprovada pelo cliente</span>
+        <span class="p-badge"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Entregue</span>
+      </div>
+      <div class="p-title"><svg viewBox="0 0 24 24"><path d="M12 3l2.7 5.6 6.3.9-4.5 4.3 1 6.2-5.5-3-5.5 3 1-6.2L3 9.5l6.3-.9z"/></svg><b>Identidade Visual<br>Marca Bold</b></div>
+      <div class="p-cli"><span class="sq">B</span><div><b>Bold Brands</b><span>Cliente</span></div></div>
+      <div class="p-lab">RESPONSÁVEL</div>
+      <div class="p-resp"><span class="av r-ary" style="background-color:#8C6E5D"></span><div><b>Ardyjany Carlos</b><span>CEO</span></div></div>
+      <div class="p-when"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>Concluída em 07/08/2026 às 14:30</div>
+      <div class="p-cont-h"><div class="p-lab" style="margin:0">CONTEÚDO</div><span>1 arquivo</span></div>
+      <div class="p-file"><span class="fic">PDF</span><div><b>Manual_Identidade_Bold.pdf</b></div><span>12.4 MB</span></div>
+      <div class="p-lab">LINHA DO TEMPO</div>
+      <div class="p-tl">
+        <div class="p-tl-row"><span class="p-tl-dot" style="background:#22C55E"></span><b>07/08/2026</b><span>Identidade aprovada pelo cliente</span></div>
+        <div class="p-tl-row"><span class="p-tl-dot" style="background:#22C55E"></span><b>06/08/2026</b><span>Revisões aplicadas</span></div>
+        <div class="p-tl-row"><span class="p-tl-dot" style="background:#F59E0B"></span><b>04/08/2026</b><span>Ajustes de feedback</span></div>
+        <div class="p-tl-row"><span class="p-tl-dot" style="background:#3B82F6"></span><b>01/08/2026</b><span>Envio para revisão</span></div>
+        <div class="p-tl-row"><span class="p-tl-dot" style="background:#8B5CF6"></span><b>28/07/2026</b><span>Briefing aprovado</span></div>
+      </div>
+      <div class="p-cta">
+        <div class="go"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"/><circle cx="12" cy="12" r="2.6"/></svg>Ver detalhes completos</div>
+        <div class="more">⋯</div>
+      </div>
+    </aside>
+  </div>
+</main>
+</body>
+</html>
