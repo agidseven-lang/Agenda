@@ -103,14 +103,14 @@ de fechamento.
 - **Artefato:** seção C8 formal. **Dependência:** R2/R7. **Imagem?** NÃO (herda amostra).
 - **Owner approval?** SIM. **Fechamento:** C8 congelada.
 
-## R7 · SUPERFÍCIES B — SPECS APLICADAS ▶ ENTREGUE (aguarda avaliação do owner)
+## R7 · SUPERFÍCIES B — SPECS APLICADAS ✔ APROVADO PELO OWNER (GO)
 > **Status:** `B-SURFACES-APPLIED-SPECS.md` criado (documental, ZERO imagem): as 6 B auditadas e
 > especificadas com foundations oficiais — Prioridades (gate por preferência, priCard rail,
 > "Aguardando cliente") · Hoje (stat-tile C8; nunca dashboard) · Hub (bcard F5; gates admin/
 > canSeeAll) · Equipe (reconfirmada ~10 linhas; spec suficiente) · Perfil (read-only + sheets C2;
 > SEM form/upload inline) · Configurações (página única; 15 seções literais; "Em breve" reais).
 > Matriz foundation×superfície = 100% coberta; **nenhuma B vira A; zero gap visual**; `renderChat`
-> registrado como código INATIVO. **R7 NÃO concluída**; R8 não iniciado.
+> registrado como código INATIVO. **R7 = GO do owner** (specs B oficiais); R8 entregue abaixo.
 - **Objetivo:** para cada B, spec curta "como compor com Golden" (decisões já provadas no mapa):
   **Prioridades** (lista de cards DS; dep C4) · **Hoje** (stat-tiles C8 + listas) · **Hub/quadros
   por pessoa** (faixas Golden F1–F5) · **Equipe** (grid de cards — B confirmada por código) ·
@@ -120,7 +120,14 @@ de fechamento.
 - **Dependência:** R2 (C1 completa) p/ Config; demais R1. **Imagem?** NÃO (amostra Config no R2).
 - **Owner approval?** SIM. **Fechamento:** 6 B sem pendência na matriz.
 
-## R8 · RESPONSIVIDADE MÍNIMA — REVALIDAÇÃO 1366×768 + 125%
+## R8 · RESPONSIVIDADE MÍNIMA — REVALIDAÇÃO 1366×768 + 125% ▶ ENTREGUE (aguarda avaliação do owner)
+> **Status:** `R8-RESPONSIVE-VALIDATION.md` criado + cópias de validação `r8-responsive/` (Golden
+> 1920 IMUTÁVEL — zero alteração). Windows 125% reproduzido fielmente (Playwright/CDP, viewport
+> 1093×614 DIP @ DSF 1.25 = o modelo que o próprio renderer real documenta); 9 arquétipos × 2
+> viewports = 18/18 PASS após 8 achados (P0 de harness + P0 de grid min-content no shell + P1/P2)
+> corrigidos SÓ nas cópias. C3 clamp de viewport e C6 max-width 94vw provados no CÓDIGO real.
+> 19 capturas entregues no chat (política: imagens fora do Git). **R8 NÃO concluída**; recomendação
+> PASS; R9 não iniciada.
 - **Objetivo:** revalidar os marcados na matriz §H: boards F1–F5 (altura de coluna/drawer),
   Detalhes F6, Agenda F8, Executivo/Relatórios F10–F11 (+ wizard/login por amostragem; login já
   tem media query real documentada). Validação VISUAL (render em 1366×768 e 1920@125%), sem

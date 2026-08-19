@@ -1,6 +1,6 @@
 # SUPERFÍCIES B — APPLIED SPECS (Light UI)
 
-**Status:** ENTREGUE (R7) — aguarda owner; NÃO concluída. Fonte: Desktop **1.0.246** (auditoria
+**Status:** ✔ **APROVADA PELO OWNER (GO R7)** — as 6 specs B são oficiais. Fonte: Desktop **1.0.246** (auditoria
 integral por superfície). Zero produção; **zero imagem nova**. Classe B = superfícies reais 100%
 especificáveis com Shell Golden + foundations C1–C8 (todas OFICIAIS) — **nenhuma vira Frame A**.
 

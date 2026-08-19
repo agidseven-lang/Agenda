@@ -180,14 +180,19 @@ photo-ready + ring por identidade · form controls (C1) · focus/hover/selected/
 scrollbars · skeleton · transições (drawer/scrim 0.18–0.2s; reduced-motion).
 
 ## H. RESPONSIVIDADE (riscos e revalidações)
+> **R8 ENTREGUE (aguarda owner):** validação real 1366×768 @1× e Windows 125% (1093×614 DIP @
+> DSF 1.25 — Playwright/CDP, sem transform:scale) — 9 arquétipos × 2 viewports = 18/18 PASS após
+> 8 achados corrigidos em cópias isoladas (`r8-responsive/`). Golden 1920 intocado. Prova, matriz
+> e achados: `R8-RESPONSIVE-VALIDATION.md`. Recomendação PASS; decisão do owner pendente.
+
 | Categoria | 1366×768 | 1440×900 | 1920×1080 | 2560×1440 | 125–150% | Revalidar? |
 |---|---|---|---|---|---|---|
-| Boards Golden (F1–F5) | ALTO (altura de coluna; drawer 416 aperta o canvas) | médio | ok | ok (max-width do canvas?) | ALTO | **SIM — 2ª validação 1366×768 + 125%** |
-| Detalhes completos | ALTO (página longa → scroll) | médio | ok | ok | médio | SIM |
-| Agenda | médio (altura da grade) | baixo | ok | ok | médio | SIM |
-| Executivo/Relatórios | ALTO (tabela + filtros) | médio | ok | ok | ALTO | SIM |
-| Wizard/modais | baixo (sheets roláveis) | baixo | ok | ok | médio | não |
-| Config/Perfil/Equipe | baixo | baixo | ok | ok | baixo | não |
+| Boards Golden (F1–F5) | **VALIDADO R8** (col ≥264 + scroll-x kanban; drawer overlay ≤1600) | médio | ok | ok (max-width do canvas?) | **VALIDADO R8 (125%)** | feito — aguarda GO R8 |
+| Detalhes completos | **VALIDADO R8** (3→2 col; timeline scroll-x) | médio | ok | ok | **VALIDADO R8 (125%)** | feito — aguarda GO R8 |
+| Agenda | **VALIDADO R8** (painel 384; ≤1240 empilha) | baixo | ok | ok | **VALIDADO R8 (125%)** | feito — aguarda GO R8 |
+| Executivo/Relatórios | **VALIDADO R8** (min(1360,100%); tabela C7 scroll-x armado) | médio | ok | ok | **VALIDADO R8 (125%)** | feito — aguarda GO R8 |
+| Wizard/modais | **VALIDADO R8** (scroll interno já projetado; sheet 88vh) | baixo | ok | ok | **VALIDADO R8 (125%)** | feito — aguarda GO R8 |
+| Config/Perfil/Equipe | baixo (coberto por arquétipo — R8 §10) | baixo | ok | ok | baixo (idem) | não |
 
 ## I. ORDEM DOS FRAMES A — ✔ CONCLUÍDA (checkpoint global)
 **F6 → F13 = todos entregues e GOLDEN** (commits no banner do topo). Restante desta trilha:
@@ -237,12 +242,12 @@ novo gerado; Golden Frames intocados.*
 | 14 | Notificação externa premium | bgnotify.html | NÃO | — | **A futura** | P2 | futuro | 1 (F14a) | contrato congelado; GO próprio |
 | 15 | Lembrete central SLA | slareminder.html | NÃO | — | **A futura** | P2 | futuro | 1 (F14b) | contrato congelado |
 | 16 | Check-in de execução | janela F3.5.4Q | NÃO | — | **A futura** | P2 | futuro | 1 (F14c) | contrato congelado |
-| 17 | Minhas Prioridades | renderPrioridades | — | — | **B — SPEC APLICADA (R7, aguarda owner)** | — | spec | — | `B-SURFACES-APPLIED-SPECS.md` §1 |
-| 18 | Hoje | renderHoje | — | — | **B — SPEC APLICADA (R7, aguarda owner)** | — | spec | — | specs §2 · stat-tile C8 |
-| 19 | Hub Tarefas / quadros por pessoa | renderHub/renderRoleBoards/personBoard | parcial | F1/F5 | **B — SPEC APLICADA (R7, aguarda owner)** | — | spec | — | specs §3 · bcard F5 |
-| 20 | Equipe | renderEquipe | — | — | **B — SPEC APLICADA (R7, aguarda owner)** | — | spec | — | specs §4 · reconfirmada ~10 linhas |
-| 21 | Perfil | renderPerfil | — | — | **B — SPEC APLICADA (R7, aguarda owner)** | — | spec | — | specs §5 · read-only + sheets C2 |
-| 22 | Configurações | renderConfig | — | — | **B — SPEC APLICADA (R7, aguarda owner)** | — | spec | — | specs §6 · amostra Golden R2 |
+| 17 | Minhas Prioridades | renderPrioridades | — | — | **B — SPEC APROVADA (R7 ✔ GO do owner)** | — | spec | — | `B-SURFACES-APPLIED-SPECS.md` §1 |
+| 18 | Hoje | renderHoje | — | — | **B — SPEC APROVADA (R7 ✔ GO do owner)** | — | spec | — | specs §2 · stat-tile C8 |
+| 19 | Hub Tarefas / quadros por pessoa | renderHub/renderRoleBoards/personBoard | parcial | F1/F5 | **B — SPEC APROVADA (R7 ✔ GO do owner)** | — | spec | — | specs §3 · bcard F5 |
+| 20 | Equipe | renderEquipe | — | — | **B — SPEC APROVADA (R7 ✔ GO do owner)** | — | spec | — | specs §4 · reconfirmada ~10 linhas |
+| 21 | Perfil | renderPerfil | — | — | **B — SPEC APROVADA (R7 ✔ GO do owner)** | — | spec | — | specs §5 · read-only + sheets C2 |
+| 22 | Configurações | renderConfig | — | — | **B — SPEC APROVADA (R7 ✔ GO do owner)** | — | spec | — | specs §6 · amostra Golden R2 |
 | 23 | Team session (renovação) | F3.5.6A-H9/H10 (estados inline) | NÃO | — | **C** | P1 | spec | — | entra na C6 |
 | 24 | Atualizador | Config Atualizações + updMaybeToast | NÃO | — | **C** | P2 | spec | — | C6 |
 | 25 | Toasts internos | notifShowToast/flashToast | NÃO | — | **C** | P1 | spec | — | C6 |

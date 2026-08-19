@@ -1,4 +1,25 @@
-# ▶ R7 — SUPERFÍCIES B · APPLIED SPECS (aguarda owner)
+# ▶ R8 — RESPONSIVIDADE · VALIDAÇÃO 1366×768 + WINDOWS 125% (aguarda owner)
+Fase de VALIDAÇÃO (não redesign). Golden 1920 IMUTÁVEL — adaptações só em cópias
+(`r8-responsive/`, um bloco `<style id="r8">` por cópia). Harness honesto: Playwright/CDP com
+viewport CSS + deviceScaleFactor EXATOS (1366×768 @1× e 1093×614 @1.25× — o mesmo modelo
+"viewport ~1092×614" que o renderer real documenta para 125%); a 1ª tentativa com
+`--headless=new --window-size` foi DESCARTADA após sonda provar viewport real 1366×681.
+- **18/18 PASS** (9 arquétipos × 2 viewports) + prova complementar F1 sem drawer; 19 capturas
+  entregues só no chat (imagens fora do Git — política reconfirmada).
+- Decisões de mecanismo: F1 col ≥264 + scroll-x kanban + drawer OVERLAY ≤1600 · F6 3→2 col +
+  timeline scroll-x · F7C teto 100vh + scrolly flex · F8 painel 384 / empilha ≤1240 · F9/F10/F11
+  min(width,100%) + wraps · F11 tabela C7 com scroll-x ARMADO no card (não necessário a 1366/125%)
+  · F12 espelho da media real 660 · F13 sheet 88vh + pr-list ≤56vh flexível.
+- Achados: P0 harness; P0 `min-width:auto` de grid inflava o shell a 125% (header cortado) —
+  vira REQUISITO de implementação (`.main>*`/`.page>*{min-width:0}`); P1 F6 (.cols/OPERAÇÃO/
+  timeline), P1 F10 toolbar; P2 chips F6 / CTA F8. Zero mudança funcional; zero token reduzido;
+  sidebar colapsada NÃO existe no real — não inventada.
+- C3 (menus nunca saem do viewport) e C6 (`.ntf max-width:94vw`; canal SLA 92vw) provados no
+  CÓDIGO real (clamp + autocalibração de escala, renderer ~12402/10930/4464/3668) — sem imagem.
+- R7 GO registrado (mapa/B-specs/roadmap). Doc: `R8-RESPONSIVE-VALIDATION.md` (13 seções).
+  Recomendação PASS — decisão do owner pendente; R9 não iniciada.
+
+# ✔ R7 — SUPERFÍCIES B · APPLIED SPECS (GO do owner)
 Fase read-only, ZERO imagem. `B-SURFACES-APPLIED-SPECS.md` criado — 6 B auditadas na 1.0.246 e
 especificadas 100% com Shell + C1–C8 oficiais (matriz foundation×superfície completa; nenhuma B
 vira Frame A; zero gap visual):

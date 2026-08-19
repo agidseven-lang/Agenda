@@ -1,0 +1,482 @@
+<!doctype html>
+<!-- R8 RESPONSIVE VALIDATION COPY — NÃO é Golden.
+     Origem (IMUTÁVEL): proposta-c-frame7c-novatarefa-briefing.html
+     Delta único: <style id="r8"> no fim do <head> + hrefs ../ .
+     Decisões e critérios: R8-RESPONSIVE-VALIDATION.md -->
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, initial-scale=1">
+<title>Agenda ID Seven — Proposta C — FRAME 7C · Nova tarefa · Etapa 3 Briefing</title>
+<link rel="stylesheet" href="../_fonts.css">
+<link rel="stylesheet" href="../_team-photos.css">
+<style>
+/* ============================================================
+   AGENDA ID SEVEN · LIGHT UI · FRAME 7C — NOVA TAREFA · ETAPA 3 BRIEFING · 1920×1080
+   DESIGN PROTOTYPE (não é produção). Continuidade literal do wizard Golden
+   7A/7B V2 (estrutura CONGELADA) — Briefing REAL do Cronograma; expande a C1.
+   ▸ FIDELIDADE (auditoria read-only no Desktop 1.0.246 — stepBriefing 11395+):
+     · Ramo REAL do cronograma (11443–11458): label "Quantidade de temas" +
+       componente [−][N][+] real (vqty-row/vqty-btn 40×40/vqty-input number
+       central/vqty-suffix "tema/temas"; − disabled quando qty≤1; placeholder
+       "Ex.: 10"; digitação direta/colar/setas suportados no input nativo).
+       cronQtyOf (11241): inteiro ≥1, teto técnico CRON_QTY_MAX=500, null se
+       vazio. Erro INLINE REAL cqErr (sq-err role=alert, hidden por padrão):
+       "Informe uma quantidade inteira igual ou superior a 1." — aparece só
+       via stepNext (f.step===2 && !cronQtyOf → f._cqErr=true + foco); com
+       12 válido o erro NÃO aparece (não simulado).
+     · curSub (11301) p/ cronograma = synthCronSub(n) (11260) — subtipo
+       SINTÉTICO (F3.5.5D substituiu Semanal/Quinzenal/Mensal): banner
+       formTitle REAL "Cronograma — 12 conteúdos" (pill índigo .12) +
+       fields sintéticos REAIS: "Período de referência" (text, ph "Ex.:
+       Junho/2026") e "Canais" (choice ÚNICA: Instagram/Facebook/YouTube/
+       WhatsApp — chips; selecionado real = accent) + contentCount = N.
+     · "Conteúdos do cronograma (12)" (label real) + N content-cards REAIS
+       (11464–11468): accordion nativo — header com dot cd (cinza vazio /
+       verde .fill quando tema||legenda) + "Conteúdo N" + ▲/▼; UM aberto
+       por vez (f._openContent; default null = todos fechados); corpo com
+       "Tema" + rteField e "Legenda" + rteField (EDITOR RICO REAL F3.5.5C,
+       placeholders "Tema do conteúdo N"/"Legenda do conteúdo N").
+     · TOOLBAR RTE REAL reproduzida (rteField 10852): undo/redo · ¶▾
+       (Normal/Título/Subtítulo) · A▾ (Pequeno/Normal/Grande/Extra) ·
+       N/I/S/tachado/X₂/X² · cor do texto/marca-texto · listas •/1. ·
+       alinhamentos 4 · recuos 2 · link/linha separadora/limpar formatação.
+       Nenhum botão inventado.
+     · CRONOGRAMA NO BRIEFING NÃO TEM: checklist (Reprovação 1.0.137,
+       isClientSector), Link/anexo, Observações livres (gate
+       !isClientSector, 11486), subtipo/Periodicidade (chips legados só p/
+       Copywriting), upload, select nativo, checkbox, radio, botão
+       adicionar/remover conteúdo individual (contagem vem SÓ da quantidade).
+     · Temas/legendas NÃO são obrigatórios ao avançar (única validação do
+       step 2 p/ cronograma é a quantidade); blocos nascem vazios e a
+       contagem regenera os N blocos a cada render.
+     · Scroll interno REAL (.scr overflow-y:auto, 1219) — o corpo corta no
+       viewport do card e rola; peek honesto do Conteúdo 4 + scrollbar fina.
+     · Voltar (data-form back): apenas f.step−1 — estado preservado (sem
+       side effects destrutivos). Footer: Voltar ghost + "Próximo".
+     · CENÁRIO (continuidade 7A/7B): Cronograma · Sunset Wear · 12 temas ·
+       Período "Setembro/2026" · canal Instagram · Conteúdos 1–2 preenchidos
+       (dot verde), 1 aberto no editor; demais vazios.
+   ▸ C1 — controles NOVOS validados: quantity stepper [−][N][+], banner de
+     resumo sintético, chips choice única, accordion de conteúdo com estado
+     de preenchimento, editor rico (toolbar + área), textarea rica; erro
+     inline sq-err documentado (contrato: texto #C4302B, tint red 8%, borda
+     red 25%, radius 9). Controles do 7B reutilizados sem redesenho.
+   ▸ RESPONSIVIDADE: card 920 congelado; em 1366×768/125% o scroll interno
+     real absorve a altura. Só 1920×1080 renderizado.
+   ▸ FOTOS: sem fotos novas; fallback real de iniciais mantido (fotos
+     locais indisponíveis nesta sessão; nunca versionadas).
+   ============================================================ */
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+svg{display:block}
+
+:root{
+  --canvas:#F5F6F9; --surface:#FFFFFF; --surface-2:#FAFBFD; --sunk:#F1F4F8;
+  --hair:#E8EBF1; --hair-2:#EFF1F6;
+  --tx-1:#14181F; --tx-2:#4B5364; --tx-3:#767E8D; --tx-4:#A8AFBC;
+  --sb-1:#252B3D; --sb-2:#1B2031; --sb-tx:#D0D5E1; --sb-dim:#9299AC; --sb-faint:#727990;
+  --sb-active:rgba(255,255,255,.065); --sb-hover:rgba(255,255,255,.04);
+  --brand:#5B7CFA; --grad:linear-gradient(135deg,#6E5EF3,#9A6BF5);
+  --blue:#3B82F6; --blue-ink:#2563EB;
+  --orange:#F59E0B; --violet:#8B5CF6; --green:#22A06B; --green-ink:#12784C; --red:#EF4444;
+  --sec-vid:#60A5FA; --sec-cron:#34D399; --sec-cards:#F472B6;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-pill:999px;
+  --sh-1:0 0 0 1px var(--hair),0 1px 2px rgba(19,24,38,.04),0 5px 14px rgba(19,24,38,.035);
+  --sh-2:0 0 0 1px var(--hair),0 2px 6px rgba(19,24,38,.06),0 16px 34px rgba(19,24,38,.085);
+}
+.u-indigo{--u:#5B6CF0}.u-violet{--u:#8A5CF6}.u-teal{--u:#12A69B}.u-rose{--u:#E85D8C}.u-cyan{--u:#12A7C4}
+
+body{font-family:'Inter',-apple-system,'Segoe UI',Roboto,sans-serif;color:var(--tx-1);background:var(--canvas);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-feature-settings:"cv05" 1,"cv11" 1}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.ic-sm{width:15px;height:15px}
+
+.av{position:relative;width:32px;height:32px;border-radius:50%;flex:none;display:grid;place-items:center;
+  font-weight:600;font-size:11px;letter-spacing:.01em;line-height:1;
+  color:color-mix(in srgb,var(--u) 74%,#26303f);
+  background-color:color-mix(in srgb,var(--u) 15%,#fff);
+  background-image:radial-gradient(120% 120% at 50% 22%,color-mix(in srgb,var(--u) 20%,#fff),color-mix(in srgb,var(--u) 12%,#fff));
+  background-size:cover;background-position:center;background-repeat:no-repeat;
+  box-shadow:0 0 0 2px #fff,0 0 0 3.5px color-mix(in srgb,var(--u) 46%,#fff),0 1px 3px rgba(19,24,38,.16)}
+.av-46{width:46px;height:46px;font-size:15.5px}
+
+.frame{width:1920px;height:1080px;overflow:hidden;position:relative;background:var(--canvas);display:grid;grid-template-columns:284px 1fr;grid-template-rows:1080px;font-size:13.5px;isolation:isolate}
+.frame::after{content:"";position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 0 1px rgba(19,24,38,.05);z-index:60}
+
+/* ===== SIDEBAR (idêntica aos Golden) ===== */
+.sb{background:linear-gradient(180deg,var(--sb-1),var(--sb-2));color:var(--sb-tx);display:flex;flex-direction:column;min-height:0;overflow:hidden;padding:0 0 12px}
+.brand{display:flex;align-items:center;gap:14px;padding:30px 24px 22px}
+.brand-mark{width:46px;height:46px;border-radius:14px;flex:none;background:linear-gradient(140deg,#5B7CFA,#6E5EF3);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px rgba(94,110,243,.4),inset 0 1px 0 rgba(255,255,255,.24)}
+.brand-mark .ic{width:24px;height:24px;stroke-width:1.9;color:#fff}
+.brand-txt{min-width:0;flex:1}
+.brand-name{font-family:'InterTight';font-weight:700;font-size:18px;color:#F5F7FB;letter-spacing:-.014em;line-height:1.14}
+.brand-sub{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--sb-faint);margin-top:4px}
+.brand-sync{width:6px;height:6px;border-radius:50%;background:#33D6A6;box-shadow:0 0 0 3px rgba(51,214,166,.15)}
+.newtask{margin:0 20px 20px;height:48px;border-radius:13px;background:var(--grad);color:#fff;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:9px;box-shadow:0 8px 20px rgba(110,94,243,.34)}
+.newtask .ic{width:18px;height:18px;stroke-width:2.1}
+.sb-scroll{flex:1;overflow:hidden;padding:0 14px;display:flex;flex-direction:column}
+.nav-label{font-size:10.5px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--sb-faint);padding:18px 14px 10px}
+.nav-item{display:flex;align-items:center;gap:13px;height:42px;padding:0 14px;border-radius:11px;color:var(--sb-tx);position:relative;font-size:14px;font-weight:450;line-height:1}
+.nav-item .ic{color:var(--sb-dim);width:19px;height:19px}
+.nav-item.active{background:var(--sb-active);color:#F7F9FC;font-weight:560;box-shadow:inset 0 0 0 1px rgba(255,255,255,.055)}
+.nav-item.active .ic{color:#B7C1FF}
+.nav-item.active::before{content:"";position:absolute;left:-14px;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;background:linear-gradient(180deg,#7C8CFF,#6E5EF3)}
+.nav-badge{margin-left:auto;height:20px;min-width:20px;padding:0 7px;border-radius:var(--r-pill);background:#EF4444;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.sb-user{margin-top:12px;padding:20px 24px 10px;display:flex;align-items:center;gap:14px;box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+.sb-user-txt{min-width:0;flex:1}
+.sb-user-name{font-size:14px;font-weight:600;color:#F3F6FB;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-user-role{font-size:12px;color:var(--sb-faint);margin-top:3px;display:flex;align-items:center;gap:6px}
+.udot{width:6px;height:6px;border-radius:50%;background:#33D6A6}
+.sb-user .chev{color:var(--sb-faint)}
+
+/* ===== MAIN: header global 92 + canvas ===== */
+.main{display:grid;grid-template-rows:92px 1fr;min-width:0;min-height:0;overflow:hidden;background:var(--canvas)}
+.hd{display:flex;align-items:center;gap:18px;padding:0 34px;background:var(--surface);box-shadow:0 1px 0 var(--hair-2)}
+.hd-back{width:42px;height:42px;border-radius:var(--r-md);display:flex;align-items:center;justify-content:center;color:var(--tx-2);box-shadow:inset 0 0 0 1px var(--hair)}
+.hd-title{display:flex;align-items:center;gap:16px}
+.hd-eye{width:46px;height:46px;border-radius:14px;flex:none;background:color-mix(in srgb,var(--brand) 13%,#fff);display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--brand) 26%,#fff)}
+.hd-eye .ic{width:22px;height:22px;color:#4E63D8;stroke-width:2}
+.hd-title .tl{display:flex;flex-direction:column;line-height:1.08}
+.hd-title .tl b{font-family:'InterTight';font-weight:700;font-size:26px;letter-spacing:-.024em;color:var(--tx-1)}
+.hd-title .tl span{font-size:13.5px;color:var(--tx-3);margin-top:4px}
+.hd-right{margin-left:auto;display:flex;align-items:center;gap:14px}
+.sla{display:flex;align-items:center;gap:12px;height:50px;padding:0 19px 0 14px;border-radius:14px;background:linear-gradient(180deg,#F1FBF7,#E8F8F0);box-shadow:inset 0 0 0 1px #CBEEDD}
+.sla-ic{width:34px;height:34px;border-radius:10px;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(18,80,54,.16)}
+.sla-ic .ic{width:18px;height:18px;color:var(--green)}
+.sla-tx{display:flex;flex-direction:column;line-height:1.22}
+.sla-k{font-size:9.5px;font-weight:800;letter-spacing:.06em;color:#3E9C74;display:flex;align-items:center;gap:5px}
+.livedot{width:6px;height:6px;border-radius:50%;background:#22C58A;box-shadow:0 0 0 3px rgba(34,197,138,.2)}
+.sla-v{font-size:14px;font-weight:650;color:#115E3D}
+.hd-bell{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;color:var(--tx-2);box-shadow:inset 0 0 0 1px var(--hair);position:relative}
+.hd-bell .ic{width:20px;height:20px}
+.hd-bell .dot{position:absolute;top:12px;right:13px;width:8px;height:8px;border-radius:50%;background:#7C6BF5;box-shadow:0 0 0 2px var(--surface)}
+
+/* ===== CANVAS DO WIZARD (superfície dedicada real — sem overlay) ===== */
+.stage{min-height:0;overflow:hidden;display:flex;justify-content:center;align-items:flex-start;padding:168px 32px 32px}
+
+/* card do wizard (paradigma real .form-wrap: card centrado radius 18) */
+.wiz{width:920px;background:var(--surface);border-radius:18px;box-shadow:var(--sh-2);position:relative;display:flex;flex-direction:column}
+.wiz-x{position:absolute;top:20px;right:20px;width:40px;height:40px;border-radius:var(--r-md);display:flex;align-items:center;justify-content:center;color:var(--tx-3);box-shadow:inset 0 0 0 1px var(--hair)}
+.wiz-x .ic{width:17px;height:17px}
+
+/* stepper premium — número + label + estado (não só cor) */
+.stepper{display:flex;align-items:center;gap:14px;padding:30px 36px 24px 32px;margin-right:64px}
+.stp{display:flex;align-items:center;gap:11px;flex:none}
+.stp .n{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:12.5px;font-weight:700;color:var(--tx-4);background:var(--surface);box-shadow:inset 0 0 0 1.5px var(--hair)}
+.stp .t{display:flex;flex-direction:column;line-height:1.15}
+.stp .k{font-size:9.5px;font-weight:800;letter-spacing:.09em;color:var(--tx-4)}
+.stp .l{font-size:13.5px;font-weight:560;color:var(--tx-3);margin-top:2px}
+.stp.cur .n{color:#fff;background:var(--grad);box-shadow:0 6px 16px rgba(110,94,243,.32)}
+.stp.cur .k{color:#6E5EF3}
+.stp.cur .l{color:var(--tx-1);font-weight:700}
+.stp.done .n{color:var(--green-ink);background:color-mix(in srgb,var(--green) 13%,#fff);box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--green) 34%,#fff)}
+.stp.done .n .ic{width:14px;height:14px;stroke-width:2.5}
+.stp.done .k{color:#2E8F63}
+.stp.done .l{color:var(--tx-2);font-weight:620}
+.stp-ln{flex:1;height:2px;border-radius:2px;background:var(--hair)}
+.stp-ln.done{background:color-mix(in srgb,var(--green) 32%,#fff)}
+
+/* conteúdo da etapa */
+.wiz-body{padding:26px 36px 30px;border-top:1px solid var(--hair-2)}
+.flabel{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--tx-3);margin-bottom:16px}
+
+/* opção de setor — C1 option card (função real sector-card preservada) */
+.sec{display:flex;align-items:center;gap:18px;width:100%;text-align:left;padding:20px 22px;border-radius:14px;background:var(--surface);box-shadow:inset 0 0 0 1px var(--hair);transition:box-shadow .14s ease-out}
+.sec+.sec{margin-top:12px}
+.sec .icb{width:52px;height:52px;border-radius:14px;flex:none;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--sc) 14%,#fff);color:var(--sc);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--sc) 24%,#fff)}
+.sec .icb .ic{width:24px;height:24px;stroke-width:1.8}
+.sec .m{flex:1;min-width:0}
+.sec .sl{font-size:16px;font-weight:650;color:var(--tx-1);letter-spacing:-.008em}
+.sec .sd{font-size:13px;color:var(--tx-3);margin-top:4px}
+.sec .ck{width:26px;height:26px;border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;background:var(--sc);box-shadow:0 3px 8px color-mix(in srgb,var(--sc) 42%,transparent);opacity:0}
+.sec .ck .ic{width:14px;height:14px;stroke-width:2.6}
+.sec.sel{background:color-mix(in srgb,var(--sc) 7%,#fff);box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--sc) 55%,#fff),0 4px 14px color-mix(in srgb,var(--sc) 14%,transparent)}
+.sec.sel .ck{opacity:1}
+.s-vid{--sc:var(--sec-vid)}.s-vid .icb{color:#2E7CD6}
+.s-cron{--sc:var(--sec-cron)}.s-cron .icb{color:#12925F}.s-cron.sel .sl{color:#0F6B47}
+.s-cards{--sc:var(--sec-cards)}.s-cards .icb{color:#D6459A}
+
+/* footer do wizard — etapa 2 real: Voltar (secundário) + Próximo (primário) */
+.wiz-foot{display:flex;align-items:center;padding:20px 36px 26px;border-top:1px solid var(--hair-2)}
+.backb{height:48px;padding:0 22px;border-radius:13px;font-size:14px;font-weight:600;color:var(--tx-2);background:var(--surface);box-shadow:inset 0 0 0 1px var(--hair);display:flex;align-items:center;gap:9px}
+.backb .ic{width:16px;height:16px}
+.next{margin-left:auto;height:48px;padding:0 30px;border-radius:13px;background:var(--grad);color:#fff;font-size:14.5px;font-weight:650;display:flex;align-items:center;gap:10px;box-shadow:0 8px 20px rgba(110,94,243,.28)}
+.next .ic{width:17px;height:17px;stroke-width:2.1}
+
+/* ===== C1 — Forms & Controls (etapa Dados) ===== */
+.cols2{display:grid;grid-template-columns:1fr 1fr;gap:0 34px;align-items:start}
+.fg+.fg{margin-top:24px}
+.fgh{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--tx-3);margin-bottom:14px}
+.flb{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--tx-2);margin-bottom:7px}
+.flb .opt{font-weight:500;color:var(--tx-3);font-size:12.5px}
+.req{font-size:9.5px;font-weight:800;letter-spacing:.04em;color:#B45309;background:color-mix(in srgb,#F59E0B 12%,#fff);padding:2.5px 8px;border-radius:var(--r-pill)}
+.fld+.fld{margin-top:15px}
+.in{position:relative;display:flex;align-items:center;height:46px;border-radius:12px;background:var(--surface);box-shadow:inset 0 0 0 1px #DFE3EB}
+.in input{border:0;outline:0;background:none;font:inherit;color:var(--tx-1);font-size:14px;font-weight:520;width:100%;padding:0 14px}
+.in.fo{box-shadow:inset 0 0 0 1.5px #6E5EF3,0 0 0 2.5px color-mix(in srgb,#6E5EF3 11%,transparent)}
+.in .lead{width:16px;height:16px;color:var(--tx-3);margin-left:13px;flex:none}
+.in.icd input{padding-left:10px}
+.pair{display:grid;grid-template-columns:1.35fr 1fr;gap:12px}
+.pick{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:10px 13px;border-radius:12px;background:var(--surface);box-shadow:inset 0 0 0 1px #DFE3EB}
+.pick .nm{flex:1;min-width:0;font-size:14px;font-weight:600;color:var(--tx-1)}
+.pick .chev{color:var(--tx-4)}
+.av-36{width:36px;height:36px;font-size:12px}
+.helper{font-size:12px;color:var(--tx-3);line-height:1.5;margin-top:9px}
+.helper b{color:var(--tx-2);font-weight:600}
+.chips{display:flex;gap:7px;flex-wrap:wrap}
+.chp{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10.5px;border-radius:var(--r-pill);font-size:12px;font-weight:600;color:var(--tx-3);background:var(--surface);box-shadow:inset 0 0 0 1px var(--hair);white-space:nowrap}
+.chp .d{width:6.5px;height:6.5px;border-radius:50%;background:var(--cc)}
+.chp.sel{color:var(--ck);background:color-mix(in srgb,var(--cc) 12%,#fff);box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--cc) 62%,#fff),0 1px 4px color-mix(in srgb,var(--cc) 18%,transparent);font-weight:700}
+.chp.sel .ck-ic{width:12.5px;height:12.5px;stroke-width:3;color:var(--ck)}
+.c-afa{--cc:#8E95A3;--ck:#3F4756}.c-inst{--cc:#6E5EF3;--ck:#4353D8}.c-and{--cc:#F59E0B;--ck:#B45309}.c-rev{--cc:#60A5FA;--ck:#2563EB}.c-ok{--cc:#34D399;--ck:#12784C}
+.swrow{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 15px;border-radius:12px;background:var(--surface);box-shadow:inset 0 0 0 1px #E4E8EF}
+.swrow .st{font-size:13.5px;font-weight:620;color:var(--tx-1)}
+.swrow .ss{font-size:12px;color:var(--tx-3);margin-top:2px}
+.sw{width:46px;height:28px;border-radius:var(--r-pill);background:#CDD3DE;box-shadow:inset 0 0 0 1px #C2C8D4;position:relative;flex:none}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1.5px 4px rgba(19,24,38,.28),0 0 0 .5px rgba(19,24,38,.06)}
+.sw.on{background:var(--brand)}
+.sw.on::after{left:21px}
+
+/* ===== C1 novos — Briefing ===== */
+.wiz-body.scrolly{position:relative;max-height:606px;overflow:hidden}
+.sbar{position:absolute;right:7px;top:120px;width:5px;height:200px;border-radius:5px;background:color-mix(in srgb,var(--tx-4) 34%,#fff)}
+.qty{display:flex;align-items:center;gap:9px}
+.qty .qb{width:42px;height:42px;border-radius:12px;background:var(--surface);box-shadow:inset 0 0 0 1px #DFE3EB;font-size:19px;font-weight:700;color:var(--tx-2);display:flex;align-items:center;justify-content:center}
+.qty .qv{width:96px;height:42px;border-radius:12px;background:var(--surface);box-shadow:inset 0 0 0 1px #DFE3EB;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:var(--tx-1)}
+.qty .qs{font-size:13px;font-weight:600;color:var(--tx-3);margin-left:3px}
+.syn{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 13px;border-radius:10px;font-size:12.5px;font-weight:700;color:#4353D8;background:color-mix(in srgb,#5B6CFF 8%,#fff);box-shadow:inset 0 0 0 1px color-mix(in srgb,#5B6CFF 20%,#fff)}
+.ccard{border-radius:12px;background:var(--surface);box-shadow:inset 0 0 0 1px var(--hair);overflow:hidden}
+.ccard+.ccard{margin-top:9px}
+.ccard .chd{display:flex;align-items:center;gap:11px;width:100%;text-align:left;padding:12px 15px}
+.ccard .dot{width:8px;height:8px;border-radius:50%;background:#D8DDE6;flex:none}
+.ccard .dot.fill{background:var(--green)}
+.ccard .ctt{flex:1;font-size:13.5px;font-weight:620;color:var(--tx-1)}
+.ccard .car{color:var(--tx-4);font-size:10px}
+.ccard.open{box-shadow:inset 0 0 0 1.5px color-mix(in srgb,#5B6CFF 26%,#fff),0 4px 14px rgba(91,108,255,.07)}
+.ccard.open .chd{padding-bottom:8px}
+.ccard .cbody{padding:0 15px 15px}
+.rlb{font-size:12.5px;font-weight:600;color:var(--tx-2);margin:10px 0 6px}
+.rte{border-radius:11px;background:var(--surface);box-shadow:inset 0 0 0 1px #DFE3EB;overflow:hidden}
+.rte.fo{box-shadow:inset 0 0 0 1.5px #6E5EF3,0 0 0 2.5px color-mix(in srgb,#6E5EF3 11%,transparent)}
+.rte-bar{display:flex;align-items:center;gap:2px;padding:5px 8px;background:var(--surface-2);box-shadow:0 1px 0 var(--hair-2);flex-wrap:nowrap}
+.rb{min-width:24px;height:24px;padding:0 4px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:650;color:var(--tx-2);white-space:nowrap}
+.rb .car{font-size:8px;color:var(--tx-4);margin-left:1px}
+.rb.sw1{gap:2px}
+.rb .swb{width:10px;height:4px;border-radius:2px;background:#E85D5D;margin-top:9px;margin-left:-9px}
+.rsep{width:1px;height:16px;background:var(--hair);margin:0 4px;flex:none}
+.rte-area{padding:10px 13px;font-size:13.5px;color:var(--tx-1);line-height:1.5;min-height:52px}
+.rte-area .ph{color:var(--tx-3);font-weight:450}
+.rte-area b{font-weight:680}
+</style>
+<style id="r8">
+/* ================= R8 BASE — frame fluido (cópia de validação; Golden intocado) ================= */
+html,body{width:100%;height:100%}
+.frame{width:100vw;min-width:1024px;height:100vh;grid-template-rows:minmax(0,1fr)}
+/* linhas do .main podem ENCOLHER: min-width:auto de itens de grid inflava a
+   coluna além do viewport a 1093 DIP e cortava o header (achado R8, Teste A) */
+.main>*{min-width:0}
+.hd>*{min-width:0}
+.hd .tl b,.hd .tl span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hd-right{flex:none}
+.page>*{min-width:0}
+
+/* ---- Teste C (F7C Wizard denso) ----
+   Decisão R8: o card do wizard já foi projetado com scroll interno
+   (.wiz-body.scrolly). Aqui o card ganha teto = viewport − header − respiro,
+   e o corpo rolável absorve a altura (flex 1). Stepper e footer PERSISTEM.
+   Largura: teto = área útil (100vw − sidebar 284 − 64 de respiro). */
+.wiz{max-width:calc(100vw - 284px - 64px)}
+@media (max-width:1560px),(max-height:980px){
+  .stage{padding:26px 32px 26px}
+  .wiz{max-height:calc(100vh - 92px - 52px)}
+  .wiz-body.scrolly{max-height:none;flex:1 1 auto;min-height:140px}
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-logo" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><path d="M8.5 9.5h7M8.5 13h7M8.5 16.5h4"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.6l2.55 5.17 5.7.83-4.13 4.02.98 5.68L12 16.98 6.9 19.3l.98-5.68L3.75 9.6l5.7-.83z"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.5h17M8 3.3v3.4M16 3.3v3.4"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8.5 6.5h11M8.5 12h11M8.5 17.5h11"/><path d="M4.4 6.5h.02M4.4 12h.02M4.4 17.5h.02"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9.2" cy="8.2" r="3.3"/><path d="M3.6 19.2a5.6 5.6 0 0111.2 0"/><path d="M15.8 5.4a3.1 3.1 0 010 5.7M17.4 19.2a5.3 5.3 0 00-2.1-4.2"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.4"/><path d="M5.6 20a6.4 6.4 0 0112.8 0"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 4v16h16"/><path d="M8 16.5v-3M12 16.5V9M16 16.5v-5.5"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 24 24"><path d="M6.2 3.4h6.6l4.9 4.9V19.6a1.2 1.2 0 01-1.2 1.2H6.2A1.2 1.2 0 015 19.6V4.6a1.2 1.2 0 011.2-1.2z"/><path d="M12.6 3.6V8.4h4.8M8.6 13h6.8M8.6 16.4h4.8"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6.6 10.2a5.4 5.4 0 0110.8 0c0 4.6 1.9 5.8 1.9 5.8H4.7s1.9-1.2 1.9-5.8z"/><path d="M10.2 19.4a2 2 0 003.6 0"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.1"/><path d="M12 2.6v2.4M12 19v2.4M4.4 4.4l1.7 1.7M17.9 17.9l1.7 1.7M2.6 12h2.4M19 12h2.4M4.4 19.6l1.7-1.7M17.9 6.1l1.7-1.7"/></symbol>
+  <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="M14.5 6l-6 6 6 6"/></symbol>
+  <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="M6 9.5l6 6 6-6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.4 4.4L19 7.3"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 7.6V12l3 1.9"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v5.2c0 4.4-3 7.4-7 8.8-4-1.4-7-4.4-7-8.8V6z"/><path d="M9 12l2.1 2.1L15.2 10"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-film" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2.2"/><path d="M8 5v14M16 5v14M3.5 9.5H8M3.5 14.5H8M16 9.5h4.5M16 14.5h4.5"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2.4"/><circle cx="9" cy="10" r="1.8"/><path d="M4.5 17.5l4.6-4.6 3.4 3.4 3-3 4 4"/></symbol>
+  <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M4.5 12h15M13.5 6l6 6-6 6"/></symbol>
+</svg>
+
+<div class="frame">
+  <aside class="sb">
+    <div class="brand">
+      <div class="brand-mark"><svg class="ic"><use href="#i-logo"/></svg></div>
+      <div class="brand-txt">
+        <div class="brand-name">Agenda ID Seven</div>
+        <div class="brand-sub"><span class="brand-sync"></span> sincronizado</div>
+      </div>
+    </div>
+    <button class="newtask"><svg class="ic"><use href="#i-plus"/></svg> Nova tarefa</button>
+    <div class="sb-scroll">
+      <div class="nav-label">Workspace</div>
+      <a class="nav-item"><svg class="ic"><use href="#i-star"/></svg> Minhas Prioridades</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-sun"/></svg> Hoje</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-calendar"/></svg> Agenda</a>
+      <a class="nav-item active"><svg class="ic"><use href="#i-list"/></svg> Tarefas</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-users"/></svg> Equipe</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-user"/></svg> Perfil</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-chart"/></svg> Executivo</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-doc"/></svg> Relatórios</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-bell"/></svg> Notificações <span class="nav-badge">9+</span></a>
+      <div class="nav-label">Sistema</div>
+      <a class="nav-item"><svg class="ic"><use href="#i-gear"/></svg> Configurações</a>
+    </div>
+    <div class="sb-user">
+      <span class="av av-46 u-indigo p-ary">AC</span>
+      <div class="sb-user-txt">
+        <div class="sb-user-name">Arydyjany Carlôto</div>
+        <div class="sb-user-role"><span class="udot"></span> CEO · admin</div>
+      </div>
+      <svg class="ic ic-sm chev"><use href="#i-chevron-down"/></svg>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="hd">
+      <button class="hd-back"><svg class="ic"><use href="#i-chevron-left"/></svg></button>
+      <div class="hd-title">
+        <span class="hd-eye"><svg class="ic"><use href="#i-plus"/></svg></span>
+        <div class="tl"><b>Nova tarefa</b><span>Etapa 3 de 4 · Cronograma</span></div>
+      </div>
+      <div class="hd-right">
+        <div class="sla">
+          <span class="sla-ic"><svg class="ic"><use href="#i-shield"/></svg></span>
+          <div class="sla-tx"><span class="sla-k"><span class="livedot"></span> MONITOR SLA • AO VIVO</span><span class="sla-v">Tudo em dia</span></div>
+        </div>
+        <button class="hd-bell"><svg class="ic"><use href="#i-bell"/></svg><span class="dot"></span></button>
+      </div>
+    </header>
+
+    <div class="stage">
+      <section class="wiz">
+        <button class="wiz-x" title="Fechar"><svg class="ic"><use href="#i-close"/></svg></button>
+
+        <!-- STEPPER: Setor atual · Dados/Briefing/Revisão futuras -->
+        <div class="stepper">
+          <div class="stp done">
+            <span class="n"><svg class="ic"><use href="#i-check"/></svg></span>
+            <span class="t"><span class="k">CONCLUÍDA</span><span class="l">Setor</span></span>
+          </div>
+          <span class="stp-ln done"></span>
+          <div class="stp done">
+            <span class="n"><svg class="ic"><use href="#i-check"/></svg></span>
+            <span class="t"><span class="k">CONCLUÍDA</span><span class="l">Dados</span></span>
+          </div>
+          <span class="stp-ln done"></span>
+          <div class="stp cur">
+            <span class="n">3</span>
+            <span class="t"><span class="k">ETAPA ATUAL</span><span class="l">Briefing</span></span>
+          </div>
+          <span class="stp-ln"></span>
+          <div class="stp">
+            <span class="n">4</span>
+            <span class="t"><span class="l">Revisão</span></span>
+          </div>
+        </div>
+
+        <!-- ETAPA 3 — BRIEFING (ramo real do Cronograma: quantidade + subtipo sintético + conteúdos) -->
+        <div class="wiz-body scrolly">
+          <span class="sbar"></span>
+
+          <div class="flb" style="margin-bottom:8px">Quantidade de temas</div>
+          <div class="qty">
+            <span class="qb">−</span>
+            <span class="qv">12</span>
+            <span class="qb">+</span>
+            <span class="qs">temas</span>
+          </div>
+
+          <div style="margin-top:16px"><span class="syn">Cronograma — 12 conteúdos</span></div>
+
+          <div class="pair" style="grid-template-columns:1fr 1.3fr;gap:26px;margin-top:16px">
+            <div>
+              <div class="flb">Período de referência</div>
+              <div class="in"><input value="Setembro/2026"></div>
+            </div>
+            <div>
+              <div class="flb">Canais</div>
+              <div class="chips" style="margin-top:2px">
+                <span class="chp c-inst sel"><svg class="ic ck-ic"><use href="#i-check"/></svg> Instagram</span>
+                <span class="chp">Facebook</span>
+                <span class="chp">YouTube</span>
+                <span class="chp">WhatsApp</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="flb" style="margin:20px 0 9px">Conteúdos do cronograma <span class="opt">(12)</span></div>
+
+          <div class="ccard open">
+            <button class="chd"><span class="dot fill"></span><span class="ctt">Conteúdo 1</span><span class="car">▲</span></button>
+            <div class="cbody">
+              <div class="rlb" style="margin-top:0">Tema</div>
+              <div class="rte fo">
+                <div class="rte-bar">
+                  <span class="rb">↶</span><span class="rb">↷</span>
+                  <span class="rsep"></span>
+                  <span class="rb">¶<span class="car">▾</span></span><span class="rb">A<span class="car">▾</span></span>
+                  <span class="rsep"></span>
+                  <span class="rb"><b>N</b></span><span class="rb"><i>I</i></span><span class="rb"><u>S</u></span><span class="rb"><s>S</s></span><span class="rb">X₂</span><span class="rb">X²</span>
+                  <span class="rsep"></span>
+                  <span class="rb sw1">A<span class="swb"></span></span><span class="rb" style="background:color-mix(in srgb,#F6D64A 38%,#fff)">A</span>
+                  <span class="rsep"></span>
+                  <span class="rb">•≡</span><span class="rb">1.≡</span>
+                  <span class="rsep"></span>
+                  <span class="rb">≡</span><span class="rb">≣</span><span class="rb">⫤</span><span class="rb">⫣</span>
+                  <span class="rsep"></span>
+                  <span class="rb">🔗</span><span class="rb">─</span><span class="rb">⌫</span>
+                </div>
+                <div class="rte-area"><b>Lançamento da coleção</b> nos Stories — cores da nova estação</div>
+              </div>
+              <div class="rlb">Legenda</div>
+              <div class="rte">
+                <div class="rte-area">“A nova coleção chegou: peças leves para dias quentes, com a cara de setembro.”</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="ccard">
+            <button class="chd"><span class="dot fill"></span><span class="ctt">Conteúdo 2</span><span class="car">▼</span></button>
+          </div>
+
+          <div class="ccard">
+            <button class="chd"><span class="dot"></span><span class="ctt">Conteúdo 3</span><span class="car">▼</span></button>
+          </div>
+
+          <div class="ccard">
+            <button class="chd"><span class="dot"></span><span class="ctt">Conteúdo 4</span><span class="car">▼</span></button>
+          </div>
+        </div>
+
+        <div class="wiz-foot">
+          <button class="backb"><svg class="ic"><use href="#i-chevron-left"/></svg> Voltar</button>
+          <button class="next">Próximo <svg class="ic"><use href="#i-arrow-right"/></svg></button>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+</body>
+</html>
