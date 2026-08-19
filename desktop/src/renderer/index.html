@@ -3064,31 +3064,43 @@ body.light-ui.desktop .det-sheet .send-go.det-hero-locked{background:var(--lui-s
    hint de fluxo) permanecem no DOM e seguem visíveis no DRAWER aprovado.
    Rail lateral = RESPONSÁVEL PRIMÁRIO (congelado; inalterado).
    ========================================================================== */
-/* card compacto (densidade Golden) + ordem visual dos slots reais */
+/* card compacto (densidade do print aprovado) + ordem visual do MODELO DE REFERÊNCIA:
+   TÍTULO → categoria → Cliente (label+nome) → Prazo (data real) → barra → microstats →
+   participantes → ações. display:contents no main libera título/cliente p/ ordenação. */
 body.light-ui.desktop .kbv2-card{gap:9px;padding:16px 18px 12px 21px}
-body.light-ui.desktop .kbv2-card-main{order:1;display:flex;flex-direction:column;gap:6px}
-body.light-ui.desktop .kbv2-card-chips{order:2}
-body.light-ui.desktop .kbv2-card-top{order:3;justify-content:flex-start}
-body.light-ui.desktop .kbv2-card-rail{order:4}
-body.light-ui.desktop .kbv2-card-summary{order:5}
-body.light-ui.desktop .kbv2-card-chk{order:6}
-body.light-ui.desktop .kbv2-card-themes,body.light-ui.desktop .kbv2-card-notes{order:7}
-body.light-ui.desktop .kbv2-card-profile{order:8}
-body.light-ui.desktop .kbv2-card-footer{order:9}
-/* TÍTULO = elemento principal (primeiro); cliente = linha discreta "Cliente · nome" */
+body.light-ui.desktop .kbv2-card-main{display:contents}
 body.light-ui.desktop .kbv2-title{order:1;font-size:15.5px;margin-top:0}
-body.light-ui.desktop .kbv2-tier{order:2;text-transform:none;letter-spacing:0;font-size:12.5px;font-weight:600;color:var(--lui-tx-1)}
-body.light-ui.desktop .kbv2-tier::before{content:'Cliente  ';font-weight:450;color:var(--lui-tx-3)}
-/* status pill sai do card (a coluna já comunica o estágio; estado completo vive no drawer);
-   permanecem SLA (urgência real) e prazo — linha compacta à esquerda */
+body.light-ui.desktop .kbv2-card-chips{order:2}
+body.light-ui.desktop .kbv2-tier{order:3}
+body.light-ui.desktop .kbv2-card-date{order:4}
+body.light-ui.desktop .kbv2-card-top{order:5;justify-content:flex-start}
+body.light-ui.desktop .kbv2-card-rail{order:6}
+body.light-ui.desktop .kbv2-card-summary{order:7}
+body.light-ui.desktop .kbv2-card-chk{order:8}
+body.light-ui.desktop .kbv2-card-profile{order:10}
+body.light-ui.desktop .kbv2-card-footer{order:11}
+/* categoria = chip uppercase tint (modelo do print; sem dot) */
+body.light-ui.desktop .kbv2-card-chips .kbv2-chip:first-child{text-transform:uppercase;font-size:10px;letter-spacing:.05em;padding:3px 9px}
+body.light-ui.desktop .kbv2-chip .kbv2-chip-dot{display:none}
+/* Cliente = label em linha própria + nome (print) */
+body.light-ui.desktop .kbv2-tier{text-transform:none;letter-spacing:0;font-size:13px;font-weight:600;color:var(--lui-tx-1)}
+body.light-ui.desktop .kbv2-tier::before{content:'Cliente';display:block;font-size:11.5px;font-weight:450;color:var(--lui-tx-3);margin-bottom:2px}
+/* Prazo = DATA REAL com prefixo, colorida pelo estado real (--kdue: ok/hoje/atrasada/concluída) */
+body.light-ui.desktop .kbv2-card-date{display:flex;font-size:12.5px;font-weight:600;color:color-mix(in srgb,var(--kdue,#5B6472) 52%,#1E2530)}
+body.light-ui.desktop .kbv2-card-date span::before{content:'Prazo  ';font-weight:450;color:var(--lui-tx-3)}
+body.light-ui.desktop .kbv2-card-date svg{color:var(--lui-tx-4)}
+/* status pill e pill de prazo relativo saem do card (a coluna/data já comunicam; detalhe no
+   drawer); a linha do topo só aparece quando há SLA REAL ativo (urgência operacional) */
 body.light-ui.desktop .kbv2-status{display:none}
+body.light-ui.desktop .kbv2-due{display:none}
 body.light-ui.desktop .kbv2-top-r{justify-content:flex-start}
-/* blocos de detalhe saem do CARD (continuam no DOM e no DRAWER): ficha do responsável
-   (nome/cargo), origem "por Fulano", Etapa atual/Próxima ação, data absoluta, hint */
+body.light-ui.desktop .kbv2-card-top:not(:has(.kbv2-sla)){display:none}
+/* blocos de detalhe saem do CARD (continuam no DOM e no DRAWER aprovado): ficha do
+   responsável (nome/cargo), origem, Etapa atual/Próxima ação, listas de temas/notas, hint */
 body.light-ui.desktop .kbv2-pm{display:none}
 body.light-ui.desktop .kbv2-card-origin{display:none}
 body.light-ui.desktop .kbv2-stage2{display:none}
-body.light-ui.desktop .kbv2-card-date{display:none}
+body.light-ui.desktop .kbv2-card-themes,body.light-ui.desktop .kbv2-card-notes{display:none}
 body.light-ui.desktop .kbv2-hint{display:none}
 /* participante compacto (avatar 24) — o responsável segue comunicado pela RAIL */
 body.light-ui.desktop .kbv2-card-profile{gap:0;min-height:24px}
@@ -3107,6 +3119,11 @@ body.light-ui.desktop .kbv2-card-summary .kbv2-sum-v{justify-content:flex-start;
 body.light-ui.desktop .kbv2-card-summary .kbv2-sum-main{font-size:11.5px;font-weight:650;color:var(--lui-tx-2)}
 body.light-ui.desktop .kbv2-card-summary .kbv2-sum-sub{font-size:11px;font-weight:600;color:var(--lui-tx-4)}
 body.light-ui.desktop .kbv2-card-summary.kbv2-sum-empty{display:none}   /* vazio ≠ microstat (o estado vive no drawer) */
+/* colunas do print: barra fina na cor REAL da coluna sob o header + add colorido */
+body.light-ui.desktop .kbv2-column-header{position:relative;margin-bottom:12px}
+body.light-ui.desktop .kbv2-column-header::after{content:'';position:absolute;left:6px;right:6px;bottom:0;height:3px;border-radius:3px;background:var(--kc,#C7CCD6)}
+body.light-ui.desktop .kbv2-column-add{color:color-mix(in srgb,var(--kc,#5B6472) 55%,#1E2530);border-color:color-mix(in srgb,var(--kc,#98A0AE) 38%,#fff)}
+body.light-ui.desktop .kbv2-column-add:hover{background:color-mix(in srgb,var(--kc,#98A0AE) 6%,#fff);color:color-mix(in srgb,var(--kc,#5B6472) 55%,#1E2530);border-color:color-mix(in srgb,var(--kc,#98A0AE) 55%,#fff)}
 /* ações compactas (função real preservada; sem toolbar de botões enormes) */
 body.light-ui.desktop .kbv2-card-footer{margin-top:2px;padding-top:10px;gap:6px}
 body.light-ui.desktop .kbv2-btn{height:28px;border-radius:8px;font-size:11.5px;font-weight:650;padding:0 10px;gap:5px}
