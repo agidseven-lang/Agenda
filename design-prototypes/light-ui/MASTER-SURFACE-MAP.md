@@ -1,4 +1,17 @@
-> ## ★ CHECKPOINT GLOBAL DO DESIGN (decisão do owner)
+> ## ★ ESTADO VIGENTE (R10 — consolidação final; substitui banners anteriores)
+> **R1–R9.1 = ✔ GO do owner.** FRAMES A 1–13 = GOLDEN/CONGELADOS · **C1–C8 = FOUNDATIONS
+> OFICIAIS** (C1 GOLDEN COMPLETA no escopo real `3c06c26` · C2 GOLDEN DOCUMENTAL `f9fe31a` ·
+> C7 `2516426` · C3–C6 `7aba3fa`+R5.1 `5959ae0` · C8 `b2f6833`) · **B ×6 = SPECS APLICADAS
+> APROVADAS** (R7 `4b72d08`) · **RESPONSIVIDADE VALIDADA: 1920×1080 · 1366×768 · Windows 125%**
+> (R8 `1b7210c` — somente esse escopo; 200%/outras resoluções NÃO declarados) · **ACESSIBILIDADE
+> AUDITADA (R9 `d927c01`) + TOKEN ERRATA CANÔNICA (R9.1 `363d221`)** — implementação futura segue
+> contracts + errata (NUNCA extrair cores dos screenshots históricos). Contagem: **GOLDEN 13 ·
+> A-futura gated 3 · B 6 · C transversais 7 · Trilha separada 1 = 30.** Dívidas: design =
+> resolvidas (errata); implementação/funcionais = registers (a11y contract §28/§29 + manifest).
+> **DESIGN COMPLETO = AINDA NÃO DECLARADO (R11) · IMPLEMENTAÇÃO LIGHT = NÃO AUTORIZADA.**
+> Handoff: `DESIGN-FREEZE-MANIFEST.md`.
+
+> ## ★ CHECKPOINT GLOBAL DO DESIGN (decisão do owner — HISTÓRICO R1; estado da época)
 > **FRAMES A PRIORITÁRIOS 1–13 = GOLDEN / CONGELADOS.** Commits finais:
 > F1 V10 `e7107e3` · F2 `45721bc` · F3 `b5842bc` · F4 `66d9a6a` · F5 `c0c83f4` · F6 `9644d94` ·
 > F7 (7A `ea485c2` · 7B `c0cb413` · 7B V2 `5d2b10d` · 7C `7361f92` · 7D `e18d9f7` · 7D V2 `755eee6` ·
@@ -195,14 +208,14 @@ scrollbars · skeleton · transições (drawer/scrim 0.18–0.2s; reduced-motion
 | Config/Perfil/Equipe | baixo (coberto por arquétipo — R8 §10) | baixo | ok | ok | baixo (idem) | não |
 
 ## H.2 ACESSIBILIDADE (status R9)
-> **R9 ENTREGUE (aguarda owner):** `ACCESSIBILITY-CONTRACT.md` = spec transversal oficial
-> proposta (comprovado × requirement × dívida). Comprovados no real: focus-visible global ·
+> **R9 ✔ GO DO OWNER (`d927c01`):** `ACCESSIBILITY-CONTRACT.md` = spec transversal OFICIAL
+> (comprovado × requirement × dívida). Comprovados no real: focus-visible global ·
 > traps evd/det · 4 dialogs aria-modal · toast stack role=status/aria-live · Enter/Espaço em
 > .evc e toasts · `<details>` nativos · `<button>` em sidebar/stats/calendário/ações · lang
 > pt-BR · reduced-motion ×6. Debt register A11Y-D01–D25 (P0 único = upload sem teclado —
 > IMPLEMENTAÇÃO). Contraste Golden: núcleo PASS; tx-3/tx-4/brand-texto/orange = design debts.
-> **R9.1 (errata candidata entregue — aguarda owner):** dívidas de DESIGN fechadas em
-> `ACCESSIBILITY-TOKEN-ERRATA.md` (E1–E11; axe −84%; regressão 9/9; Golden intocado).
+> **R9.1 ✔ GO DO OWNER (`363d221`):** dívidas de DESIGN fechadas — `ACCESSIBILITY-TOKEN-ERRATA.md`
+> = **CANÔNICA** (E1–E11; axe −84%; regressão 9/9; Golden intocado).
 > Zero superfície nova; 30/30 mantido.
 
 ## I. ORDEM DOS FRAMES A — ✔ CONCLUÍDA (checkpoint global)

@@ -1,5 +1,9 @@
 # Maquetes Light UI — “Agenda ID Seven” · Meu quadro
 
+> **NOTA R10:** este README descreve a FASE INICIAL (propostas do Frame 1). O estado vigente
+> da trilha (Frames A 1–13 Golden, C1–C8, B, R8, a11y/errata) está em
+> **`DESIGN-FREEZE-MANIFEST.md`** + `MASTER-SURFACE-MAP.md` + `DESIGN-CLOSURE-ROADMAP.md`.
+>
 > # ⚠️ MAQUETES DE DESIGN — NÃO É PRODUÇÃO.
 > **Não altera o app, o tema, nem entra no build.** Arquivos isolados apenas para aprovação visual do
 > proprietário. Ficam fora de `desktop/` (não entram no `app.asar`) e não tocam workflows nem releases.

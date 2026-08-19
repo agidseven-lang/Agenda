@@ -1,7 +1,10 @@
 # Tokens visuais — Light UI "Agenda ID Seven"
 
+> **DOCUMENTO HISTÓRICO (fase de propostas A/B/C — R10):** NÃO é mais fonte canônica.
+> Tokens canônicos vigentes = **contracts C1–C8 + `ACCESSIBILITY-TOKEN-ERRATA.md` (R9.1 GO)**
+> — em particular tx-3′ `#697181` · tx-4′ `#6E7786` · brand-ink `#4353D8` · grad stop 2
+> `#8356E6` · inks semânticos. Mantido apenas como registro da fase inicial.
 > MAQUETES DE DESIGN — NÃO É PRODUÇÃO. Não altera o app, o tema, nem entra no build.
-> Estes tokens são a fonte única de verdade das três propostas (A / B / C). Valores em `#hex`.
 
 ---
 

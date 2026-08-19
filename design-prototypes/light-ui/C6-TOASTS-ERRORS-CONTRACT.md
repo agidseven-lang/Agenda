@@ -1,6 +1,6 @@
 # C6 — TOASTS / ERRORS / FEEDBACK · FOUNDATION CONTRACT (Light UI)
 
-> **⚠ R9.1 — TOKEN ERRATA CANDIDATA (aguarda owner):** toast premium X: glyph 13–15px INTACTO, hit/container passa de 20×20 → **28×28** (top/right compensados −4px; WCAG 2.2 2.5.8 ≥24). Nenhuma outra anatomia muda (stack, avatar, CTA, TTL, aria intactos — R5.1 preservada). Fonte única: `ACCESSIBILITY-TOKEN-ERRATA.md` (before×after com contraste calculado). Após GO, estes valores tornam-se canônicos; imagens Golden históricas permanecem como registro.
+> **★ R9.1 — TOKEN ERRATA CANÔNICA (GO do owner):** toast premium X: glyph 13–15px INTACTO, hit/container passa de 20×20 → **28×28** (top/right compensados −4px; WCAG 2.2 2.5.8 ≥24). Nenhuma outra anatomia muda (stack, avatar, CTA, TTL, aria intactos — R5.1 preservada). Fonte única: `ACCESSIBILITY-TOKEN-ERRATA.md` (before×after com contraste calculado). Estes valores SÃO os canônicos; imagens Golden históricas permanecem como registro.
 
 **Status:** **FOUNDATION OFICIAL / GOLDEN** — aprovada pelo owner (R5 = GO; prova visual
 R5.1 `5959ae0`). Congelada; alterações só com autorização do owner.

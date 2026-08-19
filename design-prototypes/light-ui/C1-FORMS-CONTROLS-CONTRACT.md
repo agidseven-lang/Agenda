@@ -1,6 +1,6 @@
 # C1 — FORMS & CONTROLS · DESIGN CONTRACT (Light UI)
 
-> **⚠ R9.1 — TOKEN ERRATA CANDIDATA (aguarda owner):** `--tx-3:#697181` (4.91/4.54) · `--tx-4:#6E7786` (4.52; regra de superfície: sobre canvas usa tx-3) · `--brand-ink:#4353D8` p/ texto brand ≤18.66px · `--grad` stop claro → `#8356E6` (branco 4.73 no pior stop) · borda de input #DFE3EB MANTIDA com justificativa técnica (label+placeholder+shape+focus ring ≥3) · hit target mínimo 24×24 (WCAG 2.2) para microcontroles, conforto 28. Fonte única: `ACCESSIBILITY-TOKEN-ERRATA.md` (before×after com contraste calculado). Após GO, estes valores tornam-se canônicos; imagens Golden históricas permanecem como registro.
+> **★ R9.1 — TOKEN ERRATA CANÔNICA (GO do owner):** `--tx-3:#697181` (4.91/4.54) · `--tx-4:#6E7786` (4.52; regra de superfície: sobre canvas usa tx-3) · `--brand-ink:#4353D8` p/ texto brand ≤18.66px · `--grad` stop claro → `#8356E6` (branco 4.73 no pior stop) · borda de input #DFE3EB MANTIDA com justificativa técnica (label+placeholder+shape+focus ring ≥3) · hit target mínimo 24×24 (WCAG 2.2) para microcontroles, conforto 28. Fonte única: `ACCESSIBILITY-TOKEN-ERRATA.md` (before×after com contraste calculado). Estes valores SÃO os canônicos; imagens Golden históricas permanecem como registro.
 
 > **★ CHECKPOINT GLOBAL (decisão do owner):** os frames-fonte F8–F13 foram aprovados como
 > GOLDEN; portanto os candidatos das seções **§10 (F8) · §11 (F9) · §12 (F10) · §13 (F11) ·
@@ -122,7 +122,7 @@ no real — provavelmente sai do escopo por decisão do owner)**. Fechar via eta
 
 > **ATUALIZAÇÃO R2:** a prancha `r2-c1-completion-estados.html` fornece a PROVA VISUAL de todos os
 > itens acima que EXISTEM no real (ver §16). Os inexistentes (validation summary/radio/multi-select)
-> ficam formalmente FORA do escopo. Congelamento aguarda avaliação do owner — C1 ainda NÃO completa.
+> ficam formalmente FORA do escopo. **Congelamento APROVADO (R2 = GO `3c06c26`) — C1 = GOLDEN COMPLETA no escopo real.**
 
 ---
 
@@ -311,7 +311,7 @@ sem conflito). Componentes REAIS do renderProductionModal:
 Dívidas anotadas no F13 (não corrigir): sem validação de dimensão/tamanho; sem progress; botões
 sem loading/disabled; URL sem validação. Congelam quando o owner aprovar o Frame 13 (NÃO Golden).
 
-## 16 · R2 — C1 COMPLETION · ESTADOS REAIS (prancha `r2-c1-completion-estados.html` — aguarda owner)
+## 16 · R2 — C1 COMPLETION · ESTADOS REAIS (prancha `r2-c1-completion-estados.html` — ✔ APROVADA, R2 = GO)
 Prancha de contrato (spec board, não é tela) que fecha visualmente as pendências do §3 com
 componentes/estados/mensagens 100% reais da 1.0.246. Candidatos a congelar com a aprovação:
 - **Disabled genérico**: `.btn[disabled]` real (opacity .6, pointer-events none) aplicado a

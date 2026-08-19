@@ -1,6 +1,7 @@
 # ACCESSIBILITY CONTRACT — LIGHT UI (R9)
 
-**Status:** ENTREGUE (R9) — aguarda owner; NÃO concluída. Fonte funcional: Desktop **1.0.246**.
+**Status:** ✔ **APROVADO PELO OWNER (R9 = GO, commit `d927c01`; fechamento visual R9.1 = GO `363d221`).**
+Spec transversal OFICIAL de acessibilidade do Light UI. Fonte funcional: Desktop **1.0.246**.
 **Natureza:** fase READ-ONLY (auditoria + spec + contrato de implementação futura). **ZERO
 implementação**: nenhum ARIA adicionado ao produto, nenhum tabindex alterado, nenhum keyboard
 corrigido, nenhuma cor trocada, nenhum modal modificado, nenhum Golden alterado. **ZERO imagem
@@ -181,7 +182,7 @@ C8 congelou o visual; semântica futura decidida componente a componente (nada a
 > **R9.1:** os FAILs desta tabela receberam ERRATA CANDIDATA com prova numérica —
 > `ACCESSIBILITY-TOKEN-ERRATA.md` (tx-3′ 4.91/4.54 · tx-4′ 4.52+regra · brand-ink 6.06 ·
 > grad′ 4.73 · sla-k→green-ink 5.01 · sb-faint′ 4.74 · inks globais 5.02–7.02 · borda de
-> input justificada). Aguarda GO do owner.
+> input justificada). **ERRATA CANÔNICA (R9.1 = GO).**
 
 | Par (fg/bg) | Ratio | Critério | Status | Uso real |
 |---|---|---|---|---|
@@ -382,15 +383,15 @@ protótipos mede o HTML do mockup — o produto real foi coberto por auditoria d
 | A11Y-D02 | P1 | Login | Enter não submete (sem `<form>`, sem handler em liId/liPw; ts-auth TEM — 3022) | Implementação | submit por Enter (F12 já registrara) |
 | A11Y-D03 | P1 | Prioridades | priCard div clicável sem role/tabindex/teclado (5347) | Implementação | button/role+tabindex+Enter/Espaço (R7 reconfirmado) |
 | A11Y-D04 | P1 | Central Notificações | nc-row/nc-open divs sem teclado (5726–5732) | Implementação | linha e CTA focáveis |
-| A11Y-D05 | P1 | Tabelas/metas | tx-4 2.21:1 (th 10.5px; metas) | **Design** | **RESOLVIDA NO DESIGN — errata R9.1 E2 (tx-4′ 4.52 + regra de superfície), aguarda GO** |
-| A11Y-D06 | P1 | KPIs | orange #F59E0B 2.15:1 (falha até large) | **Design** | **RESOLVIDA — auditado: KPIs Golden já usam #B45309 (5.02); regra ink formalizada (errata E7), aguarda GO** |
-| A11Y-D07 | P1 | Links | brand #5B7CFA como texto 3.68:1 | **Design** | **RESOLVIDA NO DESIGN — errata E3 (brand-ink #4353D8 · 6.06), aguarda GO** |
-| A11Y-D08 | P2 | Texto soft | tx-3 4.09:1 (borderline) | Design | **RESOLVIDA NO DESIGN — errata E1 (tx-3′ #697181 · 4.91/4.54), aguarda GO** |
-| A11Y-D09 | P2 | CTA grad | branco 3.62:1 no stop claro | Design | **RESOLVIDA NO DESIGN — errata E4 (stop→#8356E6 · 4.73), aguarda GO** |
-| A11Y-D10 | P2 | Micro-labels | sla-k 3.08 · sb-faint 3.74 · inp border 1.29 (UI) | Design | **RESOLVIDA — errata E5/E6 (green-ink 5.01 · sb-faint′ 4.74+migração topo); borda de input MANTIDA c/ justificativa técnica E9. Aguarda GO** |
-| A11Y-D11 | P1 | Toast X | ntf-x 20×20 < 24×24 (4482) | Impl.+Design | **CONTRATO CORRIGIDO — errata E10 (hit 28×28, glyph intacto), aguarda GO**; aplicação no produto = implementação |
+| A11Y-D05 | P1 | Tabelas/metas | tx-4 2.21:1 (th 10.5px; metas) | **Design** | **RESOLVIDA NO DESIGN — errata canônica R9.1 E2 (tx-4′ 4.52 + regra de superfície)** |
+| A11Y-D06 | P1 | KPIs | orange #F59E0B 2.15:1 (falha até large) | **Design** | **RESOLVIDA — auditado: KPIs Golden já usam #B45309 (5.02); regra ink canônica (errata E7)** |
+| A11Y-D07 | P1 | Links | brand #5B7CFA como texto 3.68:1 | **Design** | **RESOLVIDA NO DESIGN — errata canônica E3 (brand-ink #4353D8 · 6.06)** |
+| A11Y-D08 | P2 | Texto soft | tx-3 4.09:1 (borderline) | Design | **RESOLVIDA NO DESIGN — errata canônica E1 (tx-3′ #697181 · 4.91/4.54)** |
+| A11Y-D09 | P2 | CTA grad | branco 3.62:1 no stop claro | Design | **RESOLVIDA NO DESIGN — errata canônica E4 (stop→#8356E6 · 4.73)** |
+| A11Y-D10 | P2 | Micro-labels | sla-k 3.08 · sb-faint 3.74 · inp border 1.29 (UI) | Design | **RESOLVIDA — errata canônica E5/E6 (green-ink 5.01 · sb-faint′ 4.74+migração topo); borda de input MANTIDA c/ justificativa técnica E9** |
+| A11Y-D11 | P1 | Toast X | ntf-x 20×20 < 24×24 (4482) | Impl.+Design | **CONTRATO CORRIGIDO — errata canônica E10 (hit 28×28, glyph intacto)**; aplicação no produto = implementação |
 | A11Y-D12 | P1 | Forms | 24 `<label>` sem for/id (3160/3162) | Implementação | associação obrigatória (§10) |
-| A11Y-D13 | P2 | Calendário | dots de tipo só-cor (6128) | Impl.+Design | **VISUAL RESOLVIDO — errata E11 (cor+forma+legenda), aguarda GO**; nome acessível do dia = implementação |
+| A11Y-D13 | P2 | Calendário | dots de tipo só-cor (6128) | Impl.+Design | **VISUAL RESOLVIDO — errata canônica E11 (cor+forma+legenda)**; nome acessível do dia = implementação |
 | A11Y-D14 | P2 | Notificações | unread sem texto acessível | Implementação | "não lida" sr-only |
 | A11Y-D15 | P2 | Estados | 0 aria-selected/current/pressed | Implementação | §9 por componente |
 | A11Y-D16 | P2 | Menus | sem arrows/Home/End; tcv4/kbv2 sem role=menu | Implementação | §16 |
@@ -418,7 +419,9 @@ reabrir Golden. Gap visual material = **NÃO** (zero prancha nova). Nova superf�
 7. aria-live no flashToast (D17) · reduced-motion transversal (§19).
 8. Semântica de selecionado por componente (§9) · tabelas com scope/caption (D20).
 
-## 30 · CLOSURE CRITERIA (R9)
-R9 fecha quando o owner: (a) aceitar este contrato como spec oficial de a11y do Light UI;
-(b) decidir sobre a microfase OPCIONAL de tokens de contraste (D05–D10) — antes do R11 ou como
-dívida assumida; (c) ratificar os guardrails §29. **Nada disso autoriza implementação.**
+## 30 · CLOSURE CRITERIA (R9) — ✔ ATENDIDOS
+(a) contrato aceito como spec oficial (R9 = GO); (b) microfase de tokens EXECUTADA e aprovada
+(R9.1 = GO — errata canônica); (c) guardrails §29 ratificados. **Nada disso autoriza
+implementação.** O P0 de implementação (D01 upload sem teclado) NÃO impede o fechamento do
+DESIGN — o contrato §22 já especifica o comportamento correto — mas é **BLOCKER para a futura
+implementação Light ser declarada pronta**.

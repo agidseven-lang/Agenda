@@ -1,9 +1,9 @@
 # C2 — MODAIS & SHEETS · FOUNDATION CONTRACT (Light UI)
 
-**Status:** CONSOLIDADA DOCUMENTALMENTE (R3) — **aguarda avaliação do owner; NÃO declarada
-concluída.** Fonte funcional auditada: Desktop **1.0.246** (renderer completo — não apenas F13).
-Branch: `design/f356b-light-ui-mockups`. Zero produção; zero imagem nova nesta fase.
-Taxonomia formal: `MASTER-SURFACE-MAP.md` §F ("C2 — Modais & Sheets").
+**Status:** ✔ **FOUNDATION OFICIAL / GOLDEN DOCUMENTAL** — aprovada pelo owner (R3 = GO, commit
+`f9fe31a`; nomenclatura "GOLDEN DOCUMENTAL" mantida por decisão: âncoras visuais = F13 + del-sheet
+R2, sem prancha própria). Congelada; alterações só com autorização do owner. (Header corrigido na
+R10 — o texto anterior "aguarda avaliação" era stale de antes do GO.)
 
 ## 1 · OBJETIVO
 Congelar o contrato visual/estrutural dos modais e sheets REAIS do produto no Light UI Golden,

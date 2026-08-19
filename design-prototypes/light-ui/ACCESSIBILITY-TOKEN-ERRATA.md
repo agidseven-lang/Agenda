@@ -1,6 +1,7 @@
 # ACCESSIBILITY TOKEN ERRATA — R9.1 (Light UI)
 
-**Status:** CANDIDATA — aguarda owner (R9.1). Prancha: `r9-1-accessibility-token-closure.html`
+**Status:** ✔ **CANÔNICA — APROVADA PELO OWNER (R9.1 = GO, commit `363d221`; registrada na R10).**
+Este documento é a fonte canônica dos tokens corrigidos. Prancha: `r9-1-accessibility-token-closure.html`
 (imagem entregue no chat). **Golden Update Policy (§8 do mandato):** os Frames Golden aprovados
 **não foram sobrescritos** — esta errata define o TOKEN ERRATA/ACCESSIBILITY OVERRIDE que, após
 GO do owner, passa a ser o valor **canônico dos contracts e da implementação**; as imagens
@@ -77,14 +78,14 @@ extra sobre texto-meta); (c) segmentos inativos sobre `--sunk` (4.4×, marginal 
 texto de controle sobre sunk usa tx-2 ou sunk clareia 1 passo). Axe não substitui o cálculo
 manual — os números canônicos são os da tabela §1.
 
-## 5 · DÍVIDAS DE DESIGN RESOLVIDAS POR ESTA ERRATA (após GO)
+## 5 · DÍVIDAS DE DESIGN RESOLVIDAS POR ESTA ERRATA (GO dado — efetivas)
 A11Y-**D05** (tx-4) · **D06** (orange como texto — auditado: KPIs já usam ink; regra formalizada)
 · **D07** (brand como texto) · **D08** (tx-3) · **D09** (gradiente CTA) · **D10** (sla-k ·
 sb-faint · input border justificada) · **D11** (toast X hit) · **D13 visual** (dots + forma +
 legenda; semântico permanece implementação). **NÃO resolvidas aqui (implementation guardrails
 intactos):** D01 (upload P0) · D02–D04 · D12 · D14–D25 — nenhuma tocada.
 
-## 6 · APLICAÇÃO APÓS GO (sem gerar V2 de 13 frames)
-Contracts passam a citar os valores desta errata como canônicos (C1 §tokens · C6 §toast ·
+## 6 · APLICAÇÃO (EM VIGOR — sem gerar V2 de 13 frames)
+Os contracts citam os valores desta errata como canônicos (C1 §tokens · C6 §toast ·
 C8 §inks/estados · F8 §dots). Implementação usa SEMPRE a errata; imagens Golden históricas não
 são regeradas. Qualquer novo componente nasce já com tx-3′/tx-4′/inks/grad′.

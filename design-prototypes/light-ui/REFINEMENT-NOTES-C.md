@@ -1,4 +1,24 @@
-# ▶ R9.1 — ACCESSIBILITY DESIGN CLOSURE · TOKEN ERRATA (aguarda owner)
+# ▶ R10 — FINAL DESIGN CLEANUP · CONSOLIDAÇÃO + READINESS (aguarda owner)
+Fase 100% documental (zero imagem; zero mudança de design; zero token novo). Executado:
+tree audit completo (63 arquivos: 13 HTML Golden A + 2 spec boards + 1 prancha R9.1 + 12
+históricos de proposta/iteração + 18 cópias de validação r8/r9.1 + 14 docs + 3 auxiliares);
+stale scan (termos "aguarda/candidata/parcial/gap/não concluída") com triagem histórico ×
+correção — corrigidos: headers C2 (R3=GO) e C7 (R4=GO) que ainda diziam "aguarda avaliação",
+C1 §3/§16 ("C1 ainda NÃO completa" → GOLDEN COMPLETA R2), ACCESSIBILITY-CONTRACT (R9=GO),
+ACCESSIBILITY-TOKEN-ERRATA (CANÔNICA, R9.1=GO), notas C1/C6/C8 (errata canônica), títulos
+desta notes (▶→✔ R2–R6/R9/R9.1), roadmap (estado vigente + R10), mapa (banner vigente R10;
+banner R1 marcado histórico; H.2 GO), TOKENS.md e README.md marcados HISTÓRICOS com ponteiro
+para as fontes canônicas (conflito "fonte única de verdade" da era das propostas eliminado).
+Criado: **DESIGN-FREEZE-MANIFEST.md** (handoff R11 — escopo, Golden, foundations, B, R8, a11y,
+errata, dívidas, guardrails, hierarquia de fontes, arquivos canônicos, commit matrix com SHAs
+reais, closure matrix 1–12, implementation pre-flight). Auditorias: mapa 30/30 fecha
+(13 Golden + 3 A-futuras gated + 6 B + 7 transversais C + 1 trilha separada); higiene do branch
+= 42 commits da trilha (ed11c08..363d221) 100% em design-prototypes/light-ui, zero produção/
+segredo/foto; PNG policy reconfirmada (screenshots só no chat; pranchas HTML versionadas).
+Closure matrix: critérios 1–11 = PASS · 12 = PENDENTE (declaração do owner no R11).
+Nenhuma superfície nova; nenhuma dívida nova. R11 NÃO iniciado.
+
+# ✔ R9.1 — ACCESSIBILITY DESIGN CLOSURE · TOKEN ERRATA (GO do owner — errata CANÔNICA)
 Decisão do owner: auditoria R9 aprovada; GO da R9 condicionado a fechar as dívidas de DESIGN.
 Entrega: `ACCESSIBILITY-TOKEN-ERRATA.md` (E1–E11, before→depois→razão→contraste→impacto) +
 prancha única `r9-1-accessibility-token-closure.html` (1920×1080, board de contrato A–E).
@@ -20,7 +40,7 @@ resíduos classificados (mockup-only; regra cobre na implementação). D05–D11
 resolvidas na errata (aguarda GO); guardrails de implementação intactos (D01 P0 upload etc.).
 Zero produção · zero função · zero V2 de frames · 1 imagem. R10 NÃO iniciada.
 
-# ✔ R9 — ACESSIBILIDADE · AUDIT + SPEC TRANSVERSAL (auditoria APROVADA; GO condicionado à R9.1)
+# ✔ R9 — ACESSIBILIDADE · AUDIT + SPEC TRANSVERSAL (GO do owner)
 Fase READ-ONLY (zero implementação/ARIA/tabindex/cor/modal alterados; zero imagem).
 `ACCESSIBILITY-CONTRACT.md` criado (30 seções): matriz global 24 linhas; keyboard real (14
 handlers; Enter/Espaço/Escape/Tab provados; ZERO arrows/Home/End); focus (regra global +
@@ -82,7 +102,7 @@ técnicos de Config, chips sem aria-pressed, priCard teclado, logout sem confirm
 
 ---
 
-# ▶ R6 — C8 ESTADOS DE INTERAÇÃO & STAT-TILE · CONSOLIDAÇÃO DOCUMENTAL (aguarda owner)
+# ✔ R6 — C8 ESTADOS DE INTERAÇÃO & STAT-TILE · CONSOLIDAÇÃO DOCUMENTAL (GO do owner)
 Fase read-only, ZERO imagem. `C8-INTERACTION-STATES-CONTRACT.md` criado (nome formal do mapa §F
 confirmado). Inventário integral: 95 `:hover` · 21 `:focus-visible` · 11 `:active` · 62
 transitions · **0 `aria-selected/current/pressed`** (requirement p/ R9). Ownership matrix
@@ -102,7 +122,7 @@ atualizados para GO (C3–C6 = FOUNDATIONS OFICIAIS). **C8 aguarda owner; R7 nã
 
 ---
 
-# ▶ R5.1 — TRANSVERSAL ANATOMY BOARD · C3 + C6 (gate visual da R5; aguarda owner)
+# ✔ R5.1 — TRANSVERSAL ANATOMY BOARD · C3 + C6 (gate visual da R5; GO do owner — gaps C3/C6 FECHADOS)
 `r5-1-transversal-anatomy-board.html` — prancha única 1920×1080 fechando os DOIS gaps da R5.
 - **C3 provado ABERTO**: menu "Mais opções" do detalhe de evento (ancorado ACIMA do trigger;
   itens reais Finalizar + Excluir definitivamente danger; role=menu/menuitem + aria-haspopup/
@@ -120,7 +140,7 @@ atualizados para GO (C3–C6 = FOUNDATIONS OFICIAIS). **C8 aguarda owner; R7 nã
 
 ---
 
-# ▶ R5 — C3/C4/C5/C6 · CONSOLIDAÇÃO DOCUMENTAL (aguarda owner)
+# ✔ R5 — C3/C4/C5/C6 · CONSOLIDAÇÃO DOCUMENTAL (GO do owner)
 Fase read-only, ZERO imagem. 4 foundation contracts criados a partir da auditoria integral:
 - **C3 Menus/Popovers**: evd-menu real (role=menu, ancorado ACIMA do trigger, min-w 220, item
   danger) + card menus ⋯ (`.tcv4-menu`/`.kbv2-menu` = PORTAL no body; fecham por scroll/resize/
@@ -140,7 +160,7 @@ C7 marcada FOUNDATION OFICIAL (GO do owner à R4). **C3–C6 aguardam avaliaçã
 
 ---
 
-# ▶ R4 — C7 TABELA · CONSOLIDAÇÃO DOCUMENTAL (aguarda owner)
+# ✔ R4 — C7 TABELA · CONSOLIDAÇÃO DOCUMENTAL (GO do owner)
 Fase read-only, ZERO imagem. `C7-TABLE-CONTRACT.md` criado. Auditoria integral: **exatamente 3
 `<table>` reais** no renderer (Ranking de designers F10 · Atrasos por designer F11 · Histórico
 resumido F11), todas `.exec-tbl` — âncoras Golden F10/F11 cobrem 100% (sem gap visual).
@@ -157,7 +177,7 @@ documental (GO do owner à R3). **C7 aguarda avaliação; R5 não iniciado.**
 
 ---
 
-# ▶ R3 — C2 MODAIS & SHEETS · CONSOLIDAÇÃO DOCUMENTAL (aguarda owner)
+# ✔ R3 — C2 MODAIS & SHEETS · CONSOLIDAÇÃO DOCUMENTAL (GO do owner)
 Fase read-only, ZERO imagem. `C2-MODALS-SHEETS-CONTRACT.md` criado: inventário integral do
 renderer (20 modais/sheets em `#modalRoot` + `ts-auth-back` e `slaedit-ov` próprios), taxonomia
 real (Confirmation · Form · Selection · Detail · Production/Workflow), tokens (larguras 420–1240,
@@ -169,7 +189,7 @@ Nenhuma superfície nova; A-futuras intocadas. **C2 aguarda avaliação; R4 não
 
 ---
 
-# ▶ R2 — C1 COMPLETION · ESTADOS REAIS (prancha entregue; aguarda owner)
+# ✔ R2 — C1 COMPLETION · ESTADOS REAIS (GO do owner — C1 GOLDEN COMPLETA no escopo real)
 `r2-c1-completion-estados.html` — **prancha de contratos** (spec board 1920×1080; não é tela do
 produto, não é Frame A). Fecha visualmente as pendências do C1 §3 com estados 100% reais da
 1.0.246; matriz de auditoria completa no header do arquivo e candidatos no **C1 §16**.

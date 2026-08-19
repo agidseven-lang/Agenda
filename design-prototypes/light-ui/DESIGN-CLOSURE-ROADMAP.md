@@ -3,7 +3,9 @@
 **Origem:** Checkpoint Global do Design (Frames A 1–13 = GOLDEN, decisão do owner).
 **Função:** sequência oficial para terminar o DESIGN. Derivada da auditoria real do
 `MASTER-SURFACE-MAP.md` (30 superfícies; taxonomia C1–C8 do §F) + `C1-FORMS-CONTROLS-CONTRACT.md`
-+ `REFINEMENT-NOTES-C.md`. **Nenhuma etapa foi iniciada.** Cada etapa só começa com GO do owner.
++ `REFINEMENT-NOTES-C.md`. ("Nenhuma etapa foi iniciada" era o estado na criação — histórico.)
+**Estado vigente (R10): R1–R9.1 = ✔ GO · R10 = ▶ ENTREGUE (aguarda owner) · R11 = NÃO INICIADO.**
+Cada etapa só começa com GO do owner.
 **Regra permanente:** implementação Light UI **PROIBIDA** até o owner declarar DESIGN COMPLETO.
 
 Formato de cada etapa: Objetivo · Artefato · Dependência · Imagem? · Owner approval? · Critério
@@ -136,17 +138,17 @@ de fechamento.
 - **Dependência:** R2–R7 (congelar antes de revalidar). **Imagem?** SIM (validação, não design
   novo). **Owner approval?** SIM. **Fechamento:** §H sem "SIM — revalidar" pendente.
 
-## R9 · ACESSIBILIDADE — SPEC MÍNIMA CONSOLIDADA ▶ AUDITORIA APROVADA · fechamento condicionado à R9.1
+## R9 · ACESSIBILIDADE — SPEC MÍNIMA CONSOLIDADA ✔ APROVADO PELO OWNER (GO)
 > **Status:** `ACCESSIBILITY-CONTRACT.md` criado (30 seções; READ-ONLY, zero implementação, zero
 > imagem). Auditoria code-based do renderer real (keyboard/focus/semântica/ARIA/motion/targets,
 > tudo com linha) + contraste WCAG CALCULADO dos tokens Golden + axe-core 4.13.0 (temporário no
 > harness; wcag2a/aa/21aa; 7 arquétipos; F12=0 violações) + matriz global + debt register
 > A11Y-D01–D25. **Design P0 = NÃO** (FAILs de contraste são debts D05–D10 c/ microfase opcional);
 > **Implementation P0 = SIM (D01 upload sem teclado)** ⇒ guardrails §29 (não reabre Golden).
-> **Decisão do owner:** auditoria R9 APROVADA tecnicamente; **R9 só recebe GO após a R9.1**
-> (fechamento das dívidas de acessibilidade que pertencem ao DESIGN). R10 não iniciada.
+> **Decisão do owner:** auditoria aprovada; fechamento visual entregue na R9.1 ⇒ **R9 = GO**
+> (commit `d927c01`; R9.1 `363d221`). `ACCESSIBILITY-CONTRACT.md` = spec oficial de a11y.
 
-## R9.1 · ACCESSIBILITY DESIGN CLOSURE ▶ ENTREGUE (aguarda avaliação do owner)
+## R9.1 · ACCESSIBILITY DESIGN CLOSURE ✔ APROVADO PELO OWNER (GO)
 > **Status:** `ACCESSIBILITY-TOKEN-ERRATA.md` + prancha `r9-1-accessibility-token-closure.html`
 > (1 imagem 1920×1080 entregue no chat). Errata E1–E11 com contraste recalculado do zero e
 > provado (tx-3′ 4.91/4.54 · tx-4′ 4.52+regra de superfície · brand-ink #4353D8 6.06 promovido
@@ -155,8 +157,8 @@ de fechamento.
 > legenda). Regressão visual 9/9 PASS em cópias isoladas (`r9-1-regression/` — Golden intocado);
 > axe before/after comparável: color-contrast **213→34 (−84%)**, F12 0→0; resíduos 34 = mockup-
 > only, todos classificados e cobertos pela regra. Dívidas de DESIGN D05–D11/D13 = resolvidas na
-> errata (aguarda GO); implementation guardrails (D01 P0 etc.) INTACTOS. Zero produção; zero
-> função; nenhuma V2 de frames. **R9.1 NÃO concluída**; após GO ⇒ R9 = GO.
+> errata; implementation guardrails (D01 P0 etc.) INTACTOS. Zero produção; zero função; nenhuma
+> V2 de frames. **R9.1 = GO do owner ⇒ ACCESSIBILITY-TOKEN-ERRATA.md = CANÔNICA** e R9 = GO.
 - **Objetivo:** consolidar C1 §6 + registros por frame num requisito único de implementação
   (contraste, foco, cor-não-única, targets, labels, keyboard, disabled≠OFF, unread≠read,
   upload acessível, erro não-só-cor). Declarar explicitamente o que NÃO é contrato do código
@@ -164,7 +166,14 @@ de fechamento.
 - **Artefato:** seção "A11Y-SPEC" única. **Dependência:** R2–R7. **Imagem?** NÃO.
 - **Owner approval?** SIM. **Fechamento:** spec aceita.
 
-## R10 · MASTER MAP CLEANUP FINAL
+## R10 · FINAL DESIGN CLEANUP ▶ ENTREGUE (aguarda avaliação do owner)
+> **Status:** auditoria documental integral da trilha — tree audit (63 arquivos classificados),
+> stale scan executado e corrigido (C2/C7 headers de R3/R4; C1 §3/§16; contract/errata R9/R9.1 →
+> GO/CANÔNICA; notes ▶→✔; mapa com banner vigente; TOKENS/README marcados históricos), matriz de
+> fechamento 1–11 = PASS (12 = aguarda R11), commit matrix com SHAs reais, higiene do branch
+> reconfirmada (42 commits, 100% em design-prototypes/light-ui), hierarquia de fonte-da-verdade
+> formalizada e **`DESIGN-FREEZE-MANIFEST.md`** criado (handoff do R11 + implementation
+> pre-flight). Zero imagem; zero mudança de design. **R10 NÃO concluída**; R11 não iniciado.
 - **Objetivo:** matriz 30/30 sem célula pendente; dívidas funcionais listadas FORA do escopo de
   design (fase funcional futura); trilhas gated explícitas (F14a–c janelas premium; Client Portal
   = trilha separada; decisão do owner se ficam fora do "completo").

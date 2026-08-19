@@ -1,10 +1,8 @@
 # C7 — TABELA · DENSE DATA FOUNDATION CONTRACT (Light UI)
 
-**Status:** CONSOLIDADA DOCUMENTALMENTE (R4) — **aguarda avaliação do owner; NÃO declarada
-concluída.** Fonte funcional auditada: Desktop **1.0.246** (renderer integral). Branch:
-`design/f356b-light-ui-mockups`. Zero produção; **zero imagem nova** (âncoras F10+F11 cobrem
-100% da taxonomia real — sem gap visual). Taxonomia formal: `MASTER-SURFACE-MAP.md` §F ("C7 —
-Tabela").
+**Status:** ✔ **FOUNDATION OFICIAL / GOLDEN** — aprovada pelo owner (R4 = GO, commit `2516426`;
+âncoras visuais F10+F11 — sem gap visual). Congelada; alterações só com autorização do owner.
+(Header corrigido na R10 — o texto anterior "aguarda avaliação" era stale de antes do GO.)
 
 ## 1 · OBJETIVO
 Congelar o contrato da tabela densa de dados REAL do produto no Light UI Golden, a partir das
