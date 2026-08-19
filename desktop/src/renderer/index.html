@@ -3145,6 +3145,134 @@ body.light-ui.desktop .kbv2-btn svg{width:12px;height:12px}
 body.light-ui.desktop .kbv2-btn-main{flex:0 1 auto}
 body.light-ui.desktop .kbv2-btn:not(.kbv2-btn-main):not(.kbv2-btn-dots){flex:0 1 auto}
 body.light-ui.desktop .kbv2-btn-dots{width:28px;font-size:14px;margin-left:auto}
+
+/* ============================================================================
+   LIGHT UI — REFERENCE ALIGNMENT v2 (reprovação 100% do owner — reconstrução
+   na ESCALA/DENSIDADE da arte canônica): fundo claro geral, toolbar sem
+   moldura, sidebar estreita/compacta, colunas em CONTAINERS com barra
+   colorida sob o header, tipografia menor, % real na barra, participantes
+   reais (responsável+autor) no rodapé do card, KPIs estilo referência,
+   painel de detalhe como coluna. Dados 100% reais; spans novos do template
+   nascem display:none (legado byte-idêntico). Revertível por seção.
+   ========================================================================== */
+/* ---- ESCALA GLOBAL ---- */
+body.light-ui{--d-side:264px;--lui-hd-h:80px;--lui-canvas:#F7F8FB}
+/* ---- SIDEBAR CLARA compacta ---- */
+body.light-ui.desktop .nav{background:var(--lui-surface);border-right:1px solid var(--lui-hair);box-shadow:none;padding:0 12px 10px;gap:1px}
+body.light-ui.desktop .nav .sb-brand{gap:11px;padding:20px 8px 14px}
+body.light-ui.desktop .nav .sb-brand .logo.sm{width:38px;height:38px}
+body.light-ui.desktop .nav .sb-brand .nm{color:var(--lui-tx-1);font-size:16px}
+body.light-ui.desktop .nav .sb-brand .nm-legacy{display:inline}
+body.light-ui.desktop .nav .sb-brand .nm-lui{display:none !important}
+body.light-ui.desktop .nav .sb-brand .sy{color:var(--lui-tx-3);font-size:11.5px;margin-top:3px}
+body.light-ui.desktop .nav .sb-brand .logo.brandlogo{box-shadow:0 5px 14px rgba(94,110,243,.22) !important}
+body.light-ui.desktop .nav .new-task-btn{height:42px;margin:2px 4px 14px;border-radius:12px;font-size:13.5px;background:linear-gradient(90deg,#2E6BFF,#EC4899);box-shadow:0 8px 18px rgba(120,80,240,.28)}
+body.light-ui.desktop .nav .new-task-btn:hover{box-shadow:0 10px 22px rgba(120,80,240,.36)}
+body.light-ui.desktop .nav .sb-sect{font-size:10px;color:var(--lui-tx-4);padding:12px 12px 8px}
+body.light-ui.desktop .nav button.sb-item{height:38px;padding:0 12px !important;gap:11px !important;border-radius:10px;color:var(--lui-tx-2) !important;font-size:13.5px !important;font-weight:500 !important}
+body.light-ui.desktop .nav button.sb-item span{font-size:13.5px !important;font-weight:500 !important}
+body.light-ui.desktop .nav button.sb-item svg{width:17px !important;height:17px !important;color:var(--lui-tx-3)}
+body.light-ui.desktop .nav button.sb-item:hover{background:var(--lui-sunk);color:var(--lui-tx-1) !important}
+body.light-ui.desktop .nav button.sb-item.on{background:#E9F1FE !important;color:var(--lui-info-ink) !important;font-weight:650 !important;box-shadow:none}
+body.light-ui.desktop .nav button.sb-item.on span{font-weight:650 !important}
+body.light-ui.desktop .nav button.sb-item.on svg{color:var(--lui-info-ink)}
+body.light-ui.desktop .nav button.sb-item.on::before{display:none}
+body.light-ui.desktop .nav .nc-navbadge{background:#475569;color:#fff;height:18px;min-width:18px;font-size:10.5px}
+body.light-ui.desktop .nav .sb-user{background:var(--lui-surface-soft);border:1px solid var(--lui-hair);border-radius:12px;box-shadow:none;margin:auto 2px 0;padding:10px}
+body.light-ui.desktop .nav .sb-user .su-n{color:var(--lui-tx-1);font-size:13px}
+body.light-ui.desktop .nav .sb-user .su-r{color:var(--lui-tx-3);font-size:11.5px;margin-top:2px}
+body.light-ui.desktop .nav .sb-footer{color:var(--lui-tx-4);font-size:10px;border:1px solid var(--lui-hair);border-radius:10px;padding:8px 10px;margin:8px 2px 0}
+/* ---- HEADER 80px compacto + cluster com avatar ---- */
+body.light-ui.desktop #content.board-mode{padding-top:12px !important;padding-left:28px !important;padding-right:28px !important}
+body.light-ui.desktop #content.board-mode .d-board-head .d-bh-title{font-size:20px;font-weight:750;letter-spacing:-.02em}
+body.light-ui.desktop .d-board-head .d-bh-sub{font-size:12px}
+body.light-ui.desktop .d-board-head .iconbtn{width:36px;height:36px;border-radius:10px}
+body.light-ui.desktop #content.board-mode .d-board-head .av{width:40px !important;height:40px !important}
+body.light-ui.desktop #app > .content{padding:0 28px 40px !important}
+body.light-ui.desktop .corner-avatar{display:flex;top:21px !important;right:28px;box-shadow:0 0 0 2px rgba(91,124,250,.55)}
+body.light-ui.desktop .corner-avatar .av{width:38px !important;height:38px !important;font-size:14px !important}
+body.light-ui.desktop .slaib-bell{top:19px !important;right:76px;width:42px;height:42px;border-radius:12px}
+body.light-ui.desktop .slamon{top:17px !important;right:128px}
+body.light-ui.desktop .slamon-chip{height:46px;border-radius:12px}
+body.light-ui.desktop .slaib-count{background:var(--lui-info-ink)}
+/* ---- TOOLBAR SEM MOLDURA + busca longa com lupa ---- */
+body.light-ui.desktop .d-board-tools.tbar{background:transparent;border:0;box-shadow:none;padding:8px 0 0;margin:6px 0 0}
+body.light-ui.desktop .d-board-tools.tbar .bsearch-wrap{flex:0 1 560px}
+body.light-ui.desktop .d-board-tools.tbar .bsearch{max-width:none}
+body.light-ui.desktop .d-board-tools.tbar .tchips{margin-left:auto}
+body.light-ui.desktop .d-board-tools.tbar .bsearch{height:40px;background:#fff url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23697181' stroke-width='2' stroke-linecap='round'><circle cx='11' cy='11' r='7'/><path d='M20 20l-3.5-3.5'/></svg>") no-repeat 13px 50%/15px !important;border-color:var(--lui-hair) !important;box-shadow:0 1px 2px rgba(19,24,38,.03) !important;padding-left:38px !important;border-radius:11px}
+body.light-ui.desktop .tchip{height:38px;font-size:12.5px;background:var(--lui-surface)}
+/* ---- FILTER ROW (nomes na cor do responsável) ---- */
+body.light-ui.desktop .lui-frow{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:12px 0 2px;padding:0 2px}
+body.light-ui.desktop .lui-frow-k{font-size:12.5px;color:var(--lui-tx-3);margin-right:2px}
+body.light-ui.desktop .lui-rchip{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 12px 0 6px;border-radius:11px;background:var(--lui-surface);border:1px solid var(--lui-hair);font-size:12.5px;font-weight:650;color:color-mix(in srgb,var(--kresp,#5B6472) 58%,#1E2530);cursor:pointer}
+body.light-ui.desktop .lui-rchip .av{width:23px !important;height:23px !important;font-size:9px !important;box-shadow:0 0 0 2px var(--kresp,#C7CCD6) !important}
+body.light-ui.desktop .lui-rchip:hover{border-color:var(--lui-brand)}
+body.light-ui.desktop .lui-rchip.on{border:1.5px solid var(--lui-info);background:#F2F7FF}
+body.light-ui.desktop .lui-rchip-all{color:var(--lui-tx-2);padding:0 12px}
+body.light-ui.desktop .lui-rchip-all svg{width:14px;height:14px;color:var(--lui-tx-3)}
+/* ---- BOARD: colunas em CONTAINERS com barra colorida sob o header ---- */
+body.light-ui.desktop .kbv2-board-surface{padding:12px 2px 0;margin-top:8px}
+body.light-ui.desktop .kbv2-board{gap:14px}
+body.light-ui.desktop .kbv2-column{min-width:250px;background:var(--lui-surface);border:1px solid var(--lui-hair);border-radius:14px;box-shadow:0 1px 2px rgba(19,24,38,.03)}
+body.light-ui.desktop .kbv2-column-active{background:var(--lui-surface);border:1px solid var(--lui-hair);box-shadow:0 1px 2px rgba(19,24,38,.03)}
+body.light-ui.desktop .kbv2-column-header{position:relative;padding:13px 12px 11px;margin-bottom:6px}
+body.light-ui.desktop .kbv2-column-header::after{content:'';position:absolute;left:0;right:0;bottom:0;height:3px;background:var(--kc,#C7CCD6);opacity:.9}
+body.light-ui.desktop .kbv2-column-header .kbv2-ctitle{font-size:13.5px;font-weight:700}
+body.light-ui.desktop .kbv2-column-header .kbv2-ccount{background:none;box-shadow:none;color:var(--lui-tx-2);font-size:13px;font-weight:750;min-width:0;padding:0 2px}
+body.light-ui.desktop .kbv2-column-body{gap:10px;padding:8px 10px 10px;background:var(--lui-canvas);border-radius:0 0 13px 13px}
+body.light-ui.desktop .kbv2-column-add{height:38px;font-size:12.5px;border:1px solid var(--lui-hair);background:var(--lui-surface);margin:0 10px 10px;color:color-mix(in srgb,var(--kc,#5B6472) 55%,#1E2530)}
+body.light-ui.desktop .kbv2-column-add:hover{border-color:var(--kc);background:#fff}
+/* ---- CARD escala da referência ---- */
+body.light-ui.desktop .kbv2-card{gap:7px;padding:12px 13px 11px;border-radius:11px;background:var(--lui-surface);border:1px solid var(--lui-hair-2);box-shadow:0 1px 2px rgba(19,24,38,.04)}
+body.light-ui.desktop .kbv2-title{font-size:13px;font-weight:700;line-height:1.35}
+body.light-ui.desktop .kbv2-card-chips .kbv2-chip:first-child{font-size:8.5px;padding:2px 7px;border-radius:5px}
+body.light-ui.desktop .kbv2-chip-soft,body.light-ui.desktop .kbv2-card-chips .kbv2-chip{font-size:9.5px}
+body.light-ui.desktop .kbv2-tier{font-size:12px}
+body.light-ui.desktop .kbv2-tier::before{font-size:10.5px;display:block;margin-bottom:1px;content:'Cliente'}
+body.light-ui.desktop .kbv2-card-date{font-size:11.5px;font-weight:600}
+body.light-ui.desktop .kbv2-card-date svg{width:12px;height:12px}
+body.light-ui.desktop .kbv2-card-top{gap:5px}
+body.light-ui.desktop .kbv2-sla,body.light-ui.desktop .kbv2-due{font-size:10px;padding:3px 7px}
+/* barra + % real à direita */
+body.light-ui.desktop .kbv2-card-rail{order:4;margin-right:42px}
+body.light-ui.desktop .kbv2-pct{display:inline !important;order:4;align-self:flex-end;margin-top:-11px;font-size:10.5px;font-weight:650;color:var(--lui-tx-3);line-height:1}
+body.light-ui.desktop .kbv2-column:first-child .kbv2-pct,body.light-ui.desktop .kbv2-column:last-child .kbv2-pct{display:none !important}
+/* footer do card: participantes reais (responsável + autor) e microstats à direita */
+body.light-ui.desktop .kbv2-card-profile{order:8;border-top:1px solid var(--lui-hair-2);padding-top:9px;margin-top:1px;gap:0;min-height:26px;position:static}
+body.light-ui.desktop .kbv2-av .av{width:24px !important;height:24px !important;font-size:9.5px !important;box-shadow:0 0 0 2px var(--kresp,#C7CCD6),0 0 0 4px var(--lui-surface) !important}
+body.light-ui.desktop .kbv2-av-by{display:inline-flex !important;margin-left:-6px}
+body.light-ui.desktop .kbv2-av-by .av{width:24px !important;height:24px !important;font-size:9.5px !important;box-shadow:0 0 0 2px var(--kby,#C7CCD6),0 0 0 4px var(--lui-surface) !important}
+body.light-ui.desktop .kbv2-card{position:relative}
+body.light-ui.desktop .kbv2-card-summary{position:absolute;right:13px;bottom:14px;margin:0}
+body.light-ui.desktop .kbv2-card-chk{position:absolute;right:13px;bottom:14px;font-size:11px}
+body.light-ui.desktop .kbv2-card:has(.kbv2-card-chk) .kbv2-card-summary{bottom:36px}
+body.light-ui.desktop .kbv2-card-summary .kbv2-sum-main{font-size:11px}
+/* ações: hover-reveal mantido (referência mostra card limpo) */
+body.light-ui.desktop .kbv2-btn-main{background:linear-gradient(90deg,#2E6BFF,#EC4899);box-shadow:0 6px 14px rgba(99,102,241,.25)}
+/* ---- KPI FOOTER estilo referência ---- */
+body.light-ui.desktop .lui-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin:16px 2px 4px}
+body.light-ui.desktop .lui-kpi{display:flex;align-items:center;gap:11px;padding:15px 16px;background:var(--lui-surface);border:1px solid var(--lui-hair);border-radius:13px;box-shadow:0 1px 2px rgba(19,24,38,.03);min-width:0}
+body.light-ui.desktop .lui-kpi-ic{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+body.light-ui.desktop .lui-kpi-ic svg{width:18px;height:18px}
+body.light-ui.desktop .lui-ic-blue{background:rgba(37,99,235,.10);color:var(--lui-info-ink)}
+body.light-ui.desktop .lui-ic-green{background:rgba(18,120,76,.10);color:var(--lui-green-ink)}
+body.light-ui.desktop .lui-ic-red{background:rgba(196,48,43,.10);color:var(--lui-danger-ink)}
+body.light-ui.desktop .lui-ic-teal{background:rgba(13,148,136,.10);color:#0D9488}
+body.light-ui.desktop .lui-kpi-tx{display:flex;flex-direction:column;min-width:0;line-height:1.15}
+body.light-ui.desktop .lui-kpi-tx b{font-size:20px;font-weight:800;color:var(--lui-tx-1);letter-spacing:-.01em}
+body.light-ui.desktop .lui-kpi-tx span{font-size:11px;color:var(--lui-tx-3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.light-ui.desktop .lui-legend-avs{display:flex;align-items:center}
+body.light-ui.desktop .lui-legend-avs>span{display:inline-flex}
+body.light-ui.desktop .lui-legend-avs>span+span{margin-left:-7px}
+body.light-ui.desktop .lui-legend-avs .av{width:26px !important;height:26px !important;font-size:10px !important;box-shadow:0 0 0 2px var(--kresp,#C7CCD6),0 0 0 4px var(--lui-surface) !important}
+body.light-ui.desktop .lui-legend .lui-kpi-tx b{font-size:12.5px;font-weight:750;line-height:1.25}
+body.light-ui.desktop .lui-legend .lui-kpi-tx span{white-space:normal;font-size:10.5px}
+/* ---- PAINEL DE DETALHE como coluna da referência ---- */
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"]{padding:160px 20px 20px 0}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-sheet{width:340px;height:auto;max-height:100%;border-radius:14px;box-shadow:var(--lui-sh-elevated)}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-title{font-size:18px}
+body.light-ui.desktop .det-sheet .send-go{background:linear-gradient(90deg,#2E6BFF,#EC4899)}
 </style>
 </head>
 <body>
@@ -6672,6 +6800,12 @@ function renderPersonBoard(){
   const isMe=state.user&&state.user.id===pid;
   let list=state.tasks.filter(t=>t.assigneeId===pid||t.by===pid);
   if(boardQuery)list=list.filter(t=>((t.title||'')+(t.client||'')).toLowerCase().includes(boardQuery.toLowerCase()));
+  /* LIGHT UI (referência canônica do owner): filtro por responsável + KPIs derivados dos MESMOS
+     dados/helpers reais (respOf/taskDeadline/isTaskCompleted). Gated por body.light-ui: sem a
+     classe, nada disto entra no HTML (legado byte-idêntico). Leitura pura; zero escrita. */
+  const _lui=document.body.classList.contains('light-ui');
+  const _list0=list.slice();
+  if(_lui&&boardRespFilter)list=list.filter(t=>{const a=respOf(t);return a&&a.id===boardRespFilter;});
   // F3.3.17-R5.1 — board do DESIGNER (dono é o designer em TODAS as suas tarefas de cronograma): usa o
   // EIXO do designer (DESIGNER_COLS4, que tem a coluna "Entregue") para a ENTREGA não ficar presa em
   // "Em andamento". Boards de Social/Admin seguem o eixo social (personBoardCol) — intacto.
@@ -6688,10 +6822,28 @@ function renderPersonBoard(){
     avatar(p,44)+
     '<div style="flex:1;min-width:0"><div class="d-bh-title">'+(isMe?'Meu quadro':'Quadro de '+esc((p.name||'').split(' ')[0]||'Responsável'))+'</div><div class="d-bh-sub">'+esc(p.role||'Fluxo individual')+'</div></div></div></div>'+
     '<div class="scr" style="padding-top:0">'+boardToolbar()+
+    (_lui?(function(){
+      const _rs=[...new Map(_list0.map(t=>{const a=respOf(t);return (a&&a.id)?[a.id,a]:null;}).filter(Boolean)).values()];
+      return '<div class="lui-frow"><span class="lui-frow-k">Filtrar por responsável:</span>'+
+        _rs.map(a=>'<button class="lui-rchip'+(boardRespFilter===a.id?' on':'')+'" data-bresp="'+a.id+'" style="--kresp:'+userColor(a.id)+'">'+avatar(a,22)+'<span>'+esc((a.name||'').split(' ')[0])+'</span></button>').join('')+
+        '<button class="lui-rchip lui-rchip-all'+(boardRespFilter?'':' on')+'" data-bresp="">'+svg('grid')+'<span>Todos</span></button></div>';
+    })():'')+
     // role-aware: no "Meu quadro" de um DESIGNER, a tarefa atribuída a ele aparece na
     // perspectiva do designer; tarefas onde ele NÃO é o designer seguem operacional.
     kbv2BoardHtml(COLS.map((st,i)=>({label:st.label,color:st.color,key:st.key,tasks:byStatus[i]})),
-      t=>(hasDesigner(t)&&designerOf(t)===pid)?kbv2Card(t,'designer'):kbv2Card(t));
+      t=>(hasDesigner(t)&&designerOf(t)===pid)?kbv2Card(t,'designer'):kbv2Card(t))+
+    (_lui?(function(){
+      const _tot=_list0.length;const _dn=_list0.filter(t=>isTaskCompleted(t)||t.status==='concluido').length;
+      const _pct=_tot?Math.round(_dn*100/_tot):0;const _lt=_list0.filter(t=>{const d0=taskDeadline(t);return d0&&d0.late;}).length;
+      const _rs=[...new Map(_list0.map(t=>{const a=respOf(t);return (a&&a.id)?[a.id,a]:null;}).filter(Boolean)).values()];
+      return '<div class="lui-kpis">'+
+        '<div class="lui-kpi"><span class="lui-kpi-ic lui-ic-blue">'+svg('flag')+'</span><div class="lui-kpi-tx"><b>'+(_tot-_dn)+'</b><span>Tarefas ativas</span></div></div>'+
+        '<div class="lui-kpi"><span class="lui-kpi-ic lui-ic-green">'+svg('check')+'</span><div class="lui-kpi-tx"><b>'+_pct+'%</b><span>Conclusão geral</span></div></div>'+
+        '<div class="lui-kpi"><span class="lui-kpi-ic lui-ic-red">'+svg('bell')+'</span><div class="lui-kpi-tx"><b>'+_lt+'</b><span>Atrasadas</span></div></div>'+
+        '<div class="lui-kpi"><span class="lui-kpi-ic lui-ic-teal">'+SLAOP_SHIELD_SVG+'</span><div class="lui-kpi-tx"><b>'+(_lt?_lt+' alerta'+(_lt===1?'':'s'):'Em dia')+'</b><span>SLA da visão</span></div></div>'+
+        '<div class="lui-kpi lui-legend"><div class="lui-legend-avs">'+_rs.map(a=>'<span style="--kresp:'+userColor(a.id)+'">'+avatar(a,26)+'</span>').join('')+'</div><div class="lui-kpi-tx"><b>Legenda de responsáveis</b><span>Cores identificam quem é responsável</span></div></div>'+
+      '</div>';
+    })():'');
   return h+'</div>';
 }
 
@@ -7570,6 +7722,7 @@ function renderSocialBoard(){
 
 /* ---- KANBAN ---- */
 let boardCol=0,boardMine=false,boardQuery='';
+let boardRespFilter='';   /* LIGHT UI (referência canônica do owner): filtro por responsável do Meu Quadro — chips só existem sob body.light-ui */
 function renderBoard(){
   const s=secOf(state.boardSector);const u=state.user;
   let list=visibleTasks(u,state.tasks).filter(t=>secOf(t.sector).key===s.key);
@@ -8608,6 +8761,8 @@ function kbv2Card(t, persp){
   // 2) perfil
   h+='<div class="kbv2-card-profile">'+
        '<span class="kbv2-av">'+(asgName?avatar(asg||{name:asgName,id:t.assigneeId},34):'<div class="av" style="width:34px;height:34px">'+svg('person')+'</div>')+'<i class="kbv2-presence"></i></span>'+
+       /* LIGHT UI ref: autor real (by) como 2º participante — inerte no legado (display:none inline) */
+       ((req&&req.id!==(asg&&asg.id))?'<span class="kbv2-av-by" style="display:none;--kby:'+userColor(req.id)+'">'+avatar(req,24)+'</span>':'')+
        '<div class="kbv2-pm"><div class="kbv2-name" title="'+esc(asgName||'Sem responsável')+'">'+esc(asgName||'Sem responsável')+'</div>'+
          '<div class="kbv2-role">'+esc(asg&&asg.role?asg.role:'Responsável')+'</div></div>'+
      '</div>';
@@ -8643,7 +8798,9 @@ function kbv2Card(t, persp){
       rail+='<i class="'+cls+'"'+(i2===prog.curIdx?' style="background:'+acc+';box-shadow:0 0 0 4px '+withAlpha(acc,.18)+'"':'')+'></i>'+(i2<prog.total-1?'<span class="ln'+(i2<prog.done?' done':'')+'"></span>':'');
     }
     if(prog.attention)rail+='<i class="att" title="Ajuste pedido pelo cliente"></i>';
-    h+='<div class="kbv2-card-rail">'+rail+'</div>';
+    h+='<div class="kbv2-card-rail">'+rail+'</div>'+
+       /* LIGHT UI ref: % real do trilho — inerte no legado (display:none inline) */
+       '<span class="kbv2-pct" style="display:none">'+Math.round((prog.total?((prog.curIdx<0?prog.total:prog.done)/prog.total):0)*100)+'%</span>';
     const etapaLbl='Etapa atual';                                   // F3.3.16
     const etapaVal=pres.ownerLabel;                                  // F3.3.16 — responsável operacional (não duplica o chip)
     /* F3.3.2 (reteste) — área "Sua etapa / Próxima" redesenhada premium: ícone + micro-label
@@ -12855,6 +13012,7 @@ document.addEventListener('click',async e=>{
     render();return;}
   if(el=g('[data-bcol]')){boardCol=+el.dataset.bcol;render();return;}
   if(el=g('[data-bmine]')){boardMine=!boardMine;render();return;}
+  if(el=g('[data-bresp]')){boardRespFilter=el.dataset.bresp||'';render();return;}   /* LIGHT UI ref: chips do filtro (DOM só sob body.light-ui) */
   if(el=g('[data-ag]')){const a=el.dataset.ag;if(a==='new'){openEventForm();return;}if(a==='togglecancel'){agShowCancelled=!agShowCancelled;render();return;}if(a==='today'){agCursor=new Date();agSel=todayStr();}else if(a==='prev')agCursor.setMonth(agCursor.getMonth()-1);else if(a==='next')agCursor.setMonth(agCursor.getMonth()+1);else if(a==='vmonth')agView='month';else if(a==='vlist')agView='list';render();return;}
   // F3.5.5B — menu "Mais opções" (⋯) do detalhe do compromisso: toggle + fechar ao
   // clicar fora dele (os itens internos têm data-evfinish/data-evdelete e seguem
