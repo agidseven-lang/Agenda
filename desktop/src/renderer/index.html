@@ -3017,6 +3017,39 @@ body.light-ui.desktop .det-cresp-ic{background:var(--lui-sunk)}
 body.light-ui.desktop .det-note-ed-msg{color:var(--lui-danger-ink)}
 body.light-ui.desktop .det-note-ed-msg.ok{color:var(--lui-green-ink)}
 body.light-ui.desktop .det-teamfix{color:var(--lui-green-ink) !important;border-color:rgba(18,120,76,.45) !important}
+
+/* ============================================================================
+   LIGHT UI — I3A.1 · F1 DETAIL = GOLDEN RIGHT DRAWER (+ exceção F1-E01)
+   A MESMA Central de Detalhes real (openDetails/.det-sheet — markup, focus
+   trap, Escape, outside-click, handlers, conteúdo e a estrutura interna real
+   det-head fixo · det-body rolável · det-actions fixo — TUDO INTACTO)
+   apresentada como o drawer lateral direito do Golden V10: 416px, full-height
+   colado à direita, sem radius, sombra --sh-drawer, hairlines de zona; SEM
+   backdrop visível (board permanece visível ao lado) — a MECÂNICA modal é
+   preservada (o .modal-back continua cobrindo a tela: outside-click/trap/
+   Escape idênticos). Escopo: SOMENTE aberturas a partir do MEU QUADRO via
+   hook aditivo data-detorigin="mine" (derivado do estado real activeTab();
+   inerte no legado); demais origens/superfícies seguem com o modal central.
+   F1-E01 (exceção de implementação): o filtro por responsável do Golden NÃO
+   existe como função no Meu quadro real ⇒ NÃO criado (código funcional
+   vence); registro formal nos docs de implementação (Design Freeze intacto).
+   ========================================================================== */
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"]{
+  background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none;
+  align-items:stretch;justify-content:flex-end;
+}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-sheet{
+  width:416px;max-width:94vw;height:100%;max-height:none;
+  border-radius:0;box-shadow:var(--lui-sh-drawer);
+}
+/* zonas Golden (estrutura real): hairline sob o header e sobre o footer */
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-head{padding-bottom:16px;box-shadow:0 1px 0 var(--lui-hair)}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-actions{border-top:0;box-shadow:0 -1px 0 var(--lui-hair)}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-title{font-size:23px;font-weight:700;letter-spacing:-.02em;line-height:1.28}
+/* Gate 7 — hierarquia de CTA no det: a primária REAL (Enviar ao cliente) = grad E4;
+   estado travado permanece neutro; demais botões mantêm sua hierarquia */
+body.light-ui.desktop .det-sheet .send-go{background:var(--lui-grad);box-shadow:var(--lui-grad-shadow);border:0;color:#fff}
+body.light-ui.desktop .det-sheet .send-go.det-hero-locked{background:var(--lui-sunk);color:var(--lui-tx-3);box-shadow:none}
 </style>
 </head>
 <body>
@@ -8783,7 +8816,11 @@ function openDetails(taskId){
   const req=t.by?state.users.find(u=>u.id===t.by):null;const reqName=req?req.name:'—';
   const cron=cronOf(t);const upd=lastUpdate(t);
   const emptyAv='<div class="av" style="width:44px;height:44px;background:var(--surface2);color:var(--faint)">'+svg('person')+'</div>';
-  let h='<div class="modal-back" data-modalbg="1" data-detmodal="1" data-detsector="'+esc(t.sector||'')+'" data-dettaskid="'+esc(t.id||'')+'"><div class="sheet det-sheet" role="dialog" aria-modal="true" aria-label="Central de Detalhes da tarefa">'+
+  /* I3A.1 (Light UI) — hook de CONTEXTO aditivo: marca a abertura feita a partir do MEU QUADRO
+     (estado real via activeTab()) p/ o tema claro apresentar a MESMA Central como drawer lateral
+     (CSS-only). Atributo inerte no tema dark (nenhuma regra o consome); zero mudança de lógica. */
+  const _detOrigin=(typeof activeTab==='function'&&state.tab==='tarefas'&&activeTab()==='mine')?' data-detorigin="mine"':'';
+  let h='<div class="modal-back" data-modalbg="1" data-detmodal="1"'+_detOrigin+' data-detsector="'+esc(t.sector||'')+'" data-dettaskid="'+esc(t.id||'')+'"><div class="sheet det-sheet" role="dialog" aria-modal="true" aria-label="Central de Detalhes da tarefa">'+
     '<div class="det-head"><div class="det-badge" style="background:'+withAlpha(s.color,.16)+';color:'+s.color+'">'+svg(s.icon)+'<span>'+esc(s.label)+'</span></div>'+
       '<button class="iconbtn det-x" data-modalclose="1">'+svg('close')+'</button></div>'+
     '<div class="det-title">'+esc(t.title||'Sem título')+'</div>'+
