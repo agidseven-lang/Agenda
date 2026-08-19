@@ -2800,6 +2800,101 @@ body.light-ui .slaib-bell{
   background:var(--lui-surface);border:1px solid var(--lui-hair);color:var(--lui-tx-2);
   box-shadow:var(--lui-sh-card);
 }
+
+/* ============================================================================
+   LIGHT UI — CORE SHELL GOLDEN ALIGNMENT (I2.1) · brand block + header band +
+   Monitor SLA/sino no cluster persistente do topo.
+   Fontes: Golden F1 V10 (.brand/.hd/.sla/.hd-bell; header row = 92px CONGELADO
+   em .main{grid-template-rows:92px …}), errata E5 (sla-k → green-ink), E7/E8
+   (inks). Somente APRESENTAÇÃO de elementos REAIS — slaMonRender/slaibRender/
+   cornerAvatar intocados (cálculo, polling, severidade, textos e handlers
+   preservados). Decisões auditadas (report I2.1):
+   (a) app mark = ASSET REAL `--logo` reutilizado (mark circular oficial); a
+       caixa-gradiente do Golden era stand-in de protótipo para este mark;
+   (b) "Agenda ID Seven" = brand copy VISUAL aplicada só sob a classe (::before;
+       markup/JS intocados ⇒ legado permanece pixel-idêntico sem a classe);
+   (c) banda do header pintada no scroller `.content` (background em camadas;
+       attachment padrão = fixa no topo do scroller) — SEM reativar o .topbar
+       (decisão de produto 1.0.140) e SEM título global; as superfícies I3+
+       assentam o próprio head dentro da banda (contrato de encaixe);
+   (d) geometria do cluster sob a classe espelha os DELTAS do runtime real
+       (right encadeado a +10px): CSS e slaClusterAlign convergem nos MESMOS
+       pixels — zero briga CSS×JS;
+   (e) dropdowns/painéis (slamon-pop/slaib-panel/sla-block) permanecem dark
+       auto-contidos — re-skin pertence às fases de componente.
+   ========================================================================== */
+body.light-ui{--lui-hd-h:92px}
+
+/* ---- A · BRAND BLOCK (Golden .brand) ---- */
+/* mark real (--logo, circular): geometria/peso Golden; !important espelha o real .brandlogo */
+body.light-ui.desktop .nav .sb-brand .logo.brandlogo{
+  border-radius:50% !important;
+  box-shadow:0 8px 20px rgba(94,110,243,.4) !important;
+}
+body.light-ui.desktop .nav .sb-brand .nm{font-size:0;line-height:0}
+body.light-ui.desktop .nav .sb-brand .nm::before{
+  content:'Agenda ID Seven';display:block;
+  font-size:18px;font-weight:700;letter-spacing:-.014em;line-height:1.14;color:#F5F7FB;
+}
+body.light-ui.desktop .nav .sb-brand .sy{gap:6px}
+
+/* ---- B/C · HEADER BAND (Golden .hd = 92px) — infraestrutura p/ as surfaces I3+ ---- */
+body.light-ui.desktop #app > .content{
+  padding:0 34px 48px !important;   /* eixo lateral Golden (hd/kb = 34px) */
+  background:
+    linear-gradient(var(--lui-hair-2),var(--lui-hair-2)) 0 var(--lui-hd-h)/100% 1px no-repeat,
+    linear-gradient(var(--lui-surface),var(--lui-surface)) 0 0/100% var(--lui-hd-h) no-repeat,
+    var(--lui-canvas);
+}
+
+/* ---- D/E · CLUSTER PERSISTENTE (elementos reais do runtime; geometria da banda) ---- */
+/* avatar (Golden av-46; o runtime propaga a ALTURA do avatar ao sino) */
+body.light-ui.desktop .corner-avatar{top:23px !important;right:34px}
+body.light-ui.desktop .corner-avatar .av{width:46px !important;height:46px !important;font-size:17px !important}
+/* sino (Golden .hd-bell: squircle, surface, hairline interna; badge = E8 danger-ink) */
+body.light-ui.desktop .slaib-bell{
+  top:23px !important;right:90px;   /* fallback = mesmos px do runtime (34+46+10) */
+  width:46px;height:46px;           /* = altura que o runtime propaga do avatar (46) */
+  border-radius:14px;background:var(--lui-surface);border:0;
+  box-shadow:inset 0 0 0 1px var(--lui-hair);color:var(--lui-tx-2);
+}
+body.light-ui.desktop .slaib-bell:hover{background:var(--lui-surface-soft)}
+body.light-ui .slaib-bell svg{width:20px;height:20px}
+body.light-ui .slaib-count{background:var(--lui-danger-ink);box-shadow:0 0 0 2px var(--lui-surface)}
+/* Monitor SLA (Golden .sla; verde literal; amber/red re-tintados com inks canônicos E7) */
+body.light-ui.desktop .slamon{top:21px !important;right:146px}   /* fallback = runtime (90+46+10) */
+body.light-ui .slamon-chip{
+  height:50px;gap:12px;padding:0 19px 0 7px;border-radius:14px;
+  border:1px solid var(--lui-hair);background:var(--lui-surface);box-shadow:none;
+}
+body.light-ui .slamon-chip:hover{transform:translateY(-1px);border-color:var(--lui-control-border);box-shadow:0 6px 16px rgba(19,24,38,.10)}
+body.light-ui .slamon-orb{width:34px;height:34px;border-radius:10px}
+body.light-ui .slamon-orb .slamon-ic svg{width:18px;height:18px}
+body.light-ui .slamon-kicker{font-size:9.5px;letter-spacing:.06em;color:var(--lui-green-ink)}   /* E5 */
+body.light-ui .slamon-status{font-size:14px;font-weight:650}
+body.light-ui .slamon-live{color:var(--lui-green-ink);font-size:8.5px}
+body.light-ui .slamon-live i{background:#22C58A;box-shadow:0 0 0 3px rgba(34,197,138,.2)}
+body.light-ui .slamon.green .slamon-chip{background:linear-gradient(180deg,#F1FBF7,#E8F8F0);border-color:#CBEEDD}
+body.light-ui .slamon.green .slamon-orb{background:#fff;box-shadow:0 2px 6px rgba(18,80,54,.16)}
+body.light-ui .slamon.green .slamon-orb .slamon-ic{color:var(--lui-green)}
+body.light-ui .slamon.green .slamon-status{color:#115E3D}
+body.light-ui .slamon.amber .slamon-chip{border-color:var(--lui-warning)}
+body.light-ui .slamon.amber .slamon-orb{background:#fff;box-shadow:0 2px 6px rgba(19,24,38,.14)}
+body.light-ui .slamon.amber .slamon-orb .slamon-ic{color:var(--lui-warning)}
+body.light-ui .slamon.amber .slamon-kicker{color:var(--lui-warning-ink)}
+body.light-ui .slamon.amber .slamon-status{color:var(--lui-warning-ink)}
+body.light-ui .slamon.red .slamon-chip{border-color:var(--lui-danger)}
+body.light-ui .slamon.red .slamon-orb{background:#fff;box-shadow:0 2px 6px rgba(19,24,38,.14)}
+body.light-ui .slamon.red .slamon-orb .slamon-ic{color:var(--lui-danger)}
+body.light-ui .slamon.red .slamon-kicker{color:var(--lui-danger-ink)}
+body.light-ui .slamon.red .slamon-status{color:var(--lui-danger-ink)}
+body.light-ui .slamon-badge{box-shadow:none}
+body.light-ui .slamon.amber .slamon-badge{background:var(--lui-warning-ink)}   /* E8 */
+body.light-ui .slamon.red .slamon-badge{background:var(--lui-danger-ink)}      /* E8 */
+body.light-ui .slamon-seg.red{color:var(--lui-danger-ink);background:rgba(196,48,43,.10);border-color:rgba(196,48,43,.28);box-shadow:none}
+body.light-ui .slamon-seg.amber{color:var(--lui-warning-ink);background:rgba(180,83,9,.10);border-color:rgba(180,83,9,.26);box-shadow:none}
+body.light-ui .slamon .f354g-nm{color:var(--lui-tx-1)}
+body.light-ui .slamon .f354g-more{color:var(--lui-tx-2);background:var(--lui-sunk);border-color:var(--lui-hair)}
 </style>
 </head>
 <body>
