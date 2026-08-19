@@ -1,6 +1,6 @@
 # R8 · RESPONSIVIDADE — VALIDAÇÃO 1366×768 @100% + WINDOWS 125% (Light UI)
 
-**Status:** ENTREGUE (R8) — aguarda owner; NÃO concluída. Fonte funcional: Desktop **1.0.246**.
+**Status:** ✔ **APROVADA PELO OWNER (GO R8)** — responsividade 1366×768 + Windows 125% VALIDADA. Fonte funcional: Desktop **1.0.246**.
 **Natureza:** VALIDAÇÃO do DS Golden congelado — **não é redesign**. Golden 1920 = IMUTÁVEL
 (zero arquivo Golden alterado; verificado por `git status` antes do commit). Toda adaptação vive
 em **cópias isoladas** em `r8-responsive/` (HTML Golden + um único bloco `<style id="r8">`
@@ -213,5 +213,4 @@ extra necessário** (NEEDS EXTRA PROOF: nenhuma).
   ao que o próprio renderer real documenta) ⇒ o gate de honestidade NÃO exigiu "PARCIAL".
 - 18 execuções de teste (9 arquétipos × 2 viewports) + 1 prova complementar = **18/18 PASS**
   após os 8 achados corrigidos nas cópias.
-- **Recomendação: R8 = PASS (GO).** Decisão final é do owner; até lá o status desta fase é
-  **ENTREGUE — aguarda owner**. R9 NÃO iniciada.
+- **Decisão do owner: R8 = GO (APROVADO).** Responsividade oficial: 1920 Golden · 1366 validado · 125% validado.

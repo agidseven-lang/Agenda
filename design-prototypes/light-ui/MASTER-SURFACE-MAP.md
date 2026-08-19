@@ -180,19 +180,28 @@ photo-ready + ring por identidade · form controls (C1) · focus/hover/selected/
 scrollbars · skeleton · transições (drawer/scrim 0.18–0.2s; reduced-motion).
 
 ## H. RESPONSIVIDADE (riscos e revalidações)
-> **R8 ENTREGUE (aguarda owner):** validação real 1366×768 @1× e Windows 125% (1093×614 DIP @
+> **R8 ✔ GO DO OWNER (commit `1b7210c`):** validação real 1366×768 @1× e Windows 125% (1093×614 DIP @
 > DSF 1.25 — Playwright/CDP, sem transform:scale) — 9 arquétipos × 2 viewports = 18/18 PASS após
 > 8 achados corrigidos em cópias isoladas (`r8-responsive/`). Golden 1920 intocado. Prova, matriz
-> e achados: `R8-RESPONSIVE-VALIDATION.md`. Recomendação PASS; decisão do owner pendente.
+> e achados: `R8-RESPONSIVE-VALIDATION.md`. **Responsividade oficial: 1920 Golden · 1366 = VALIDADO · Windows 125% = VALIDADO.**
 
 | Categoria | 1366×768 | 1440×900 | 1920×1080 | 2560×1440 | 125–150% | Revalidar? |
 |---|---|---|---|---|---|---|
-| Boards Golden (F1–F5) | **VALIDADO R8** (col ≥264 + scroll-x kanban; drawer overlay ≤1600) | médio | ok | ok (max-width do canvas?) | **VALIDADO R8 (125%)** | feito — aguarda GO R8 |
-| Detalhes completos | **VALIDADO R8** (3→2 col; timeline scroll-x) | médio | ok | ok | **VALIDADO R8 (125%)** | feito — aguarda GO R8 |
-| Agenda | **VALIDADO R8** (painel 384; ≤1240 empilha) | baixo | ok | ok | **VALIDADO R8 (125%)** | feito — aguarda GO R8 |
-| Executivo/Relatórios | **VALIDADO R8** (min(1360,100%); tabela C7 scroll-x armado) | médio | ok | ok | **VALIDADO R8 (125%)** | feito — aguarda GO R8 |
-| Wizard/modais | **VALIDADO R8** (scroll interno já projetado; sheet 88vh) | baixo | ok | ok | **VALIDADO R8 (125%)** | feito — aguarda GO R8 |
+| Boards Golden (F1–F5) | **VALIDADO R8** (col ≥264 + scroll-x kanban; drawer overlay ≤1600) | médio | ok | ok (max-width do canvas?) | **VALIDADO R8 (125%)** | ✔ GO R8 |
+| Detalhes completos | **VALIDADO R8** (3→2 col; timeline scroll-x) | médio | ok | ok | **VALIDADO R8 (125%)** | ✔ GO R8 |
+| Agenda | **VALIDADO R8** (painel 384; ≤1240 empilha) | baixo | ok | ok | **VALIDADO R8 (125%)** | ✔ GO R8 |
+| Executivo/Relatórios | **VALIDADO R8** (min(1360,100%); tabela C7 scroll-x armado) | médio | ok | ok | **VALIDADO R8 (125%)** | ✔ GO R8 |
+| Wizard/modais | **VALIDADO R8** (scroll interno já projetado; sheet 88vh) | baixo | ok | ok | **VALIDADO R8 (125%)** | ✔ GO R8 |
 | Config/Perfil/Equipe | baixo (coberto por arquétipo — R8 §10) | baixo | ok | ok | baixo (idem) | não |
+
+## H.2 ACESSIBILIDADE (status R9)
+> **R9 ENTREGUE (aguarda owner):** `ACCESSIBILITY-CONTRACT.md` = spec transversal oficial
+> proposta (comprovado × requirement × dívida). Comprovados no real: focus-visible global ·
+> traps evd/det · 4 dialogs aria-modal · toast stack role=status/aria-live · Enter/Espaço em
+> .evc e toasts · `<details>` nativos · `<button>` em sidebar/stats/calendário/ações · lang
+> pt-BR · reduced-motion ×6. Debt register A11Y-D01–D25 (P0 único = upload sem teclado —
+> IMPLEMENTAÇÃO). Contraste Golden: núcleo PASS; tx-3/tx-4/brand-texto/orange = design debts
+> (microfase opcional, owner decide). Zero superfície nova; 30/30 mantido.
 
 ## I. ORDEM DOS FRAMES A — ✔ CONCLUÍDA (checkpoint global)
 **F6 → F13 = todos entregues e GOLDEN** (commits no banner do topo). Restante desta trilha:

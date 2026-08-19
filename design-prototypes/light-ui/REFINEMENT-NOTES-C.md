@@ -1,4 +1,21 @@
-# ▶ R8 — RESPONSIVIDADE · VALIDAÇÃO 1366×768 + WINDOWS 125% (aguarda owner)
+# ▶ R9 — ACESSIBILIDADE · AUDIT + SPEC TRANSVERSAL (aguarda owner)
+Fase READ-ONLY (zero implementação/ARIA/tabindex/cor/modal alterados; zero imagem).
+`ACCESSIBILITY-CONTRACT.md` criado (30 seções): matriz global 24 linhas; keyboard real (14
+handlers; Enter/Espaço/Escape/Tab provados; ZERO arrows/Home/End); focus (regra global +
+variante danger 1144 + return focus 12124); semântica (buttons reais na maioria; divs: priCard/
+nc-row); ARIA inventário exato (42 aria-label; 4 aria-modal; 0 selected/current/pressed/invalid/
+describedby); contraste WCAG CALCULADO (tx-1 17.8 PASS … tx-4 2.21 FAIL; focus ring 4.26+ PASS);
+cor-não-única (dots calendário = gap); targets (ntf-x 20×20 FAIL 2.5.8; vqty 40 padrão-ouro);
+tabelas (scope/caption ZERO); menus (evd role=menu ✓; arrows ZERO); toasts (stack live ✓;
+flashToast sem aria); loading (aria-busy único 11578); motion (6 blocos reduced ✓; hover-lift
+sem override); ícones-only (matriz); avatar/arte F13 (arte = conteúdo); upload = **A11Y-D01 P0
+implementação** (input hidden sem teclado, 9217); RTE (toolbar ✓ labels; pressed ZERO);
+forced-colors ZERO; zoom 200% fora de escopo (só 125% validado); axe-core 4.13.0 temporário
+(7 arquétipos; F12 = 0). Debt register D01–D25 + guardrails §29 (inclui min-width:0 do R8).
+Design P0 = NÃO · Implementation P0 = SIM (D01) · gap visual = NÃO · superfície nova = NÃO.
+R8 GO registrado em todos os docs. R10 NÃO iniciada.
+
+# ✔ R8 — RESPONSIVIDADE · VALIDAÇÃO 1366×768 + WINDOWS 125% (GO do owner)
 Fase de VALIDAÇÃO (não redesign). Golden 1920 IMUTÁVEL — adaptações só em cópias
 (`r8-responsive/`, um bloco `<style id="r8">` por cópia). Harness honesto: Playwright/CDP com
 viewport CSS + deviceScaleFactor EXATOS (1366×768 @1× e 1093×614 @1.25× — o mesmo modelo

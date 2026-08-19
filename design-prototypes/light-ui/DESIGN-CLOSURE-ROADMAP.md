@@ -120,14 +120,14 @@ de fechamento.
 - **Dependência:** R2 (C1 completa) p/ Config; demais R1. **Imagem?** NÃO (amostra Config no R2).
 - **Owner approval?** SIM. **Fechamento:** 6 B sem pendência na matriz.
 
-## R8 · RESPONSIVIDADE MÍNIMA — REVALIDAÇÃO 1366×768 + 125% ▶ ENTREGUE (aguarda avaliação do owner)
+## R8 · RESPONSIVIDADE MÍNIMA — REVALIDAÇÃO 1366×768 + 125% ✔ APROVADO PELO OWNER (GO)
 > **Status:** `R8-RESPONSIVE-VALIDATION.md` criado + cópias de validação `r8-responsive/` (Golden
 > 1920 IMUTÁVEL — zero alteração). Windows 125% reproduzido fielmente (Playwright/CDP, viewport
 > 1093×614 DIP @ DSF 1.25 = o modelo que o próprio renderer real documenta); 9 arquétipos × 2
 > viewports = 18/18 PASS após 8 achados (P0 de harness + P0 de grid min-content no shell + P1/P2)
 > corrigidos SÓ nas cópias. C3 clamp de viewport e C6 max-width 94vw provados no CÓDIGO real.
-> 19 capturas entregues no chat (política: imagens fora do Git). **R8 NÃO concluída**; recomendação
-> PASS; R9 não iniciada.
+> 19 capturas entregues no chat (política: imagens fora do Git). **R8 = GO do owner** (commit
+> `1b7210c`): 1920 Golden · 1366 validado · Windows 125% validado. Guardrail `min-width:0` registrado.
 - **Objetivo:** revalidar os marcados na matriz §H: boards F1–F5 (altura de coluna/drawer),
   Detalhes F6, Agenda F8, Executivo/Relatórios F10–F11 (+ wizard/login por amostragem; login já
   tem media query real documentada). Validação VISUAL (render em 1366×768 e 1920@125%), sem
@@ -136,7 +136,14 @@ de fechamento.
 - **Dependência:** R2–R7 (congelar antes de revalidar). **Imagem?** SIM (validação, não design
   novo). **Owner approval?** SIM. **Fechamento:** §H sem "SIM — revalidar" pendente.
 
-## R9 · ACESSIBILIDADE — SPEC MÍNIMA CONSOLIDADA
+## R9 · ACESSIBILIDADE — SPEC MÍNIMA CONSOLIDADA ▶ ENTREGUE (aguarda avaliação do owner)
+> **Status:** `ACCESSIBILITY-CONTRACT.md` criado (30 seções; READ-ONLY, zero implementação, zero
+> imagem). Auditoria code-based do renderer real (keyboard/focus/semântica/ARIA/motion/targets,
+> tudo com linha) + contraste WCAG CALCULADO dos tokens Golden + axe-core 4.13.0 (temporário no
+> harness; wcag2a/aa/21aa; 7 arquétipos; F12=0 violações) + matriz global + debt register
+> A11Y-D01–D25. **Design P0 = NÃO** (FAILs de contraste são debts D05–D10 c/ microfase opcional);
+> **Implementation P0 = SIM (D01 upload sem teclado)** ⇒ guardrails §29 (não reabre Golden).
+> **R9 NÃO concluída**; R10 não iniciada.
 - **Objetivo:** consolidar C1 §6 + registros por frame num requisito único de implementação
   (contraste, foco, cor-não-única, targets, labels, keyboard, disabled≠OFF, unread≠read,
   upload acessível, erro não-só-cor). Declarar explicitamente o que NÃO é contrato do código
