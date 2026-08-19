@@ -12,7 +12,7 @@ Branches: `impl/light-ui-foundation-1.0.246` (I1, `0dc87ccb`) →
 `impl/light-ui-core-shell-final-1.0.246` (I2.2, `0d107dea`, ✔ GO) →
 `impl/light-ui-f1-meu-quadro-1.0.246` (I3A, `7eb93bb1`) →
 `impl/light-ui-f1-final-1.0.246` (I3A.1, `58847c85`) →
-`impl/light-ui-f1-golden-cards-1.0.246` (I3A.2, `6744090a`).
+`impl/light-ui-f1-golden-cards-1.0.246` (I3A.2, `6744090a` + `116723a7`).
 Zero build/deploy/release; produção intacta; version 1.0.246.
 
 **Regras permanentes da trilha inteira:**
@@ -174,6 +174,12 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > densidade @1920 = **2 cards completos/coluna** (antes 1). Smoke 8/8 intacto; drawer I3A.1
 > intacto (416/right:0/foco); shell intacto; 1366/win125 sem overflow; **legado 0px**
 > (dark/light/hc, board montado). Provas I3A.2-F1-{1920, DRAWER-1920, 1366, win125} no chat.
+> **Refino `116723a7`:** o owner forneceu o PRINT DE REFERÊNCIA canônico do card → ajustes
+> CSS-only 1:1: título → categoria UPPERCASE tint (sem dot) → "Cliente" label+nome (2 linhas)
+> → "Prazo" + DATA REAL colorida pelo estado (--kdue) → barra → microstats → avatar → ações;
+> pill de prazo relativo removida (data+cor comunicam; urgência só com SLA real ativo);
+> temas/notas → drawer; colunas com barra na cor real (--kc) + add colorido. Altura média
+> 264px; 2 cards completos/coluna; smoke OK; drawer intacto; legado 0px.
 > Relatório: `LIGHT-UI-I3A-2-GOLDEN-CARDS-REPORT.md`. **Gate de saída: GO do owner.**
 > **Status:** branch `impl/light-ui-core-shell-1.0.246` criado EXATAMENTE de `0dc87ccb` (I1
 > aprovada). Commit `6a4ea142`: 1 arquivo, **+80/−0, 1 hunk**, seção SHELL comentada dentro do

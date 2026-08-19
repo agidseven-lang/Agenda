@@ -2,7 +2,7 @@
 
 **Fase:** I3A.2 — restauração do modelo de card aprovado (prints 5/6) · **Status:** ENTREGUE
 — aguarda owner. **Branch:** `impl/light-ui-f1-golden-cards-1.0.246` (base EXATA `58847c85` =
-I3A.1 — contém F1 + drawer aprovado; árvore auditada). **Commit:** `6744090a` · version
+I3A.1 — contém F1 + drawer aprovado; árvore auditada). **Commits:** `6744090a` + `116723a7` (refino ao PRINT DE REFERÊNCIA canônico fornecido pelo owner: título→categoria UPPERCASE→Cliente label+nome→Prazo=data real colorida por estado→barra; pill relativa removida; urgência só com SLA ativo; temas/notas→drawer; colunas com barra --kc e add colorido) · version
 **1.0.246 intacta** · zero build/release · nenhum PR.
 
 ## 1 · CARD MODEL CORRECTION (registro formal)
