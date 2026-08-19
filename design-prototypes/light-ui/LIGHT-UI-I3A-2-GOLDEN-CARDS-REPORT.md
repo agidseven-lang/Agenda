@@ -80,7 +80,20 @@ zero JS · zero lógica/helpers/dados removidos · seletores só `.kbv2-*` sob
 `body.light-ui.desktop` (F2 não implementado — print 5 usado apenas como referência de
 filosofia). **Rollback:** remover a seção I3A.2 (= reverter `6744090a`).
 
-## 8 · GATE
+## 8 · REFERÊNCIA CANÔNICA (correção do owner) — commit `3fc30fbb`
+O owner reenviou a REFERÊNCIA CANÔNICA (frame completo do Meu Quadro light), corrigindo a
+leitura anterior. Card ajustado: **SEM rail lateral** — identificação do responsável =
+**ANEL COLORIDO no avatar** (cor real `--kresp`; contrato rail→ring ATUALIZADO pela
+referência) + legenda; radius 12; título 14/700; colunas SEM barra sob o header; altura
+média ~199px. **Deltas de FUNÇÃO/SHELL presentes na referência que exigem DECISÃO DO OWNER
+(não implementados nesta fase — conflitam com gates formais anteriores/P0):**
+sidebar clara · "ID Seven" no brand (I2.2 fixou "Agenda ID Seven") · corner-avatar no
+cluster (removido no gate I2.2) · workspace selector + Plano Business (funções novas —
+proibidas no Gate 4 da I2) · filtro por responsável (F1-E01) · KPI footer (função nova) ·
+badge no sino · gradientes rosa/azul-magenta (errata E4 vigente) · painel de detalhe
+inline com pin/kebab (drawer 416 foi APROVADO na I3A.1). Owner decide caso a caso.
+
+## 9 · GATE
 Provas I3A.2-F1-{1920, DRAWER-1920, 1366, win125} no chat (não versionadas).
 **Recomendação: GO** — anatomia = prints 5/6, card compacto, drawer concentra o detalhe,
 zero função perdida, rail congelada, board responsivo, shell congelado, legado intacto.
