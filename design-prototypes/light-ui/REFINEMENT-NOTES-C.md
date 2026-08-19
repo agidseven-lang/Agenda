@@ -1,3 +1,21 @@
+# ▶ R5.1 — TRANSVERSAL ANATOMY BOARD · C3 + C6 (gate visual da R5; aguarda owner)
+`r5-1-transversal-anatomy-board.html` — prancha única 1920×1080 fechando os DOIS gaps da R5.
+- **C3 provado ABERTO**: menu "Mais opções" do detalhe de evento (ancorado ACIMA do trigger;
+  itens reais Finalizar + Excluir definitivamente danger; role=menu/menuitem + aria-haspopup/
+  expanded comprovados; Escape/setas = requirement) e card menu ⋯ (PORTAL → body, fixed z-80;
+  itens reais "Reenviar notificação" + "Excluir tarefa" com :focus-visible por tipo; fecha por
+  scroll/resize/ESCAPE/re-render/ação). Mesma família visual, mecânica distinta. SELECT=C1 e
+  Electron nativo registrados fora.
+- **C6 provado**: stack premium real (role=status + aria-live=polite COMPROVADOS) com 3 amostras
+  — crítico/SLA (rail vermelho, avatar iniciais, Responsável, sev-chip, X), atribuição info
+  (variante real; X em :focus-visible) e AGRUPADO premium (eyebrow "3 atualizações", linhas
+  Ator·ação, "+1 outras", **CTA pill real "Abrir →"**). TTLs 11/8/6s; teclado Enter/Espaço REAL;
+  flashToast como amostra separada. Upgrades requirement→comprovado registrados no C6.
+- Zero função inventada; dados demonstrativos; tradução dark→Light Golden. **C3/C6 aguardam
+  owner; R5 NÃO concluída; R6 não iniciado.**
+
+---
+
 # ▶ R5 — C3/C4/C5/C6 · CONSOLIDAÇÃO DOCUMENTAL (aguarda owner)
 Fase read-only, ZERO imagem. 4 foundation contracts criados a partir da auditoria integral:
 - **C3 Menus/Popovers**: evd-menu real (role=menu, ancorado ACIMA do trigger, min-w 220, item

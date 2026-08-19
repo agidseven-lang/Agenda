@@ -1,6 +1,9 @@
 # C3 — MENUS / DROPDOWNS / POPOVERS · FOUNDATION CONTRACT (Light UI)
 
-**Status:** CONSOLIDADA DOCUMENTALMENTE (R5) — aguarda owner; NÃO concluída. Fonte: Desktop
+**Status:** DOCUMENTAL (R5) + **PROVA VISUAL ENTREGUE (R5.1: `r5-1-transversal-anatomy-board.html`)**
+— CANDIDATA a Golden; aguarda owner; NÃO concluída. A prancha mostra os DOIS menus ABERTOS
+(ancorado do detalhe de evento + card ⋯ portal) na mesma família visual, com itens/literais/
+a11y reais e requirements pendentes anotados. Fonte: Desktop
 **1.0.246** (renderer integral). Zero produção; zero imagem nova. Nome formal: MASTER-SURFACE-MAP §F.
 
 ## 1 · OBJETIVO / ESCOPO
@@ -38,9 +41,8 @@ são scroll/resize/Escape/re-render/ação).
 
 ## 7 · RESPONSIVIDADE / DEPENDÊNCIAS / DÍVIDAS / GAP
 1366×768/125% = requirement (R8). C3 consome tokens C1 (tipografia/ícones/cores). Dívidas:
-keyboard incompleto; click-outside implícito. **GAP VISUAL C3 = SIM (material):** nenhum menu
-aberto tem prova visual Golden — candidato à "Transversal Anatomy Board" futura (evd-menu + card
-⋯ portal), decisão do owner; nada gerado nesta R5.
+keyboard incompleto; click-outside implícito. **GAP VISUAL C3 = FECHADO na R5.1** (Transversal Anatomy
+Board — evd-menu e card ⋯ portal abertos). Congela com a aprovação do owner.
 
 ## 8 · GUARDRAILS
 Não transformar selects em menus; não redesenhar o menu nativo Electron nesta trilha; manter

@@ -1,6 +1,11 @@
 # C6 — TOASTS / ERRORS / FEEDBACK · FOUNDATION CONTRACT (Light UI)
 
-**Status:** CONSOLIDADA DOCUMENTALMENTE (R5) — aguarda owner; NÃO concluída. Fonte: Desktop
+**Status:** DOCUMENTAL (R5) + **PROVA VISUAL DO TOAST PREMIUM ENTREGUE (R5.1:
+`r5-1-transversal-anatomy-board.html`)** — CANDIDATA a Golden; aguarda owner; NÃO concluída.
+**Upgrades comprovados na reauditoria R5.1** (antes listados como requirement): o STACK premium
+tem `role="status"` + `aria-live="polite"` REAIS (notifEnsureStack) e o teclado Enter/Espaço no
+CTA e no fechar é REAL (F3.5.5E). TTLs reais: 11s critical · 8s warning · 6s info/success.
+O AGRUPADO premium tem CTA pill REAL `data-cta` ("N atualizações nesta tarefa" | "Abrir →"). Fonte: Desktop
 **1.0.246**. Zero produção; zero imagem nova. Nome formal: MASTER-SURFACE-MAP §F. Escopo =
 feedback IN-APP do renderer (a notificação EXTERNA premium bgnotify é A-futura gated — fora).
 
@@ -40,7 +45,7 @@ aqui. C6 organiza o SISTEMA transversal (canais, quando cada um aparece, persist
 ## 6 · A11Y — comprovado × requirement
 **Comprovado:** `role="alert"` (sq-err/evd-err) · X do toast premium com aria-label +
 `:focus-visible` · cor nunca é o único indicador (ícone+texto sempre) · reduced-motion.
-**Requirement (não existe; não declarar):** `aria-live` no flashToast e status lines · foco
+**Requirement (não existe; não declarar):** `aria-live` no flashToast e status lines (o STACK premium JÁ tem aria-live=polite — comprovado R5.1) · foco
 automático no primeiro erro (fora do caso quantidade) · announcement de toasts para leitores.
 
 ## 7 · DÍVIDAS (registradas; NÃO corrigir)
@@ -50,8 +55,6 @@ mensagens técnicas em alguns literais (ex.: rodapé/status técnicos — dívid
 consolidada no checkpoint) · F13 depende de toast para erro de upload (sem estado no slot).
 
 ## 8 · GAPS VISUAIS / GUARDRAILS
-**GAP VISUAL C6 = PARCIAL:** o **toast premium interno** (stack, severidades, avatar, CTA, X,
-agrupamento) não tem NENHUMA prova visual Light — candidato à "Transversal Anatomy Board"
-futura (junto com os menus C3); flashToast/inline/banner já cobertos (R2/F12/F13 docs). Owner
-decide; nada gerado nesta R5. Guardrails: não redesenhar alert()/confirm() como toast; não
+**GAP VISUAL C6 = FECHADO na R5.1** (stack com crítico/SLA + atribuição info + AGRUPADO com
+CTA pill; flashToast como amostra de canal distinto). Congela com a aprovação do owner. Guardrails: não redesenhar alert()/confirm() como toast; não
 adicionar stacking ao flashToast; não remover o X/CTA do premium; canais permanecem separados.

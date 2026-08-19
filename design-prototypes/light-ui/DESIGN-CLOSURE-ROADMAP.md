@@ -73,6 +73,10 @@ de fechamento.
 > nativos = dívida). **Gaps visuais registrados:** C3 (menus abertos) + C6 (toast premium) →
 > UMA "Transversal Anatomy Board" futura OPCIONAL (owner decide). C4/C5 sem gap.
 > **C3–C6 NÃO declaradas concluídas**; R6 não iniciado.
+> **R5.1 (gate visual da R5, decisão do owner): ▶ ENTREGUE — aguarda owner.**
+> `r5-1-transversal-anatomy-board.html`: 1 prancha 1920×1080 com menus C3 ABERTOS (anchored ×
+> portal) + toast premium C6 (stack, severidades, atribuição, AGRUPADO com CTA pill, flashToast
+> como canal distinto); upgrades a11y comprovados registrados. **R5 só encerra com o GO à R5.1.**
 - **Objetivo:** contratos de Menus/Dropdowns (C3 — selects provados F9/F10/F11; card menus e
   popovers mapeados; menu NATIVO Electron registrado fora do CSS), Empty States (C4 —
   `emptyState()` real; 1 amostra visual pode ser incluída no frame R2 para prova), Loading/
