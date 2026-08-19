@@ -3,15 +3,16 @@
 **Natureza:** roadmap TÉCNICO da implementação do Design Freeze. O Design Closure (R1–R11) está
 FINALIZADO/FROZEN e **não é reutilizado** — esta trilha começa do zero com nomenclatura própria.
 **Estado:** **I0 = ✔ GO · I1 = ✔ GO · I2 = ✔ GO · I2.1 = ✔ GO · I2.2 = ✔ GO (CORE SHELL
-GOLDEN = CONGELADO, commit `0d107dea`) · I3A — F1 Meu Quadro = TECHNICAL PASS / refinement required ·
-I3A.1 — F1 Final Golden Alignment = ▶ ENTREGUE (último gate do F1; aguarda owner) ·
+GOLDEN = CONGELADO, commit `0d107dea`) · I3A — F1 Meu Quadro = VISUAL REFINEMENT REQUIRED (task card) ·
+I3A.1 — F1 drawer = PASS · I3A.2 — Golden Task Card = ▶ ENTREGUE (aguarda owner) ·
 I3B+ = NÃO INICIADAS.**
 Branches: `impl/light-ui-foundation-1.0.246` (I1, `0dc87ccb`) →
 `impl/light-ui-core-shell-1.0.246` (I2, `6a4ea142`) →
 `impl/light-ui-core-shell-refine-1.0.246` (I2.1, `c368a6c2`) →
 `impl/light-ui-core-shell-final-1.0.246` (I2.2, `0d107dea`, ✔ GO) →
 `impl/light-ui-f1-meu-quadro-1.0.246` (I3A, `7eb93bb1`) →
-`impl/light-ui-f1-final-1.0.246` (I3A.1, `58847c85`).
+`impl/light-ui-f1-final-1.0.246` (I3A.1, `58847c85`) →
+`impl/light-ui-f1-golden-cards-1.0.246` (I3A.2, `6744090a`).
 Zero build/deploy/release; produção intacta; version 1.0.246.
 
 **Regras permanentes da trilha inteira:**
@@ -154,7 +155,26 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > e RETORNO DE FOCO ao botão de origem provados; regressões 0px (board light I3A×I3A.1 sem
 > drawer; legado dark/light/hc com board montado; dark com a Central ABERTA — hook inerte).
 > Provas I3A.1-F1-{1920, DRAWER-1920, DRAWER-1366, DRAWER-win125} no chat (não versionadas).
-> Relatório: `LIGHT-UI-I3A-1-F1-FINAL-REPORT.md`. **Gate de saída: GO do owner (fecha o F1).**
+> Relatório: `LIGHT-UI-I3A-1-F1-FINAL-REPORT.md`. **Owner: DRAWER = PASS; task card = NO-GO
+> visual (regressão ao modelo denso legado) → I3A.2.**
+
+### I3A.2 · GOLDEN TASK CARD RESTORATION ▶ ENTREGUE (aguarda owner)
+> **Status:** branch `impl/light-ui-f1-golden-cards-1.0.246` de `58847c85` (F1 + drawer
+> preservados). Commit `6744090a`: 1 arquivo, **+64/−0, 1 hunk CSS-ONLY** (zero markup/JS/
+> função). **CARD MODEL CORRECTION registrada:** "os cards densos da I3A eram regressão para
+> o modelo legado; a fonte visual correta são os cards dos Frames Golden aprovados"
+> (prints 5/6). Regra compartilhada F1–F5: **CARD = RESUMO OPERACIONAL · DRAWER = DETALHE.**
+> Reorganização por CSS order/display sobre o markup real do kbv2Card: título primeiro;
+> "Cliente · nome" discreto; chip de categoria; pill de prazo/urgência real; **progresso real
+> como barra segmentada 5px** (mesma semântica); microstats de 1 linha (conteúdo/checklist;
+> vazio não renderiza); participante avatar 24; ações compactas 28px (Detalhes grad E4 /
+> Mover / ⋯); ocultados do card (permanecem no DOM e no DRAWER): ficha do responsável,
+> origem, Etapa atual/Próxima ação, data absoluta, hint. RAIL = responsável primário
+> (congelado, inalterado). **Números (mesmo fixture):** altura média **460→246px (−46%)**;
+> densidade @1920 = **2 cards completos/coluna** (antes 1). Smoke 8/8 intacto; drawer I3A.1
+> intacto (416/right:0/foco); shell intacto; 1366/win125 sem overflow; **legado 0px**
+> (dark/light/hc, board montado). Provas I3A.2-F1-{1920, DRAWER-1920, 1366, win125} no chat.
+> Relatório: `LIGHT-UI-I3A-2-GOLDEN-CARDS-REPORT.md`. **Gate de saída: GO do owner.**
 > **Status:** branch `impl/light-ui-core-shell-1.0.246` criado EXATAMENTE de `0dc87ccb` (I1
 > aprovada). Commit `6a4ea142`: 1 arquivo, **+80/−0, 1 hunk**, seção SHELL comentada dentro do
 > MESMO bloco `<style id="light-ui-foundation">`. Escopo cumprido = SÓ camada compartilhada
