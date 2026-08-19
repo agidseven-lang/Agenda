@@ -185,6 +185,8 @@ funcional ⇒ **PARAR → REPORTAR → OWNER DECIDE**.
 | 12 | Owner declarar DESIGN COMPLETO | **✔ DECLARADO (R11 · 19/08/2026)** | mandato R11 do owner; Gates 1–11 revalidados PASS |
 
 ## 15 · FUTURE IMPLEMENTATION PRE-FLIGHT (registro; NADA executado)
+> **Referência (I0):** o roadmap de implementação vive em `LIGHT-UI-IMPLEMENTATION-ROADMAP.md`
+> (+ `LIGHT-UI-BASELINE-REAUDIT.md` e `LIGHT-UI-IMPLEMENTATION-TOKENS.md`). O Design permanece FROZEN.
 Antes do primeiro commit de produção, a futura fase de implementação DEVE:
 1. Atualizar a base para a versão Desktop MAIS RECENTE (não a 1.0.246);
 2. Reauditar funções adicionadas após a 1.0.246 (diff funcional completo);
