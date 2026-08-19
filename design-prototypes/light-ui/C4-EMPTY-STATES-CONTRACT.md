@@ -1,6 +1,6 @@
 # C4 — EMPTY STATES · FOUNDATION CONTRACT (Light UI)
 
-**Status:** CONSOLIDADA DOCUMENTALMENTE (R5) — aguarda owner; NÃO concluída. Fonte: Desktop
+**Status:** **FOUNDATION OFICIAL / GOLDEN** — aprovada pelo owner (R5 = GO; âncoras R2). Congelada. Fonte: Desktop
 **1.0.246**. Zero produção; zero imagem nova. Nome formal: MASTER-SURFACE-MAP §F.
 
 ## 1 · OBJETIVO / ESCOPO

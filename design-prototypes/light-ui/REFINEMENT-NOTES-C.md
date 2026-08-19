@@ -1,3 +1,23 @@
+# ▶ R6 — C8 ESTADOS DE INTERAÇÃO & STAT-TILE · CONSOLIDAÇÃO DOCUMENTAL (aguarda owner)
+Fase read-only, ZERO imagem. `C8-INTERACTION-STATES-CONTRACT.md` criado (nome formal do mapa §F
+confirmado). Inventário integral: 95 `:hover` · 21 `:focus-visible` · 11 `:active` · 62
+transitions · **0 `aria-selected/current/pressed`** (requirement p/ R9). Ownership matrix
+formal (C8 referencia C1–C7; não duplica). Consolidados: **SELECTED ≠ ACTIVE ≠ ACCENT** (dia do
+calendário roxo sólido = exceção local que NÃO generaliza); gramática current/completed/future
+(stepper≠timeline); read/unread (unread≠disabled); severity = sistema de cor semântica (fora da
+interação); **REGRA GLOBAL REAL de focus-visible desktop** (outline 2px accent, linha 1324) com
+tokens-base C1 e variações contextuais reais; HOVER (4 mecânicas: surface shift/tint/brightness+
+lift/border accent — desktop-only) e PRESSED (3: brightness .94/translateY 1px/scale .97-.995)
+= owner C8; temporal (today/dim/selected F8 + literais taskDeadline); sync (dot shell + banner
+offline âmbar de Prioridades + splash C5). **STAT-TILE completo** (owner C8): anatomia real,
+variantes default/accent (accent = destaque, não seleção), clicável data-tab, **hover-lift REAL
+(translateY −2px + border accent + sombra, linha 1320)**, focus global, **≠ KPI CARD (regra
+formal)**; sem trend/delta/sparkline/tooltip. Motion: sem foundation formal — C8 referencia
+timings reais (.1–.2s). Anchors R2/F7/F8/F9/F12/R5.1 → **sem gap visual**. Docs da R5
+atualizados para GO (C3–C6 = FOUNDATIONS OFICIAIS). **C8 aguarda owner; R7 não iniciado.**
+
+---
+
 # ▶ R5.1 — TRANSVERSAL ANATOMY BOARD · C3 + C6 (gate visual da R5; aguarda owner)
 `r5-1-transversal-anatomy-board.html` — prancha única 1920×1080 fechando os DOIS gaps da R5.
 - **C3 provado ABERTO**: menu "Mais opções" do detalhe de evento (ancorado ACIMA do trigger;

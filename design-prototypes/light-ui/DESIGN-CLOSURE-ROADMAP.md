@@ -65,7 +65,8 @@ de fechamento.
 - **Artefato:** seção C7 formal (dentro do C1-CONTRACT ou arquivo próprio — decisão editorial).
 - **Dependência:** R1. **Imagem?** NÃO. **Owner approval?** SIM. **Fechamento:** C7 congelada.
 
-## R5 · C3/C4/C5/C6 — SPECS DOCUMENTAIS ▶ ENTREGUE (aguarda avaliação do owner)
+## R5 · C3/C4/C5/C6 — SPECS DOCUMENTAIS ✔ APROVADO PELO OWNER (GO / CONCLUÍDO)
+> **C3 · C4 · C5 · C6 = FOUNDATIONS OFICIAIS / GOLDEN** (docs `7aba3fa` + prova visual R5.1 `5959ae0`).
 > **Status:** 4 contracts criados (documental, ZERO imagem): `C3-MENUS-POPOVERS` (2 famílias:
 > evd-menu ancorado + card menus portal; SELECT C1 ≠ MENU; Electron nativo fora) ·
 > `C4-EMPTY-STATES` (1 linguagem/3 escalas; SEM CTA; initial ≠ no-results) · `C5-LOADING-SPLASH`
@@ -73,7 +74,7 @@ de fechamento.
 > nativos = dívida). **Gaps visuais registrados:** C3 (menus abertos) + C6 (toast premium) →
 > UMA "Transversal Anatomy Board" futura OPCIONAL (owner decide). C4/C5 sem gap.
 > **C3–C6 NÃO declaradas concluídas**; R6 não iniciado.
-> **R5.1 (gate visual da R5, decisão do owner): ▶ ENTREGUE — aguarda owner.**
+> **R5.1 (gate visual da R5): ✔ APROVADO PELO OWNER (GO).**
 > `r5-1-transversal-anatomy-board.html`: 1 prancha 1920×1080 com menus C3 ABERTOS (anchored ×
 > portal) + toast premium C6 (stack, severidades, atribuição, AGRUPADO com CTA pill, flashToast
 > como canal distinto); upgrades a11y comprovados registrados. **R5 só encerra com o GO à R5.1.**
@@ -87,7 +88,14 @@ de fechamento.
 - **Dependência:** R2 (amostras). **Imagem?** NÃO por padrão (amostras entram no frame R2).
 - **Owner approval?** SIM. **Fechamento:** C3–C6 congeladas.
 
-## R6 · C8 — ESTADOS DE INTERAÇÃO & STAT-TILE
+## R6 · C8 — ESTADOS DE INTERAÇÃO & STAT-TILE ▶ ENTREGUE (aguarda avaliação do owner)
+> **Status:** `C8-INTERACTION-STATES-CONTRACT.md` criado (documental, ZERO imagem): inventário
+> integral (95 hover · 21 focus-visible · 11 active · 62 transitions · 0 aria-selected/current/
+> pressed), ownership matrix (C8 não rouba C1–C7), gramáticas SELECTED≠ACTIVE≠ACCENT, current/
+> completed/future, read/unread, temporal, sync; REGRA GLOBAL real de focus-visible desktop;
+> hover/pressed = owner C8 (4+3 mecânicas reais); **STAT-TILE completo (com hover-lift real
+> linha 1320) ≠ KPI CARD (regra formal)**; anchors R2/F7/F8/F9/F12/R5.1 — **sem gap visual**.
+> **C8 NÃO declarada concluída**; R7 não iniciado.
 - **Objetivo:** consolidar hover/selected/focus/scrollbar (maioria já congelada via C1 §2) +
   **stat-tile** (única peça sem prova — vive no "Hoje", classe B). Prova via spec aplicada do
   Hoje (R7) ou amostra no frame R2 — escolher no GO.

@@ -1,7 +1,7 @@
 # C6 — TOASTS / ERRORS / FEEDBACK · FOUNDATION CONTRACT (Light UI)
 
-**Status:** DOCUMENTAL (R5) + **PROVA VISUAL DO TOAST PREMIUM ENTREGUE (R5.1:
-`r5-1-transversal-anatomy-board.html`)** — CANDIDATA a Golden; aguarda owner; NÃO concluída.
+**Status:** **FOUNDATION OFICIAL / GOLDEN** — aprovada pelo owner (R5 = GO; prova visual
+R5.1 `5959ae0`). Congelada; alterações só com autorização do owner.
 **Upgrades comprovados na reauditoria R5.1** (antes listados como requirement): o STACK premium
 tem `role="status"` + `aria-live="polite"` REAIS (notifEnsureStack) e o teclado Enter/Espaço no
 CTA e no fechar é REAL (F3.5.5E). TTLs reais: 11s critical · 8s warning · 6s info/success.
@@ -56,5 +56,5 @@ consolidada no checkpoint) · F13 depende de toast para erro de upload (sem esta
 
 ## 8 · GAPS VISUAIS / GUARDRAILS
 **GAP VISUAL C6 = FECHADO na R5.1** (stack com crítico/SLA + atribuição info + AGRUPADO com
-CTA pill; flashToast como amostra de canal distinto). Congela com a aprovação do owner. Guardrails: não redesenhar alert()/confirm() como toast; não
+CTA pill; flashToast como amostra de canal distinto). **CONGELADA (GO do owner).** Guardrails: não redesenhar alert()/confirm() como toast; não
 adicionar stacking ao flashToast; não remover o X/CTA do premium; canais permanecem separados.
