@@ -2794,8 +2794,13 @@ body.light-ui.desktop #app > .content{padding:30px 32px 48px !important}
 body.light-ui.desktop #app > .content > *{max-width:none}
 
 /* ---- CLUSTER FLUTUANTE DO TOPO (elementos reais; skin de superfície apenas) ---- */
-body.light-ui .corner-avatar{box-shadow:0 0 0 2px rgba(91,124,250,.45)}
-body.light-ui .corner-avatar:hover{box-shadow:0 0 0 3px rgba(91,124,250,.35)}
+/* I2.2 (Gates 1/2): o cluster Golden congelado = [Monitor SLA][Bell] — F1–F5 não têm avatar
+   global no hd-right (o av-46 do Golden é o avatar CONTEXTUAL da surface, no título). O
+   #cornerAvatar real NÃO tem função única: navega p/ 'perfil' pela MESMA delegação [data-tab]
+   do .sb-user (sempre visível no rodapé da sidebar); sem menu/keyboard próprios; historicamente
+   substituía o #topAvatar do topbar oculto (1.0.140). Sob a classe ele é apenas OCULTADO —
+   elemento, handler e comportamento legado permanecem 100% intactos. */
+body.light-ui.desktop .corner-avatar{display:none}
 body.light-ui .slaib-bell{
   background:var(--lui-surface);border:1px solid var(--lui-hair);color:var(--lui-tx-2);
   box-shadow:var(--lui-sh-card);
@@ -2831,11 +2836,13 @@ body.light-ui.desktop .nav .sb-brand .logo.brandlogo{
   border-radius:50% !important;
   box-shadow:0 8px 20px rgba(94,110,243,.4) !important;
 }
-body.light-ui.desktop .nav .sb-brand .nm{font-size:0;line-height:0}
-body.light-ui.desktop .nav .sb-brand .nm::before{
-  content:'Agenda ID Seven';display:block;
-  font-size:18px;font-weight:700;letter-spacing:-.014em;line-height:1.14;color:#F5F7FB;
-}
+/* I2.2 — nome do brand como TEXTO REAL no DOM (Gate 3): o markup real traz os dois spans
+   (.nm-legacy visível no legado; .nm-lui nasce display:none inline). Sob a classe, o par é
+   invertido — o SR recebe exatamente "Agenda ID Seven" (sem duplicação); sem a classe, o
+   legado renderiza/anuncia "ID Seven" como sempre. Pseudo-element ::before REMOVIDO como
+   fonte textual (decisão do owner — I2.2). */
+body.light-ui.desktop .nav .sb-brand .nm-legacy{display:none}
+body.light-ui.desktop .nav .sb-brand .nm-lui{display:inline !important}
 body.light-ui.desktop .nav .sb-brand .sy{gap:6px}
 
 /* ---- B/C · HEADER BAND (Golden .hd = 92px) — infraestrutura p/ as surfaces I3+ ---- */
@@ -2848,13 +2855,14 @@ body.light-ui.desktop #app > .content{
 }
 
 /* ---- D/E · CLUSTER PERSISTENTE (elementos reais do runtime; geometria da banda) ---- */
-/* avatar (Golden av-46; o runtime propaga a ALTURA do avatar ao sino) */
-body.light-ui.desktop .corner-avatar{top:23px !important;right:34px}
-body.light-ui.desktop .corner-avatar .av{width:46px !important;height:46px !important;font-size:17px !important}
+/* I2.2: cluster Golden final = [Monitor SLA][Bell] (avatar oculto — ver seção I2). Com o
+   avatar sem rect, o runtime (F3.5.4G, avOk=false) não reescreve o right do sino ⇒ o CSS
+   manda no sino (34 = eixo Golden) e o monitor continua encadeado pelo runtime a partir do
+   sino (innerWidth − bell.left + 10 = 90) — MESMOS px do fallback CSS; zero briga. */
 /* sino (Golden .hd-bell: squircle, surface, hairline interna; badge = E8 danger-ink) */
 body.light-ui.desktop .slaib-bell{
-  top:23px !important;right:90px;   /* fallback = mesmos px do runtime (34+46+10) */
-  width:46px;height:46px;           /* = altura que o runtime propaga do avatar (46) */
+  top:23px !important;right:34px;   /* eixo lateral Golden (34px) */
+  width:46px;height:46px;
   border-radius:14px;background:var(--lui-surface);border:0;
   box-shadow:inset 0 0 0 1px var(--lui-hair);color:var(--lui-tx-2);
 }
@@ -2862,7 +2870,7 @@ body.light-ui.desktop .slaib-bell:hover{background:var(--lui-surface-soft)}
 body.light-ui .slaib-bell svg{width:20px;height:20px}
 body.light-ui .slaib-count{background:var(--lui-danger-ink);box-shadow:0 0 0 2px var(--lui-surface)}
 /* Monitor SLA (Golden .sla; verde literal; amber/red re-tintados com inks canônicos E7) */
-body.light-ui.desktop .slamon{top:21px !important;right:146px}   /* fallback = runtime (90+46+10) */
+body.light-ui.desktop .slamon{top:21px !important;right:90px}   /* fallback = runtime (34+46+10) */
 body.light-ui .slamon-chip{
   height:50px;gap:12px;padding:0 19px 0 7px;border-radius:14px;
   border:1px solid var(--lui-hair);background:var(--lui-surface);box-shadow:none;
@@ -5334,7 +5342,7 @@ function render(){
   // o board-mode ainda não foi recalculado para o render atual. Hook no wrapper de render() abaixo.
   if(isDesktop()){
     nav.innerHTML=
-      '<div class="sb-brand"><div class="logo sm brandlogo"></div><div><div class="nm">ID Seven</div><div class="sy"><span class="dot"></span>sincronizado</div></div></div>'+
+      '<div class="sb-brand"><div class="logo sm brandlogo"></div><div><div class="nm"><span class="nm-legacy">ID Seven</span><span class="nm-lui" style="display:none">Agenda ID Seven</span></div><div class="sy"><span class="dot"></span>sincronizado</div></div></div>'+
       '<button class="new-task-btn" data-fab="1"><span class="new-task-icon">'+svg('plus')+'</span><span class="new-task-label">Nova tarefa</span></button>'+
       '<div class="sb-sect">Workspace</div>'+
       TABS.filter(function(t){return typeof priTabVisible==='function'?priTabVisible(t):true;}).map(sbItem).join('')+
