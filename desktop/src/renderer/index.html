@@ -2903,6 +2903,120 @@ body.light-ui .slamon-seg.red{color:var(--lui-danger-ink);background:rgba(196,48
 body.light-ui .slamon-seg.amber{color:var(--lui-warning-ink);background:rgba(180,83,9,.10);border-color:rgba(180,83,9,.26);box-shadow:none}
 body.light-ui .slamon .f354g-nm{color:var(--lui-tx-1)}
 body.light-ui .slamon .f354g-more{color:var(--lui-tx-2);background:var(--lui-sunk);border-color:var(--lui-hair)}
+
+/* ============================================================================
+   LIGHT UI — F1 · MEU QUADRO / BOARD SURFACE (I3A)
+   Fonte visual: Golden F1 V10 + contracts pós-errata (E2/E7/E8). Fonte
+   funcional: renderPersonBoard/boardToolbar/kbv2* REAIS — zero mudança de
+   lógica; somente apresentação sob body.light-ui. As classes daqui
+   (d-board-head/tbar/tchip/kbv2-*) são o MESMO componente compartilhado de
+   F1–F5: estilizar a navegação/estrutura compartilhada NÃO migra F2–F5
+   (conteúdo delas continua legado até suas fases). Inks de cores dinâmicas
+   derivados por color-mix das vars ADITIVAS do card (--ktone/--ksec/--kdue;
+   errata E7 — nunca texto pequeno em cor crua); faixa lateral do card =
+   RESPONSÁVEL PRIMÁRIO via --kresp (contrato congelado; nunca multicolor).
+   ========================================================================== */
+body.light-ui{--accent:var(--lui-brand);--grad:var(--lui-grad);--kbv2-pri:var(--lui-danger-ink)}   /* --accent/--grad: pendência declarada da I1 p/ I2+ (CTAs reais ganham o gradiente E4); --kbv2-pri: ink do chip Prioridade (E8) */
+
+/* ---- SURFACE HEADER (assenta na banda do shell — contrato de encaixe da I2.1) ---- */
+body.light-ui.desktop #content.board-mode{padding-top:18px !important;padding-left:34px !important;padding-right:34px !important}
+body.light-ui.desktop #content.board-mode .d-board-head .d-bh-title{font-size:26px;font-weight:700;letter-spacing:-.024em;color:var(--lui-tx-1)}
+body.light-ui.desktop .d-board-head .d-bh-sub{font-size:13.5px;color:var(--lui-tx-3)}
+body.light-ui.desktop .d-board-head .iconbtn{width:42px;height:42px;border-radius:12px;background:var(--lui-surface);border:0;box-shadow:inset 0 0 0 1px var(--lui-hair);color:var(--lui-tx-2)}
+body.light-ui.desktop #content.board-mode .d-board-head .av{width:46px !important;height:46px !important}
+
+/* ---- TOOLBAR compartilhada dos boards (busca ⌘K + abas reais) ---- */
+body.light-ui.desktop .d-board-tools.tbar{background:var(--lui-surface);border:1px solid var(--lui-hair);box-shadow:var(--lui-sh-card)}
+body.light-ui.desktop .d-board-tools.tbar .inp{color-scheme:light}
+/* busca Golden (sunk + hairline interna) — o dark usa preto com !important (linha ~2222) */
+body.light-ui.desktop .d-board-tools.tbar .bsearch{background:var(--lui-sunk) !important;border-color:var(--lui-hair) !important;box-shadow:inset 0 0 0 1px var(--lui-hair) !important;color:var(--lui-tx-1)}
+body.light-ui.desktop .d-board-tools.tbar .bsearch::placeholder{color:var(--lui-tx-3)}
+body.light-ui.desktop .bsearch-kbd{color:var(--lui-tx-4);background:var(--lui-sunk);border:1px solid var(--lui-hair)}
+body.light-ui.desktop .tchip{font-weight:600}
+body.light-ui.desktop .tchip:hover{border-color:var(--lui-brand)}
+body.light-ui.desktop .tchip.on{background:var(--lui-info-ink);border-color:var(--lui-info-ink);color:#fff}   /* E8: pill de visão ativa usa INK */
+body.light-ui.desktop #content.board-mode :is(button,input):focus-visible{outline:2px solid var(--lui-focus);outline-offset:2px;box-shadow:0 0 0 4px var(--lui-focus-halo)}
+
+/* ---- BOARD Golden: colunas limpas sobre o canvas + scroll-x CONTROLADO (R8) ---- */
+body.light-ui.desktop .kbv2-board-surface{background:transparent;border:0;box-shadow:none;padding:16px 2px 0;margin-top:12px}
+body.light-ui.desktop .kbv2-board{gap:24px;overflow-x:auto;overscroll-behavior-x:contain;padding-bottom:8px}
+body.light-ui.desktop .kbv2-column{min-width:260px;background:transparent;border:0;box-shadow:none}
+body.light-ui.desktop .kbv2-column-active{background:transparent;border:0;box-shadow:none}
+body.light-ui.desktop .kbv2-column-header{padding:0 6px 16px}
+body.light-ui.desktop .kbv2-column-header .kbv2-cdot{box-shadow:none}
+body.light-ui.desktop .kbv2-column-header .kbv2-ctitle{font-size:15px;font-weight:650;color:var(--lui-tx-1);letter-spacing:-.006em}
+body.light-ui.desktop .kbv2-column-header .kbv2-ccount{background:var(--lui-surface);box-shadow:inset 0 0 0 1px var(--lui-hair);color:var(--lui-tx-3);border-radius:var(--lui-r-pill);height:23px;min-width:25px}
+body.light-ui.desktop .kbv2-column-body{gap:18px;padding:4px 6px 12px}
+body.light-ui.desktop .kbv2-column-add{border:1px dashed var(--lui-control-border);color:var(--lui-tx-3);margin:12px 6px 6px}
+body.light-ui.desktop .kbv2-column-add:hover{background:var(--lui-surface);color:var(--lui-brand-ink);border-color:var(--lui-brand)}
+body.light-ui.desktop .kbv2-empty-ic{background:var(--lui-surface);border:1px solid var(--lui-hair);color:var(--lui-tx-4)}
+body.light-ui.desktop .kbv2-empty-t{color:var(--lui-tx-2)}
+body.light-ui.desktop .kbv2-empty-s{color:var(--lui-tx-4)}
+
+/* ---- CARD (KanbanTaskCardUnified — skin Golden; TODOS os slots reais preservados) ---- */
+body.light-ui.desktop .kbv2-card{gap:10px;padding:18px 18px 14px 21px;border-radius:var(--lui-r-card);background:var(--lui-surface);border:0;box-shadow:var(--lui-sh-card)}
+body.light-ui.desktop .kbv2-card::before{left:0;right:auto;top:0;bottom:0;width:3px;height:auto;border-radius:0;opacity:1;background:color-mix(in srgb,var(--kresp,#C7CCD6) 62%,#fff)}
+body.light-ui.desktop .kbv2-status{color:color-mix(in srgb,var(--ktone,#5B6472) 52%,#1E2530) !important;background:color-mix(in srgb,var(--ktone,#98A0AE) 8%,#fff) !important;border-color:color-mix(in srgb,var(--ktone,#98A0AE) 26%,#fff) !important}
+body.light-ui.desktop .kbv2-status .kbv2-status-dot{background:var(--ktone,#98A0AE) !important}
+body.light-ui.desktop .kbv2-due{color:color-mix(in srgb,var(--kdue,#5B6472) 52%,#1E2530) !important;background:color-mix(in srgb,var(--kdue,#98A0AE) 8%,#fff) !important;border-color:color-mix(in srgb,var(--kdue,#98A0AE) 26%,#fff) !important}
+body.light-ui.desktop .kbv2-presence{border-color:var(--lui-surface)}
+body.light-ui.desktop .kbv2-name{color:var(--lui-tx-1)}
+body.light-ui.desktop .kbv2-role{color:var(--lui-tx-3)}
+body.light-ui.desktop .kbv2-card-origin{color:var(--lui-tx-3)}
+body.light-ui.desktop .kbv2-card-origin svg{color:var(--lui-tx-4)}
+body.light-ui.desktop .kbv2-card-origin b{color:var(--lui-tx-1)}
+body.light-ui.desktop .kbv2-tier{color:var(--lui-brand-ink)}
+body.light-ui.desktop .kbv2-title{font-size:16px;font-weight:640;line-height:1.45;letter-spacing:-.009em;color:var(--lui-tx-1)}
+body.light-ui.desktop .kbv2-card-chips .kbv2-chip:first-child{color:color-mix(in srgb,var(--ksec,#5B6472) 52%,#1E2530) !important;background:color-mix(in srgb,var(--ksec,#98A0AE) 7%,#fff) !important;border-color:color-mix(in srgb,var(--ksec,#98A0AE) 22%,#fff) !important}
+body.light-ui.desktop .kbv2-chip-soft{color:var(--lui-brand-ink);background:rgba(91,124,250,.10);border-color:rgba(91,124,250,.26)}
+body.light-ui.desktop .kbv2-sla-azul{color:var(--lui-info-ink);background:rgba(37,99,235,.08);border-color:rgba(37,99,235,.24)}
+body.light-ui.desktop .kbv2-sla-laranja{color:var(--lui-warning-ink);background:rgba(180,83,9,.09);border-color:rgba(180,83,9,.26)}
+body.light-ui.desktop .kbv2-sla-vermelho{color:var(--lui-danger-ink);background:rgba(196,48,43,.09);border-color:rgba(196,48,43,.28)}
+body.light-ui.desktop .kbv2-sla-verde{color:var(--lui-green-ink);background:rgba(18,120,76,.08);border-color:rgba(18,120,76,.24)}
+body.light-ui.desktop .kbv2-card-rail i{background:#DFE4EC}
+body.light-ui.desktop .kbv2-card-rail i.done{background:var(--lui-green)}
+body.light-ui.desktop .kbv2-card-rail i.att{background:var(--lui-warning)}
+body.light-ui.desktop .kbv2-card-rail .ln{background:#E8ECF2}
+body.light-ui.desktop .kbv2-card-rail .ln.done{background:linear-gradient(90deg,var(--lui-green),#7FD8B4)}
+body.light-ui.desktop .kbv2-st2-k{color:var(--lui-tx-4)}
+body.light-ui.desktop .kbv2-st2-ic{color:var(--kacc) !important;background:color-mix(in srgb,var(--kacc,#98A0AE) 10%,#fff) !important}
+body.light-ui.desktop .kbv2-st2-ic-next{color:var(--lui-tx-3) !important;background:var(--lui-sunk) !important}
+body.light-ui.desktop .kbv2-st2-pill{color:color-mix(in srgb,var(--kacc,#5B6472) 52%,#1E2530) !important;background:color-mix(in srgb,var(--kacc,#98A0AE) 9%,#fff) !important;border-color:color-mix(in srgb,var(--kacc,#98A0AE) 26%,#fff) !important}
+body.light-ui.desktop .kbv2-st2-next{color:var(--lui-tx-2)}
+body.light-ui.desktop .kbv2-card-themes{border:1px solid var(--lui-hair);background:var(--lui-surface-soft)}
+body.light-ui.desktop .kbv2-themes-h{color:var(--lui-tx-4);background:var(--lui-sunk)}
+body.light-ui.desktop .kbv2-theme{border-top:1px solid var(--lui-hair-2);color:var(--lui-tx-2)}
+body.light-ui.desktop .kbv2-theme-n{background:rgba(91,124,250,.12);color:var(--lui-brand-ink)}
+body.light-ui.desktop .kbv2-card-note .kbv2-note-k{color:var(--lui-tx-4)}
+body.light-ui.desktop .kbv2-card-note .kbv2-note-k svg{color:var(--lui-tx-4)}
+body.light-ui.desktop .kbv2-card-note .kbv2-note-v{color:var(--lui-tx-2)}
+body.light-ui.desktop .kbv2-card-chk{color:var(--lui-tx-3)}
+body.light-ui.desktop .kbv2-card-chk svg{color:var(--lui-tx-4)}
+body.light-ui.desktop .kbv2-card-date{color:var(--lui-tx-1)}
+body.light-ui.desktop .kbv2-card-date svg{color:var(--lui-tx-3)}
+/* footer — hierarquia de CTA dos contracts: PRIMARY (Detalhes, grad E4) · SECONDARY (Mover) · CONTEXTUAL (⋯) */
+body.light-ui.desktop .kbv2-card-footer{margin-top:4px;padding-top:14px;box-shadow:inset 0 1px 0 var(--lui-hair-2)}
+body.light-ui.desktop .kbv2-btn{border:1px solid var(--lui-hair);background:var(--lui-surface);color:var(--lui-tx-2)}
+body.light-ui.desktop .kbv2-btn:hover{background:var(--lui-sunk)}
+body.light-ui.desktop .kbv2-btn-main{border:0;color:#fff;background:var(--lui-grad);box-shadow:var(--lui-grad-shadow)}
+body.light-ui.desktop .kbv2-btn-main:hover{filter:brightness(1.05)}
+body.light-ui.desktop .kbv2-menu{background:var(--lui-surface);border:1px solid var(--lui-hair);box-shadow:var(--lui-sh-elevated)}
+body.light-ui.desktop .kbv2-menu-it{color:var(--lui-tx-1)}
+body.light-ui.desktop .kbv2-menu-it svg{color:var(--lui-tx-3)}
+body.light-ui.desktop .kbv2-menu-it:hover{background:var(--lui-sunk)}
+body.light-ui.desktop .kbv2-menu-del{color:var(--lui-danger-ink)}
+body.light-ui.desktop .kbv2-menu-del svg{color:var(--lui-danger-ink)}
+
+/* ---- CENTRAL DE DETALHES (o "drawer" REAL do F1 = modal .det-sheet aberto por Detalhes).
+   O componente usa as vars reais (--surface/--ink/--line…) ⇒ o grosso herda a foundation;
+   abaixo somente os hardcoded dark e o backdrop C2. Traps/handlers/menus intocados. ---- */
+body.light-ui.desktop .modal-back{background:rgba(15,19,32,.46)}   /* C2: backdrop pós-errata */
+body.light-ui.desktop .det-x:hover{color:var(--lui-tx-1);background:var(--lui-sunk)}
+body.light-ui.desktop .det-acc>summary:hover{background:var(--lui-sunk)}
+body.light-ui.desktop .det-cresp-ic{background:var(--lui-sunk)}
+body.light-ui.desktop .det-note-ed-msg{color:var(--lui-danger-ink)}
+body.light-ui.desktop .det-note-ed-msg.ok{color:var(--lui-green-ink)}
+body.light-ui.desktop .det-teamfix{color:var(--lui-green-ink) !important;border-color:rgba(18,120,76,.45) !important}
 </style>
 </head>
 <body>
@@ -8349,7 +8463,12 @@ function kbv2Card(t, persp){
      conteúdo específico (≤2 linhas/campo; "+N" p/ listas) · trilho · etapa · próxima ação · prazo ·
      ações. Conteúdo varia por setor; ESTRUTURA nunca. Menos texto, mais ícones (todos com tooltip);
      conteúdo integral permanece no Detalhes. Marker aprovado preservado + identidade do componente. */
-  let h='<div class="kbv2-card" data-card-renderer="canonical-board-card" data-card-component="KanbanTaskCardUnified" style="--kacc:'+_slaAcc+'">';
+  /* I3A (Light UI) — vars ADITIVAS de tema no card: --ktone/--ksec/--kdue/--kresp expõem as
+     mesmas cores já calculadas para o CSS do tema claro derivar inks (errata E7) e a faixa
+     lateral do responsável primário (contrato Golden). Inertes no tema dark (nenhuma regra
+     dark as consome); zero mudança de lógica/estado/handlers. */
+  const _kresp=(asg&&asg.id)?userColor(asg.id):'#C7CCD6';
+  let h='<div class="kbv2-card" data-card-renderer="canonical-board-card" data-card-component="KanbanTaskCardUnified" style="--kacc:'+_slaAcc+';--ktone:'+pres.tone+';--ksec:'+s.color+';--kresp:'+_kresp+(d?';--kdue:'+d.color:'')+'">';
   // 1) topo: status + SLA (F1) + prazo
   h+='<div class="kbv2-card-top">'+
        '<span class="kbv2-status" style="color:'+pres.tone+';background:'+withAlpha(pres.tone,.18)+';border-color:'+withAlpha(pres.tone,.48)+'"><i class="kbv2-status-dot" style="background:'+pres.tone+'"></i>'+esc(topLabel)+'</span>'+
@@ -8380,7 +8499,7 @@ function kbv2Card(t, persp){
        ''+
        '<span class="kbv2-chip" style="color:'+s.color+';background:'+withAlpha(s.color,.18)+';border-color:'+withAlpha(s.color,.46)+'"><i class="kbv2-chip-dot" style="background:'+s.color+'"></i>'+esc(s.label)+'</span>'+
        (cron&&cron.label&&cron.label!==s.label?'<span class="kbv2-chip kbv2-chip-soft">'+esc(cron.label)+'</span>':'')+
-       (t.priority?'<span class="kbv2-chip" style="color:#F87171;background:'+withAlpha('#EF4444',.18)+';border-color:'+withAlpha('#EF4444',.46)+'"><i class="kbv2-chip-dot" style="background:#EF4444"></i>Prioridade</span>':'')+
+       (t.priority?'<span class="kbv2-chip" style="color:var(--kbv2-pri,#F87171);background:'+withAlpha('#EF4444',.18)+';border-color:'+withAlpha('#EF4444',.46)+'"><i class="kbv2-chip-dot" style="background:#EF4444"></i>Prioridade</span>':'')+
      '</div>';
   /* F3.5.4W — SLOT CENTRAL DE CONTEÚDO: RESUMO compacto (apenas contagem). A lista/texto integral
      de temas/legendas/roteiros/vídeos e Legenda/Observações vai para a Central de Detalhes; NENHUM
