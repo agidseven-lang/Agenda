@@ -93,7 +93,17 @@ proibidas no Gate 4 da I2) · filtro por responsável (F1-E01) · KPI footer (fu
 badge no sino · gradientes rosa/azul-magenta (errata E4 vigente) · painel de detalhe
 inline com pin/kebab (drawer 416 foi APROVADO na I3A.1). Owner decide caso a caso.
 
-## 9 · GATE
+## 9 · REFERENCE SCALE REBUILD (2ª reprovação 100%) — commit da reconstrução
+O owner reprovou a iteração anterior e a superfície foi RECONSTRUÍDA na escala/densidade da
+arte canônica: sidebar clara compacta 264, header 80 com avatar no cluster, toolbar sem
+moldura com busca longa+lupa, FILTER ROW por responsável REAL (função nova gated por
+body.light-ui — provada 2→1→2), colunas em containers com barra colorida, card na escala da
+referência com % REAL e participantes reais (responsável+autor) com anéis, KPI footer real,
+painel de detalhe como coluna 340. Não fabricado (registrado): sparklines/deltas (sem
+histórico), 💬/📎 (inexistentes), bookmark (sem função), workspace selector/Plano Business
+(inexistentes). Legado 0px com o MESMO fixture (dark/light/hc).
+
+## 10 · GATE
 Provas I3A.2-F1-{1920, DRAWER-1920, 1366, win125} no chat (não versionadas).
 **Recomendação: GO** — anatomia = prints 5/6, card compacto, drawer concentra o detalhe,
 zero função perdida, rail congelada, board responsivo, shell congelado, legado intacto.
