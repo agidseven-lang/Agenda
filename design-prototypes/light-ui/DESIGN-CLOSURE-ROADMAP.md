@@ -88,7 +88,8 @@ de fechamento.
 - **Dependência:** R2 (amostras). **Imagem?** NÃO por padrão (amostras entram no frame R2).
 - **Owner approval?** SIM. **Fechamento:** C3–C6 congeladas.
 
-## R6 · C8 — ESTADOS DE INTERAÇÃO & STAT-TILE ▶ ENTREGUE (aguarda avaliação do owner)
+## R6 · C8 — ESTADOS DE INTERAÇÃO & STAT-TILE ✔ APROVADO PELO OWNER (GO)
+> **C8 = FOUNDATION OFICIAL / GOLDEN** (commit `b2f6833`) ⇒ **C1–C8 = FOUNDATIONS OFICIAIS.**
 > **Status:** `C8-INTERACTION-STATES-CONTRACT.md` criado (documental, ZERO imagem): inventário
 > integral (95 hover · 21 focus-visible · 11 active · 62 transitions · 0 aria-selected/current/
 > pressed), ownership matrix (C8 não rouba C1–C7), gramáticas SELECTED≠ACTIVE≠ACCENT, current/
@@ -102,7 +103,14 @@ de fechamento.
 - **Artefato:** seção C8 formal. **Dependência:** R2/R7. **Imagem?** NÃO (herda amostra).
 - **Owner approval?** SIM. **Fechamento:** C8 congelada.
 
-## R7 · SUPERFÍCIES B — SPECS APLICADAS (sem frames próprios)
+## R7 · SUPERFÍCIES B — SPECS APLICADAS ▶ ENTREGUE (aguarda avaliação do owner)
+> **Status:** `B-SURFACES-APPLIED-SPECS.md` criado (documental, ZERO imagem): as 6 B auditadas e
+> especificadas com foundations oficiais — Prioridades (gate por preferência, priCard rail,
+> "Aguardando cliente") · Hoje (stat-tile C8; nunca dashboard) · Hub (bcard F5; gates admin/
+> canSeeAll) · Equipe (reconfirmada ~10 linhas; spec suficiente) · Perfil (read-only + sheets C2;
+> SEM form/upload inline) · Configurações (página única; 15 seções literais; "Em breve" reais).
+> Matriz foundation×superfície = 100% coberta; **nenhuma B vira A; zero gap visual**; `renderChat`
+> registrado como código INATIVO. **R7 NÃO concluída**; R8 não iniciado.
 - **Objetivo:** para cada B, spec curta "como compor com Golden" (decisões já provadas no mapa):
   **Prioridades** (lista de cards DS; dep C4) · **Hoje** (stat-tiles C8 + listas) · **Hub/quadros
   por pessoa** (faixas Golden F1–F5) · **Equipe** (grid de cards — B confirmada por código) ·

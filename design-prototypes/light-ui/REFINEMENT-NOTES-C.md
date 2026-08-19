@@ -1,3 +1,27 @@
+# ▶ R7 — SUPERFÍCIES B · APPLIED SPECS (aguarda owner)
+Fase read-only, ZERO imagem. `B-SURFACES-APPLIED-SPECS.md` criado — 6 B auditadas na 1.0.246 e
+especificadas 100% com Shell + C1–C8 oficiais (matriz foundation×superfície completa; nenhuma B
+vira Frame A; zero gap visual):
+- **Prioridades** (5287): gate por PREFERÊNCIA (estado desativado literal), resumo em pills,
+  Minimizar/Expandir, offline banner, 8 filtros chip, priCard (rail 5px por nível + pill "Nª ·
+  Nível" + razões), empty "Tudo certo por aqui", seção "Aguardando cliente" + ocorrências.
+- **Hoje** (5821): saudação + STAT-TILES C8 (accent no primeiro; nunca dashboard/KPI) + 3
+  colunas (compromissos/urgentes/próximos) + emptylines reais (incl. "🎉" literal).
+- **Hub** (6135/6175): bcards F5 — Meu quadro · Quadros por responsável (GATE ADMIN) · Cliente/
+  Designers (canSeeAll, pills de atraso) · setores ativos; RoleBoards → personBoard F1.
+- **Equipe** (10260): RECONFIRMADA ~10 linhas — card avatar 42 + (você) + cargo·admin + pill
+  Ativo/Pendente; sem ações/filtros ⇒ SPEC SUFICIENTE. `renderChat` = código INATIVO (K8).
+- **Perfil** (10282): pcard 92 + pill Admin/Membro + 3 settRow→sheets C2 (Conta/Segurança/Sobre)
+  + "Sair da conta"; READ-ONLY — sem inputs/upload inline (edições = modais C2).
+- **Configurações** (10334): página única, 15 seções literais mapeadas (toggles reais de
+  diagnóstico, tray com 5 estados, Iniciar com o Windows, Check-ins [amostra Golden R2],
+  Atualizações, "Em breve" reais); Sobre/versão = D reconfirmado.
+R6 GO registrado (C8 = FOUNDATION OFICIAL ⇒ **C1–C8 oficiais**). Dívidas novas: literais
+técnicos de Config, chips sem aria-pressed, priCard teclado, logout sem confirmação.
+**R7 aguarda owner; R8 não iniciado.**
+
+---
+
 # ▶ R6 — C8 ESTADOS DE INTERAÇÃO & STAT-TILE · CONSOLIDAÇÃO DOCUMENTAL (aguarda owner)
 Fase read-only, ZERO imagem. `C8-INTERACTION-STATES-CONTRACT.md` criado (nome formal do mapa §F
 confirmado). Inventário integral: 95 `:hover` · 21 `:focus-visible` · 11 `:active` · 62

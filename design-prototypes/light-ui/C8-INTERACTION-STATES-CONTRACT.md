@@ -1,6 +1,6 @@
 # C8 — ESTADOS DE INTERAÇÃO & STAT-TILE · FOUNDATION CONTRACT (Light UI)
 
-**Status:** CONSOLIDADA DOCUMENTALMENTE (R6) — aguarda owner; NÃO concluída. Nome formal
+**Status:** **FOUNDATION OFICIAL / GOLDEN** — aprovada pelo owner (R6 = GO, commit `b2f6833`). Congelada. Nome formal
 confirmado no `MASTER-SURFACE-MAP.md` §F. Fonte: Desktop **1.0.246** (inventário integral:
 95 `:hover` · 21 `:focus-visible` · 11 `:active` · 62 `transition:` · 4 `aria-expanded` ·
 1 `aria-busy` · **0 `aria-selected/current/pressed`**). Zero produção; **zero imagem nova**

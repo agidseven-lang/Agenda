@@ -166,7 +166,7 @@ inventário). Estado após F1–F13:
 | C5 | Loading/Skeleton/Splash | **FOUNDATION OFICIAL / GOLDEN (R5 GO)**: `C5-LOADING-SPLASH-CONTRACT.md` (skeleton/progress = INEXISTENTES) | R2 `3c06c26` + splash F12 | — |
 | C6 | Toasts & Erros inline | **FOUNDATION OFICIAL / GOLDEN (R5 GO)**: `C6-TOASTS-ERRORS-CONTRACT.md` (7 canais; nativos = dívida) | R5.1 `5959ae0` (toast premium) + R2/F12/F13 | — |
 | C7 | Tabela | **FOUNDATION OFICIAL / GOLDEN (R4 aprovada `2516426`)**: `C7-TABLE-CONTRACT.md` | F10 `9de9a6b` + F11 `efb264a` — sem gap visual | — |
-| C8 | Estados de interação & stat-tile | **CONSOLIDADA DOCUMENTALMENTE (R6 — aguarda owner)**: `C8-INTERACTION-STATES-CONTRACT.md` (ownership matrix; gramáticas selected/hover/pressed/focus-global/temporal/sync; STAT-TILE completo ≠ KPI; 0 aria-selected/current/pressed no real) | R2 stat-tile + F7/F8/F9/R5.1/F12 — **sem gap visual** | aprovação do owner |
+| C8 | Estados de interação & stat-tile | **FOUNDATION OFICIAL / GOLDEN (R6 GO `b2f6833`)**: `C8-INTERACTION-STATES-CONTRACT.md` | R2 + F7/F8/F9/F12/R5.1 — sem gap | — |
 Nenhuma outra foundation nomeada existe nos documentos; **não criar códigos novos** sem decisão
 do owner. O modal do F13 pertence à **C2** (corrigida a nota do F13 que dizia "sem foundation
 nomeada" — o nome já existia neste §F).
@@ -237,12 +237,12 @@ novo gerado; Golden Frames intocados.*
 | 14 | Notificação externa premium | bgnotify.html | NÃO | — | **A futura** | P2 | futuro | 1 (F14a) | contrato congelado; GO próprio |
 | 15 | Lembrete central SLA | slareminder.html | NÃO | — | **A futura** | P2 | futuro | 1 (F14b) | contrato congelado |
 | 16 | Check-in de execução | janela F3.5.4Q | NÃO | — | **A futura** | P2 | futuro | 1 (F14c) | contrato congelado |
-| 17 | Minhas Prioridades | renderPrioridades | NÃO | — | **B** | P1 | não | — | lista de cards DS |
-| 18 | Hoje | renderHoje | NÃO | — | **B** | P1 | não | — | stat-tiles no DS |
-| 19 | Hub Tarefas / quadros por pessoa | renderHub/renderRoleBoards/personBoard(outros) | parcial | padrões F1–F5 | **B** | P1 | não | — | faixas Golden |
-| 20 | Equipe | renderEquipe | NÃO | — | **B** | P1 | não | — | ver decisão 2 |
-| 21 | Perfil | renderPerfil | NÃO | — | **B** | P2 | não | — | |
-| 22 | Configurações | renderConfig | NÃO | — | **B (+C1)** | P1 | não | — | ver decisão 3 |
+| 17 | Minhas Prioridades | renderPrioridades | — | — | **B — SPEC APLICADA (R7, aguarda owner)** | — | spec | — | `B-SURFACES-APPLIED-SPECS.md` §1 |
+| 18 | Hoje | renderHoje | — | — | **B — SPEC APLICADA (R7, aguarda owner)** | — | spec | — | specs §2 · stat-tile C8 |
+| 19 | Hub Tarefas / quadros por pessoa | renderHub/renderRoleBoards/personBoard | parcial | F1/F5 | **B — SPEC APLICADA (R7, aguarda owner)** | — | spec | — | specs §3 · bcard F5 |
+| 20 | Equipe | renderEquipe | — | — | **B — SPEC APLICADA (R7, aguarda owner)** | — | spec | — | specs §4 · reconfirmada ~10 linhas |
+| 21 | Perfil | renderPerfil | — | — | **B — SPEC APLICADA (R7, aguarda owner)** | — | spec | — | specs §5 · read-only + sheets C2 |
+| 22 | Configurações | renderConfig | — | — | **B — SPEC APLICADA (R7, aguarda owner)** | — | spec | — | specs §6 · amostra Golden R2 |
 | 23 | Team session (renovação) | F3.5.6A-H9/H10 (estados inline) | NÃO | — | **C** | P1 | spec | — | entra na C6 |
 | 24 | Atualizador | Config Atualizações + updMaybeToast | NÃO | — | **C** | P2 | spec | — | C6 |
 | 25 | Toasts internos | notifShowToast/flashToast | NÃO | — | **C** | P1 | spec | — | C6 |
