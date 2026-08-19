@@ -2,8 +2,9 @@
 
 **Natureza:** roadmap TÉCNICO da implementação do Design Freeze. O Design Closure (R1–R11) está
 FINALIZADO/FROZEN e **não é reutilizado** — esta trilha começa do zero com nomenclatura própria.
-**Estado:** **I0 = ENTREGUE — aguarda owner. I1+ = NÃO INICIADAS. IMPLEMENTAÇÃO = PROIBIDA até
-o GO da I0** (zero branch, zero código, zero CSS, zero build, zero deploy).
+**Estado:** **I0 = ✔ GO do owner · I1 = ▶ ENTREGUE (aguarda owner) · I2+ = NÃO INICIADAS.**
+Branch de implementação: `impl/light-ui-foundation-1.0.246` (base `a4312c57` = v1.0.246).
+Zero build/deploy/release; produção intacta; version 1.0.246.
 
 **Regras permanentes da trilha inteira:**
 1. **Fonte funcional = código Desktop MAIS RECENTE no momento de cada fase** (hoje: 1.0.246 —
@@ -22,7 +23,7 @@ o GO da I0** (zero branch, zero código, zero CSS, zero build, zero deploy).
 
 ---
 
-## I0 · IMPLEMENTATION PRE-FLIGHT & BASELINE REAUDIT — ▶ ENTREGUE (aguarda owner)
+## I0 · IMPLEMENTATION PRE-FLIGHT & BASELINE REAUDIT — ✔ APROVADA PELO OWNER (GO)
 Auditoria read-only completa: Desktop mais recente identificada e provada (= 1.0.246, tip
 `a4312c57`, tag v1.0.246, release Latest); **drift funcional 1.0.246→atual = ZERO** (renderer/
 main/preload/auth byte-idênticos; zero commits novos); mapa 30/30 vigente; F1–F13/B/C1–C8 sem
@@ -33,7 +34,20 @@ técnica paralela via pipeline existente), metodologia de teste, fluxos P0, base
 (`a4312c57`). Docs: `LIGHT-UI-BASELINE-REAUDIT.md` + este roadmap +
 `LIGHT-UI-IMPLEMENTATION-TOKENS.md`. **Gate de saída:** GO do owner.
 
-## I1 · FOUNDATION — TOKENS & THEME RAIL (primeira fase com código; branch novo)
+## I1 · FOUNDATION — TOKENS & THEME RAIL ▶ ENTREGUE (aguarda owner)
+> **Status:** branch `impl/light-ui-foundation-1.0.246` criado de `a4312c57` (reverificado tip =
+> a4312c57; tag v1.0.246 = commit de build 0fa34335, diff tag→tip só workflow, desktop/src
+> idêntico). Commit `0dc87ccb`: 1 arquivo, +55/−0, um único bloco `<style id="light-ui-foundation">`
+> no fim do head — namespace `body.light-ui` (SEM ativação em produção; só harness), tokens
+> --lui-* literais de contracts+errata, base canvas via vars reais (--bg/--ink/…; --accent/--grad
+> ficam p/ I2), precedência HC preservada (body.light-ui.hc), guardrail R8 min-width:0 em
+> seletores estruturais reais auditados. Validação: tokens computados = errata (literal); legado
+> pixel-idêntico sem a classe (dark/light/hc/light+hc @1920, 0px c/ animações congeladas; artefato
+> de spinner provado base×base); smokes light-ui 1920/1366/win125 + hc + zoom 110/125 sem
+> overflow/colapso. Desvios documentados: aria-live flashToast e toast X 28 ADIADOS p/ fases de
+> componente (Gate 25 do mandato I1 é mais estrito que o rascunho da I0); token brand-hover NÃO
+> criado (sem valor canônico — hover Golden é mecânica C8, não hex). Relatório:
+> `LIGHT-UI-I1-FOUNDATION-REPORT.md`. **Gate de saída: GO do owner.**
 Criar branch `desktop/light-ui-i1-foundation-tokens` a partir de `a4312c57`. Introduzir bloco
 `<style id="light-ui">` (fim do head) + classe técnica **`body.light-ui`** aplicada pelo
 pipeline `applyAppearance()` sob flag técnica INTERNA (não exposta; owner decide exposição na
