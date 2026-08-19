@@ -2,12 +2,14 @@
 
 **Natureza:** roadmap TÉCNICO da implementação do Design Freeze. O Design Closure (R1–R11) está
 FINALIZADO/FROZEN e **não é reutilizado** — esta trilha começa do zero com nomenclatura própria.
-**Estado:** **I0 = ✔ GO · I1 = ✔ GO · I2 = técnica PASS (aguarda fechamento) · I2.1 =
-visual PASS · I2.2 = ▶ ENTREGUE (último gate da I2; aguarda owner) · I3+ = NÃO INICIADAS.**
-Branches: `impl/light-ui-foundation-1.0.246` (I1, `0dc87ccb`, ✔ GO) →
+**Estado:** **I0 = ✔ GO · I1 = ✔ GO · I2 = ✔ GO · I2.1 = ✔ GO · I2.2 = ✔ GO (CORE SHELL
+GOLDEN = CONGELADO, commit `0d107dea`) · I3A — F1 Meu Quadro = ▶ ENTREGUE (aguarda owner) ·
+I3B+ = NÃO INICIADAS.**
+Branches: `impl/light-ui-foundation-1.0.246` (I1, `0dc87ccb`) →
 `impl/light-ui-core-shell-1.0.246` (I2, `6a4ea142`) →
 `impl/light-ui-core-shell-refine-1.0.246` (I2.1, `c368a6c2`) →
-`impl/light-ui-core-shell-final-1.0.246` (I2.2, `0d107dea`).
+`impl/light-ui-core-shell-final-1.0.246` (I2.2, `0d107dea`, ✔ GO) →
+`impl/light-ui-f1-meu-quadro-1.0.246` (I3A, `7eb93bb1`).
 Zero build/deploy/release; produção intacta; version 1.0.246.
 
 **Regras permanentes da trilha inteira:**
@@ -102,7 +104,32 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > PASS (win125 bell edge 1059<1093, folga maior); cluster [Monitor SLA][Bell]; monitor verde
 > real; nav smoke 11/11. Provas I2.2-SHELL-{1920,1366,win125} no chat (não versionadas).
 > Relatório: `LIGHT-UI-I2-2-CORE-SHELL-FINAL-REPORT.md`.
-> **Gate de saída: GO do owner (fecha I2 + I2.1 + I2.2 — Core Shell).**
+> **Gate de saída: ✔ GO do owner (registrado) — I2 + I2.1 + I2.2 fechadas; Core Shell Golden
+> CONGELADO para implementação em `0d107dea`.**
+
+## I3A · F1 — MEU QUADRO ▶ ENTREGUE (aguarda owner)
+> **Status:** branch `impl/light-ui-f1-meu-quadro-1.0.246` de `0d107dea` (Gate 0 ✓). Commit
+> `7eb93bb1`: 1 arquivo, **+121/−2, 3 hunks** (114 CSS na seção F1 do bloco + 2 literais de
+> template do card com vars aditivas inertes no dark — zero lógica). **Reaudit real:** F1 =
+> `renderPersonBoard` (isMe) + `boardToolbar` (busca ⌘K + abas reais) + `kbv2BoardHtml`
+> (SOCIAL_COLS4 reais: A Fazer/Em andamento/Revisão/Finalizado) + `kbv2Card`
+> (KanbanTaskCardUnified) + **"drawer" real = Central de Detalhes** (`openDetails` → modal
+> `.det-sheet`; NÃO existe drawer lateral no produto — decisão auditada: o det-sheet é o
+> painel de detalhe do F1 e foi re-skinado; o F6 página segue para I4). **Skin Golden:**
+> header da surface na banda (avatar contextual real 46 + título 26/700), busca clara (o dark
+> pintava preto com !important), abas com ativa em info-ink (E8), colunas limpas sobre canvas,
+> card com faixa lateral = RESPONSÁVEL PRIMÁRIO (--kresp via userColor real; contrato
+> congelado), pills/chips com inks derivados por color-mix (E7), CTA hierarquia (Detalhes
+> grad E4 / Mover secondary / menu contextual), estados provados (normal/Hoje/Atrasada/
+> pré-envio neutro/Concluída sem Mover — guarda real). **R8:** colunas min 260 + scroll-x SÓ
+> no kanban; página sem overflow nos 3 perfis. **Desvios auditados (P0):** filtro Golden
+> "Filtrar por responsável" NÃO existe como função no Meu quadro real → NÃO adicionado
+> (regra P0 vence; análogo real = hub por responsável/strips, fases próprias); drawer =
+> Central de Detalhes (acima). **Validação:** smoke funcional 6/6 real, shell regression
+> cluster/banda 0px + sidebar deltas só de conteúdo harness→render, legado 0px (arquivo E
+> board montado, relógio congelado), HC smoke. Provas I3A-F1-{1920,1366,win125,drawer-1920}
+> no chat (não versionadas). Relatório: `LIGHT-UI-I3A-F1-MEU-QUADRO-REPORT.md`.
+> **Gate de saída: GO do owner.**
 > **Status:** branch `impl/light-ui-core-shell-1.0.246` criado EXATAMENTE de `0dc87ccb` (I1
 > aprovada). Commit `6a4ea142`: 1 arquivo, **+80/−0, 1 hunk**, seção SHELL comentada dentro do
 > MESMO bloco `<style id="light-ui-foundation">`. Escopo cumprido = SÓ camada compartilhada
