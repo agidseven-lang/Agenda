@@ -2666,6 +2666,61 @@ body.desktop .kbv2-name{ white-space:normal; display:-webkit-box; -webkit-box-or
   body.desktop .kbv2-card-note .kbv2-note-k{ padding:5px 11px }
 }
 </style>
+<style id="light-ui-foundation">
+/* ============================================================================
+   LIGHT UI — FOUNDATION (I1) · namespace técnico `body.light-ui`
+   Fontes canônicas: Design Freeze (contracts C1–C8/R8) + ACCESSIBILITY-TOKEN-ERRATA
+   (E1–E11, canônica). NUNCA extrair cores de screenshots Golden históricos.
+   Sem a classe `light-ui` no <body>: ZERO efeito (dark :root, body.light e body.hc
+   permanecem intactos). Nesta fase NENHUM código de produção aplica a classe —
+   somente o harness de validação (I1). Rollback: remover este bloco único.
+   ========================================================================== */
+body.light-ui{
+  color-scheme:light;
+  /* SURFACES */
+  --lui-canvas:#F5F6F9; --lui-surface:#FFFFFF; --lui-surface-soft:#FAFBFD; --lui-sunk:#F1F4F8;
+  /* TEXT (errata E1/E2: tx-3′/tx-4′; regra de superfície E2 vale nas fases de componente) */
+  --lui-tx-1:#14181F; --lui-tx-2:#4B5364; --lui-tx-3:#697181; --lui-tx-4:#6E7786;
+  /* BRAND (accent cru ≠ texto; texto/sólido-pequeno usa brand-ink — errata E3/E8) */
+  --lui-brand:#5B7CFA; --lui-brand-ink:#4353D8;
+  /* SEMANTIC — accent × ink (errata E7; cru só em dot/barra/ícone/tint/KPI grande) */
+  --lui-green:#22A06B;   --lui-green-ink:#12784C;
+  --lui-warning:#F59E0B; --lui-warning-ink:#B45309;
+  --lui-danger:#EF4444;  --lui-danger-ink:#C4302B;
+  --lui-info:#60A5FA;    --lui-info-ink:#2563EB;
+  --lui-crit:#E11D48;    --lui-crit-ink:#B10E38;
+  --lui-sys:#9CA3AF;     --lui-sys-ink:#5B6472;
+  /* BORDER */
+  --lui-hair:#E8EBF1; --lui-hair-2:#EFF1F6; --lui-control-border:#DFE3EB;
+  /* FOCUS (C1/C8 — tokens preparados; seletores de focus entram com o shell na I2) */
+  --lui-focus:#6E5EF3; --lui-focus-halo:rgba(110,94,243,.11);
+  /* RADIUS (C1) */
+  --lui-r-control:12px; --lui-r-card:16px; --lui-r-sheet:18px; --lui-r-pill:999px;
+  /* SHADOWS (Golden) */
+  --lui-sh-card:0 0 0 1px var(--lui-hair),0 1px 2px rgba(19,24,38,.04),0 5px 14px rgba(19,24,38,.035);
+  --lui-sh-elevated:0 0 0 1px var(--lui-hair),0 2px 6px rgba(19,24,38,.06),0 16px 34px rgba(19,24,38,.085);
+  --lui-sh-drawer:-18px 0 48px rgba(19,24,38,.085),-1px 0 0 var(--lui-hair);
+  --lui-sh-modal:0 0 0 1px var(--lui-hair),0 24px 70px -18px rgba(19,24,38,.38),0 44px 96px rgba(19,24,38,.2);
+  /* PRIMARY GRADIENT (errata E4 — stop claro acessível; branco ≥4.73 no pior stop) */
+  --lui-grad:linear-gradient(135deg,#6E5EF3,#8356E6);
+  --lui-grad-shadow:0 8px 20px rgba(110,94,243,.28);
+  /* SIDEBAR (consumo na I2; sb-faint′ = errata E6) */
+  --lui-sb-1:#252B3D; --lui-sb-2:#1B2031; --lui-sb-tx:#D0D5E1; --lui-sb-dim:#9299AC; --lui-sb-faint:#828AA8;
+  /* BASE CANVAS (Gate 12): deriva o tema base re-declarando SÓ as vars que o app já
+     consome — mesmo padrão do body.light real. --accent/--grad reais ficam para a I2+. */
+  --bg:var(--lui-canvas); --surface:var(--lui-surface); --surface2:var(--lui-surface-soft);
+  --line:var(--lui-hair); --line-soft:var(--lui-hair-2);
+  --ink:var(--lui-tx-1); --soft:var(--lui-tx-3); --faint:var(--lui-tx-4);
+}
+/* HIGH CONTRAST continua soberano sob light-ui (precedência: base → light/hc → light-ui →
+   light-ui.hc). Valores = os MESMOS do body.light.hc real (HC sobre fundo claro). */
+body.light-ui.hc{--ink:#000000; --soft:#232936; --faint:#3E4657; --line:#8890A2; --line-soft:#A8AFC0}
+/* GUARDRAIL R8 (P0 min-width — R8-RESPONSIVE-VALIDATION §12.1), restrito ao namespace.
+   Itens de grid/flex ESTRUTURAIS reais auditados (#app grid: .nav + #content; .topbar flex).
+   No-op no layout atual; os contêineres Golden da I2+ nascem com o guardrail. */
+body.light-ui.desktop.authed #app>*{min-width:0}
+body.light-ui .topbar>*{min-width:0}
+</style>
 </head>
 <body>
 
