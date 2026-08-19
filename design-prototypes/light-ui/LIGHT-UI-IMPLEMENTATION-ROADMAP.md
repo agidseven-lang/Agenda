@@ -2,11 +2,12 @@
 
 **Natureza:** roadmap TÉCNICO da implementação do Design Freeze. O Design Closure (R1–R11) está
 FINALIZADO/FROZEN e **não é reutilizado** — esta trilha começa do zero com nomenclatura própria.
-**Estado:** **I0 = ✔ GO · I1 = ✔ GO · I2 = técnica PASS, NÃO FECHADA (owner) · I2.1 =
-▶ ENTREGUE (gate final da I2; aguarda owner) · I3+ = NÃO INICIADAS.**
+**Estado:** **I0 = ✔ GO · I1 = ✔ GO · I2 = técnica PASS (aguarda fechamento) · I2.1 =
+visual PASS · I2.2 = ▶ ENTREGUE (último gate da I2; aguarda owner) · I3+ = NÃO INICIADAS.**
 Branches: `impl/light-ui-foundation-1.0.246` (I1, `0dc87ccb`, ✔ GO) →
 `impl/light-ui-core-shell-1.0.246` (I2, `6a4ea142`) →
-`impl/light-ui-core-shell-refine-1.0.246` (I2.1, `c368a6c2`).
+`impl/light-ui-core-shell-refine-1.0.246` (I2.1, `c368a6c2`) →
+`impl/light-ui-core-shell-final-1.0.246` (I2.2, `0d107dea`).
 Zero build/deploy/release; produção intacta; version 1.0.246.
 
 **Regras permanentes da trilha inteira:**
@@ -77,7 +78,31 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > quadro p/ o gate real); 3 perfis ok (P0 win125 PASS); nav smoke 11/11; HC/zoom ok;
 > legado sem classe = **0px vs I2** (dark/light/hc). Provas I2.1-SHELL-{1920,1366,win125}
 > entregues no chat (não versionadas). Relatório: `LIGHT-UI-I2-1-SHELL-REFINEMENT-REPORT.md`.
-> **Gate de saída: GO do owner (fecha I2+I2.1).**
+> **Owner sobre a I2.1: visual PASS**, MAS dois pontos impediram o GO final do Core Shell:
+> corner-avatar no cluster (fora do Golden) e brand name via `::before` (DOM ≠ visual).
+> Resolvidos na I2.2 abaixo.
+
+### I2.2 · CORE SHELL FINAL CLEANUP ▶ ENTREGUE (aguarda owner — ÚLTIMO gate da I2)
+> **Status:** branch `impl/light-ui-core-shell-final-1.0.246` de `c368a6c2`. Commit
+> `0d107dea`: 1 arquivo, **+22/−14** (5 hunks CSS + 1 literal de markup do brand), zero
+> lógica JS. **GAP 1 — corner-avatar:** auditoria = **NÃO possui função única** (navega p/
+> 'perfil' pela MESMA delegação `[data-tab]` do `.sb-user`, sempre visível; sem menu/keyboard
+> próprios; substituto histórico do #topAvatar oculto em 1.0.140; p/ SLA/sino é só âncora de
+> medida — runtime F3.5.4G trata rect-zero). Golden F1–F5 reconfirmados: hd-right = SÓ
+> [Monitor SLA][Bell] (av-46 = avatar contextual da SURFACE no título). Decisão: **oculto sob
+> `body.light-ui`** (elemento/handler intactos no DOM e no legado); cluster recalculado SEM
+> gap (bell right 34 = eixo Golden; monitor 90 = runtime-converge). **GAP 2 — brand DOM:**
+> nome visual = nome acessível via TEXTO REAL — markup do brand passa a ter
+> `.nm-legacy` "ID Seven" + `.nm-lui` "Agenda ID Seven" (nasce display:none inline); sob a
+> classe o par inverte (`display:inline !important`); **::before removido como fonte
+> textual**; SR sob light-ui = "Agenda ID Seven" sem duplicação; legado anuncia/renderiza
+> "ID Seven" como sempre. "sincronizado" texto real intacto; mark real 46 preservado.
+> **Validação:** a11y pontual (innerText/::before=none); legado **0px** (arquivo inteiro
+> dark/light/hc + prova complementar da SIDEBAR montada markup velho×novo = 0px); 3 perfis
+> PASS (win125 bell edge 1059<1093, folga maior); cluster [Monitor SLA][Bell]; monitor verde
+> real; nav smoke 11/11. Provas I2.2-SHELL-{1920,1366,win125} no chat (não versionadas).
+> Relatório: `LIGHT-UI-I2-2-CORE-SHELL-FINAL-REPORT.md`.
+> **Gate de saída: GO do owner (fecha I2 + I2.1 + I2.2 — Core Shell).**
 > **Status:** branch `impl/light-ui-core-shell-1.0.246` criado EXATAMENTE de `0dc87ccb` (I1
 > aprovada). Commit `6a4ea142`: 1 arquivo, **+80/−0, 1 hunk**, seção SHELL comentada dentro do
 > MESMO bloco `<style id="light-ui-foundation">`. Escopo cumprido = SÓ camada compartilhada
