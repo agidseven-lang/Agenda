@@ -3050,6 +3050,70 @@ body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-tit
    estado travado permanece neutro; demais botões mantêm sua hierarquia */
 body.light-ui.desktop .det-sheet .send-go{background:var(--lui-grad);box-shadow:var(--lui-grad-shadow);border:0;color:#fff}
 body.light-ui.desktop .det-sheet .send-go.det-hero-locked{background:var(--lui-sunk);color:var(--lui-tx-3);box-shadow:none}
+
+/* ============================================================================
+   LIGHT UI — I3A.2 · GOLDEN TASK CARD RESTORATION (F1)
+   CARD MODEL CORRECTION: os cards densos da I3A eram regressão para o modelo
+   legado (mini detail panel). Fonte visual canônica = cards dos Frames Golden
+   APROVADOS (prints 5/6 = Frame Meu Quadro/Cliente): CARD = RESUMO OPERACIONAL
+   (título → cliente+categoria → prazo/urgência → progresso compacto →
+   microstats → participantes → ações compactas); DRAWER = DETALHE COMPLETO.
+   Implementação 100% APRESENTAÇÃO (CSS order/display sobre o markup real do
+   kbv2Card): nenhuma lógica/helper/dado removido — os blocos ocultados
+   (ficha do responsável, origem, Etapa atual/Próxima ação, data absoluta,
+   hint de fluxo) permanecem no DOM e seguem visíveis no DRAWER aprovado.
+   Rail lateral = RESPONSÁVEL PRIMÁRIO (congelado; inalterado).
+   ========================================================================== */
+/* card compacto (densidade Golden) + ordem visual dos slots reais */
+body.light-ui.desktop .kbv2-card{gap:9px;padding:16px 18px 12px 21px}
+body.light-ui.desktop .kbv2-card-main{order:1;display:flex;flex-direction:column;gap:6px}
+body.light-ui.desktop .kbv2-card-chips{order:2}
+body.light-ui.desktop .kbv2-card-top{order:3;justify-content:flex-start}
+body.light-ui.desktop .kbv2-card-rail{order:4}
+body.light-ui.desktop .kbv2-card-summary{order:5}
+body.light-ui.desktop .kbv2-card-chk{order:6}
+body.light-ui.desktop .kbv2-card-themes,body.light-ui.desktop .kbv2-card-notes{order:7}
+body.light-ui.desktop .kbv2-card-profile{order:8}
+body.light-ui.desktop .kbv2-card-footer{order:9}
+/* TÍTULO = elemento principal (primeiro); cliente = linha discreta "Cliente · nome" */
+body.light-ui.desktop .kbv2-title{order:1;font-size:15.5px;margin-top:0}
+body.light-ui.desktop .kbv2-tier{order:2;text-transform:none;letter-spacing:0;font-size:12.5px;font-weight:600;color:var(--lui-tx-1)}
+body.light-ui.desktop .kbv2-tier::before{content:'Cliente  ';font-weight:450;color:var(--lui-tx-3)}
+/* status pill sai do card (a coluna já comunica o estágio; estado completo vive no drawer);
+   permanecem SLA (urgência real) e prazo — linha compacta à esquerda */
+body.light-ui.desktop .kbv2-status{display:none}
+body.light-ui.desktop .kbv2-top-r{justify-content:flex-start}
+/* blocos de detalhe saem do CARD (continuam no DOM e no DRAWER): ficha do responsável
+   (nome/cargo), origem "por Fulano", Etapa atual/Próxima ação, data absoluta, hint */
+body.light-ui.desktop .kbv2-pm{display:none}
+body.light-ui.desktop .kbv2-card-origin{display:none}
+body.light-ui.desktop .kbv2-stage2{display:none}
+body.light-ui.desktop .kbv2-card-date{display:none}
+body.light-ui.desktop .kbv2-hint{display:none}
+/* participante compacto (avatar 24) — o responsável segue comunicado pela RAIL */
+body.light-ui.desktop .kbv2-card-profile{gap:0;min-height:24px}
+body.light-ui.desktop .kbv2-av .av{width:24px !important;height:24px !important;font-size:10px !important}
+body.light-ui.desktop .kbv2-presence{width:7px;height:7px}
+/* progresso real (dots do trilho) apresentado como BARRA segmentada compacta 5px (Golden) */
+body.light-ui.desktop .kbv2-card-rail{gap:3px;padding:0}
+body.light-ui.desktop .kbv2-card-rail i{width:auto;flex:1 1 auto;height:5px;border-radius:3px}
+body.light-ui.desktop .kbv2-card-rail i.att{flex:0 0 auto;width:8px;height:8px;border-radius:50%;margin-left:4px}
+body.light-ui.desktop .kbv2-card-rail .ln{display:none}
+/* caixa "Conteúdo" vira MICROSTAT de uma linha (contagem real; detalhe no drawer) */
+body.light-ui.desktop .kbv2-card-summary{margin-top:0;padding:0;border:0;background:none;justify-content:flex-start;gap:7px}
+body.light-ui.desktop .kbv2-card-summary .kbv2-sum-k{color:var(--lui-tx-4)}
+body.light-ui.desktop .kbv2-card-summary .kbv2-sum-k span{display:none}
+body.light-ui.desktop .kbv2-card-summary .kbv2-sum-v{justify-content:flex-start;text-align:left}
+body.light-ui.desktop .kbv2-card-summary .kbv2-sum-main{font-size:11.5px;font-weight:650;color:var(--lui-tx-2)}
+body.light-ui.desktop .kbv2-card-summary .kbv2-sum-sub{font-size:11px;font-weight:600;color:var(--lui-tx-4)}
+body.light-ui.desktop .kbv2-card-summary.kbv2-sum-empty{display:none}   /* vazio ≠ microstat (o estado vive no drawer) */
+/* ações compactas (função real preservada; sem toolbar de botões enormes) */
+body.light-ui.desktop .kbv2-card-footer{margin-top:2px;padding-top:10px;gap:6px}
+body.light-ui.desktop .kbv2-btn{height:28px;border-radius:8px;font-size:11.5px;font-weight:650;padding:0 10px;gap:5px}
+body.light-ui.desktop .kbv2-btn svg{width:12px;height:12px}
+body.light-ui.desktop .kbv2-btn-main{flex:0 1 auto}
+body.light-ui.desktop .kbv2-btn:not(.kbv2-btn-main):not(.kbv2-btn-dots){flex:0 1 auto}
+body.light-ui.desktop .kbv2-btn-dots{width:28px;font-size:14px;margin-left:auto}
 </style>
 </head>
 <body>
