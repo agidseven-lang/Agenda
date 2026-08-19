@@ -3,13 +3,15 @@
 **Natureza:** roadmap TÉCNICO da implementação do Design Freeze. O Design Closure (R1–R11) está
 FINALIZADO/FROZEN e **não é reutilizado** — esta trilha começa do zero com nomenclatura própria.
 **Estado:** **I0 = ✔ GO · I1 = ✔ GO · I2 = ✔ GO · I2.1 = ✔ GO · I2.2 = ✔ GO (CORE SHELL
-GOLDEN = CONGELADO, commit `0d107dea`) · I3A — F1 Meu Quadro = ▶ ENTREGUE (aguarda owner) ·
+GOLDEN = CONGELADO, commit `0d107dea`) · I3A — F1 Meu Quadro = TECHNICAL PASS / refinement required ·
+I3A.1 — F1 Final Golden Alignment = ▶ ENTREGUE (último gate do F1; aguarda owner) ·
 I3B+ = NÃO INICIADAS.**
 Branches: `impl/light-ui-foundation-1.0.246` (I1, `0dc87ccb`) →
 `impl/light-ui-core-shell-1.0.246` (I2, `6a4ea142`) →
 `impl/light-ui-core-shell-refine-1.0.246` (I2.1, `c368a6c2`) →
 `impl/light-ui-core-shell-final-1.0.246` (I2.2, `0d107dea`, ✔ GO) →
-`impl/light-ui-f1-meu-quadro-1.0.246` (I3A, `7eb93bb1`).
+`impl/light-ui-f1-meu-quadro-1.0.246` (I3A, `7eb93bb1`) →
+`impl/light-ui-f1-final-1.0.246` (I3A.1, `58847c85`).
 Zero build/deploy/release; produção intacta; version 1.0.246.
 
 **Regras permanentes da trilha inteira:**
@@ -129,7 +131,30 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > cluster/banda 0px + sidebar deltas só de conteúdo harness→render, legado 0px (arquivo E
 > board montado, relógio congelado), HC smoke. Provas I3A-F1-{1920,1366,win125,drawer-1920}
 > no chat (não versionadas). Relatório: `LIGHT-UI-I3A-F1-MEU-QUADRO-REPORT.md`.
-> **Gate de saída: GO do owner.**
+> **Owner sobre a I3A: TECHNICAL PASS** (board/cards/responsividade/legado/smoke), MAS F1
+> Golden não fechado: detail era modal central (Golden = drawer) e o filtro por responsável
+> exigia resolução formal. A I3A.1 abaixo é o ÚLTIMO gate do F1.
+
+### I3A.1 · F1 FINAL GOLDEN ALIGNMENT ▶ ENTREGUE (aguarda owner — último gate do F1)
+> **Status:** branch `impl/light-ui-f1-final-1.0.246` de `7eb93bb1`. Commit `58847c85`:
+> 1 arquivo, **+38/−1** (33 CSS + 1 literal de hook no openDetails), zero lógica.
+> **B — Detail = Golden drawer:** a MESMA Central real (openDetails/.det-sheet; trap/Escape/
+> outside-click/handlers/conteúdo/estrutura det-head·det-body·det-actions INTACTOS)
+> apresentada como drawer lateral direito Golden (416px/max 94vw, full-height right:0, sem
+> radius, --sh-drawer, hairlines de zona, título 23/700, SEM backdrop visível — mecânica
+> modal preservada), SOMENTE para aberturas do Meu quadro via hook aditivo
+> `data-detorigin="mine"` (derivado do estado real `activeTab()`; inerte no legado — provado
+> 0px com a Central ABERTA no dark); demais origens/superfícies = modal central. CTA primária
+> real `.send-go` ("Enviar ao cliente") = grad E4 (Gate 7). **A — Responsible filter:**
+> reauditoria ampla (responsavel/filter/mine/personBoard/strip/f354/owner/userFilter)
+> confirmou: função INEXISTENTE no Meu quadro real → **IMPLEMENTATION EXCEPTION F1-E01**
+> registrada: controle NÃO criado (código funcional vence; Design Freeze intacto — Golden
+> permanece registro histórico). **Validação:** drawer 416 full-height nos 3 perfis (X e
+> footer no viewport, corpo rola, página sem overflow-x); card→drawer, Escape, outside-click
+> e RETORNO DE FOCO ao botão de origem provados; regressões 0px (board light I3A×I3A.1 sem
+> drawer; legado dark/light/hc com board montado; dark com a Central ABERTA — hook inerte).
+> Provas I3A.1-F1-{1920, DRAWER-1920, DRAWER-1366, DRAWER-win125} no chat (não versionadas).
+> Relatório: `LIGHT-UI-I3A-1-F1-FINAL-REPORT.md`. **Gate de saída: GO do owner (fecha o F1).**
 > **Status:** branch `impl/light-ui-core-shell-1.0.246` criado EXATAMENTE de `0dc87ccb` (I1
 > aprovada). Commit `6a4ea142`: 1 arquivo, **+80/−0, 1 hunk**, seção SHELL comentada dentro do
 > MESMO bloco `<style id="light-ui-foundation">`. Escopo cumprido = SÓ camada compartilhada
