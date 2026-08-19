@@ -2,9 +2,11 @@
 
 **Natureza:** roadmap TÉCNICO da implementação do Design Freeze. O Design Closure (R1–R11) está
 FINALIZADO/FROZEN e **não é reutilizado** — esta trilha começa do zero com nomenclatura própria.
-**Estado:** **I0 = ✔ GO · I1 = ✔ GO · I2 = ▶ ENTREGUE (aguarda owner) · I3+ = NÃO INICIADAS.**
-Branches de implementação: `impl/light-ui-foundation-1.0.246` (I1, tip `0dc87ccb`, ✔ GO) →
-`impl/light-ui-core-shell-1.0.246` (I2, base `0dc87ccb`, tip `6a4ea142`).
+**Estado:** **I0 = ✔ GO · I1 = ✔ GO · I2 = técnica PASS, NÃO FECHADA (owner) · I2.1 =
+▶ ENTREGUE (gate final da I2; aguarda owner) · I3+ = NÃO INICIADAS.**
+Branches: `impl/light-ui-foundation-1.0.246` (I1, `0dc87ccb`, ✔ GO) →
+`impl/light-ui-core-shell-1.0.246` (I2, `6a4ea142`) →
+`impl/light-ui-core-shell-refine-1.0.246` (I2.1, `c368a6c2`).
 Zero build/deploy/release; produção intacta; version 1.0.246.
 
 **Regras permanentes da trilha inteira:**
@@ -48,7 +50,34 @@ registrados: aria-live flashToast e toast X 28 adiados p/ fases de componente; b
 criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 `LIGHT-UI-I1-FOUNDATION-REPORT.md`. **Gate de saída: ✔ GO do owner (registrado).**
 
-## I2 · CORE SHELL — SIDEBAR · HEADER · CANVAS ▶ ENTREGUE (aguarda owner)
+## I2 · CORE SHELL — SIDEBAR · HEADER · CANVAS — técnica PASS · NÃO FECHADA
+> **Decisão do owner sobre a entrega I2:** implementação técnica = PASS, MAS Core Shell
+> Golden ainda não fechado (brand block fora do Golden; header/cluster persistente não
+> provado visualmente). **A I2.1 abaixo é o GATE FINAL da I2** — a I2 só fecha com o GO
+> da I2.1. Registro original da entrega I2 mantido a seguir para rastreabilidade.
+
+### I2.1 · CORE SHELL GOLDEN ALIGNMENT ▶ ENTREGUE (aguarda owner — gate final da I2)
+> **Status:** branch `impl/light-ui-core-shell-refine-1.0.246` criado de `6a4ea142` (I2).
+> Commit `c368a6c2`: 1 arquivo, **+95/−0, 1 hunk**, seção I2.1 comentada no MESMO bloco
+> `<style id="light-ui-foundation">`; zero JS; zero markup. **A — Brand:** app mark = ASSET
+> REAL `--logo` reutilizado (mark circular oficial; caixa-gradiente do Golden era stand-in
+> de protótipo) em 46px + sombra Golden; **"Agenda ID Seven"** como brand copy VISUAL só
+> sob a classe (::before — legado pixel-idêntico); "sincronizado" + dot Golden. **B/C —
+> Header:** token `--lui-hd-h:92px` (CONGELADO do Golden V10 grid rows); banda surface +
+> hairline pintada no scroller `.content` (fixa no topo); eixo lateral 34px; topbar legado
+> segue oculto (1.0.140); sem título global — surfaces I3+ assentam o head na banda.
+> **D/E — Monitor SLA + sino REAIS:** skin Golden do `#sla-monitor` real (chip 50 r14,
+> verde tint F1FBF7→E8F8F0 ring CBEEDD, orb 34 branco, kicker green-ink E5, status
+> #115E3D "Tudo em dia"; amber/red com inks E7; badges E8) e do `#slaib-bell` real
+> (46 squircle, surface+hairline, badge danger-ink); avatar 46 (Golden av-46); geometria
+> do cluster na banda com fallbacks CSS que ESPELHAM o runtime (34/90/146 = mesmos px do
+> slaClusterAlign; zero briga CSS×JS); cálculo/polling/severidade/textos/handlers 100%
+> preservados; dropdowns/painéis dark auto-contidos → fases de componente. **Validação:**
+> cluster real criado por `slaibRefresh()` de produção no harness (contexto mínimo de
+> quadro p/ o gate real); 3 perfis ok (P0 win125 PASS); nav smoke 11/11; HC/zoom ok;
+> legado sem classe = **0px vs I2** (dark/light/hc). Provas I2.1-SHELL-{1920,1366,win125}
+> entregues no chat (não versionadas). Relatório: `LIGHT-UI-I2-1-SHELL-REFINEMENT-REPORT.md`.
+> **Gate de saída: GO do owner (fecha I2+I2.1).**
 > **Status:** branch `impl/light-ui-core-shell-1.0.246` criado EXATAMENTE de `0dc87ccb` (I1
 > aprovada). Commit `6a4ea142`: 1 arquivo, **+80/−0, 1 hunk**, seção SHELL comentada dentro do
 > MESMO bloco `<style id="light-ui-foundation">`. Escopo cumprido = SÓ camada compartilhada
