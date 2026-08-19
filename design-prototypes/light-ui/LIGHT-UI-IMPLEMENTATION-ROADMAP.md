@@ -2,8 +2,9 @@
 
 **Natureza:** roadmap TÉCNICO da implementação do Design Freeze. O Design Closure (R1–R11) está
 FINALIZADO/FROZEN e **não é reutilizado** — esta trilha começa do zero com nomenclatura própria.
-**Estado:** **I0 = ✔ GO do owner · I1 = ▶ ENTREGUE (aguarda owner) · I2+ = NÃO INICIADAS.**
-Branch de implementação: `impl/light-ui-foundation-1.0.246` (base `a4312c57` = v1.0.246).
+**Estado:** **I0 = ✔ GO · I1 = ✔ GO · I2 = ▶ ENTREGUE (aguarda owner) · I3+ = NÃO INICIADAS.**
+Branches de implementação: `impl/light-ui-foundation-1.0.246` (I1, tip `0dc87ccb`, ✔ GO) →
+`impl/light-ui-core-shell-1.0.246` (I2, base `0dc87ccb`, tip `6a4ea142`).
 Zero build/deploy/release; produção intacta; version 1.0.246.
 
 **Regras permanentes da trilha inteira:**
@@ -34,30 +35,37 @@ técnica paralela via pipeline existente), metodologia de teste, fluxos P0, base
 (`a4312c57`). Docs: `LIGHT-UI-BASELINE-REAUDIT.md` + este roadmap +
 `LIGHT-UI-IMPLEMENTATION-TOKENS.md`. **Gate de saída:** GO do owner.
 
-## I1 · FOUNDATION — TOKENS & THEME RAIL ▶ ENTREGUE (aguarda owner)
-> **Status:** branch `impl/light-ui-foundation-1.0.246` criado de `a4312c57` (reverificado tip =
-> a4312c57; tag v1.0.246 = commit de build 0fa34335, diff tag→tip só workflow, desktop/src
-> idêntico). Commit `0dc87ccb`: 1 arquivo, +55/−0, um único bloco `<style id="light-ui-foundation">`
-> no fim do head — namespace `body.light-ui` (SEM ativação em produção; só harness), tokens
-> --lui-* literais de contracts+errata, base canvas via vars reais (--bg/--ink/…; --accent/--grad
-> ficam p/ I2), precedência HC preservada (body.light-ui.hc), guardrail R8 min-width:0 em
-> seletores estruturais reais auditados. Validação: tokens computados = errata (literal); legado
-> pixel-idêntico sem a classe (dark/light/hc/light+hc @1920, 0px c/ animações congeladas; artefato
-> de spinner provado base×base); smokes light-ui 1920/1366/win125 + hc + zoom 110/125 sem
-> overflow/colapso. Desvios documentados: aria-live flashToast e toast X 28 ADIADOS p/ fases de
-> componente (Gate 25 do mandato I1 é mais estrito que o rascunho da I0); token brand-hover NÃO
-> criado (sem valor canônico — hover Golden é mecânica C8, não hex). Relatório:
-> `LIGHT-UI-I1-FOUNDATION-REPORT.md`. **Gate de saída: GO do owner.**
-Criar branch `desktop/light-ui-i1-foundation-tokens` a partir de `a4312c57`. Introduzir bloco
-`<style id="light-ui">` (fim do head) + classe técnica **`body.light-ui`** aplicada pelo
-pipeline `applyAppearance()` sob flag técnica INTERNA (não exposta; owner decide exposição na
-I12). Re-declarar sob `.light-ui` os tokens canônicos (TOKENS doc §2): canvas/surface/hairlines/
-tx-1..tx-4′/inks/brand/grad′/radius/shadows/focus. Incluir desde já: aria-live no flashToast
-(D17) e toast X hit 28×28 (E10) — mudanças globais de baixo risco. **Gate:** app dark intacto
-com flag OFF (screenshot diff = zero); com flag ON só cores mudam; smoke P0 1–13.
-**Dependências:** GO da I0. **Risco:** baixo.
+## I1 · FOUNDATION — TOKENS & THEME RAIL — ✔ APROVADA PELO OWNER (GO)
+Branch `impl/light-ui-foundation-1.0.246` de `a4312c57` (tip reverificado; tag v1.0.246 =
+commit de build 0fa34335, diff tag→tip só workflow). **Commit `0dc87ccb` APROVADO (GO):** 1
+arquivo, +55/−0, bloco único `<style id="light-ui-foundation">` no fim do head — namespace
+`body.light-ui` (SEM ativação em produção; só harness; zero JS), tokens --lui-* literais de
+contracts+errata, base canvas via vars reais (--bg/--ink/…; --accent/--grad ficam p/ I2+),
+precedência HC preservada (body.light-ui.hc), guardrail R8 min-width:0 em seletores estruturais
+reais. Validado: tokens computados == errata (literal); legado pixel-idêntico sem a classe
+(dark/light/hc/light+hc @1920, 0px); smokes light-ui 3 perfis + hc + zoom sem overflow. Desvios
+registrados: aria-live flashToast e toast X 28 adiados p/ fases de componente; brand-hover não
+criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
+`LIGHT-UI-I1-FOUNDATION-REPORT.md`. **Gate de saída: ✔ GO do owner (registrado).**
 
-## I2 · CORE SHELL — SIDEBAR · HEADER · CANVAS
+## I2 · CORE SHELL — SIDEBAR · HEADER · CANVAS ▶ ENTREGUE (aguarda owner)
+> **Status:** branch `impl/light-ui-core-shell-1.0.246` criado EXATAMENTE de `0dc87ccb` (I1
+> aprovada). Commit `6a4ea142`: 1 arquivo, **+80/−0, 1 hunk**, seção SHELL comentada dentro do
+> MESMO bloco `<style id="light-ui-foundation">`. Escopo cumprido = SÓ camada compartilhada
+> autenticada sob `body.light-ui`: sidebar Golden 284 (--d-side re-declarado só sob a classe;
+> gradiente petróleo, brand 46, CTA grad E4 48px, sb-sect, itens 42 com ativo pill+ring+barra
+> C8, badge danger-ink E8, sb-user/footer; nada inventado — sem collapse/workspace selector),
+> canvas claro (vence radial navy do body.desktop) + padding de página, cluster skin-only
+> (sino/avatar por token; zero mudança em cálculo/texto/click do Monitor SLA). **Decisão
+> auditada (regra 1):** topbar real está `display:none` por decisão de produto da 1.0.140
+> (título vive por superfície) — NÃO foi reabilitado; header Golden 92 materializa nas fases
+> de surface (owner valida na revisão). Desvios vs rascunho abaixo: aria-current D15 e
+> landmarks D25 exigiriam JS/markup — fora do mandato I2 (zero JS) → I11; accessible name do
+> sino segue dívida (mandato Gate 9). Validado: navw=284 nos 3 perfis sem overflow; **P0
+> win125 PASS** (cluster dentro do viewport); nav smoke **11/11 handlers reais**; zoom
+> 110/125; HC smoke; legado sem classe = 0px vs I1 (dark/light/hc @1920) com navw=216.
+> Screenshots 1920/1366/win125 entregues no chat (política: não versionar). Relatório:
+> `LIGHT-UI-I2-CORE-SHELL-REPORT.md`. **Gate de saída: GO do owner.**
 Sob `.light-ui`: shell Golden (sidebar petróleo 284 com `sb-item`s reais, header 92, canvas
 #F5F6F9) sobre a navegação REAL (`TABS`/`render()` intactos). Guardrail `min-width:0` nos filhos
 de grid do shell (R8 P0). Semântica: `aria-current="page"` no item ativo (D15 parcial), `<nav>`/
