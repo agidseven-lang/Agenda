@@ -25,17 +25,15 @@ body{width:1920px;height:1080px;overflow:hidden;background:var(--bg);
   font-family:Inter,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
   -webkit-font-smoothing:antialiased;color:var(--tx1);display:flex}
 svg{display:block}
-.av{border-radius:50%;background-size:cover;flex:none;position:relative;overflow:hidden}
-.av::after{content:'';position:absolute;inset:0;background:
-  radial-gradient(circle at 50% 34%, rgba(255,246,235,.92) 0 21%, transparent 22.5%),
-  radial-gradient(ellipse 42% 30% at 50% 96%, rgba(255,246,235,.92) 0 99%, transparent 100%)}
+.av{border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;
+  color:#fff;font-weight:800;font-size:9px;letter-spacing:.02em}
 
 /* ══════════ SIDEBAR (shell claro aprovado — contexto) ══════════ */
 .sb{width:264px;height:100%;background:var(--surface);border-right:1px solid var(--hair);
   display:flex;flex-direction:column;padding:18px 14px 14px;flex:none}
 .sb-brand{display:flex;align-items:center;gap:11px;padding:2px 6px 16px}
-.sb-mark{width:40px;height:40px;border-radius:50%;background:conic-gradient(from 210deg,#5B2EBC,#B01E8E,#5B2EBC);display:flex;align-items:center;justify-content:center}
-.sb-mark i{width:26px;height:26px;border-radius:50%;background:#3E8FB0;display:flex;align-items:center;justify-content:center;color:#fff;font-style:normal;font-weight:800;font-size:13px}
+.sb-mark{width:38px;height:38px;border-radius:11px;background:#2563EB;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 10px rgba(37,99,235,.3)}
+.sb-mark svg{width:20px;height:20px;stroke:#fff;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
 .sb-nm{font-size:16.5px;font-weight:800;letter-spacing:-.015em}
 .sb-sync{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--tx3);margin-top:2px}
 .sb-sync i{width:6px;height:6px;border-radius:50%;background:#22C55E}
@@ -46,32 +44,32 @@ svg{display:block}
 .sb-it svg{width:17px;height:17px;stroke:var(--tx3);stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}
 .sb-it.on{background:#E9F1FE;color:var(--blue-ink);font-weight:650}
 .sb-it.on svg{stroke:var(--blue-ink)}
-.sb-badge{margin-left:auto;background:#475569;color:#fff;font-size:10.5px;font-weight:700;height:18px;min-width:24px;padding:0 6px;border-radius:999px;display:flex;align-items:center;justify-content:center}
-.sb-user{margin-top:auto;display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--hair);border-radius:12px;background:#FAFBFD}
+.sb-badge{margin-left:auto;background:#1E293B;color:#fff;font-size:10.5px;font-weight:700;height:18px;min-width:24px;padding:0 6px;border-radius:999px;display:flex;align-items:center;justify-content:center}
+.sb-user{margin-top:auto;display:flex;align-items:center;gap:10px;padding:11px;border-radius:12px;background:#0F1523}
 .sb-user .av{width:34px;height:34px}
-.sb-user b{font-size:13px;display:block}
-.sb-user span{font-size:11.5px;color:var(--tx3)}
+.sb-user b{font-size:13px;display:block;color:#F3F6FB}
+.sb-user span{font-size:11.5px;color:#8B94A6}
 .sb-user i{width:7px;height:7px;border-radius:50%;background:#22C55E;margin-left:auto;font-style:normal}
-.sb-ws{display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid var(--hair);border-radius:12px;margin-top:8px;font-size:12.5px;font-weight:650}
-.sb-ws span{color:var(--tx3);font-weight:500}
-.sb-ws svg{width:13px;height:13px;stroke:var(--tx3);stroke-width:2;fill:none;margin-left:auto}
-.sb-plan{padding:10px 12px;border:1px solid var(--hair);border-radius:12px;margin-top:8px}
+.sb-ws{display:flex;align-items:center;gap:6px;padding:11px 12px;border-radius:12px;margin-top:8px;font-size:12.5px;font-weight:700;background:#0F1523;color:#F3F6FB}
+.sb-ws span{color:#8B94A6;font-weight:500}
+.sb-ws svg{width:13px;height:13px;stroke:#8B94A6;stroke-width:2;fill:none;margin-left:auto}
+.sb-plan{padding:11px 12px;border-radius:12px;margin-top:8px;background:#0F1523;color:#F3F6FB}
 .sb-plan .r{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700}
-.sb-plan .r b{margin-left:auto;font-size:11.5px;color:var(--tx2)}
-.sb-plan .bar{height:6px;border-radius:99px;background:#EDF0F5;margin-top:8px;overflow:hidden}
+.sb-plan .r b{margin-left:auto;font-size:11.5px;color:#C9D2E2}
+.sb-plan .bar{height:6px;border-radius:99px;background:#273044;margin-top:8px;overflow:hidden}
 .sb-plan .bar i{display:block;height:100%;width:80%;border-radius:99px;background:var(--grad-cta)}
 
 /* ══════════ MAIN ══════════ */
 .main{flex:1;display:flex;flex-direction:column;min-width:0;padding:0 24px}
-.hd{height:76px;display:flex;align-items:center;gap:14px;flex:none}
+.hd{height:68px;display:flex;align-items:center;gap:14px;flex:none}
 .hd-back{width:36px;height:36px;border-radius:10px;border:1px solid var(--hair);background:var(--surface);display:flex;align-items:center;justify-content:center}
 .hd-back svg{width:16px;height:16px;stroke:var(--tx2);stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
 .hd .av{width:42px;height:42px}
 .hd-t b{font-size:20px;font-weight:800;letter-spacing:-.02em;display:block;line-height:1.15}
 .hd-t span{font-size:12px;color:var(--tx3)}
 .hd-r{margin-left:auto;display:flex;align-items:center;gap:12px}
-.sla{display:flex;align-items:center;gap:10px;height:46px;padding:0 16px 0 10px;border-radius:12px;background:linear-gradient(180deg,#F1FBF7,#E9F8F0);box-shadow:inset 0 0 0 1px #CBEEDD}
-.sla-ic{width:30px;height:30px;border-radius:9px;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(18,80,54,.14)}
+.sla{display:flex;align-items:center;gap:10px;height:46px;padding:0 16px 0 10px;border-radius:12px;background:#FBFEFC;box-shadow:inset 0 0 0 1px #C9EBDA}
+.sla-ic{width:30px;height:30px;border-radius:9px;background:#E9F8F0;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(18,80,54,.14)}
 .sla-ic svg{width:16px;height:16px;stroke:#16A34A;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
 .sla-k{font-size:9px;font-weight:800;letter-spacing:.07em;color:#12784C;display:flex;align-items:center;gap:5px}
 .sla-k i{width:5px;height:5px;border-radius:50%;background:#22C58A;box-shadow:0 0 0 3px rgba(34,197,138,.18)}
@@ -97,11 +95,11 @@ svg{display:block}
 .frow-k{font-size:12.5px;color:var(--tx3);margin-right:2px}
 .rchip{display:flex;align-items:center;gap:7px;height:34px;padding:0 12px 0 6px;border-radius:11px;border:1px solid var(--hair);background:var(--surface);font-size:12.5px;font-weight:700}
 .rchip .av{width:23px;height:23px}
-.rchip.c-blue{color:#2563EB}.rchip.c-blue .av{box-shadow:0 0 0 2px #6366F1}
-.rchip.c-purple{color:#7C3AED}.rchip.c-purple .av{box-shadow:0 0 0 2px #8B5CF6}
-.rchip.c-orange{color:#D97706}.rchip.c-orange .av{box-shadow:0 0 0 2px #F59E0B}
-.rchip.c-red{color:#DC2626}.rchip.c-red .av{box-shadow:0 0 0 2px #EF4444}
-.rchip.c-green{color:#16A34A}.rchip.c-green .av{box-shadow:0 0 0 2px #22C55E}
+.rchip.c-blue{color:#2563EB;border-color:#BFD6FE}.rchip.c-blue .av{box-shadow:0 0 0 2px #6366F1}
+.rchip.c-purple{color:#7C3AED;border-color:#DDD0FC}.rchip.c-purple .av{box-shadow:0 0 0 2px #8B5CF6}
+.rchip.c-orange{color:#D97706;border-color:#FBDFAE}.rchip.c-orange .av{box-shadow:0 0 0 2px #F59E0B}
+.rchip.c-red{color:#DC2626;border-color:#FBC7C7}.rchip.c-red .av{box-shadow:0 0 0 2px #EF4444}
+.rchip.c-green{color:#16A34A;border-color:#BFEBD0}.rchip.c-green .av{box-shadow:0 0 0 2px #22C55E}
 .rchip.all{color:var(--tx2);padding:0 12px;gap:8px}
 .rchip.all svg{width:14px;height:14px;stroke:var(--tx3);stroke-width:1.8;fill:none}
 .rchip.all b{font-weight:700}
@@ -109,6 +107,23 @@ svg{display:block}
 
 /* ══════════ BOARD ══════════ */
 .stage{flex:1;display:flex;gap:18px;min-height:0}
+/* KPI footer */
+.kpis{flex:none;display:flex;gap:14px;padding:14px 0 14px}
+.kpi{flex:1;display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--hair);border-radius:13px;box-shadow:var(--sh-card);padding:13px 15px;min-width:0}
+.kpi-ic{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex:none}
+.kpi-ic svg{width:19px;height:19px;stroke-width:1.9;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.kpi-tx b{font-size:19px;font-weight:800;letter-spacing:-.01em;display:block;line-height:1.1}
+.kpi-tx span{font-size:11px;color:var(--tx3);display:block;margin-top:1px}
+.kpi-tx i{font-style:normal;font-size:10px;font-weight:700;display:block;margin-top:2px}
+.kpi-spark{margin-left:auto;flex:none}
+.kpi-spark svg{width:64px;height:30px;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.k-up{color:#16A34A}.k-down{color:#DC2626}
+.kpi-legend .avs{display:flex;align-items:center}
+.kpi-legend .avs .av{width:24px;height:24px;font-size:8.5px;box-shadow:0 0 0 2px #fff}
+.kpi-legend .avs .av+.av,.kpi-legend .avs .more{margin-left:-6px}
+.kpi-legend .avs .more{width:24px;height:24px;border-radius:50%;background:#EDF0F5;color:var(--tx3);font-size:9px;font-weight:750;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px #fff}
+.kpi-legend b{font-size:12px;font-weight:750;display:block}
+.kpi-legend span{font-size:10px;color:var(--tx3);line-height:1.3;display:block}
 .col{width:272px;flex:none;display:flex;flex-direction:column;min-height:0}
 .col-h{display:flex;align-items:center;gap:9px;padding:4px 4px 10px;position:relative}
 .col-h::after{content:'';position:absolute;left:0;right:0;bottom:0;height:3px;border-radius:3px;background:var(--c)}
@@ -177,7 +192,7 @@ svg{display:block}
 .p-title svg{width:20px;height:20px;fill:#F6C344;stroke:#F6C344;flex:none;margin-top:1px}
 .p-title b{font-size:17.5px;font-weight:800;letter-spacing:-.015em;line-height:1.25}
 .p-cli{display:flex;align-items:center;gap:10px;margin-bottom:14px}
-.p-cli .sq{width:34px;height:34px;border-radius:9px;background:#E9F8F0;color:#16A34A;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center}
+.p-cli .sq{width:34px;height:34px;border-radius:9px;background:#fff;border:1px solid var(--hair);color:#16A34A;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center}
 .p-cli b{font-size:13px;display:block}
 .p-cli span{font-size:11px;color:var(--tx3)}
 .p-lab{font-size:10px;font-weight:800;letter-spacing:.08em;color:var(--tx4);margin:2px 0 8px}
@@ -211,7 +226,7 @@ svg{display:block}
 <!-- SIDEBAR -->
 <aside class="sb">
   <div class="sb-brand">
-    <div class="sb-mark"><i>a</i></div>
+    <div class="sb-mark"><svg viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="13" rx="2.5"/><path d="M9 21h6M12 17.5V21"/></svg></div>
     <div><div class="sb-nm">ID Seven</div><div class="sb-sync"><i></i>sincronizado</div></div>
   </div>
   <div class="sb-new">＋ Nova tarefa</div>
@@ -227,7 +242,7 @@ svg{display:block}
   <div class="sb-it"><svg viewBox="0 0 24 24"><path d="M6.6 10a5.4 5.4 0 0110.8 0c0 4.6 1.9 5.7 1.9 5.7H4.7s1.9-1.1 1.9-5.7z"/><path d="M10.2 19a2 2 0 003.6 0"/></svg>Notificações<span class="sb-badge">9+</span></div>
   <div class="sb-sect">SISTEMA</div>
   <div class="sb-it"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 00-2-1.2L14.2 3h-4l-.4 2.6a7 7 0 00-2 1.2l-2.3-.9-2 3.4 2 1.5A7 7 0 005 12c0 .4 0 .8.1 1.2l-2 1.5 2 3.4 2.3-.9a7 7 0 002 1.2l.4 2.6h4l.4-2.6a7 7 0 002-1.2l2.3.9 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z"/></svg>Configurações</div>
-  <div class="sb-user"><span class="av r-ary" style="background-color:#6366F1"></span><div><b>Ardyjany Carló...</b><span>CEO · admin</span></div><i></i></div>
+  <div class="sb-user"><span class="av" style="background:linear-gradient(135deg,#6366F1,#4F46E5);font-size:12px">AC</span><div><b>Ardyjany Carló...</b><span>CEO · admin</span></div><i></i></div>
   <div class="sb-ws"><b>ID Seven</b><span>· Agência</span><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>
   <div class="sb-plan"><div class="r">👑 Plano Business<b>80%</b></div><div class="bar"><i></i></div></div>
 </aside>
@@ -237,13 +252,13 @@ svg{display:block}
   <!-- HEADER -->
   <div class="hd">
     <div class="hd-back"><svg viewBox="0 0 24 24"><path d="M14 6l-6 6 6 6"/></svg></div>
-    <span class="av hd-av" style="background-color:#8C6E5D"></span>
+    <span class="av hd-av" style="background:linear-gradient(135deg,#6366F1,#4F46E5);font-size:13px">AC</span>
     <div class="hd-t"><b>Meu quadro</b><span>CEO</span></div>
     <div class="hd-r">
       <div class="sla"><span class="sla-ic"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.4-2.9 8-7 10-4.1-2-7-5.6-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg></span>
         <div><div class="sla-k"><i></i>MONITOR SLA · AO VIVO</div><div class="sla-v">Tudo em dia</div></div></div>
       <div class="bell"><svg viewBox="0 0 24 24"><path d="M6.6 10a5.4 5.4 0 0110.8 0c0 4.6 1.9 5.7 1.9 5.7H4.7s1.9-1.1 1.9-5.7z"/><path d="M10.2 19a2 2 0 003.6 0"/></svg><i></i></div>
-      <span class="av hd-av" style="background-color:#8C6E5D"></span>
+      <span class="av hd-av" style="background:linear-gradient(135deg,#6366F1,#4F46E5);font-size:13px">AC</span>
     </div>
   </div>
 
@@ -262,11 +277,11 @@ svg{display:block}
   <!-- FILTER ROW -->
   <div class="frow">
     <span class="frow-k">Filtrar por responsável:</span>
-    <div class="rchip c-blue"><span class="av" style="background-color:#8C6E5D"></span>Ardyjany</div>
-    <div class="rchip c-purple"><span class="av" style="background-color:#B08968"></span>Sunset</div>
-    <div class="rchip c-orange"><span class="av" style="background-color:#7D5A44"></span>MoveOn</div>
-    <div class="rchip c-red"><span class="av" style="background-color:#5C4033"></span>TechOne</div>
-    <div class="rchip c-green"><span class="av" style="background-color:#9C7B5E"></span>GreenLife</div>
+    <div class="rchip c-blue"><span class="av" style="background:linear-gradient(135deg,#6366F1,#4F46E5)">AC</span>Ardyjany</div>
+    <div class="rchip c-purple"><span class="av" style="background:linear-gradient(135deg,#A78BFA,#7C3AED)">SW</span>Sunset</div>
+    <div class="rchip c-orange"><span class="av" style="background:linear-gradient(135deg,#FBBF24,#D97706)">MO</span>MoveOn</div>
+    <div class="rchip c-red"><span class="av" style="background:linear-gradient(135deg,#F87171,#DC2626)">TO</span>TechOne</div>
+    <div class="rchip c-green"><span class="av" style="background:linear-gradient(135deg,#4ADE80,#16A34A)">GL</span>GreenLife</div>
     <div class="rchip all"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg><b>Todos</b><svg class="ch" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>
   </div>
 
@@ -283,7 +298,7 @@ svg{display:block}
           <div class="c-cli"><span>Cliente</span><b>Sunset Wear</b></div>
           <div class="c-due"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>Prazo 15/08/2026</div>
           <div class="c-foot">
-            <div class="stack"><span class="av r-ary" style="background-color:#8C6E5D"></span><span class="av r-bea" style="background-color:#B08968"></span><span class="av r-cai" style="background-color:#7D5A44"></span><span class="more">+2</span></div>
+            <div class="stack"><span class="av r-ary" style="background:linear-gradient(135deg,#6366F1,#4F46E5)">AC</span><span class="av r-bea" style="background:linear-gradient(135deg,#38BDF8,#0284C7)">BD</span><span class="av r-cai" style="background:linear-gradient(135deg,#FBBF24,#D97706)">CM</span><span class="more">+2</span></div>
             <div class="meta"><span><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 10-3.2 6.4L20 20l-.6-3.2A7.9 7.9 0 0020 12z"/></svg>3</span><span><svg viewBox="0 0 24 24"><path d="M21 12.5l-8.5 8.5a5 5 0 01-7-7L14 5.5a3.4 3.4 0 014.8 4.8L10.5 18.5a1.7 1.7 0 01-2.4-2.4L16 8"/></svg>2</span></div>
           </div>
         </article>
@@ -293,7 +308,7 @@ svg{display:block}
           <div class="c-cli"><span>Cliente</span><b>Café do Centro</b></div>
           <div class="c-due"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>Prazo 18/08/2026</div>
           <div class="c-foot">
-            <div class="stack"><span class="av r-cai" style="background-color:#7D5A44"></span><span class="av r-pau" style="background-color:#6B4F3A"></span><span class="av r-fel" style="background-color:#8A5A3B"></span></div>
+            <div class="stack"><span class="av r-cai" style="background:linear-gradient(135deg,#FBBF24,#D97706)">CM</span><span class="av r-pau" style="background:linear-gradient(135deg,#F472B6,#DB2777)">PV</span><span class="av r-fel" style="background:linear-gradient(135deg,#2DD4BF,#0D9488)">FT</span></div>
             <div class="meta"><span><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 10-3.2 6.4L20 20l-.6-3.2A7.9 7.9 0 0020 12z"/></svg>2</span><span><svg viewBox="0 0 24 24"><path d="M21 12.5l-8.5 8.5a5 5 0 01-7-7L14 5.5a3.4 3.4 0 014.8 4.8L10.5 18.5a1.7 1.7 0 01-2.4-2.4L16 8"/></svg>1</span></div>
           </div>
         </article>
@@ -303,7 +318,7 @@ svg{display:block}
           <div class="c-cli"><span>Cliente</span><b>TechOne</b></div>
           <div class="c-due"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>Prazo 20/08/2026</div>
           <div class="c-foot">
-            <div class="stack"><span class="av r-ary" style="background-color:#8C6E5D"></span><span class="av r-bea" style="background-color:#B08968"></span><span class="av r-fel" style="background-color:#8A5A3B"></span></div>
+            <div class="stack"><span class="av r-ary" style="background:linear-gradient(135deg,#6366F1,#4F46E5)">AC</span><span class="av r-bea" style="background:linear-gradient(135deg,#38BDF8,#0284C7)">BD</span><span class="av r-fel" style="background:linear-gradient(135deg,#2DD4BF,#0D9488)">FT</span></div>
             <div class="meta"><span><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 10-3.2 6.4L20 20l-.6-3.2A7.9 7.9 0 0020 12z"/></svg>4</span><span><svg viewBox="0 0 24 24"><path d="M21 12.5l-8.5 8.5a5 5 0 01-7-7L14 5.5a3.4 3.4 0 014.8 4.8L10.5 18.5a1.7 1.7 0 01-2.4-2.4L16 8"/></svg>2</span></div>
           </div>
         </article>
@@ -322,7 +337,7 @@ svg{display:block}
           <div class="c-due"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>Prazo 12/08/2026</div>
           <div class="c-prog"><div class="c-bar"><i style="width:65%"></i></div><span class="c-pct">65%</span></div>
           <div class="c-foot">
-            <div class="stack"><span class="av r-cai" style="background-color:#7D5A44"></span><span class="av r-pau" style="background-color:#6B4F3A"></span><span class="more">+1</span></div>
+            <div class="stack"><span class="av r-cai" style="background:linear-gradient(135deg,#FBBF24,#D97706)">CM</span><span class="av r-pau" style="background:linear-gradient(135deg,#F472B6,#DB2777)">PV</span><span class="more">+1</span></div>
             <div class="meta"><span><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 10-3.2 6.4L20 20l-.6-3.2A7.9 7.9 0 0020 12z"/></svg>3</span><span><svg viewBox="0 0 24 24"><path d="M21 12.5l-8.5 8.5a5 5 0 01-7-7L14 5.5a3.4 3.4 0 014.8 4.8L10.5 18.5a1.7 1.7 0 01-2.4-2.4L16 8"/></svg>2</span></div>
           </div>
         </article>
@@ -333,7 +348,7 @@ svg{display:block}
           <div class="c-due"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>Prazo 12/08/2026</div>
           <div class="c-prog"><div class="c-bar"><i style="width:40%"></i></div><span class="c-pct">40%</span></div>
           <div class="c-foot">
-            <div class="stack"><span class="av r-fel" style="background-color:#8A5A3B"></span><span class="av r-ary" style="background-color:#8C6E5D"></span></div>
+            <div class="stack"><span class="av r-fel" style="background:linear-gradient(135deg,#2DD4BF,#0D9488)">FT</span><span class="av r-ary" style="background:linear-gradient(135deg,#6366F1,#4F46E5)">AC</span></div>
             <div class="meta"><span><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 10-3.2 6.4L20 20l-.6-3.2A7.9 7.9 0 0020 12z"/></svg>1</span><span><svg viewBox="0 0 24 24"><path d="M21 12.5l-8.5 8.5a5 5 0 01-7-7L14 5.5a3.4 3.4 0 014.8 4.8L10.5 18.5a1.7 1.7 0 01-2.4-2.4L16 8"/></svg>0</span></div>
           </div>
         </article>
@@ -344,7 +359,7 @@ svg{display:block}
           <div class="c-due"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>Prazo 19/08/2026</div>
           <div class="c-prog"><div class="c-bar"><i style="width:70%"></i></div><span class="c-pct">70%</span></div>
           <div class="c-foot">
-            <div class="stack"><span class="av r-bea" style="background-color:#B08968"></span><span class="av r-pau" style="background-color:#6B4F3A"></span><span class="av r-cai" style="background-color:#7D5A44"></span></div>
+            <div class="stack"><span class="av r-bea" style="background:linear-gradient(135deg,#38BDF8,#0284C7)">BD</span><span class="av r-pau" style="background:linear-gradient(135deg,#F472B6,#DB2777)">PV</span><span class="av r-cai" style="background:linear-gradient(135deg,#FBBF24,#D97706)">CM</span></div>
             <div class="meta"><span><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 10-3.2 6.4L20 20l-.6-3.2A7.9 7.9 0 0020 12z"/></svg>2</span><span><svg viewBox="0 0 24 24"><path d="M21 12.5l-8.5 8.5a5 5 0 01-7-7L14 5.5a3.4 3.4 0 014.8 4.8L10.5 18.5a1.7 1.7 0 01-2.4-2.4L16 8"/></svg>3</span></div>
           </div>
         </article>
@@ -363,7 +378,7 @@ svg{display:block}
           <div class="c-due"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>Prazo 11/08/2026</div>
           <div class="c-prog"><div class="c-bar"><i style="width:80%"></i></div><span class="c-pct">80%</span></div>
           <div class="c-foot">
-            <div class="stack"><span class="av r-ary" style="background-color:#8C6E5D"></span><span class="av r-cai" style="background-color:#7D5A44"></span><span class="more">+1</span></div>
+            <div class="stack"><span class="av r-ary" style="background:linear-gradient(135deg,#6366F1,#4F46E5)">AC</span><span class="av r-cai" style="background:linear-gradient(135deg,#FBBF24,#D97706)">CM</span><span class="more">+1</span></div>
             <div class="meta"><span><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 10-3.2 6.4L20 20l-.6-3.2A7.9 7.9 0 0020 12z"/></svg>2</span><span><svg viewBox="0 0 24 24"><path d="M21 12.5l-8.5 8.5a5 5 0 01-7-7L14 5.5a3.4 3.4 0 014.8 4.8L10.5 18.5a1.7 1.7 0 01-2.4-2.4L16 8"/></svg>1</span></div>
           </div>
         </article>
@@ -374,7 +389,7 @@ svg{display:block}
           <div class="c-due"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>Prazo 09/08/2026</div>
           <div class="c-prog"><div class="c-bar"><i style="width:75%"></i></div><span class="c-pct">75%</span></div>
           <div class="c-foot">
-            <div class="stack"><span class="av r-bea" style="background-color:#B08968"></span><span class="av r-fel" style="background-color:#8A5A3B"></span></div>
+            <div class="stack"><span class="av r-bea" style="background:linear-gradient(135deg,#38BDF8,#0284C7)">BD</span><span class="av r-fel" style="background:linear-gradient(135deg,#2DD4BF,#0D9488)">FT</span></div>
             <div class="meta"><span><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 10-3.2 6.4L20 20l-.6-3.2A7.9 7.9 0 0020 12z"/></svg>2</span><span><svg viewBox="0 0 24 24"><path d="M21 12.5l-8.5 8.5a5 5 0 01-7-7L14 5.5a3.4 3.4 0 014.8 4.8L10.5 18.5a1.7 1.7 0 01-2.4-2.4L16 8"/></svg>2</span></div>
           </div>
         </article>
@@ -385,7 +400,7 @@ svg{display:block}
           <div class="c-due"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>Prazo 14/08/2026</div>
           <div class="c-prog"><div class="c-bar"><i style="width:60%"></i></div><span class="c-pct">60%</span></div>
           <div class="c-foot">
-            <div class="stack"><span class="av r-pau" style="background-color:#6B4F3A"></span><span class="av r-ary" style="background-color:#8C6E5D"></span></div>
+            <div class="stack"><span class="av r-pau" style="background:linear-gradient(135deg,#F472B6,#DB2777)">PV</span><span class="av r-ary" style="background:linear-gradient(135deg,#6366F1,#4F46E5)">AC</span></div>
             <div class="meta"><span><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 10-3.2 6.4L20 20l-.6-3.2A7.9 7.9 0 0020 12z"/></svg>1</span><span><svg viewBox="0 0 24 24"><path d="M21 12.5l-8.5 8.5a5 5 0 01-7-7L14 5.5a3.4 3.4 0 014.8 4.8L10.5 18.5a1.7 1.7 0 01-2.4-2.4L16 8"/></svg>1</span></div>
           </div>
         </article>
@@ -403,7 +418,7 @@ svg{display:block}
           <div class="c-cli"><span>Cliente</span><b>Bold Brands</b></div>
           <div class="c-due done"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 108-8"/><path d="M4 5v4h4"/><path d="M9.5 12.5l2 2 3.5-3.5"/></svg>Concluída em 07/08/2026</div>
           <div class="c-foot">
-            <div class="stack"><span class="av r-ary" style="background-color:#8C6E5D"></span><span class="av r-bea" style="background-color:#B08968"></span></div>
+            <div class="stack"><span class="av r-ary" style="background:linear-gradient(135deg,#6366F1,#4F46E5)">AC</span><span class="av r-bea" style="background:linear-gradient(135deg,#38BDF8,#0284C7)">BD</span></div>
           </div>
         </article>
         <article class="card">
@@ -412,7 +427,7 @@ svg{display:block}
           <div class="c-cli"><span>Cliente</span><b>Café do Centro</b></div>
           <div class="c-due done"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 108-8"/><path d="M4 5v4h4"/><path d="M9.5 12.5l2 2 3.5-3.5"/></svg>Concluída em 06/08/2026</div>
           <div class="c-foot">
-            <div class="stack"><span class="av r-cai" style="background-color:#7D5A44"></span><span class="av r-pau" style="background-color:#6B4F3A"></span></div>
+            <div class="stack"><span class="av r-cai" style="background:linear-gradient(135deg,#FBBF24,#D97706)">CM</span><span class="av r-pau" style="background:linear-gradient(135deg,#F472B6,#DB2777)">PV</span></div>
           </div>
         </article>
         <article class="card">
@@ -421,7 +436,7 @@ svg{display:block}
           <div class="c-cli"><span>Cliente</span><b>Sunset Wear</b></div>
           <div class="c-due done"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 108-8"/><path d="M4 5v4h4"/><path d="M9.5 12.5l2 2 3.5-3.5"/></svg>Concluída em 05/08/2026</div>
           <div class="c-foot">
-            <div class="stack"><span class="av r-fel" style="background-color:#8A5A3B"></span><span class="av r-ary" style="background-color:#8C6E5D"></span></div>
+            <div class="stack"><span class="av r-fel" style="background:linear-gradient(135deg,#2DD4BF,#0D9488)">FT</span><span class="av r-ary" style="background:linear-gradient(135deg,#6366F1,#4F46E5)">AC</span></div>
           </div>
         </article>
       </div>
@@ -445,7 +460,7 @@ svg{display:block}
       <div class="p-title"><svg viewBox="0 0 24 24"><path d="M12 3l2.7 5.6 6.3.9-4.5 4.3 1 6.2-5.5-3-5.5 3 1-6.2L3 9.5l6.3-.9z"/></svg><b>Identidade Visual<br>Marca Bold</b></div>
       <div class="p-cli"><span class="sq">B</span><div><b>Bold Brands</b><span>Cliente</span></div></div>
       <div class="p-lab">RESPONSÁVEL</div>
-      <div class="p-resp"><span class="av r-ary" style="background-color:#8C6E5D"></span><div><b>Ardyjany Carlos</b><span>CEO</span></div></div>
+      <div class="p-resp"><span class="av" style="background:linear-gradient(135deg,#6366F1,#4F46E5);font-size:11px;box-shadow:0 0 0 2px #6366F1,0 0 0 4px #fff">AC</span><div><b>Ardyjany Carlos</b><span>CEO</span></div></div>
       <div class="p-when"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>Concluída em 07/08/2026 às 14:30</div>
       <div class="p-cont-h"><div class="p-lab" style="margin:0">CONTEÚDO</div><span>1 arquivo</span></div>
       <div class="p-file"><span class="fic">PDF</span><div><b>Manual_Identidade_Bold.pdf</b></div><span>12.4 MB</span></div>
@@ -462,6 +477,23 @@ svg{display:block}
         <div class="more">⋯</div>
       </div>
     </aside>
+  </div>
+
+  <!-- KPI FOOTER (referência) -->
+  <div class="kpis">
+    <div class="kpi"><span class="kpi-ic" style="background:#E7F0FE"><svg viewBox="0 0 24 24" style="stroke:#2563EB"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg></span>
+      <div class="kpi-tx"><b>32</b><span>Tarefas ativas</span><i class="k-up">+12% vs mês passado</i></div>
+      <span class="kpi-spark"><svg viewBox="0 0 64 30" style="stroke:#3B82F6"><polyline points="2,22 10,18 18,21 26,14 34,17 42,10 50,13 62,6"/></svg></span></div>
+    <div class="kpi"><span class="kpi-ic" style="background:#E8F8EE"><svg viewBox="0 0 24 24" style="stroke:#16A34A"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></svg></span>
+      <div class="kpi-tx"><b>78%</b><span>Conclusão geral</span><i class="k-up">+8% vs mês passado</i></div>
+      <span class="kpi-spark"><svg viewBox="0 0 64 30" style="stroke:#22C55E"><polyline points="2,24 12,22 22,18 32,19 42,12 52,10 62,4"/></svg></span></div>
+    <div class="kpi"><span class="kpi-ic" style="background:#FDE8E8"><svg viewBox="0 0 24 24" style="stroke:#DC2626"><path d="M4 19L8 7l4 8 4-10 4 14"/></svg></span>
+      <div class="kpi-tx"><b>5</b><span>Atrasadas</span><i class="k-down">-2 vs semana passada</i></div>
+      <span class="kpi-spark"><svg viewBox="0 0 64 30" style="stroke:#EF4444"><polyline points="2,10 12,14 22,9 32,16 42,13 52,20 62,24"/></svg></span></div>
+    <div class="kpi"><span class="kpi-ic" style="background:#E8F8EE"><svg viewBox="0 0 24 24" style="stroke:#16A34A"><path d="M12 3l7 3v5c0 4.4-2.9 8-7 10-4.1-2-7-5.6-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg></span>
+      <div class="kpi-tx"><b>98%</b><span>SLA em dia</span><i class="k-up">+5% vs mês</i></div></div>
+    <div class="kpi kpi-legend"><span class="avs"><span class="av" style="background:linear-gradient(135deg,#38BDF8,#0284C7);box-shadow:0 0 0 2px #0EA5E9,0 0 0 4px #fff">BD</span><span class="av" style="background:linear-gradient(135deg,#FBBF24,#D97706);box-shadow:0 0 0 2px #F59E0B,0 0 0 4px #fff">CM</span><span class="av" style="background:linear-gradient(135deg,#6366F1,#4F46E5);box-shadow:0 0 0 2px #6366F1,0 0 0 4px #fff">AC</span><span class="av" style="background:linear-gradient(135deg,#F472B6,#DB2777);box-shadow:0 0 0 2px #EC4899,0 0 0 4px #fff">PV</span><span class="more">+1</span></span>
+      <div style="min-width:0"><b>Legenda de responsáveis</b><span>Cores ajudam a identificar quem é responsável</span></div></div>
   </div>
 </main>
 </body>
