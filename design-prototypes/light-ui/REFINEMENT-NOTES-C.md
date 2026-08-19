@@ -1,4 +1,21 @@
-# ▶ R10 — FINAL DESIGN CLEANUP · CONSOLIDAÇÃO + READINESS (aguarda owner)
+# ★ R11 — FINAL DESIGN COMPLETE DECLARATION (19/08/2026)
+Gate final do Design Closure Roadmap, autorizado explicitamente pelo owner. Revalidação
+read-only ANTES de declarar (regra P0 — nada declarado automaticamente): Gate 1 branch/HEAD
+`329cc35`/tree limpa ✔ · Gate 2 mapa 30/30 (13+3+6+7+1; 30 números únicos no §A) ✔ · Gate 3
+F1–F13 Golden sem stale (matches "proposta" = nomes de arquivo históricos, triados) ✔ · Gate 4
+B ×6 aprovadas ✔ · Gate 5 C1 GOLDEN COMPLETA/C2 GOLDEN DOCUMENTAL/C3–C8 GOLDEN ✔ · Gate 6 R8
+escopo exato sem claims inflados (0 matches em 21 docs) ✔ · Gate 7 R9/R9.1 GO + errata CANÔNICA
++ D05–D13 resolvidas (8 marcas) ✔ · Gate 8 P0 upload ABERTO com a distinção (não bloqueia
+design; bloqueia implementação pronta) ✔ · Gate 9 functional debts registradas/separadas ✔ ·
+Gate 10 hierarquia de fontes (código recente = funcional; Golden/contracts = visual) ✔ ·
+Gate 11 higiene: 43 commits da trilha, ZERO paths fora de design-prototypes/light-ui ✔.
+⇒ **DESIGN COMPLETO = DECLARADO PELO OWNER · DESIGN FROZEN** (manifest §16; roadmap R11 ✔;
+mapa banner COMPLETE/FROZEN). DESIGN-COMPLETE-DECLARATION.md NÃO criado (manifest já comporta
+a declaração sem ambiguidade — preferência do mandato por não duplicar). Zero imagem; zero
+implementação; produção intacta. Implementação Light UI = NÃO iniciada/NÃO autorizada — aguarda
+NOVO mandato do owner (sem "R12" automático).
+
+# ✔ R10 — FINAL DESIGN CLEANUP · CONSOLIDAÇÃO + READINESS (GO do owner)
 Fase 100% documental (zero imagem; zero mudança de design; zero token novo). Executado:
 tree audit completo (63 arquivos: 13 HTML Golden A + 2 spec boards + 1 prancha R9.1 + 12
 históricos de proposta/iteração + 18 cópias de validação r8/r9.1 + 14 docs + 3 auxiliares);

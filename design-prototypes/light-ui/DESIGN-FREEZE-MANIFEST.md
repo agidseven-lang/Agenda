@@ -1,9 +1,14 @@
-# DESIGN FREEZE MANIFEST — LIGHT UI · AGENDA ID SEVEN (R10)
+# DESIGN FREEZE MANIFEST — LIGHT UI · AGENDA ID SEVEN
 
-**Função:** handoff final e único para a decisão do owner no R11.
-**Status desta fase:** R10 = ENTREGUE — aguarda owner.
-**Declaração explícita:** ⚠ **DESIGN COMPLETO AINDA NÃO DECLARADO — depende exclusivamente do
-owner no R11.** Implementação Light UI = **NÃO AUTORIZADA**.
+**Função:** documento final de fechamento do Design Closure Roadmap (R1–R11).
+
+# ★ DESIGN COMPLETO — DECLARADO PELO OWNER
+**Declaração registrada no R11 em 19/08/2026**, após revalidação read-only dos Gates 1–11
+(todos PASS; provas no relatório R11 e na closure matrix §14). Autorização explícita do owner
+no mandato R11. **Esta declaração fecha exclusivamente o DESIGN — NÃO autoriza implementação**
+(desktop/src, build, deploy, release, PR de produção, Firebase/Firestore/Functions/Worker/
+Electron/updater seguem intocados e proibidos). A futura implementação terá mandato e roadmap
+próprios, aprovados separadamente pelo owner.
 
 ## 1 · SCOPE
 Redesign visual Light UI da Desktop "Agenda ID Seven": 13 Frames A Golden + 8 foundations
@@ -160,7 +165,8 @@ funcional ⇒ **PARAR → REPORTAR → OWNER DECIDE**.
 | R1 Checkpoint Global | `44fe256` |
 | R2 `3c06c26` · R3 `f9fe31a` · R4 `2516426` · R5 `7aba3fa` · R5.1 `5959ae0` · R6 `b2f6833` |
 | R7 `4b72d08` · R8 `1b7210c` · R9 `d927c01` · R9.1 `363d221` |
-| R10 (este cleanup) | ver commit desta entrega |
+| R10 Final cleanup | `329cc35` |
+| R11 Design Complete Declaration | commit desta entrega (declare design complete and freeze) |
 
 ## 14 · CLOSURE MATRIX
 | # | Critério | Status | Evidência |
@@ -176,7 +182,7 @@ funcional ⇒ **PARAR → REPORTAR → OWNER DECIDE**.
 | 9 | Dívidas separadas do redesign | **PASS** | §9/§10; a11y §28 |
 | 10 | Branch limpo | **PASS** | 42 commits 100% em design-prototypes/light-ui; zero produção/segredo/foto real |
 | 11 | Source-of-truth definida | **PASS** | §11/§12 |
-| 12 | Owner declarar DESIGN COMPLETO | **PENDENTE — OWNER DECLARATION (R11)** | — |
+| 12 | Owner declarar DESIGN COMPLETO | **✔ DECLARADO (R11 · 19/08/2026)** | mandato R11 do owner; Gates 1–11 revalidados PASS |
 
 ## 15 · FUTURE IMPLEMENTATION PRE-FLIGHT (registro; NADA executado)
 Antes do primeiro commit de produção, a futura fase de implementação DEVE:
@@ -192,3 +198,18 @@ Antes do primeiro commit de produção, a futura fase de implementação DEVE:
 10. Planejar rollout incremental (superfície a superfície; sem big-bang).
 *A estratégia de release completa NÃO está definida aqui — a fase de implementação terá mandato
 próprio.*
+
+## 16 · DESIGN FREEZE (statement final — R11)
+O Light UI do Agenda ID Seven está formalmente:
+
+# DESIGN COMPLETE + DESIGN FROZEN
+
+**Significa:** composição visual aprovada (13 Frames A Golden) · foundations aprovadas (C1–C8
+oficiais) · B specs aprovadas (6) · responsividade mínima validada (1920×1080 · 1366×768 ·
+Windows 125% — somente esse escopo) · acessibilidade de design fechada (R9/R9.1) · errata
+canônica · mapa 30/30 completo.
+
+**NÃO significa:** implementação pronta · código alterado · release aprovado · produção migrada.
+Qualquer alteração de design a partir daqui exige reabertura explícita pelo owner. A
+implementação futura segue o pre-flight (§15) sob NOVO mandato — o Design Closure Roadmap
+termina aqui (não existe "R12" automático).

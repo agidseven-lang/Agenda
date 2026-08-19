@@ -4,7 +4,7 @@
 **Função:** sequência oficial para terminar o DESIGN. Derivada da auditoria real do
 `MASTER-SURFACE-MAP.md` (30 superfícies; taxonomia C1–C8 do §F) + `C1-FORMS-CONTROLS-CONTRACT.md`
 + `REFINEMENT-NOTES-C.md`. ("Nenhuma etapa foi iniciada" era o estado na criação — histórico.)
-**Estado vigente (R10): R1–R9.1 = ✔ GO · R10 = ▶ ENTREGUE (aguarda owner) · R11 = NÃO INICIADO.**
+**Estado FINAL (R11): R1–R11 = ✔ GO / CONCLUÍDOS · ★ DESIGN COMPLETO = DECLARADO PELO OWNER (19/08/2026) · DESIGN FROZEN · Implementação Light UI = NÃO INICIADA / NÃO AUTORIZADA (novo mandato futuro).**
 Cada etapa só começa com GO do owner.
 **Regra permanente:** implementação Light UI **PROIBIDA** até o owner declarar DESIGN COMPLETO.
 
@@ -166,21 +166,28 @@ de fechamento.
 - **Artefato:** seção "A11Y-SPEC" única. **Dependência:** R2–R7. **Imagem?** NÃO.
 - **Owner approval?** SIM. **Fechamento:** spec aceita.
 
-## R10 · FINAL DESIGN CLEANUP ▶ ENTREGUE (aguarda avaliação do owner)
+## R10 · FINAL DESIGN CLEANUP ✔ APROVADO PELO OWNER (GO / CONCLUÍDO)
 > **Status:** auditoria documental integral da trilha — tree audit (63 arquivos classificados),
 > stale scan executado e corrigido (C2/C7 headers de R3/R4; C1 §3/§16; contract/errata R9/R9.1 →
 > GO/CANÔNICA; notes ▶→✔; mapa com banner vigente; TOKENS/README marcados históricos), matriz de
 > fechamento 1–11 = PASS (12 = aguarda R11), commit matrix com SHAs reais, higiene do branch
 > reconfirmada (42 commits, 100% em design-prototypes/light-ui), hierarquia de fonte-da-verdade
 > formalizada e **`DESIGN-FREEZE-MANIFEST.md`** criado (handoff do R11 + implementation
-> pre-flight). Zero imagem; zero mudança de design. **R10 NÃO concluída**; R11 não iniciado.
+> pre-flight). Zero imagem; zero mudança de design. **R10 = GO do owner (commit `329cc35`).**
 - **Objetivo:** matriz 30/30 sem célula pendente; dívidas funcionais listadas FORA do escopo de
   design (fase funcional futura); trilhas gated explícitas (F14a–c janelas premium; Client Portal
   = trilha separada; decisão do owner se ficam fora do "completo").
 - **Artefato:** MASTER-SURFACE-MAP final. **Dependência:** R2–R9. **Imagem?** NÃO.
 - **Owner approval?** SIM. **Fechamento:** mapa sem pendências.
 
-## R11 · CHECKPOINT FINAL — DECLARAÇÃO "DESIGN COMPLETO"
+## R11 · CHECKPOINT FINAL — DECLARAÇÃO "DESIGN COMPLETO" ✔ GO / DESIGN COMPLETO DECLARADO
+> **Status:** executado em 19/08/2026 com autorização explícita do owner. Gates 1–11 revalidados
+> read-only (branch/HEAD `329cc35` limpo · mapa 30/30 · F1–F13 Golden · B ×6 · C1–C8 oficiais ·
+> R8 escopo exato · R9/R9.1 GO + errata canônica · P0 de implementação preservado aberto ·
+> functional debts registradas · hierarquia de fontes · higiene 43 commits 100% light-ui) —
+> **todos PASS** ⇒ **DESIGN COMPLETO = DECLARADO** e registrado no `DESIGN-FREEZE-MANIFEST.md`
+> (§16 Design Freeze). Zero imagem; zero implementação; produção intacta. O roadmap termina
+> aqui — a implementação terá NOVO mandato/roadmap aprovado separadamente.
 - **Objetivo:** relatório final de fechamento (critérios abaixo) e decisão explícita do owner.
 - **Critérios (todos):** 1) F1–13 Golden ✔ · 2) B cobertas (R7) · 3) transversais cobertos
   (R3–R6) · 4) foundations congeladas · 5) C1 completa no escopo ratificado (R2) · 6)

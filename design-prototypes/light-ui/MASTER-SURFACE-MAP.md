@@ -8,8 +8,9 @@
 > contracts + errata (NUNCA extrair cores dos screenshots históricos). Contagem: **GOLDEN 13 ·
 > A-futura gated 3 · B 6 · C transversais 7 · Trilha separada 1 = 30.** Dívidas: design =
 > resolvidas (errata); implementação/funcionais = registers (a11y contract §28/§29 + manifest).
-> **DESIGN COMPLETO = AINDA NÃO DECLARADO (R11) · IMPLEMENTAÇÃO LIGHT = NÃO AUTORIZADA.**
-> Handoff: `DESIGN-FREEZE-MANIFEST.md`.
+> ★ **DESIGN STATUS = COMPLETE / FROZEN** — declarado pelo owner no R11 (19/08/2026; Gates 1–11
+> PASS). **IMPLEMENTAÇÃO LIGHT = NÃO INICIADA / NÃO AUTORIZADA** (novo mandato futuro).
+> Declaração e freeze statement: `DESIGN-FREEZE-MANIFEST.md` (§16).
 
 > ## ★ CHECKPOINT GLOBAL DO DESIGN (decisão do owner — HISTÓRICO R1; estado da época)
 > **FRAMES A PRIORITÁRIOS 1–13 = GOLDEN / CONGELADOS.** Commits finais:
