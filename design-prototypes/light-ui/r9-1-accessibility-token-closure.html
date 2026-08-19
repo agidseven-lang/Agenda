@@ -1,0 +1,314 @@
+<!doctype html>
+<!-- ============================================================================
+  R9.1 — ACCESSIBILITY TOKEN CLOSURE · BEFORE × AFTER (prancha de contrato, 1920×1080)
+  Errata CANDIDATA de tokens Golden (aguarda owner). NÃO é tela operacional.
+  Golden originais INTOCADOS — esta prancha define o TOKEN ERRATA / ACCESSIBILITY
+  OVERRIDE para contracts e futura implementação (política §8 do mandato R9.1).
+  Ratios impressos = contraste WCAG calculado (luminância relativa sRGB) dos hex.
+  Baseline: texto normal ≥4.5 · texto grande ≥3.0 · UI/foco ≥3.0.
+============================================================================ -->
+<html lang="pt-BR"><head><meta charset="utf-8">
+<title>R9.1 — Accessibility Token Closure</title>
+<link rel="stylesheet" href="_fonts.css">
+<style>
+:root{
+  --canvas:#F5F6F9; --surface:#FFFFFF; --sunk:#F1F4F8;
+  --hair:#E8EBF1; --hair-2:#EFF1F6;
+  --tx-1:#14181F; --tx-2:#4B5364;
+  /* antes */
+  --tx3-old:#767E8D; --tx4-old:#A8AFBC; --sbf-old:#727990;
+  /* depois (errata candidata) */
+  --tx3-new:#697181; --tx4-new:#6E7786; --sbf-new:#828AA8;
+  --brand:#5B7CFA; --brand-ink:#4353D8;
+  --grad-old:linear-gradient(135deg,#6E5EF3,#9A6BF5);
+  --grad-new:linear-gradient(135deg,#6E5EF3,#8356E6);
+  --sb-1:#252B3D; --sb-2:#1B2031; --sb-dim:#9299AC;
+  --green:#22A06B; --green-ink:#12784C; --blue:#60A5FA; --blue-ink:#2563EB;
+  --orange:#F59E0B; --warn-ink:#B45309; --red:#EF4444; --danger-ink:#C4302B;
+  --crit:#E11D48; --crit-ink:#B10E38; --sys:#9CA3AF; --sys-ink:#5B6472;
+  --r-md:12px; --r-lg:16px; --r-pill:999px;
+  --sh-1:0 0 0 1px var(--hair),0 1px 2px rgba(19,24,38,.04),0 5px 14px rgba(19,24,38,.035);
+}
+html,body{margin:0;padding:0}
+body{font-family:'Inter',-apple-system,'Segoe UI',Roboto,sans-serif;color:var(--tx-1);background:var(--canvas);-webkit-font-smoothing:antialiased;font-feature-settings:"cv05" 1,"cv11" 1}
+.frame{width:1920px;height:1080px;overflow:hidden;position:relative;background:var(--canvas);font-size:13px}
+.frame::after{content:"";position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 0 1px rgba(19,24,38,.05)}
+.wrap{padding:26px 34px 0}
+/* header */
+.hd{display:flex;align-items:center;gap:16px;margin-bottom:16px}
+.hd-ic{width:46px;height:46px;border-radius:13px;background:linear-gradient(140deg,#5B7CFA,#6E5EF3);display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 8px 20px rgba(94,110,243,.3)}
+.hd-ic svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.hd h1{margin:0;font-family:'InterTight';font-size:24px;font-weight:700;letter-spacing:-.02em;line-height:1.05}
+.hd .sub{font-size:12.5px;color:var(--tx3-new);margin-top:4px}
+.hd .sub b{color:var(--tx-2);font-weight:650}
+.badges{margin-left:auto;display:flex;gap:8px}
+.badge{height:30px;padding:0 13px;border-radius:var(--r-pill);display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:800;letter-spacing:.05em}
+.badge.errata{color:#8A5A04;background:color-mix(in srgb,#F59E0B 12%,#fff);box-shadow:inset 0 0 0 1px color-mix(in srgb,#F59E0B 30%,#fff)}
+.badge.cand{color:#4353D8;background:color-mix(in srgb,#5B7CFA 10%,#fff);box-shadow:inset 0 0 0 1px color-mix(in srgb,#5B7CFA 26%,#fff)}
+/* grid da prancha */
+.grid{display:grid;grid-template-columns:1.24fr 1fr 1fr;grid-template-rows:auto auto;gap:14px}
+.panel{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--sh-1);padding:16px 18px 15px;min-width:0}
+.p-k{font-size:10px;font-weight:800;letter-spacing:.11em;color:var(--tx4-new);text-transform:uppercase;display:flex;align-items:center;gap:8px}
+.p-k .n{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:6px;background:var(--sunk);color:var(--tx-2);font-size:10.5px;letter-spacing:0}
+.p-t{font-family:'InterTight';font-size:16px;font-weight:700;letter-spacing:-.012em;margin:6px 0 2px}
+.p-s{font-size:11.5px;color:var(--tx3-new);line-height:1.5;margin-bottom:11px}
+/* chips de ratio */
+.rt{display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 8px;border-radius:var(--r-pill);font-size:10px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rt.pass{color:#12784C;background:color-mix(in srgb,#22A06B 11%,#fff);box-shadow:inset 0 0 0 1px color-mix(in srgb,#22A06B 26%,#fff)}
+.rt.fail{color:#C4302B;background:color-mix(in srgb,#EF4444 9%,#fff);box-shadow:inset 0 0 0 1px color-mix(in srgb,#EF4444 24%,#fff)}
+.rt.keep{color:var(--tx-2);background:var(--sunk);box-shadow:inset 0 0 0 1px var(--hair)}
+.hexl{font-size:10px;font-weight:700;color:var(--tx4-new);font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.arrow{color:var(--tx4-new);font-size:14px;font-weight:600}
+/* A — hierarquia */
+.trow{display:grid;grid-template-columns:1fr 18px 1fr;gap:10px;align-items:center;padding:11.5px 0;border-bottom:1px solid var(--hair-2)}
+.trow:last-child{border-bottom:0}
+.tcell{display:flex;align-items:center;gap:10px;min-width:0}
+.tcell .sw{width:14px;height:14px;border-radius:5px;flex:none;box-shadow:inset 0 0 0 1px rgba(19,24,38,.08)}
+.tcell .lab{min-width:0}
+.tcell .lab .nm{font-size:11px;font-weight:700;color:var(--tx-2)}
+.tcell .lab .sample{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meta-note{font-size:10.5px;color:var(--tx3-new);background:var(--sunk);border-radius:9px;padding:8px 11px;line-height:1.58;margin-top:12px}
+.meta-note b{color:var(--tx-2)}
+/* B — inks */
+.ink-row{display:grid;grid-template-columns:86px 1fr 1fr;gap:10px;align-items:center;padding:6.5px 0;border-bottom:1px solid var(--hair-2)}
+.ink-row:last-child{border-bottom:0}
+.ink-fam{font-size:11px;font-weight:750;color:var(--tx-2)}
+.acc{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--tx3-new)}
+.acc .d{width:10px;height:10px;border-radius:50%;flex:none}
+.inktx{font-size:12.5px;font-weight:700;display:flex;align-items:center;gap:7px;white-space:nowrap}
+/* C — CTA */
+.cta-pair{display:flex;gap:14px;align-items:flex-start}
+.cta-col{flex:1;min-width:0}
+.cta-lbl{font-size:10px;font-weight:800;letter-spacing:.09em;color:var(--tx4-new);margin-bottom:7px}
+.btn{height:44px;border-radius:12px;color:#fff;font-size:14px;font-weight:650;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 8px 20px rgba(110,94,243,.26)}
+.btn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.b-old{background:var(--grad-old)} .b-new{background:var(--grad-new)}
+.stopline{display:flex;align-items:center;gap:7px;margin-top:8px;font-size:10.5px;color:var(--tx3-new)}
+.stopline .sw{width:12px;height:12px;border-radius:4px}
+.daycell{width:52px;height:48px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;margin-top:10px;box-shadow:0 6px 16px rgba(110,94,243,.3)}
+/* D — calendário */
+.calpair{display:flex;gap:12px}
+.calmini{flex:1;background:var(--surface);border-radius:11px;box-shadow:inset 0 0 0 1px var(--hair);padding:9px 9px 7px}
+.calmini .cl{font-size:9.5px;font-weight:800;letter-spacing:.08em;color:var(--tx4-new);margin-bottom:6px;text-transform:uppercase}
+.cgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+.cc{height:44px;border-radius:9px;background:var(--surface);box-shadow:inset 0 0 0 1px var(--hair-2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:11.5px;font-weight:650;color:var(--tx-2)}
+.dots{display:flex;gap:3.5px;height:7px;align-items:center}
+.dt{width:5.5px;height:5.5px;border-radius:50%}
+/* shapes (depois) */
+.sh-c{width:6px;height:6px;border-radius:50%}
+.sh-q{width:6px;height:6px;border-radius:1.5px}
+.sh-t{width:0;height:0;border-left:3.6px solid transparent;border-right:3.6px solid transparent;border-bottom:6.4px solid var(--c)}
+.sh-l{width:6px;height:6px;border-radius:1.5px;transform:rotate(45deg) scale(.92)}
+.sh-o{width:6px;height:6px;border-radius:50%;background:transparent!important;box-shadow:inset 0 0 0 1.6px var(--c)}
+.legend{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+.lchip{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border-radius:var(--r-pill);background:var(--surface);box-shadow:inset 0 0 0 1px var(--hair);font-size:10.5px;font-weight:650;color:var(--tx-2)}
+/* E — target */
+.toast{position:relative;width:352px;border-radius:15px;background:linear-gradient(180deg,#1A202E,#111620);box-shadow:0 16px 40px -14px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.07);padding:11px 34px 11px 13px;display:flex;gap:10px;align-items:flex-start}
+.toast .av{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#5B6CFF,#22D3EE);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:12.5px;flex:none}
+.toast .bd{min-width:0}
+.toast .t1{color:#EEF2F8;font-size:12.5px;font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.toast .t2{color:#8B97A8;font-size:11px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tx-glyph{position:absolute;top:8px;right:9px;width:20px;height:20px;border-radius:6px;color:#7F8AA0;display:flex;align-items:center;justify-content:center;font-size:13px;line-height:1}
+.hit{position:absolute;border-radius:8px;pointer-events:none}
+.hit.bad{outline:1.5px dashed #E4574C;outline-offset:0}
+.hit.good{outline:1.5px dashed #22A06B;outline-offset:0}
+.hitlab{position:absolute;font-size:9.5px;font-weight:800;letter-spacing:.04em;white-space:nowrap}
+/* F — complementos */
+.sbdemo{border-radius:11px;background:linear-gradient(180deg,var(--sb-1),var(--sb-2));padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.sbdemo .l1{font-size:10.5px;font-weight:700;letter-spacing:.15em;text-transform:uppercase}
+.sbdemo .l2{font-size:12px}
+.foot{position:absolute;left:34px;right:34px;bottom:12px;display:flex;align-items:center;gap:10px;font-size:10.5px;color:var(--tx4-new)}
+.foot .d{width:4px;height:4px;border-radius:50%;background:var(--tx4-new);opacity:.5}
+.inp-demo{height:40px;border-radius:12px;background:var(--surface);box-shadow:inset 0 0 0 1px #DFE3EB;display:flex;align-items:center;padding:0 12px;font-size:12.5px;color:var(--tx3-new)}
+.inp-demo.focus{box-shadow:inset 0 0 0 1.5px #6E5EF3,0 0 0 2.5px rgba(110,94,243,.11);color:var(--tx-1)}
+.subrow{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.sublab{font-size:10px;font-weight:800;letter-spacing:.09em;color:var(--tx4-new);margin-bottom:6px}
+</style></head><body>
+<div class="frame"><div class="wrap">
+
+  <div class="hd">
+    <div class="hd-ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.6 2.6L16.5 9"/></svg></div>
+    <div>
+      <h1>R9.1 — Accessibility Token Closure · before × after</h1>
+      <div class="sub"><b>Errata de tokens Golden</b> · contraste WCAG calculado (4.5 texto · 3.0 grande/UI) · Golden originais intocados · prancha de contrato — não é tela</div>
+    </div>
+    <div class="badges">
+      <span class="badge errata">TOKEN ERRATA</span>
+      <span class="badge cand">CANDIDATO — AGUARDA OWNER</span>
+    </div>
+  </div>
+
+  <div class="grid">
+
+    <!-- A · TEXT HIERARCHY -->
+    <div class="panel" style="grid-row:span 2">
+      <div class="p-k"><span class="n">A</span> TEXT HIERARCHY</div>
+      <div class="p-t">tx-1 → tx-4 · hierarquia editorial preservada</div>
+      <div class="p-s">tx-1/tx-2 mantidos. tx-3/tx-4 recebem o <b>menor escurecimento</b> que atinge o alvo — sem “virar preto”.</div>
+
+      <div class="trow">
+        <div class="tcell"><span class="sw" style="background:#14181F"></span><div class="lab"><div class="nm">tx-1 <span class="hexl">#14181F</span></div><div class="sample" style="color:#14181F;font-size:13.5px;font-weight:650">Cronograma Feed &amp; Stories</div></div></div>
+        <span class="arrow">→</span>
+        <div class="tcell"><span class="rt keep">MANTIDO · 17.79</span><span class="rt pass">PASS</span></div>
+      </div>
+      <div class="trow">
+        <div class="tcell"><span class="sw" style="background:#4B5364"></span><div class="lab"><div class="nm">tx-2 <span class="hexl">#4B5364</span></div><div class="sample" style="color:#4B5364;font-size:13px">Legendas e artes de cada conteúdo</div></div></div>
+        <span class="arrow">→</span>
+        <div class="tcell"><span class="rt keep">MANTIDO · 7.72</span><span class="rt pass">PASS</span></div>
+      </div>
+      <div class="trow">
+        <div class="tcell"><span class="sw" style="background:var(--tx3-old)"></span><div class="lab"><div class="nm">tx-3 <span class="hexl">#767E8D</span></div><div class="sample" style="color:var(--tx3-old);font-size:13px">Enviado por Miercohévisk em 11/08</div></div><span class="rt fail">4.09 · 3.78</span></div>
+        <span class="arrow">→</span>
+        <div class="tcell"><span class="sw" style="background:var(--tx3-new)"></span><div class="lab"><div class="nm">tx-3′ <span class="hexl">#697181</span></div><div class="sample" style="color:var(--tx3-new);font-size:13px">Enviado por Miercohévisk em 11/08</div></div><span class="rt pass">4.91 · 4.54 ✓</span></div>
+      </div>
+      <div class="trow">
+        <div class="tcell"><span class="sw" style="background:var(--tx4-old)"></span><div class="lab"><div class="nm">tx-4 <span class="hexl">#A8AFBC</span></div><div class="sample" style="color:var(--tx4-old);font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase">DESIGNER&nbsp;&nbsp;CARGA&nbsp;&nbsp;% NO PRAZO&nbsp;&nbsp;ATRASO MÉD.</div></div><span class="rt fail">2.21 · 2.04</span></div>
+        <span class="arrow">→</span>
+        <div class="tcell"><span class="sw" style="background:var(--tx4-new)"></span><div class="lab"><div class="nm">tx-4′ <span class="hexl">#6E7786</span></div><div class="sample" style="color:var(--tx4-new);font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase">DESIGNER&nbsp;&nbsp;CARGA&nbsp;&nbsp;% NO PRAZO&nbsp;&nbsp;ATRASO MÉD.</div></div><span class="rt pass">4.52 (surface) ✓</span></div>
+      </div>
+
+      <div class="meta-note"><b>Regra de superfície tx-4′:</b> token de texto para <b>surface</b> (cards brancos: th de tabela, metas, timestamps — 4.52 ✓). Sobre <b>canvas</b> (4.18) texto usa tx-3′ — ex.: rodapé do Executivo migra de uso. Hierarquia mantém 4 degraus: 17.79 › 7.72 › 4.91 › 4.52 + diferenças de corpo/peso já Golden.</div>
+      <div class="meta-note" style="margin-top:7px"><b>Disabled (R2) reconfirmado:</b> continua <b>componente esmaecido</b> (`opacity:.6` + pointer-events:none — isento WCAG por inativo) — distinto dos novos tx-3′/tx-4′, que são texto pleno. OFF ≠ disabled preservado (trilho #CDD3DE intacto).</div>
+
+      <div class="subrow">
+        <div>
+          <div class="sublab">SIDEBAR · SB-FAINT</div>
+          <div class="sbdemo">
+            <div class="l1" style="color:var(--sb-dim)">WORKSPACE <span class="rt pass" style="margin-left:6px">via sb-dim 4.94 ✓</span></div>
+            <div class="l2" style="color:var(--sbf-old)">CEO · admin <span class="rt fail" style="margin-left:6px">3.74</span></div>
+            <div class="l2" style="color:var(--sbf-new)">CEO · admin <span class="rt pass" style="margin-left:6px">#828AA8 · 4.74 ✓</span></div>
+          </div>
+          <div class="meta-note" style="margin-top:7px">sb-faint′ vale na <b>metade inferior</b> (base sb-2); micro-labels do topo (WORKSPACE, sub da marca) migram para <b>sb-dim</b> (4.94–5.68 em toda a extensão).</div>
+        </div>
+        <div>
+          <div class="sublab">INPUT BORDER · JUSTIFICATIVA</div>
+          <div class="inp-demo">Buscar tarefas, clientes…</div>
+          <div class="inp-demo focus" style="margin-top:6px">Buscar tarefas, clientes…</div>
+          <div class="meta-note" style="margin-top:7px">Hairline #DFE3EB (1.29) <b>mantida</b>: a borda não é o único identificador — label sempre visível + placeholder tx-3′ 4.91 + shape/radius + focus ring 4.26–4.61 ≥3 ✓. Registro técnico, sem engrossar borda.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- B · SEMANTIC INKS -->
+    <div class="panel" style="grid-column:span 2">
+      <div class="p-k"><span class="n">B</span> SEMANTIC INKS</div>
+      <div class="p-t">Accent ≠ Ink — regra global promovida do próprio DS</div>
+      <div class="p-s">F9/F10/F11 <b>já praticam</b> o par accent (dot/ícone/barra ≥3:1) × ink (texto ≥4.5). A errata só <b>formaliza o vocabulário global</b> — zero cor inventada; brand-ink é promovido do “Abrir tarefa” real do F9.</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 26px">
+        <div>
+          <div class="ink-row"><span class="ink-fam">BRAND</span><span class="acc"><span class="d" style="background:#5B7CFA"></span>#5B7CFA <span class="rt fail">texto 3.68</span></span><span class="inktx" style="color:var(--brand-ink)">Esqueci minha senha <span class="rt pass">ink #4353D8 · 6.06 ✓</span></span></div>
+          <div class="ink-row"><span class="ink-fam">INFO</span><span class="acc"><span class="d" style="background:#60A5FA"></span>#60A5FA accent</span><span class="inktx" style="color:var(--blue-ink)">Cliente aprovou os temas <span class="rt pass">#2563EB · 5.17 ✓</span></span></div>
+          <div class="ink-row"><span class="ink-fam">SUCCESS</span><span class="acc"><span class="d" style="background:#22A06B"></span>#22A06B <span class="rt keep">ícone ≥3 ✓ 3.33</span></span><span class="inktx" style="color:var(--green-ink)">Concluída no prazo <span class="rt pass">#12784C · 5.50 ✓</span></span></div>
+          <div class="ink-row"><span class="ink-fam">SISTEMA</span><span class="acc"><span class="d" style="background:#9CA3AF"></span>#9CA3AF accent</span><span class="inktx" style="color:var(--sys-ink)">Nova versão instalada <span class="rt pass">#5B6472 · 5.98 ✓</span></span></div>
+        </div>
+        <div>
+          <div class="ink-row"><span class="ink-fam">WARNING</span><span class="acc"><span class="d" style="background:#F59E0B"></span>#F59E0B <span class="rt fail">texto 2.15</span></span><span class="inktx" style="color:var(--warn-ink)">Prazo próximo — 30 min <span class="rt pass">#B45309 · 5.02 ✓</span></span></div>
+          <div class="ink-row"><span class="ink-fam">DANGER</span><span class="acc"><span class="d" style="background:#EF4444"></span>#EF4444 <span class="rt keep">large/ícone ≥3 ✓</span></span><span class="inktx" style="color:var(--danger-ink)">Prazo vencido há 20 min <span class="rt pass">#C4302B · 5.52 ✓</span></span></div>
+          <div class="ink-row"><span class="ink-fam">CRÍTICO</span><span class="acc"><span class="d" style="background:#E11D48"></span>#E11D48 accent</span><span class="inktx" style="color:var(--crit-ink)">2 tarefas críticas <span class="rt pass">#B10E38 · 7.02 ✓</span></span></div>
+          <div class="ink-row"><span class="ink-fam">MONITOR SLA</span><span class="acc"><span class="d" style="background:#3E9C74"></span>sla-k <span class="rt fail">3.08</span></span><span class="inktx" style="color:var(--green-ink)">MONITOR SLA • AO VIVO <span class="rt pass">→ green-ink · 5.01 ✓</span></span></div>
+        </div>
+      </div>
+      <div class="meta-note" style="margin-top:9px"><b>Regra global (C8):</b> cor semântica crua nunca é texto &lt;18.66px — texto usa o ink da família. Cru permanece legítimo em dot/barra/ícone/fundo-tint (≥3:1 quando essencial) e em números-KPI <b>grandes</b> quando ≥3:1 (red 3.76 ✓; orange NÃO ✓ → KPI laranja já usa #B45309 no Golden F10/F11 ✓).</div>
+    </div>
+
+    <!-- C · CTA GRADIENT -->
+    <div class="panel">
+      <div class="p-k"><span class="n">C</span> CTA · PRIMARY GRADIENT</div>
+      <div class="p-t">Branco no pior stop ≥ 4.5</div>
+      <div class="p-s">Só o <b>stop claro</b> muda — 1º stop, ângulo, raio, sombra e glyph intactos. Identidade violeta preservada.</div>
+      <div class="cta-pair">
+        <div class="cta-col">
+          <div class="cta-lbl">ANTES</div>
+          <div class="btn b-old"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Nova tarefa</div>
+          <div class="stopline"><span class="sw" style="background:#6E5EF3"></span>#6E5EF3 <span class="rt pass">4.61</span></div>
+          <div class="stopline"><span class="sw" style="background:#9A6BF5"></span>#9A6BF5 <span class="rt fail">3.62</span></div>
+          <div class="daycell" style="background:var(--grad-old)">17</div>
+        </div>
+        <div class="cta-col">
+          <div class="cta-lbl">DEPOIS</div>
+          <div class="btn b-new"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Nova tarefa</div>
+          <div class="stopline"><span class="sw" style="background:#6E5EF3"></span>#6E5EF3 <span class="rt pass">4.61 ✓</span></div>
+          <div class="stopline"><span class="sw" style="background:#8356E6"></span>#8356E6 <span class="rt pass">4.73 ✓</span></div>
+          <div class="daycell" style="background:var(--grad-new)">17</div>
+        </div>
+      </div>
+      <div class="meta-note" style="margin-top:10px"><b>Sólidos brand com texto branco pequeno</b> (ex.: pill de visão ativa “Meu quadro”, 3.68) → fundo usa <b>brand-ink #4353D8</b> (branco 6.06 ✓).</div>
+    </div>
+
+    <!-- D · CALENDAR -->
+    <div class="panel">
+      <div class="p-k"><span class="n">D</span> CALENDÁRIO · TIPO ≠ SÓ COR</div>
+      <div class="p-t">Dots ganham forma por tipo</div>
+      <div class="p-s">Menor redundância possível: <b>mesmas cores, formas distintas</b> (5–6px). Grade continua limpa; nenhuma função nova. Os chips de filtro do F8 (cor + nome) são a <b>legenda oficial</b>.</div>
+      <div class="calpair">
+        <div class="calmini">
+          <div class="cl">Antes — só cor</div>
+          <div class="cgrid">
+            <div class="cc">4<div class="dots"><span class="dt" style="background:#F43F7B"></span></div></div>
+            <div class="cc">6<div class="dots"><span class="dt" style="background:#60A5FA"></span><span class="dt" style="background:#8B5CF6"></span></div></div>
+            <div class="cc">11<div class="dots"><span class="dt" style="background:#F59E0B"></span></div></div>
+            <div class="cc">27<div class="dots"><span class="dt" style="background:#F59E0B"></span><span class="dt" style="background:#F43F7B"></span></div></div>
+          </div>
+        </div>
+        <div class="calmini">
+          <div class="cl">Depois — cor + forma</div>
+          <div class="cgrid">
+            <div class="cc">4<div class="dots"><span class="sh-c" style="background:#F43F7B"></span></div></div>
+            <div class="cc">6<div class="dots"><span class="sh-t" style="--c:#60A5FA"></span><span class="sh-l" style="background:#8B5CF6"></span></div></div>
+            <div class="cc">11<div class="dots"><span class="sh-q" style="background:#F59E0B"></span></div></div>
+            <div class="cc">27<div class="dots"><span class="sh-q" style="background:#F59E0B"></span><span class="sh-c" style="background:#F43F7B"></span></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="legend">
+        <span class="lchip"><span class="sh-c" style="background:#F43F7B"></span> Gravação</span>
+        <span class="lchip"><span class="sh-q" style="background:#F59E0B"></span> Fotografia</span>
+        <span class="lchip"><span class="sh-t" style="--c:#60A5FA"></span> Reunião</span>
+        <span class="lchip"><span class="sh-l" style="background:#8B5CF6"></span> Edição</span>
+        <span class="lchip"><span class="sh-o" style="--c:#767E8D"></span> Outro</span>
+      </div>
+      <div class="meta-note" style="margin-top:9px">Nome acessível do dia (“17 de agosto — 1 gravação, 1 reunião”) = <b>requirement de implementação</b> (A11Y-D13 semântico) — não desenhado aqui.</div>
+    </div>
+
+    <!-- E · TARGET -->
+    <div class="panel" style="grid-column:1 / -1">
+      <div class="p-k"><span class="n">E</span> TARGET SIZE · TOAST X</div>
+      <div class="p-t">Glyph igual · hit target ≥ 24×24 (WCAG 2.2)</div>
+      <div class="p-s">O X visual não muda (anatomia R5.1 preservada). Só a <b>área interativa invisível</b> cresce: 20×20 → <b>28×28</b>. Único outro microtarget auditado: “+” de coluna 25×25 já ≥24 ✓ (conforme; conforto C1 recomenda 28 na implementação).</div>
+      <div style="display:flex;gap:22px;align-items:flex-start">
+        <div>
+          <div class="cta-lbl">ANTES — hit 20×20 <span class="rt fail" style="margin-left:5px">&lt; 24 · FAIL 2.5.8</span></div>
+          <div class="toast">
+            <div class="av">TG</div>
+            <div class="bd"><div class="t1">Prazo próximo — faltam 30 min</div><div class="t2">Sunset Wear · Cronograma Feed &amp; Stories</div></div>
+            <div class="tx-glyph">✕</div>
+            <div class="hit bad" style="top:8px;right:9px;width:20px;height:20px"></div>
+            <div class="hitlab" style="top:-14px;right:6px;color:#C4302B">20×20</div>
+          </div>
+        </div>
+        <div>
+          <div class="cta-lbl">DEPOIS — hit 28×28 <span class="rt pass" style="margin-left:5px">≥ 24 · PASS</span></div>
+          <div class="toast">
+            <div class="av">TG</div>
+            <div class="bd"><div class="t1">Prazo próximo — faltam 30 min</div><div class="t2">Sunset Wear · Cronograma Feed &amp; Stories</div></div>
+            <div class="tx-glyph">✕</div>
+            <div class="hit good" style="top:4px;right:5px;width:28px;height:28px"></div>
+            <div class="hitlab" style="top:-14px;right:2px;color:#12784C">28×28</div>
+          </div>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div class="meta-note"><b>Contrato C6 (errata):</b> `.ntf-x` mantém glyph 13–15px e posição óptica; container/hit 28×28 (top/right compensados −4px). Foco visível já contratado (C6/C8). Nenhuma outra anatomia do toast muda — stack, avatar, CTA, TTL e aria (role=status/aria-live=polite) intactos.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="foot">
+    <span>R9.1 · errata candidata — vale para contracts + implementação; imagens Golden históricas permanecem como registro de aprovação</span><span class="d"></span>
+    <span>ratios = WCAG luminância relativa calculada</span><span class="d"></span>
+    <span>fundos: surface #FFFFFF · canvas #F5F6F9 · sidebar #252B3D→#1B2031</span><span class="d"></span>
+    <span>zero função alterada · zero produção</span>
+  </div>
+
+</div></body></html>

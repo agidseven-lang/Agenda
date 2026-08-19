@@ -200,8 +200,10 @@ scrollbars · skeleton · transições (drawer/scrim 0.18–0.2s; reduced-motion
 > traps evd/det · 4 dialogs aria-modal · toast stack role=status/aria-live · Enter/Espaço em
 > .evc e toasts · `<details>` nativos · `<button>` em sidebar/stats/calendário/ações · lang
 > pt-BR · reduced-motion ×6. Debt register A11Y-D01–D25 (P0 único = upload sem teclado —
-> IMPLEMENTAÇÃO). Contraste Golden: núcleo PASS; tx-3/tx-4/brand-texto/orange = design debts
-> (microfase opcional, owner decide). Zero superfície nova; 30/30 mantido.
+> IMPLEMENTAÇÃO). Contraste Golden: núcleo PASS; tx-3/tx-4/brand-texto/orange = design debts.
+> **R9.1 (errata candidata entregue — aguarda owner):** dívidas de DESIGN fechadas em
+> `ACCESSIBILITY-TOKEN-ERRATA.md` (E1–E11; axe −84%; regressão 9/9; Golden intocado).
+> Zero superfície nova; 30/30 mantido.
 
 ## I. ORDEM DOS FRAMES A — ✔ CONCLUÍDA (checkpoint global)
 **F6 → F13 = todos entregues e GOLDEN** (commits no banner do topo). Restante desta trilha:

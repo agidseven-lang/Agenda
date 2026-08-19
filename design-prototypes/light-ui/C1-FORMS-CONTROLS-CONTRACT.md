@@ -1,5 +1,7 @@
 # C1 — FORMS & CONTROLS · DESIGN CONTRACT (Light UI)
 
+> **⚠ R9.1 — TOKEN ERRATA CANDIDATA (aguarda owner):** `--tx-3:#697181` (4.91/4.54) · `--tx-4:#6E7786` (4.52; regra de superfície: sobre canvas usa tx-3) · `--brand-ink:#4353D8` p/ texto brand ≤18.66px · `--grad` stop claro → `#8356E6` (branco 4.73 no pior stop) · borda de input #DFE3EB MANTIDA com justificativa técnica (label+placeholder+shape+focus ring ≥3) · hit target mínimo 24×24 (WCAG 2.2) para microcontroles, conforto 28. Fonte única: `ACCESSIBILITY-TOKEN-ERRATA.md` (before×after com contraste calculado). Após GO, estes valores tornam-se canônicos; imagens Golden históricas permanecem como registro.
+
 > **★ CHECKPOINT GLOBAL (decisão do owner):** os frames-fonte F8–F13 foram aprovados como
 > GOLDEN; portanto os candidatos das seções **§10 (F8) · §11 (F9) · §12 (F10) · §13 (F11) ·
 > §14 (F12) · §15 (F13)** ficam **PROMOVIDOS a GOLDEN** com seus frames (prova visual +

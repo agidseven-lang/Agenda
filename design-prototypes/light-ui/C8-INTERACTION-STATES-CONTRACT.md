@@ -1,5 +1,7 @@
 # C8 — ESTADOS DE INTERAÇÃO & STAT-TILE · FOUNDATION CONTRACT (Light UI)
 
+> **⚠ R9.1 — TOKEN ERRATA CANDIDATA (aguarda owner):** REGRA GLOBAL **accent × ink** formalizada (prática já existente em F9 `--ac/--cx` e F10/F11 `sv-*i`): cor semântica crua NUNCA é texto <18.66px — texto usa o ink da família (brand `#4353D8` · info `#2563EB` · success `#12784C` · warning `#B45309` · danger `#C4302B` · crítico `#B10E38` · sistema `#5B6472`); sólidos accent com texto branco pequeno usam o ink como fundo (pill de visão ativa, badges de contagem/CRÍTICO). Cru permanece em dot/barra/ícone/tint (≥3:1 quando essencial) e KPI grande ≥3:1. F8 dots de tipo: cor + FORMA por tipo + chips-filtro como legenda oficial. Fonte única: `ACCESSIBILITY-TOKEN-ERRATA.md` (before×after com contraste calculado). Após GO, estes valores tornam-se canônicos; imagens Golden históricas permanecem como registro.
+
 **Status:** **FOUNDATION OFICIAL / GOLDEN** — aprovada pelo owner (R6 = GO, commit `b2f6833`). Congelada. Nome formal
 confirmado no `MASTER-SURFACE-MAP.md` §F. Fonte: Desktop **1.0.246** (inventário integral:
 95 `:hover` · 21 `:focus-visible` · 11 `:active` · 62 `transition:` · 4 `aria-expanded` ·

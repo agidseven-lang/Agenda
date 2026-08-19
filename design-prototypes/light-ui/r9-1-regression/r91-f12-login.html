@@ -1,0 +1,203 @@
+<!doctype html>
+<!-- R9.1 REGRESSION COPY — NÃO é Golden. Origem (IMUTÁVEL): proposta-c-frame12-login.html
+     Delta único: <style id="r91-tokens"> (errata candidata de tokens) + hrefs ../ -->
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, initial-scale=1">
+<title>Agenda ID Seven — Proposta C — FRAME 12 · Login</title>
+<link rel="stylesheet" href="../_fonts.css">
+<style>
+/* ============================================================
+   AGENDA ID SEVEN · LIGHT UI · FRAME 12 — LOGIN · 1920×1080
+   DESIGN PROTOTYPE (não é produção). Superfície REAL de autenticação
+   redesenhada no Design System Golden (Frames 1–11 + C1). NÃO é landing/
+   marketing/onboarding; NÃO cria novo sistema de autenticação.
+   ▸ FIDELIDADE (auditoria read-only 1.0.246 — renderLogin 3151 + doLogin 2929
+     + logout 3035 + boot F3.5.4V-H1 12695 + static #login 2686 + CSS 70–128;
+     main: auth.ts + auth-core.ts + preload.ts + main.ts 661–688):
+     · SHELL: o Login real é STANDALONE (#login fullscreen, coluna centrada
+       max-width 480) — SEM sidebar/topbar/SLA/sino. Mockup honra isso.
+     · ARQUITETURA (relatório, não UI): login SERVER-SIDE via processo main
+       (IPC auth-login → auth-core → POST loginUser Cloud Run, payload
+       {identifier,password}). O renderer NÃO lê a coleção users, NÃO vê
+       pass/salt/hash e NÃO verifica senha; recebe SÓ {ok,user público,error}.
+       TOKEN confinado ao main (memória + userData/session.json 0600, escrita
+       atômica); NUNCA vai ao renderer/localStorage/log. contextIsolation:true,
+       nodeIntegration:false. Sessão persiste ao fechar; boot = SPLASH
+       "Restaurando sessão…" + authSelf (getUserSelf Bearer); login SÓ aparece
+       em negativa real (no_session/expired) ou escape manual. Logout =
+       authLogout (apaga session.json, provado por diag) + limpa wp_uid/
+       wp_name/wp_team_jwt → reabrir pede login. Fechar no X = bandeja (≠
+       logout). Rate-limit e inativo são server-side.
+     · ESTRUTURA REAL (ordem): brand (logo oficial + h1 "ID Seven" + sub
+       "Desktop · Paridade APK") → título "Entrar" → subtítulo "Acesse sua
+       agenda e tarefas da equipe" → #loginBanner (vazio no default) →
+       form → vfooter (pill "Desktop" + "ID Seven", SEM número de versão).
+     · IDENTIFIER real: label E placeholder "E-mail ou WhatsApp" (inputmode
+       email; servidor faz match por e-mail OU telefone). NÃO é só "E-mail".
+     · SENHA real: label/placeholder "Senha", type=password, toggle TEXTUAL
+       "Mostrar"/"Ocultar" dentro do campo (não é ícone). Sem caps-lock warn,
+       sem minlength no login, sem strength meter, sem autocomplete declarado.
+     · CTA literal: "Entrar" (único primário). Loading real: botão disabled +
+       spinner substitui o texto (documentado; não desenhado).
+     · Recovery real: txtbtn "Esqueci minha senha" (troca p/ modo forgot).
+     · Auto-cadastro DESATIVADO (Opção A do owner) — nota real: "Cadastro
+       interno desativado. Solicite acesso ao administrador." Sem "Criar
+       conta"/social/biometria/QR/magic link/PIN/SSO/captcha/2FA/"Lembrar-me"
+       (não existem).
+     · ERRO real: banner FORM-LEVEL em #loginBanner (.banner.err tint), acima
+       do form. Literais: "E-mail/WhatsApp ou senha incorretos." /
+       "Conta inativa ou aguardando aprovação." / "Muitas tentativas. Aguarde
+       alguns minutos e tente de novo." / "Preencha e-mail/WhatsApp e senha." /
+       "Sem conexão com o servidor de login...". Default = SEM banner (estado
+       mostrado). Não é inline/toast/modal.
+     · Pós-login: startApp → some login, #app flex, tab inicial 'hoje',
+       subscribeData (usersPublic allowlist/events/tasks), render, sessionLogin.
+   ▸ ESTADO DEMONSTRADO: pronto para entrada — identifier preenchido com conta
+     FICTÍCIA teste@idseven.com.br + FOCO Golden C1 (ring #6E5EF3 + halo 11%,
+     caret); senha mascarada (glifos "•" no HTML — NENHUMA senha real/
+     documentada). Toggle "Mostrar" (senha oculta). Sem banner.
+   ▸ DÍVIDAS FUNCIONAIS registradas (precedente Subtipo; NÃO corrigir):
+     1. RECOVERY STUB nesta build: as telas forgot existem, mas "Enviar
+        código"/"Criar nova senha" NÃO chamam endpoint — banners dizem que o
+        backend de reset (Cloud Functions de produção) "não é tocado nesta
+        prévia/homologação". Link real; fluxo além dele = placeholder.
+     2. ENTER NÃO SUBMETE o login: #loginForm é <div> (sem <form>/keydown);
+        só o modal de team-session tem Enter. Dívida de a11y/teclado.
+     3. wp_team_jwt (JWT de EQUIPE escopado, TTL 12h, Worker /team/session)
+        vive em localStorage do renderer — deliberado/documentado no código;
+        NÃO é o token de sessão do auth (esse fica no main). Registro, não bug.
+   ▸ ADAPTAÇÕES DE APRESENTAÇÃO (documentadas): campos reais ficam soltos no
+     fundo escuro; no Light UI a coluna vira CARD Golden branco (sh-2) sobre
+     canvas — precedente F8/F10/F11. Marca: o real usa o PNG oficial (base64
+     --logo); o mockup usa o brand-mark Golden dos Frames 1–11 (asset binário
+     não copiado ao protótipo). h1 real é na cor accent; DS usa tx-1.
+     Labels reais são uppercase 11px; C1 Golden = 13/600 sentence-case
+     (literais preservados).
+   ▸ RESPONSIVIDADE real documentada: @media(max-height:660px) compacta o
+     login (logo 54, títulos menores) p/ 1366×768 @125% SEM scroll — contrato
+     mantido p/ implementação (frame único 1920×1080 nesta entrega).
+   ▸ C1: reutiliza text input h46/r12/ring #DFE3EB, label 13/600, focus
+     #6E5EF3, primary CTA gradiente h48/r13. NOVOS candidatos (§14): password
+     input + reveal textual, form-level error banner, auth split (card auth),
+     brand block, version footer pill, splash de restauração (documentado).
+   ▸ FOTOS: nenhuma (login não tem avatar). Sem segredos no HTML.
+   ============================================================ */
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+svg{display:block}
+:root{
+  --canvas:#F5F6F9; --surface:#FFFFFF; --surface-2:#FAFBFD; --sunk:#F1F4F8;
+  --hair:#E8EBF1; --hair-2:#EFF1F6;
+  --tx-1:#14181F; --tx-2:#4B5364; --tx-3:#767E8D; --tx-4:#A8AFBC;
+  --brand:#5B7CFA; --grad:linear-gradient(135deg,#6E5EF3,#9A6BF5);
+  --focus:#6E5EF3;
+  --r-md:12px; --r-lg:16px; --r-pill:999px;
+  --sh-1:0 0 0 1px var(--hair),0 1px 2px rgba(19,24,38,.04),0 5px 14px rgba(19,24,38,.035);
+  --sh-2:0 0 0 1px var(--hair),0 2px 6px rgba(19,24,38,.06),0 16px 34px rgba(19,24,38,.085);
+}
+body{font-family:'Inter',-apple-system,'Segoe UI',Roboto,sans-serif;color:var(--tx-1);background:var(--canvas);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-feature-settings:"cv05" 1,"cv11" 1}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.frame{width:1920px;height:1080px;overflow:hidden;position:relative;background:var(--canvas);display:grid;place-items:center;font-size:13.5px;isolation:isolate}
+.frame::after{content:"";position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 0 1px rgba(19,24,38,.05);z-index:60}
+/* fundo sofisticado e contido: 1 véu radial da marca (≤4%) — sem mesh/blobs/neon */
+.frame::before{content:"";position:absolute;inset:0;pointer-events:none;
+  background:
+    radial-gradient(720px 420px at 50% 12%,rgba(110,94,243,.05),transparent 68%),
+    radial-gradient(900px 520px at 50% 108%,rgba(91,124,250,.035),transparent 70%)}
+/* coluna central (real: #login coluna centrada max-width 480) */
+.auth{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center}
+/* CARD Golden (adaptação de apresentação do fundo escuro → surface) */
+.card{width:464px;background:var(--surface);border-radius:18px;box-shadow:var(--sh-2);padding:42px 44px 34px;display:flex;flex-direction:column;align-items:center}
+/* brand real: logo + "ID Seven" + "Desktop · Paridade APK" */
+.brand-mark{width:60px;height:60px;border-radius:17px;background:linear-gradient(140deg,#5B7CFA,#6E5EF3);display:flex;align-items:center;justify-content:center;box-shadow:0 10px 24px rgba(94,110,243,.36),inset 0 1px 0 rgba(255,255,255,.24)}
+.brand-mark .ic{width:30px;height:30px;stroke-width:1.9;color:#fff}
+.brand h1{margin:16px 0 0;font-family:'InterTight';font-weight:700;font-size:25px;letter-spacing:-.02em;color:var(--tx-1);line-height:1.1;text-align:center}
+.brand .sub{font-size:13px;color:var(--tx-3);margin-top:5px;text-align:center}
+.brand{display:flex;flex-direction:column;align-items:center}
+/* título/subtítulo reais */
+.title{font-family:'InterTight';font-weight:700;font-size:21px;letter-spacing:-.016em;color:var(--tx-1);margin-top:26px;text-align:center}
+.subtitle{font-size:13.5px;color:var(--tx-3);margin-top:5px;text-align:center;line-height:1.5;max-width:340px}
+/* form (C1 Golden) */
+.form{width:100%;margin-top:22px}
+.fld{width:100%;margin-top:14px}
+.fld:first-child{margin-top:0}
+.fld label{display:block;font-size:13px;font-weight:600;color:var(--tx-2);margin-bottom:7px}
+.inp{position:relative;display:flex;align-items:center;height:46px;border-radius:var(--r-md);background:var(--surface);box-shadow:inset 0 0 0 1px #DFE3EB;padding:0 14px;font-size:14px;font-weight:520;color:var(--tx-1)}
+.inp.focus{box-shadow:inset 0 0 0 1.5px var(--focus),0 0 0 2.5px rgba(110,94,243,.11)}
+.caret{width:1.5px;height:18px;background:var(--focus);margin-left:1.5px;border-radius:1px}
+.pwbox{position:relative}
+.pwbox .inp{padding-right:86px}
+.pwdots{letter-spacing:.14em;font-size:15px;color:var(--tx-1);transform:translateY(1px)}
+.toggle{position:absolute;right:6px;top:50%;transform:translateY(-50%);height:34px;padding:0 12px;border-radius:9px;font-size:12.5px;font-weight:700;color:var(--brand)}
+/* CTA primário Golden — literal real "Entrar" (único por tela) */
+.btn-primary{width:100%;height:48px;border-radius:13px;background:var(--grad);color:#fff;font-size:14.5px;font-weight:650;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:22px;box-shadow:0 8px 20px rgba(110,94,243,.28)}
+/* link real "Esqueci minha senha" (não compete) */
+.txtbtn{width:100%;margin-top:8px;padding:11px 8px;font-size:13px;font-weight:650;color:var(--brand);text-align:center;border-radius:10px}
+/* nota real do auto-cadastro desativado */
+.note{margin-top:12px;font-size:12.5px;color:var(--tx-3);text-align:center;line-height:1.5;max-width:330px}
+/* vfooter real: pill "Desktop" + "ID Seven" (sem número de versão) */
+.vfooter{margin-top:26px;text-align:center;font-size:11px;color:var(--tx-4);line-height:1.7}
+.vfooter .pill-ver{display:inline-block;background:color-mix(in srgb,var(--brand) 12%,#fff);color:#4E63D8;font-weight:800;padding:4.5px 12px;border-radius:var(--r-pill);letter-spacing:.02em;margin-bottom:6px;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--brand) 20%,#fff)}
+.vfooter .apk{display:block;font-weight:600;color:var(--tx-4)}
+</style>
+<style id="r91-tokens">
+/* ===== R9.1 TOKEN ERRATA (candidata) — aplicada SÓ nesta cópia de regressão ===== */
+:root{
+  --tx-3:#697181;            /* 4.91 W · 4.54 CV */
+  --tx-4:#6E7786;            /* 4.52 W (regra de superfície: canvas usa tx-3) */
+  --grad:linear-gradient(135deg,#6E5EF3,#8356E6); /* branco pior stop 4.73 */
+  --sb-faint:#828AA8;        /* 4.74 sb-2 (metade inferior) */
+  --brand-ink:#4353D8;       /* texto brand ≤18px · 6.06 */
+}
+/* micro-labels do topo da sidebar migram p/ sb-dim (4.94–5.68 em toda a extensão) */
+.nav-label,.brand-sub{color:var(--sb-dim)}
+/* MONITOR SLA micro-label → green-ink (5.01 sobre #E8F8F0) */
+.sla-k{color:var(--green-ink,#12784C)}
+/* sólidos accent com texto branco pequeno usam o INK da família */
+.tab.on{background:var(--blue-ink,#2563EB);box-shadow:0 7px 16px rgba(37,99,235,.30)}
+/* texto brand cru ≤18px → brand-ink (F12: reveal + esqueci senha) */
+.toggle,.txtbtn{color:var(--brand-ink)}
+/* badges/chips vermelhos com texto branco pequeno → danger-ink (mesma regra ink) */
+.nav-badge,.nc-crit{background:var(--danger-ink,#C4302B)}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-logo" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><path d="M8.5 9.5h7M8.5 13h7M8.5 16.5h4"/></symbol>
+</svg>
+<div class="frame">
+  <div class="auth">
+    <div class="card">
+      <div class="brand">
+        <div class="brand-mark"><svg class="ic"><use href="#i-logo"/></svg></div>
+        <h1>ID Seven</h1>
+        <div class="sub">Desktop · Paridade APK</div>
+      </div>
+      <div class="title">Entrar</div>
+      <div class="subtitle">Acesse sua agenda e tarefas da equipe</div>
+      <!-- #loginBanner real fica AQUI (vazio no estado default — erros são banner form-level) -->
+      <div class="form">
+        <div class="fld">
+          <label>E-mail ou WhatsApp</label>
+          <div class="inp focus"><span>teste@idseven.com.br</span><span class="caret"></span></div>
+        </div>
+        <div class="fld">
+          <label>Senha</label>
+          <div class="pwbox">
+            <div class="inp"><span class="pwdots">••••••••••</span></div>
+            <button class="toggle">Mostrar</button>
+          </div>
+        </div>
+        <button class="btn-primary">Entrar</button>
+        <button class="txtbtn">Esqueci minha senha</button>
+        <div class="note">Cadastro interno desativado. Solicite acesso ao administrador.</div>
+      </div>
+    </div>
+    <div class="vfooter"><span class="pill-ver">Desktop</span><span class="apk">ID Seven</span></div>
+  </div>
+</div>
+</body>
+</html>

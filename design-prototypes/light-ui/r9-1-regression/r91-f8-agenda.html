@@ -1,0 +1,452 @@
+<!doctype html>
+<!-- R9.1 REGRESSION COPY — NÃO é Golden. Origem (IMUTÁVEL): proposta-c-frame8-agenda.html
+     Delta único: <style id="r91-tokens"> (errata candidata de tokens) + hrefs ../ -->
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, initial-scale=1">
+<title>Agenda ID Seven — Proposta C — FRAME 8 · Agenda</title>
+<link rel="stylesheet" href="../_fonts.css">
+<link rel="stylesheet" href="../_team-photos.css">
+<style>
+/* ============================================================
+   AGENDA ID SEVEN · LIGHT UI · FRAME 8 — AGENDA · 1920×1080
+   DESIGN PROTOTYPE (não é produção). Superfície AGENDA REAL redesenhada no
+   Design System Golden congelado (Frames 1–7 + C1). NÃO é uma nova Agenda.
+   ▸ FIDELIDADE (auditoria read-only no Desktop 1.0.246 — renderAgenda 6084):
+     · Rota real: state.tab==='agenda' → renderAgenda() injeta em #content
+       (shell global; SEM sidebar/subnav própria; board-mode removido).
+     · Fonte de dados: state.events (Firestore 'events', onSnapshot tempo
+       real — "Agenda compartilhada da equipe"). Campos reais: type, title,
+       client, location, date(YYYY-MM-DD), start/end(HH:MM), ownerId, by,
+       notes, status, done/doneAt, startedAt, cancelledAt.
+     · Duas VISTAS reais: "Mês" (calendarGrid 6×7 + lista do dia selecionado)
+       e "Agenda"/lista (buckets Atrasados/Hoje/Próximos). Aqui: vista MÊS
+       (padrão agView='month') = estado operacional mais informativo.
+     · Toolbar REAL: toggle Mês/Agenda · busca "Buscar compromisso…"
+       (agQuery filtra title+client) · "Novo compromisso" (ação primária
+       real, texto literal) · "Mostrar cancelados" (toggle) · chips de TIPO
+       "Todos" + TYPES (Gravação #EF4444 · Fotografia #F59E0B · Reunião
+       #60A5FA · Edição #A78BFA · Outro #9CA3AF) · nav de mês (Hoje/‹/›).
+     · calendarGrid: 42 células (6 semanas, começa no DOMINGO), dots (até 4)
+       na cor do TIPO; estados agcell dim/today/sel reais. Ago/2026 começa
+       sábado (validado). Dia selecionado = hoje 17/08/2026 (segunda).
+     · eventCard REAL: faixa lateral = cor do RESPONSÁVEL (identity; vermelho
+       se atrasado eventLate) · bloco de data (DOW/dd/MÊS) · hora start—end ·
+       status pill (evStatusMeta: Agendado #60A5FA / Em andamento #F59E0B /
+       Finalizado #34D399 / Cancelado #F87171 com dot) · título line-clamp 2 ·
+       cliente (person) · local (place) · rodapé avatar+nome+TAG do tipo.
+     · Interação real: clicar no eventCard → openEventDetail (MODAL centrado,
+       não drawer) com tipo/status, quando, grid (Cliente/Local/Responsável/
+       Criado por/Tipo/Status), Observações, Linha do tempo e ações
+       (Iniciar/Finalizar/Cancelar/Editar/Excluir-admin). Clicar em dia →
+       agSel. ‹/› → mês. O modal NÃO é renderizado aqui (superfície limpa;
+       é contrato próprio — C2 Modais).
+     · Empty state real: emptyState('calendar','Dia livre','Nenhum
+       compromisso para esta data.') — não é o caso (dia com 3 compromissos).
+     · Datas PT-BR: dayShort = "seg, 17 de agosto"; horas HH:MM; "hoje" local.
+   ▸ LAYOUT: a Agenda real é coluna única empilhada (calendário em cima,
+     lista do dia embaixo). No widescreen 1920 o Light UI arranja os DOIS
+     mesmos componentes REAIS lado a lado (calendário 1fr | lista do dia
+     424px) — decisão de apresentação já aprovada nos Frames 6/7B; mesma
+     lógica, mesmos dados, mesma ordenação. Nada inventado.
+   ▸ C1: reutiliza input/busca, chips, botão primário, choice-chips, ícones,
+     tipografia, avatares Golden. NOVOS candidatos a foundation validados
+     pela Agenda REAL: segmented view switcher (Mês/Agenda), calendar grid
+     cell (default/dim/today/selected + dots), event/list card, empty state.
+   ▸ RESPONSIVIDADE: painéis com min-height:0 + scroll interno; em
+     1366×768/125% o painel do dia rola e o calendário reduz as células —
+     nada depende de Full HD. Só 1920×1080 renderizado.
+   ▸ FOTOS: sem fotos novas; avatares com fallback real de iniciais (fotos
+     locais indisponíveis nesta sessão; nunca versionadas). _team-photos.css
+     LOCAL-ONLY (gitignored).
+   ============================================================ */
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+svg{display:block}
+
+:root{
+  --canvas:#F5F6F9; --surface:#FFFFFF; --surface-2:#FAFBFD; --sunk:#F1F4F8;
+  --hair:#E8EBF1; --hair-2:#EFF1F6;
+  --tx-1:#14181F; --tx-2:#4B5364; --tx-3:#767E8D; --tx-4:#A8AFBC;
+  --sb-1:#252B3D; --sb-2:#1B2031; --sb-tx:#D0D5E1; --sb-dim:#9299AC; --sb-faint:#727990;
+  --sb-active:rgba(255,255,255,.065); --sb-hover:rgba(255,255,255,.04);
+  --brand:#5B7CFA; --grad:linear-gradient(135deg,#6E5EF3,#9A6BF5);
+  --blue:#3B82F6; --blue-ink:#2563EB;
+  --orange:#F59E0B; --violet:#8B5CF6; --green:#22A06B; --green-ink:#12784C; --red:#EF4444;
+  --ty-grav:#EF4444; --ty-foto:#F59E0B; --ty-reun:#60A5FA; --ty-edic:#A78BFA; --ty-outro:#9CA3AF;
+  --ev-sched:#60A5FA; --ev-prog:#F59E0B; --ev-done:#34D399; --ev-canc:#F87171;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-pill:999px;
+  --sh-1:0 0 0 1px var(--hair),0 1px 2px rgba(19,24,38,.04),0 5px 14px rgba(19,24,38,.035);
+  --sh-2:0 0 0 1px var(--hair),0 2px 6px rgba(19,24,38,.06),0 16px 34px rgba(19,24,38,.085);
+}
+.u-indigo{--u:#5B6CF0}.u-violet{--u:#8A5CF6}.u-teal{--u:#12A69B}.u-rose{--u:#E85D8C}.u-cyan{--u:#12A7C4}
+
+body{font-family:'Inter',-apple-system,'Segoe UI',Roboto,sans-serif;color:var(--tx-1);background:var(--canvas);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-feature-settings:"cv05" 1,"cv11" 1}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.ic-sm{width:15px;height:15px}
+
+.av{position:relative;width:32px;height:32px;border-radius:50%;flex:none;display:grid;place-items:center;
+  font-weight:600;font-size:11px;letter-spacing:.01em;line-height:1;
+  color:color-mix(in srgb,var(--u) 74%,#26303f);
+  background-color:color-mix(in srgb,var(--u) 15%,#fff);
+  background-image:radial-gradient(120% 120% at 50% 22%,color-mix(in srgb,var(--u) 20%,#fff),color-mix(in srgb,var(--u) 12%,#fff));
+  background-size:cover;background-position:center;background-repeat:no-repeat;
+  box-shadow:0 0 0 2px #fff,0 0 0 3.5px color-mix(in srgb,var(--u) 46%,#fff),0 1px 3px rgba(19,24,38,.16)}
+.av-20{width:20px;height:20px;font-size:8px}
+.av-46{width:46px;height:46px;font-size:15.5px}
+
+.frame{width:1920px;height:1080px;overflow:hidden;position:relative;background:var(--canvas);display:grid;grid-template-columns:284px 1fr;grid-template-rows:1080px;font-size:13.5px;isolation:isolate}
+.frame::after{content:"";position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 0 1px rgba(19,24,38,.05);z-index:60}
+
+/* ===== SIDEBAR (idêntica aos Golden) ===== */
+.sb{background:linear-gradient(180deg,var(--sb-1),var(--sb-2));color:var(--sb-tx);display:flex;flex-direction:column;min-height:0;overflow:hidden;padding:0 0 12px}
+.brand{display:flex;align-items:center;gap:14px;padding:30px 24px 22px}
+.brand-mark{width:46px;height:46px;border-radius:14px;flex:none;background:linear-gradient(140deg,#5B7CFA,#6E5EF3);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px rgba(94,110,243,.4),inset 0 1px 0 rgba(255,255,255,.24)}
+.brand-mark .ic{width:24px;height:24px;stroke-width:1.9;color:#fff}
+.brand-txt{min-width:0;flex:1}
+.brand-name{font-family:'InterTight';font-weight:700;font-size:18px;color:#F5F7FB;letter-spacing:-.014em;line-height:1.14}
+.brand-sub{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--sb-faint);margin-top:4px}
+.brand-sync{width:6px;height:6px;border-radius:50%;background:#33D6A6;box-shadow:0 0 0 3px rgba(51,214,166,.15)}
+.newtask{margin:0 20px 20px;height:48px;border-radius:13px;background:var(--grad);color:#fff;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:9px;box-shadow:0 8px 20px rgba(110,94,243,.34)}
+.newtask .ic{width:18px;height:18px;stroke-width:2.1}
+.sb-scroll{flex:1;overflow:hidden;padding:0 14px;display:flex;flex-direction:column}
+.nav-label{font-size:10.5px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--sb-faint);padding:18px 14px 10px}
+.nav-item{display:flex;align-items:center;gap:13px;height:42px;padding:0 14px;border-radius:11px;color:var(--sb-tx);position:relative;font-size:14px;font-weight:450;line-height:1}
+.nav-item .ic{color:var(--sb-dim);width:19px;height:19px}
+.nav-item.active{background:var(--sb-active);color:#F7F9FC;font-weight:560;box-shadow:inset 0 0 0 1px rgba(255,255,255,.055)}
+.nav-item.active .ic{color:#B7C1FF}
+.nav-item.active::before{content:"";position:absolute;left:-14px;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;background:linear-gradient(180deg,#7C8CFF,#6E5EF3)}
+.nav-badge{margin-left:auto;height:20px;min-width:20px;padding:0 7px;border-radius:var(--r-pill);background:#EF4444;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.sb-user{margin-top:12px;padding:20px 24px 10px;display:flex;align-items:center;gap:14px;box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+.sb-user-txt{min-width:0;flex:1}
+.sb-user-name{font-size:14px;font-weight:600;color:#F3F6FB;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-user-role{font-size:12px;color:var(--sb-faint);margin-top:3px;display:flex;align-items:center;gap:6px}
+.udot{width:6px;height:6px;border-radius:50%;background:#33D6A6}
+.sb-user .chev{color:var(--sb-faint)}
+
+/* ===== MAIN: header global 92 + página ===== */
+.main{display:grid;grid-template-rows:92px 1fr;min-width:0;min-height:0;overflow:hidden;background:var(--canvas)}
+.hd{display:flex;align-items:center;gap:18px;padding:0 34px;background:var(--surface);box-shadow:0 1px 0 var(--hair-2)}
+.hd-title{display:flex;align-items:center;gap:16px}
+.hd-eye{width:46px;height:46px;border-radius:14px;flex:none;background:color-mix(in srgb,var(--brand) 13%,#fff);display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--brand) 26%,#fff)}
+.hd-eye .ic{width:22px;height:22px;color:#4E63D8;stroke-width:2}
+.hd-title .tl{display:flex;flex-direction:column;line-height:1.08}
+.hd-title .tl b{font-family:'InterTight';font-weight:700;font-size:26px;letter-spacing:-.024em;color:var(--tx-1)}
+.hd-title .tl span{font-size:13.5px;color:var(--tx-3);margin-top:4px}
+.hd-right{margin-left:auto;display:flex;align-items:center;gap:14px}
+.sla{display:flex;align-items:center;gap:12px;height:50px;padding:0 19px 0 14px;border-radius:14px;background:linear-gradient(180deg,#F1FBF7,#E8F8F0);box-shadow:inset 0 0 0 1px #CBEEDD}
+.sla-ic{width:34px;height:34px;border-radius:10px;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(18,80,54,.16)}
+.sla-ic .ic{width:18px;height:18px;color:var(--green)}
+.sla-tx{display:flex;flex-direction:column;line-height:1.22}
+.sla-k{font-size:9.5px;font-weight:800;letter-spacing:.06em;color:#3E9C74;display:flex;align-items:center;gap:5px}
+.livedot{width:6px;height:6px;border-radius:50%;background:#22C58A;box-shadow:0 0 0 3px rgba(34,197,138,.2)}
+.sla-v{font-size:14px;font-weight:650;color:#115E3D}
+.hd-bell{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;color:var(--tx-2);box-shadow:inset 0 0 0 1px var(--hair);position:relative}
+.hd-bell .ic{width:20px;height:20px}
+.hd-bell .dot{position:absolute;top:12px;right:13px;width:8px;height:8px;border-radius:50%;background:#7C6BF5;box-shadow:0 0 0 2px var(--surface)}
+
+/* ===== PÁGINA AGENDA ===== */
+.page{min-height:0;overflow:hidden;padding:22px 32px 24px;display:grid;grid-template-rows:auto auto 1fr;gap:15px}
+
+/* toolbar */
+.ag-tools{display:flex;align-items:center;gap:13px}
+.seg{display:inline-flex;background:var(--sunk);border-radius:11px;padding:3px;gap:2px}
+.seg button{height:36px;padding:0 18px;border-radius:9px;font-size:13.5px;font-weight:600;color:var(--tx-3);display:flex;align-items:center;gap:7px}
+.seg button.on{background:var(--surface);color:var(--tx-1);font-weight:650;box-shadow:0 1px 2px rgba(19,24,38,.06),0 0 0 1px var(--hair)}
+.seg .ic{width:15px;height:15px}
+.ag-search{position:relative;display:flex;align-items:center;height:44px;width:340px;border-radius:12px;background:var(--surface);box-shadow:inset 0 0 0 1px #DFE3EB}
+.ag-search .lead{width:17px;height:17px;color:var(--tx-3);margin-left:14px;flex:none}
+.ag-search input{border:0;outline:0;background:none;font:inherit;font-size:14px;color:var(--tx-1);width:100%;padding:0 14px 0 10px}
+.ag-search input::placeholder{color:var(--tx-3)}
+.ag-new{margin-left:auto;height:44px;padding:0 20px;border-radius:12px;background:var(--grad);color:#fff;font-size:14px;font-weight:650;display:inline-flex;align-items:center;gap:9px;box-shadow:0 8px 20px rgba(110,94,243,.28)}
+.ag-new .ic{width:17px;height:17px;stroke-width:2.1}
+
+/* filtros por tipo */
+.ag-filters{display:flex;align-items:center;gap:8px}
+.tchip{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 13px;border-radius:var(--r-pill);font-size:12.5px;font-weight:600;color:var(--tx-3);background:var(--surface);box-shadow:inset 0 0 0 1px var(--hair)}
+.tchip .d{width:7px;height:7px;border-radius:50%;background:var(--tc)}
+.tchip.on{color:var(--tk);background:color-mix(in srgb,var(--tc) 12%,#fff);box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--tc) 52%,#fff);font-weight:700}
+.tchip.all{--tc:#6E5EF3;--tk:#4353D8}
+.t-grav{--tc:#EF4444;--tk:#C4302B}.t-foto{--tc:#F59E0B;--tk:#B45309}.t-reun{--tc:#60A5FA;--tk:#2563EB}.t-edic{--tc:#A78BFA;--tk:#6D45D0}.t-outro{--tc:#9CA3AF;--tk:#5B6472}
+.ag-cancel{margin-left:auto;height:34px;padding:0 14px;border-radius:10px;font-size:12.5px;font-weight:600;color:var(--tx-3);box-shadow:inset 0 0 0 1px var(--hair);display:inline-flex;align-items:center;gap:8px}
+.ag-cancel .ic{width:14px;height:14px;color:var(--tx-4)}
+
+/* corpo: calendário | dia */
+.ag-body{display:grid;grid-template-columns:1fr 424px;gap:18px;min-height:0;overflow:hidden}
+.panel{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--sh-1);display:flex;flex-direction:column;min-height:0;overflow:hidden}
+
+/* calendário */
+.cal{padding:18px 20px 20px}
+.cal-head{display:flex;align-items:center;margin-bottom:16px}
+.cal-mo{font-family:'InterTight';font-size:19px;font-weight:700;letter-spacing:-.016em;color:var(--tx-1)}
+.cal-mo b{color:var(--tx-3);font-weight:600}
+.cal-nav{margin-left:auto;display:flex;align-items:center;gap:8px}
+.cal-today{height:36px;padding:0 15px;border-radius:10px;font-size:12.5px;font-weight:600;color:var(--tx-2);box-shadow:inset 0 0 0 1px var(--hair)}
+.cal-ib{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--tx-2);box-shadow:inset 0 0 0 1px var(--hair)}
+.cal-ib .ic{width:18px;height:18px}
+.cal-dow{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:8px}
+.cal-dow span{text-align:center;font-size:10.5px;font-weight:700;letter-spacing:.06em;color:var(--tx-4)}
+.cal-grid{flex:1;display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:repeat(6,1fr);gap:6px;min-height:0}
+.agcell{border-radius:11px;background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--hair);display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:6px;padding:12px 0 0;font-size:14px;font-weight:600;color:var(--tx-1);position:relative}
+.agcell .dn{line-height:1}
+.agcell .dots{display:flex;gap:3px;height:5px;align-items:center}
+.agcell .dot{width:5px;height:5px;border-radius:50%}
+.agcell.dim{background:transparent;box-shadow:none;color:var(--tx-4)}
+.agcell.today{box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--brand) 55%,#fff);color:#4353D8;font-weight:700}
+.agcell.sel{background:var(--grad);box-shadow:0 6px 16px rgba(110,94,243,.3);color:#fff;font-weight:700}
+.agcell.sel .dots{display:none}
+
+/* painel do dia */
+.day{padding:18px 20px}
+.day-h{display:flex;align-items:baseline;gap:9px;margin-bottom:15px}
+.day-t{font-family:'InterTight';font-size:17px;font-weight:700;letter-spacing:-.01em;color:var(--tx-1)}
+.day-c{font-size:12px;font-weight:700;color:#4353D8;background:color-mix(in srgb,#5B6CFF 13%,#fff);padding:2px 10px;border-radius:var(--r-pill)}
+.day-list{display:flex;flex-direction:column;gap:11px;min-height:0;overflow:hidden}
+
+/* event card (evc real → Golden) */
+.evc{display:flex;gap:13px;background:var(--surface-2);border-radius:14px;box-shadow:inset 0 0 0 1px var(--hair);padding:13px 15px 13px 13px}
+.evc-rail{width:3.5px;border-radius:var(--r-pill);flex:none;align-self:stretch;background:var(--rc,var(--hair))}
+.evc-date{flex:none;width:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;background:var(--surface);box-shadow:inset 0 0 0 1px var(--hair);border-radius:11px;padding:7px 0;align-self:flex-start}
+.evc-dw{font-size:9px;font-weight:800;letter-spacing:.08em;color:var(--tx-4)}
+.evc-dd{font-size:20px;font-weight:750;line-height:1.05;color:var(--tx-1);font-variant-numeric:tabular-nums}
+.evc-dm{font-size:9px;font-weight:800;letter-spacing:.08em;color:var(--tx-3)}
+.evc-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.evc-top{display:flex;align-items:center;gap:8px}
+.evc-time{display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:700;color:var(--tx-1);font-variant-numeric:tabular-nums}
+.evc-time .ic{width:14px;height:14px;color:var(--tx-3)}
+.evc-te{font-weight:600;color:var(--tx-3);font-size:12.5px}
+.evc-st{margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;letter-spacing:.02em;padding:3px 9px;border-radius:var(--r-pill);color:var(--sk);background:color-mix(in srgb,var(--sc) 14%,#fff)}
+.evc-st .d{width:5px;height:5px;border-radius:50%;background:var(--sc)}
+.ev-sched{--sc:#60A5FA;--sk:#2563EB}.ev-prog{--sc:#F59E0B;--sk:#B45309}.ev-done{--sc:#34D399;--sk:#12784C}
+.evc-ti{font-size:14.5px;font-weight:640;line-height:1.32;color:var(--tx-1);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.evc-meta{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--tx-3)}
+.evc-meta .ic{width:14px;height:14px;color:var(--tx-4);flex:none}
+.evc-meta span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.evc-foot{display:flex;align-items:center;gap:7px;margin-top:1px}
+.evc-name{font-size:12px;font-weight:550;color:var(--tx-3)}
+.evc-ty{margin-left:auto;flex:none;font-size:9.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;padding:3px 9px;border-radius:7px;color:var(--tk);background:color-mix(in srgb,var(--tc) 13%,#fff)}
+.ty-reun{--tc:#60A5FA;--tk:#2563EB}.ty-grav{--tc:#EF4444;--tk:#C4302B}.ty-edic{--tc:#A78BFA;--tk:#6D45D0}
+</style>
+<style id="r91-tokens">
+/* ===== R9.1 TOKEN ERRATA (candidata) — aplicada SÓ nesta cópia de regressão ===== */
+:root{
+  --tx-3:#697181;            /* 4.91 W · 4.54 CV */
+  --tx-4:#6E7786;            /* 4.52 W (regra de superfície: canvas usa tx-3) */
+  --grad:linear-gradient(135deg,#6E5EF3,#8356E6); /* branco pior stop 4.73 */
+  --sb-faint:#828AA8;        /* 4.74 sb-2 (metade inferior) */
+  --brand-ink:#4353D8;       /* texto brand ≤18px · 6.06 */
+}
+/* micro-labels do topo da sidebar migram p/ sb-dim (4.94–5.68 em toda a extensão) */
+.nav-label,.brand-sub{color:var(--sb-dim)}
+/* MONITOR SLA micro-label → green-ink (5.01 sobre #E8F8F0) */
+.sla-k{color:var(--green-ink,#12784C)}
+/* sólidos accent com texto branco pequeno usam o INK da família */
+.tab.on{background:var(--blue-ink,#2563EB);box-shadow:0 7px 16px rgba(37,99,235,.30)}
+/* texto brand cru ≤18px → brand-ink (F12: reveal + esqueci senha) */
+.toggle,.txtbtn{color:var(--brand-ink)}
+/* badges/chips vermelhos com texto branco pequeno → danger-ink (mesma regra ink) */
+.nav-badge,.nc-crit{background:var(--danger-ink,#C4302B)}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-logo" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><path d="M8.5 9.5h7M8.5 13h7M8.5 16.5h4"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.6l2.55 5.17 5.7.83-4.13 4.02.98 5.68L12 16.98 6.9 19.3l.98-5.68L3.75 9.6l5.7-.83z"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.5h17M8 3.3v3.4M16 3.3v3.4"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8.5 6.5h11M8.5 12h11M8.5 17.5h11"/><path d="M4.4 6.5h.02M4.4 12h.02M4.4 17.5h.02"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9.2" cy="8.2" r="3.3"/><path d="M3.6 19.2a5.6 5.6 0 0111.2 0"/><path d="M15.8 5.4a3.1 3.1 0 010 5.7M17.4 19.2a5.3 5.3 0 00-2.1-4.2"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.4"/><path d="M5.6 20a6.4 6.4 0 0112.8 0"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 4v16h16"/><path d="M8 16.5v-3M12 16.5V9M16 16.5v-5.5"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 24 24"><path d="M6.2 3.4h6.6l4.9 4.9V19.6a1.2 1.2 0 01-1.2 1.2H6.2A1.2 1.2 0 015 19.6V4.6a1.2 1.2 0 011.2-1.2z"/><path d="M12.6 3.6V8.4h4.8M8.6 13h6.8M8.6 16.4h4.8"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6.6 10.2a5.4 5.4 0 0110.8 0c0 4.6 1.9 5.8 1.9 5.8H4.7s1.9-1.2 1.9-5.8z"/><path d="M10.2 19.4a2 2 0 003.6 0"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.1"/><path d="M12 2.6v2.4M12 19v2.4M4.4 4.4l1.7 1.7M17.9 17.9l1.7 1.7M2.6 12h2.4M19 12h2.4M4.4 19.6l1.7-1.7M17.9 6.1l1.7-1.7"/></symbol>
+  <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="M14.5 6l-6 6 6 6"/></symbol>
+  <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="M9.5 6l6 6-6 6"/></symbol>
+  <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="M6 9.5l6 6 6-6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.4 4.4L19 7.3"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 7.6V12l3 1.9"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v5.2c0 4.4-3 7.4-7 8.8-4-1.4-7-4.4-7-8.8V6z"/><path d="M9 12l2.1 2.1L15.2 10"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></symbol>
+  <symbol id="i-place" viewBox="0 0 24 24"><path d="M12 21s7-5.6 7-11a7 7 0 10-14 0c0 5.4 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></symbol>
+  <symbol id="i-eyeoff" viewBox="0 0 24 24"><path d="M3 3l18 18M10.6 10.7a2 2 0 002.7 2.9M9.4 5.6A9 9 0 0112 5.5c6 0 9.5 6.5 9.5 6.5a15 15 0 01-3.2 3.9M6.2 6.6A15 15 0 002.5 12s3.5 6.5 9.5 6.5a9 9 0 003.2-.6"/></symbol>
+</svg>
+
+<div class="frame">
+  <aside class="sb">
+    <div class="brand">
+      <div class="brand-mark"><svg class="ic"><use href="#i-logo"/></svg></div>
+      <div class="brand-txt">
+        <div class="brand-name">Agenda ID Seven</div>
+        <div class="brand-sub"><span class="brand-sync"></span> sincronizado</div>
+      </div>
+    </div>
+    <button class="newtask"><svg class="ic"><use href="#i-plus"/></svg> Nova tarefa</button>
+    <div class="sb-scroll">
+      <div class="nav-label">Workspace</div>
+      <a class="nav-item"><svg class="ic"><use href="#i-star"/></svg> Minhas Prioridades</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-sun"/></svg> Hoje</a>
+      <a class="nav-item active"><svg class="ic"><use href="#i-calendar"/></svg> Agenda</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-list"/></svg> Tarefas</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-users"/></svg> Equipe</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-user"/></svg> Perfil</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-chart"/></svg> Executivo</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-doc"/></svg> Relatórios</a>
+      <a class="nav-item"><svg class="ic"><use href="#i-bell"/></svg> Notificações <span class="nav-badge">9+</span></a>
+      <div class="nav-label">Sistema</div>
+      <a class="nav-item"><svg class="ic"><use href="#i-gear"/></svg> Configurações</a>
+    </div>
+    <div class="sb-user">
+      <span class="av av-46 u-indigo p-ary">AC</span>
+      <div class="sb-user-txt">
+        <div class="sb-user-name">Arydyjany Carlôto</div>
+        <div class="sb-user-role"><span class="udot"></span> CEO · admin</div>
+      </div>
+      <svg class="ic ic-sm chev"><use href="#i-chevron-down"/></svg>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="hd">
+      <div class="hd-title">
+        <span class="hd-eye"><svg class="ic"><use href="#i-calendar"/></svg></span>
+        <div class="tl"><b>Agenda</b><span>Compromissos da equipe · em tempo real</span></div>
+      </div>
+      <div class="hd-right">
+        <div class="sla">
+          <span class="sla-ic"><svg class="ic"><use href="#i-shield"/></svg></span>
+          <div class="sla-tx"><span class="sla-k"><span class="livedot"></span> MONITOR SLA • AO VIVO</span><span class="sla-v">Tudo em dia</span></div>
+        </div>
+        <button class="hd-bell"><svg class="ic"><use href="#i-bell"/></svg><span class="dot"></span></button>
+      </div>
+    </header>
+
+    <div class="page">
+      <!-- toolbar real: toggle de vista + busca + Novo compromisso -->
+      <div class="ag-tools">
+        <div class="seg">
+          <button class="on"><svg class="ic"><use href="#i-calendar"/></svg> Mês</button>
+          <button><svg class="ic"><use href="#i-list"/></svg> Agenda</button>
+        </div>
+        <div class="ag-search"><svg class="ic lead"><use href="#i-search"/></svg><input placeholder="Buscar compromisso…"></div>
+        <button class="ag-new"><svg class="ic"><use href="#i-plus"/></svg> Novo compromisso</button>
+      </div>
+
+      <!-- filtros por tipo (reais) + mostrar cancelados -->
+      <div class="ag-filters">
+        <span class="tchip all on"><span class="d"></span> Todos</span>
+        <span class="tchip t-grav"><span class="d"></span> Gravação</span>
+        <span class="tchip t-foto"><span class="d"></span> Fotografia</span>
+        <span class="tchip t-reun"><span class="d"></span> Reunião</span>
+        <span class="tchip t-edic"><span class="d"></span> Edição</span>
+        <span class="tchip t-outro"><span class="d"></span> Outro</span>
+        <button class="ag-cancel"><svg class="ic"><use href="#i-eyeoff"/></svg> Mostrar cancelados</button>
+      </div>
+
+      <!-- corpo: calendário (mês) | lista do dia selecionado -->
+      <div class="ag-body">
+        <section class="panel cal">
+          <div class="cal-head">
+            <div class="cal-mo">Agosto <b>2026</b></div>
+            <div class="cal-nav">
+              <button class="cal-today">Hoje</button>
+              <button class="cal-ib"><svg class="ic"><use href="#i-chevron-left"/></svg></button>
+              <button class="cal-ib"><svg class="ic"><use href="#i-chevron-right"/></svg></button>
+            </div>
+          </div>
+          <div class="cal-dow"><span>DOM</span><span>SEG</span><span>TER</span><span>QUA</span><span>QUI</span><span>SEX</span><span>SÁB</span></div>
+          <div class="cal-grid">
+<button class="agcell dim"><span class="dn">26</span><span class="dots"></span></button>
+<button class="agcell dim"><span class="dn">27</span><span class="dots"></span></button>
+<button class="agcell dim"><span class="dn">28</span><span class="dots"></span></button>
+<button class="agcell dim"><span class="dn">29</span><span class="dots"></span></button>
+<button class="agcell dim"><span class="dn">30</span><span class="dots"></span></button>
+<button class="agcell dim"><span class="dn">31</span><span class="dots"></span></button>
+<button class="agcell"><span class="dn">1</span><span class="dots"></span></button>
+<button class="agcell"><span class="dn">2</span><span class="dots"></span></button>
+<button class="agcell"><span class="dn">3</span><span class="dots"></span></button>
+<button class="agcell"><span class="dn">4</span><span class="dots"><span class="dot" style="background:#EF4444"></span></span></button>
+<button class="agcell"><span class="dn">5</span><span class="dots"></span></button>
+<button class="agcell"><span class="dn">6</span><span class="dots"><span class="dot" style="background:#60A5FA"></span><span class="dot" style="background:#A78BFA"></span></span></button>
+<button class="agcell"><span class="dn">7</span><span class="dots"></span></button>
+<button class="agcell"><span class="dn">8</span><span class="dots"></span></button>
+<button class="agcell"><span class="dn">9</span><span class="dots"></span></button>
+<button class="agcell"><span class="dn">10</span><span class="dots"></span></button>
+<button class="agcell"><span class="dn">11</span><span class="dots"><span class="dot" style="background:#F59E0B"></span></span></button>
+<button class="agcell"><span class="dn">12</span><span class="dots"></span></button>
+<button class="agcell"><span class="dn">13</span><span class="dots"></span></button>
+<button class="agcell"><span class="dn">14</span><span class="dots"></span></button>
+<button class="agcell"><span class="dn">15</span><span class="dots"></span></button>
+<button class="agcell"><span class="dn">16</span><span class="dots"></span></button>
+<button class="agcell today sel"><span class="dn">17</span><span class="dots"></span></button>
+<button class="agcell"><span class="dn">18</span><span class="dots"></span></button>
+<button class="agcell"><span class="dn">19</span><span class="dots"><span class="dot" style="background:#A78BFA"></span></span></button>
+<button class="agcell"><span class="dn">20</span><span class="dots"></span></button>
+<button class="agcell"><span class="dn">21</span><span class="dots"></span></button>
+<button class="agcell"><span class="dn">22</span><span class="dots"></span></button>
+<button class="agcell"><span class="dn">23</span><span class="dots"></span></button>
+<button class="agcell"><span class="dn">24</span><span class="dots"><span class="dot" style="background:#60A5FA"></span></span></button>
+<button class="agcell"><span class="dn">25</span><span class="dots"></span></button>
+<button class="agcell"><span class="dn">26</span><span class="dots"></span></button>
+<button class="agcell"><span class="dn">27</span><span class="dots"><span class="dot" style="background:#EF4444"></span><span class="dot" style="background:#F59E0B"></span></span></button>
+<button class="agcell"><span class="dn">28</span><span class="dots"></span></button>
+<button class="agcell"><span class="dn">29</span><span class="dots"></span></button>
+<button class="agcell"><span class="dn">30</span><span class="dots"></span></button>
+<button class="agcell"><span class="dn">31</span><span class="dots"></span></button>
+<button class="agcell dim"><span class="dn">1</span><span class="dots"></span></button>
+<button class="agcell dim"><span class="dn">2</span><span class="dots"></span></button>
+<button class="agcell dim"><span class="dn">3</span><span class="dots"></span></button>
+<button class="agcell dim"><span class="dn">4</span><span class="dots"></span></button>
+<button class="agcell dim"><span class="dn">5</span><span class="dots"></span></button>
+          </div>
+        </section>
+
+        <section class="panel day">
+          <div class="day-h">
+            <div class="day-t">Segunda, 17 de agosto</div>
+            <span class="day-c">3 compromissos</span>
+          </div>
+          <div class="day-list">
+            <div class="evc">
+              <span class="evc-rail" style="--rc:#E85D8C"></span>
+              <div class="evc-date"><span class="evc-dw">SEG</span><span class="evc-dd">17</span><span class="evc-dm">AGO</span></div>
+              <div class="evc-main">
+                <div class="evc-top"><span class="evc-time"><svg class="ic"><use href="#i-clock"/></svg>09:30<span class="evc-te">— 11:00</span></span><span class="evc-st ev-sched"><span class="d"></span>Agendado</span></div>
+                <div class="evc-ti">Alinhamento de pauta — Sunset Wear</div>
+                <div class="evc-meta"><svg class="ic"><use href="#i-user"/></svg><span>Sunset Wear</span></div>
+                <div class="evc-foot"><span class="av av-20 u-rose p-tat">TG</span><span class="evc-name">Tatiana Gomes</span><span class="evc-ty ty-reun">Reunião</span></div>
+              </div>
+            </div>
+
+            <div class="evc">
+              <span class="evc-rail" style="--rc:#12A69B"></span>
+              <div class="evc-date"><span class="evc-dw">SEG</span><span class="evc-dd">17</span><span class="evc-dm">AGO</span></div>
+              <div class="evc-main">
+                <div class="evc-top"><span class="evc-time"><svg class="ic"><use href="#i-clock"/></svg>14:00<span class="evc-te">— 17:00</span></span><span class="evc-st ev-prog"><span class="d"></span>Em andamento</span></div>
+                <div class="evc-ti">Gravação da coleção primavera</div>
+                <div class="evc-meta"><svg class="ic"><use href="#i-user"/></svg><span>Sunset Wear</span></div>
+                <div class="evc-meta"><svg class="ic"><use href="#i-place"/></svg><span>Estúdio Sul</span></div>
+                <div class="evc-foot"><span class="av av-20 u-teal p-fel">FT</span><span class="evc-name">Felipe Teodozio</span><span class="evc-ty ty-grav">Gravação</span></div>
+              </div>
+            </div>
+
+            <div class="evc">
+              <span class="evc-rail" style="--rc:#12A7C4"></span>
+              <div class="evc-date"><span class="evc-dw">SEG</span><span class="evc-dd">17</span><span class="evc-dm">AGO</span></div>
+              <div class="evc-main">
+                <div class="evc-top"><span class="evc-time"><svg class="ic"><use href="#i-clock"/></svg>18:00</span><span class="evc-st ev-sched"><span class="d"></span>Agendado</span></div>
+                <div class="evc-ti">Corte final do Reels institucional</div>
+                <div class="evc-foot"><span class="av av-20 u-cyan p-boa">BM</span><span class="evc-name">Boaz Macêdo</span><span class="evc-ty ty-edic">Edição</span></div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

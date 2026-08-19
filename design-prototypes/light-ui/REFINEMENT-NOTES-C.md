@@ -1,4 +1,26 @@
-# ▶ R9 — ACESSIBILIDADE · AUDIT + SPEC TRANSVERSAL (aguarda owner)
+# ▶ R9.1 — ACCESSIBILITY DESIGN CLOSURE · TOKEN ERRATA (aguarda owner)
+Decisão do owner: auditoria R9 aprovada; GO da R9 condicionado a fechar as dívidas de DESIGN.
+Entrega: `ACCESSIBILITY-TOKEN-ERRATA.md` (E1–E11, before→depois→razão→contraste→impacto) +
+prancha única `r9-1-accessibility-token-closure.html` (1920×1080, board de contrato A–E).
+Números recalculados DO ZERO dos contracts: tx-3 4.09/3.78 · tx-4 2.21 · brand-texto 3.68 ·
+orange 2.15 · grad claro 3.62 · sla-k 3.08 · sb-faint 3.25(topo) · inp border 1.29 confirmados.
+Menor ajuste provado: tx-3′ #697181 (4.91/4.54) · tx-4′ #6E7786 (4.52 + regra de superfície:
+canvas usa tx-3′) · brand-ink #4353D8 (6.06 — valor JÁ EXISTENTE no F9, promovido a token) ·
+grad stop 2 #8356E6 (branco 4.73 pior stop; stop 1 e identidade intactos) · sla-k → green-ink
+(5.01, reuso) · sb-faint′ #828AA8 (4.74 base) + topo migra p/ sb-dim · REGRA GLOBAL accent×ink
+(formaliza F9 --ac/--cx e F10/F11 sv-*i; auditado: KPI laranja Golden JÁ usa #B45309 — nenhum
+KPI usa laranja cru) · sólidos accent c/ texto branco pequeno → ink (pill visão ativa 3.68→
+#2563EB 5.17; badges 9+/CRÍTICO → #C4302B 5.52) · borda de input MANTIDA com justificativa
+técnica (label+placeholder+shape+focus ≥3) · toast X hit 20→28 (glyph intacto, R5.1 preservada)
+· F8 dots: cor+FORMA (●■▲◆○) + chips-filtro = legenda oficial (semântica = implementação).
+Hierarquia preservada (17.79›7.72›4.91›4.52; disabled/OFF intactos; focus reconfirmado 4.26+).
+Regressão 9/9 PASS (F1 F7B F8 F9 F10 F11 F12 F13 R5.1 em `r9-1-regression/`; Golden INTOCADO;
+9 critérios do mandato ✔). Axe 4.13.0 before/after comparável: color-contrast 213→34 (−84%);
+resíduos classificados (mockup-only; regra cobre na implementação). D05–D11/D13 design =
+resolvidas na errata (aguarda GO); guardrails de implementação intactos (D01 P0 upload etc.).
+Zero produção · zero função · zero V2 de frames · 1 imagem. R10 NÃO iniciada.
+
+# ✔ R9 — ACESSIBILIDADE · AUDIT + SPEC TRANSVERSAL (auditoria APROVADA; GO condicionado à R9.1)
 Fase READ-ONLY (zero implementação/ARIA/tabindex/cor/modal alterados; zero imagem).
 `ACCESSIBILITY-CONTRACT.md` criado (30 seções): matriz global 24 linhas; keyboard real (14
 handlers; Enter/Espaço/Escape/Tab provados; ZERO arrows/Home/End); focus (regra global +

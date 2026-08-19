@@ -136,14 +136,27 @@ de fechamento.
 - **Dependência:** R2–R7 (congelar antes de revalidar). **Imagem?** SIM (validação, não design
   novo). **Owner approval?** SIM. **Fechamento:** §H sem "SIM — revalidar" pendente.
 
-## R9 · ACESSIBILIDADE — SPEC MÍNIMA CONSOLIDADA ▶ ENTREGUE (aguarda avaliação do owner)
+## R9 · ACESSIBILIDADE — SPEC MÍNIMA CONSOLIDADA ▶ AUDITORIA APROVADA · fechamento condicionado à R9.1
 > **Status:** `ACCESSIBILITY-CONTRACT.md` criado (30 seções; READ-ONLY, zero implementação, zero
 > imagem). Auditoria code-based do renderer real (keyboard/focus/semântica/ARIA/motion/targets,
 > tudo com linha) + contraste WCAG CALCULADO dos tokens Golden + axe-core 4.13.0 (temporário no
 > harness; wcag2a/aa/21aa; 7 arquétipos; F12=0 violações) + matriz global + debt register
 > A11Y-D01–D25. **Design P0 = NÃO** (FAILs de contraste são debts D05–D10 c/ microfase opcional);
 > **Implementation P0 = SIM (D01 upload sem teclado)** ⇒ guardrails §29 (não reabre Golden).
-> **R9 NÃO concluída**; R10 não iniciada.
+> **Decisão do owner:** auditoria R9 APROVADA tecnicamente; **R9 só recebe GO após a R9.1**
+> (fechamento das dívidas de acessibilidade que pertencem ao DESIGN). R10 não iniciada.
+
+## R9.1 · ACCESSIBILITY DESIGN CLOSURE ▶ ENTREGUE (aguarda avaliação do owner)
+> **Status:** `ACCESSIBILITY-TOKEN-ERRATA.md` + prancha `r9-1-accessibility-token-closure.html`
+> (1 imagem 1920×1080 entregue no chat). Errata E1–E11 com contraste recalculado do zero e
+> provado (tx-3′ 4.91/4.54 · tx-4′ 4.52+regra de superfície · brand-ink #4353D8 6.06 promovido
+> do F9 · grad stop→#8356E6 4.73 · sla-k→green-ink · sb-faint′ 4.74 · regra global accent×ink ·
+> sólidos c/ branco → ink · borda de input justificada · toast X hit 28×28 · dots com forma +
+> legenda). Regressão visual 9/9 PASS em cópias isoladas (`r9-1-regression/` — Golden intocado);
+> axe before/after comparável: color-contrast **213→34 (−84%)**, F12 0→0; resíduos 34 = mockup-
+> only, todos classificados e cobertos pela regra. Dívidas de DESIGN D05–D11/D13 = resolvidas na
+> errata (aguarda GO); implementation guardrails (D01 P0 etc.) INTACTOS. Zero produção; zero
+> função; nenhuma V2 de frames. **R9.1 NÃO concluída**; após GO ⇒ R9 = GO.
 - **Objetivo:** consolidar C1 §6 + registros por frame num requisito único de implementação
   (contraste, foco, cor-não-única, targets, labels, keyboard, disabled≠OFF, unread≠read,
   upload acessível, erro não-só-cor). Declarar explicitamente o que NÃO é contrato do código
