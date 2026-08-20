@@ -1,0 +1,90 @@
+# LIGHT UI — I3K · F11 RELATÓRIOS — RELATÓRIO
+
+**Fase:** I3K · F11 — Golden Frame 11 sobre os Relatórios de Atraso REAIS
+**Base congelada:** `594cf02c` (F1–F10 GOLDEN/CONGELADAS) · **Branch:** `impl/light-ui-f11-relatorios-1.0.246`
+**Golden:** `proposta-c-frame11-relatorios.html` (Frame 11 aprovado, Design Freeze `efb264a4`; contrato C7-Table `2516426`; renderizado 1920×1080 ANTES de editar)
+**Checkpoint:** `db53881a` (`feat(light-ui): port F11 reports golden`)
+**Versão:** 1.0.246 (inalterada) · **Status:** ENTREGUE — aguarda owner. **F11 NÃO congelada. F12 NÃO iniciado.**
+
+---
+
+## A · Reauditoria funcional literal (FASE 2 — 50 itens, código ATUAL)
+
+1. **Entry real:** `state.tab==='relatorios'` → `renderReports()` + `afterReports()` (dispatch linha do render switch). Tab `{k:'relatorios', i:'bars'}` em TABS; **`priTabVisible` só oculta 'prioridades'** → Relatórios sempre na nav. **Dados por papel:** `visibleTasks(u)` — `canSeeAll` (ADMIN/MANAGER) → tudo; designer vê `assigneeId===uid || by===uid` (provado: fixture admin 13 × designer ft 7).
+2. **Estado:** `reportFilters {periodo:'7d', designer, cliente, tipo, statusSLA, soAtrasados:false, concluidas:''}` (var de sessão em memória).
+3. **Pipeline puro:** `slaExecReports(tasks,users,now,filtros)` = `reportsFilter` (execApplyFilters + soAtrasados[state==='overdue'] + concluidas sim/nao[isTaskCompleted]) → `slaExecAggregate(list,…,{periodo:'all'})` (EXEC-CORE congelado — período NÃO reaplicado) + `execPeriodBuckets(list,now,dm,repPeriodDays)` + loop próprio (overdueMins/concl/reincid/historico/taskRows).
+4. **`repPeriodDays` literal:** hoje=1 · 30d=30 · **all=30** · senão 7 — no modo "Tudo" as barras mostram 30 buckets (provado g19b) enquanto os KPIs cobrem tudo (execWithinPeriod all→true).
+5. **KPIs (4) — fórmulas literais:** Atraso médio = `round(mean(d.overdueMin))` dos overdue (minutos JÁ arredondados por task) · % entrega no prazo = `concl>0 ? round(conclNoPrazo/concl*100) : 100` (**zero concluídas → 100%**, diferente do pct por designer que dá 0 se há atraso) com concl = done&&hasSla e noPrazo = `finishedAt<=finishMs` · Reincidentes = `reincid.length` (TOTAL, não o slice) · Críticas = `agg.totais.critico`.
+6. **Fonte única de SLA:** `resolveTaskDisplayState` + `isTaskCompleted` + `slaPanelFinishMs` (plannedFinishAt→planDueAt→assignment.end→due). Nenhuma fórmula paralela.
+7. **Tabela "Atrasos por designer":** dados = `agg.porDesigner` (risco `execRiskScore`=crít×3+atr×2+lar desc, desempate carga desc); células = `execDesRow` (**7 células**). Ver F11-D01 abaixo.
+8. **Laterais:** porCliente slice(0,**6**) e porTipo slice(0,**6**) (a F10 usa 5 — literal da F11); sorts crítico→atras / atras.
+9. **"Tarefas críticas":** `R.criticas = agg.criticasRecentes` = **TODOS os overdue** (critical-first, overdueMs desc, top 8) — inclui overdue NÃO-crítico (dívida herdada da F10, registrada no Golden; provado g25 com dots vermelho×crítico).
+10. **Reincidentes:** `execTaskLateCount` = entries do history com `atras|overdue|late` em kind|to|from (lowercase) OU `to==='revisao'/'revisão'` + overdue atual → `max(c,1)`; card = lc≥2, sort lc desc (empate = ordem de inserção, sort estável), top 12; **membership independe do estado atual** (running com 2 hits históricos ENTRA — provado g27 com rr1).
+11. **Histórico:** lc≥1, steps = `history.map(kind||to||'evento')` `slice(-7)` (fallback literal `['enviado', label||state]`), pill lc≥3 crítico/≥2 laranja/senão verde, cores `repStepColor`, top 10.
+12. **Export:** `[data-rep-export]` → RECOMPUTA `slaExecReports` do estado atual (dataset = visível) → `execDownload(name,mime,text)` Blob+anchor LOCAL. CSV = `toCSV(R.taskRows)`; JSON = objeto `{geradoEm,filtros,kpis,porDesigner,porCliente,porTipo,periodo,reincidentes,tarefas}`.
+13. **Empty:** `count===0` → "Sem dados no período selecionado" (com svg('bars')). **Loading:** N/A (síncrono). **Deep-link/F6:** N/A REAL — afterReports liga apenas período/filtros/toggle/export; nenhum clique em rows/listas (equivalente real = navegação por tabs). **Live:** pipeline global do onSnapshot. **Storage/mutations do bloco: ZERO.**
+
+## B · Threshold do crítico — prova literal + boundary (FASE 9)
+
+14. **Definição literal:** `critical = (now >= finishMs + _GRACE)` — comparação **≥ sobre MS BRUTOS**, com `_GRACE=(slaCfgOf(t).overdueGraceMinutes||10)*60000` — **POR SETOR** (`SECTOR_SLA`): cronograma/default = **10 min** · **edicao_midia = 20 min** (warning 40) · roteiro designerSla:false. `resolveTaskDisplayState` NÃO consulta o flag `critical:false` da config (ele rege notificação, não display) — literal.
+15. **Boundary provado (g26, engine + UI):** cronograma — atraso **599999ms → NÃO crítica com overdueMin=10** (round de 9.99998) · **600000ms exatos → CRÍTICA** (≥) · 600001ms → CRÍTICA. As duas de "10 min" aparecem no card com dots distintos (vermelho #FF6B61 × crítico #F2415A) — provado no DOM.
+16. **Por setor provado:** edicao_midia 15 min → **NÃO crítica apesar de >10** · 25 min → crítica (≥20). O subtítulo "atraso > 10 min" (card e KPI) é texto herdado do template (idêntico na F10 congelada e no Golden): impreciso no caso exato de 10:00.000 e em setores de grace ≠10 — **a lógica real explica** (cláusula do mandato; documentado, sem D0x novo). NÃO tolerado silenciosamente: provado e registrado.
+
+## C · Write map (FASE 3) — export local ≠ backend write
+
+17. Handlers reais: período (muda `reportFilters`+render) · 5 selects (idem) · toggle (bool+render) · **export (LEITURA + download local via Blob/ObjectURL/anchor — nenhum IPC/rede/Firestore)**. **Firestore/Functions/Worker/API writes = 0** (stub contador = 0 em TODA a bateria, incl. exports); **localStorage novo = 0** (só `wp_uid`/`wp_name` do `saveSession` REAL do auth no boot — pré-existente, documentado).
+
+## D · Exportação auditada (FASE 4 — g33/g34/g35/g35b)
+
+18. **CSV:** separador **`;`**; header literal `tarefa;cliente;tipo;designer;status_sla;atraso_min;reincidencias;prazo;concluida` (ordem = Object.keys do 1º row); 8 rows na fixture (só overdue/critical — rr1 running com lc=2 NÃO entra; done não-overdue não entram); **escaping `/[";\n]/` com aspas duplicadas** provado com título `Cronograma "urgente"; edição` → `"Cronograma ""urgente""; edição"`; campo vazio (client '') vira `;;`; prazo = `slaibFmtHM` HH:MM; concluida sim/nao; charset no mime `text/csv;charset=utf-8` (sem BOM — literal).
+19. **JSON:** shape/da ordem das chaves `{geradoEm,filtros,kpis,porDesigner,porCliente,porTipo,periodo,reincidentes,tarefas}`; tipos numéricos dos KPIs; tarefas=8, periodo=7, reincidentes=3; `null,2` pretty. **Não inclui** historico/criticas/totais (literal).
+20. **Filenames:** `relatorio-atraso-AAAA-MM-DD.csv/.json` (stamp = `new Date().toISOString().slice(0,10)`, relógio REAL — no harness só `Date.now` é stubado; no produto os dois relógios coincidem — limitação do harness documentada). `execDownload` REAL exercido (Blob+ObjectURL+click → true). Handler completo testado com espião não-destrutivo por cima de `execDownload` (mandato: payload/blob/filename pela implementação real).
+21. **Export respeita filtro:** com designer ft → 4 linhas (header+3). **Export vazio:** dataset 0 → `toCSV([])` = `''` — arquivo vazio **SEM cabeçalho** (literal); o texto do empty-s do produto promete "arquivo vazio com cabeçalho" — **imprecisão textual herdada documentada** (não corrigida: texto real).
+
+## E · Matriz Golden × Real (FASE 5) — ISSUE = 0
+
+22. **MATCH (A):** header título/sub com dot; períodos Hoje/7d/30d/Tudo; 5 selects + toggle + 2 exports; 4 KPIs (labels/subs literais); card "Atrasos por período" (barras+counts+labels MM-DD); tabela designer; "Atrasos por cliente"/"por tipo"; "Tarefas críticas" (sub "atraso > 10 min"); "Reincidentes em atraso" (sub "≥ 2 atrasos"); "Histórico resumido por tarefa" + timeline repStepColor; empty; footer literal "…exportação LOCAL (CSV/JSON via download) · não grava no Firestore".
+23. **ADAPTAÇÃO JUSTIFICADA (D→resolvida):** layout masonry do Golden = "adaptação de apresentação — cards do renderReports reagrupados" (declarado NO PRÓPRIO Golden) — o app preserva o DOM/fluxo real (KPIs → gráfico full → grid designer+laterais → grid críticas+reincidentes → histórico full), mesmo precedente da F10; toolbar do Golden em 2 linhas vs linha única real (exec-filters) — DOM real preservado; números do protótipo são fictícios → app mostra os valores REAIS provados; label das barras: código real = `day.slice(5)` (**MM-DD**, ex. 08-20) — o Golden desenhou DD-MM contradizendo o próprio comentário ("label MM-DD") → autoridade código real, formato real mantido.
+24. **F11-E01 (B — Golden only):** estilo `.rep-pbn.z` (número da barra zero esmaecido) — o renderReports não emite a classe `z`; distinção impossível via CSS puro sem mudar markup → não portado (cosmético).
+25. **C (produto only):** seleção '—' no ranking de clientes p/ client vazio; modo "Tudo" com 30 buckets; linha "Sem designers."/"Sem histórico…" (empties internos). Todos preservados.
+
+## F · Tabela — F11-D01 (FASE 8, mismatch REAL documentado, NÃO corrigido)
+
+26. **F11-D01 — desalinhamento header×células na tabela "Atrasos por designer" (PRÉ-EXISTENTE no produto):** o header real emite **5 `<th>`** (`Designer|Atrasadas|Críticas|Atraso méd.|% no prazo`, empty colspan=5) mas cada linha (`execDesRow`, contrato C7 do F10) emite **7 `<td>`** (Designer|Carga|%noPrazo|Lar.|Atr.|Crít.|Atraso méd.) — colunas 6-7 sem header e rótulos desalinhados das células 2-5. O Golden REGISTRA esta dívida ("precedente Subtipo; NÃO corrigir") e desenha as 7 colunas reais. **Não corrigido nesta fase:** a correção altera markup universal (muda o DOM/textos do tema dark legado → legacy 0px impossível; muda semântica de apresentação) → exige autorização do owner. Provado em gate (g11: 5 th literais · g12: 7 td por row) — dívida NÃO silenciosa. Correção candidata (7 th espelhando execDesRow, como no Golden) fica a decisão do owner.
+
+## G · Provas matemáticas (FASES 6/7 — fixture N=1787265000000 = 2026-08-20T22:30Z)
+
+27. **Fixture (13 tasks):** ft/Felipe {r1 running +2h · w1 warning +10min · b1 −599999ms · m1 edicao_midia −15min · c1 −22min crítica com history lc=2 · rr1 running com history lc=2 · d1 done NO prazo} · bm/Boaz {b2 −600000ms · b3 −600001ms (client '') · m2 edicao_midia −25min · c2 −30min com history 8 entries lc=3 · o1 −1d30min (título com `"` e `;`) · d2 done FORA (due +3d)} · clientes Sunset Wear/GreenLife/Bold Brand/'' · setores cronograma/edicao_midia.
+28. **KPIs provados (g05-g08, recomputo manual):** Atraso médio **199 min** = round((10+10+10+15+25+22+30+1470)/8) · % no prazo **50%** = round(1/2·100) (d1 sim, d2 não) · Reincidentes **3** (c2=3, c1=2, rr1=2) · Críticas **6** (b2,b3,m2,c1,c2,o1).
+29. **Barras (g09/g10):** buckets 08-14…08-20; counts **0,0,0,0,0,1,7** (o1 em 08-19; 7 overdue hoje) = 8 = total overdue; altura = `max(6, count/pmax·100)`% (100% e 14.29% provados numericamente); cores literais count≥4 vermelho `#FF6B61` / ≥2 laranja / senão azul `#7FA6FF` — normalização visual = matemática real.
+30. **Tabela (g12/g13):** Boaz primeiro (risco 15=5crít×3 > Felipe 8=1×3+2×2+1) — rows literais `Boaz50%005309 min` (amed 92700001ms/5/60000→309: críticos INCLUÍDOS, fórmula EXEC-CORE) e `Felipe6100%12116 min` (2819999/3/60000→16; pct 100 = concl 1/1 no prazo).
+31. **Filtros (g14-g24, isolados+combinados):** designer ft {crít 1 · 16 min · reincid 2} · cliente GreenLife {crít 2 · 15 min · **pct 100% com 0 concluídas — literal**} · tipo edicao_midia {crít 1 · 20 min} · statusSLA crítico {6} e vermelho {0 crít · 13 min = round(12.5)} · conclusão sim {0 min · 50% · crít 0}/nao {11} · período hoje {crít 5 · 17 min · 1 bucket · pct 100 — o1 e d2 fora} · all {30 buckets} · soAtrasados {count 8} · **combinação bm+crítico {5 · 309 min · 1 row Boaz · barras 0,0,0,0,0,1,4}** — KPIs+tabela+barras+listas coerentes após CADA filtro.
+
+## H · A11y (FASE 13)
+
+32. Selects/botões de período nativos (teclado nativo; focus-visible da I3J já cobre `.exec-fl`/`.exec-seg button` por classe). **Toggle e exports são `<span>` clicáveis REAIS do produto** → ganharam semântica mínima: `role="button"`, `tabindex="0"`, `aria-pressed` dinâmico no toggle (nome acessível = texto real). **Keyables FOLHA no afterReports com `preventDefault`+`stopPropagation`** (invariante F9-D01; nenhum ancestral interativo). Provado g38: Enter alterna ON (aria-pressed true), Espaço alterna OFF com `defaultPrevented` (zero scroll), foco visível #4353D8. **Nested interactive = 0 no DOM (g39).** Tabelas com `<th>` reais; gráficos com equivalente textual REAL (rep-pbn/rep-pbl por barra; listas/KPIs textuais). Reduced motion: superfície sem animações (REP_CSS/EXEC_CSS não definem). `th[scope]` ausente no produto (igual F10 congelada — não introduzido). **Nenhuma div clicável introduzida.**
+
+## I · Responsivo (FASE 14)
+
+33. **1920 / 1366 / win125 (1093×614 @1.25):** zero page-level overflow (scrollW==vw provado nas 3); **≤1100px a media query REAL do EXEC_CSS rege** (KPIs 2 col, grids 1 col) — a regra light de 4 colunas só existe em `@media(min-width:1101px)`; zero transform:scale; nenhuma função desaparece (filtros/exports/tabelas/barras presentes em todos os breakpoints; tabela cabe no card — sem necessidade de scroll interno na fixture).
+
+## J · Smoke (FASE 16) — **48/48 PASS**
+
+34. 44 gates do mandato (g01-g44) + 4 sub-gates (g17b vermelho · g18b conclusão=nao · g19b all=30 buckets · g35b export filtrado/vazio): entrada/render/acesso RBAC/dataset/KPIs+prova/distribuição+soma/headers/células/sort/7 filtros/combinação/coerência pós-filtro/críticos membership/boundary −1-exato-+1/por-setor/reincidentes+contagens (c2=3·c1=2·rr1=2·b1=1·d1=0)/timeline slice(-7)+fallback+cores/empty/coleção vazia/campo opcional (sem SLA + client '' → '—')/CSV/JSON/filenames+payloads/zero writes/zero storage/teclado/nested=0/navegação F10↔F11↔F9↔F1/estado não vaza. Equivalentes reais documentados: busca NÃO existe na F11; deep-link NÃO existe (navegação por tabs); distribuição da F11 = barras por período.
+
+## K · Regressão e legacy (FASES 19/20)
+
+35. **Diff audit (proteção F9-D01): PASS** — 1 arquivo, **+45/−2**, três blocos: seção CSS I3K (+40), 2 linhas do renderReports reescritas (SÓ atributos a11y), +3 linhas keyables no afterReports. **ZERO toque em handlers/DOM da F9** (grep nc-*/notifHistory/afterNotifCentral no diff = 0) → gate de teclado F9-D01 não exigido (nenhum JS/DOM compartilhado tocado); estrutura funcional congelada da F9 intacta.
+36. **Light UI (19 pares, base `594cf02c`):** F1 board+painel · F2 board+painel · F3 board+painel · F4 board+painel · F5 board+painel · F6 default · F7 Setor+Dados · F8 month/list/detail · F9 populated+detail · **F10 main+empty** = **0px puro em 16 dos 19 pares**; f3 painel / f4 board / f5 board divergiram SÓ na bbox do sino `(1443,29,1485,71)` com flake AUTO-PROVADO per-superfície (A base×base e/ou B cur×cur divergem sozinhos na MESMA bbox; máscara = apenas essa bbox; **0px fora** nos 3).
+37. **Legacy (11 pares, sem body.light-ui):** **F11 (Relatórios) dark/light/hc** · Executivo dark/light/hc · Central de Notificações dark/light/hc · Painel de Detalhes dark · Agenda dark = **0px PURO em 11/11** (sem máscara) — em especial os Relatórios dark/light/hc: os atributos a11y adicionados são pixel-inertes nos 3 temas legados.
+
+## L · Escopo do diff (FASE 21)
+
+38. **1 arquivo** (`desktop/src/renderer/index.html`), +45/−2. **CSS:** seção I3K única — **19 seletores, 19/19 gated `body.light-ui.desktop`, 0 leakage, 0 global, 1 media (min-width:1101px, conteúdo gated), 1 `!important`** (contra-!important escopado devolvendo a cor inline real `#F2A93B` ao 1º KPI da F11 — neutraliza na superfície o `:first-child` da I3J, que é específico do KPI "Ativas" do Executivo; balanço de chaves 0). **JS:** 1 bloco keyables no `afterReports` (folhas, stopPropagation). **Attributes:** role/tabindex/aria-pressed nos 3 spans reais (pixel-inertes — legacy 0px). **Funções novas: 0 · handlers removidos: 0 · storage: 0 · writes: 0 · globals: 0 · exports/mutations: inalterados.**
+
+## M · Fechamento (FASES 22/23)
+
+39. Provas no chat: F11-RELATORIOS-{1920, 1920-FILTERED, 1920-EMPTY, 1366, win125}.png + F11-COMPARE-GOLDEN-vs-APP.png (sem modal de export inventado — export é download direto). Checkpoint único `db53881a` + push; sem PR/merge/build/tag/release/bump/ativação. Roadmap: **I3J = ✔ GO · F10 = CONGELADA @ `594cf02c` · I3K = ENTREGUE — AGUARDA OWNER · F11 = NÃO CONGELADA · F12 = NÃO INICIADO.**
+40. **Recomendação: GO** — skin gated sobre pipeline puro read-only revalidado item a item; threshold do crítico provado em ms com boundary e POR SETOR; export CSV/JSON auditado byte a byte; 48/48 gates; **1 defeito PRÉ-EXISTENTE documentado (F11-D01 header 5×células 7 — decisão do owner pendente; não introduzido nem corrigido nesta fase)**; F11-E01 cosmético; regressão e legacy conforme seção K.
+
+**HARD STOP.** F12 não iniciado. Aguarda GO explícito do owner.

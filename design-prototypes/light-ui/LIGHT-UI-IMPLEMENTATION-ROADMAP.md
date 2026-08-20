@@ -627,6 +627,61 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > F10-COMPARE-GOLDEN-vs-APP.png no chat (detail real não existe → ALTERNATE = empty
 > real, explicado). **Recomendação: GO.**
 > **Gate de saída: avaliação do owner. F10 = NÃO congelado. F11 = NÃO INICIADO.**
+>
+> **I3J = ✔ GO DO OWNER (registrado). F10 = CONGELADA @ `594cf02c`.**
+
+## I3K · F11 — RELATÓRIOS ▶ ENTREGUE (aguarda owner)
+> **GO do owner recebido (F11 somente; F12 NÃO autorizada).** **Branch:**
+> `impl/light-ui-f11-relatorios-1.0.246` de `594cf02c` (HEAD confirmado; worktree limpa;
+> 1.0.246; Light UI inativa) · **checkpoint único `db53881a`** ("feat(light-ui): port F11
+> reports golden") · relatório `LIGHT-UI-I3K-F11-RELATORIOS-REPORT.md` · Golden
+> `proposta-c-frame11-relatorios.html` (freeze `efb264a4`; C7 `2516426`; renderizado antes
+> de editar). Reauditoria literal 50 itens SEM memória: entry `state.tab==='relatorios'` →
+> `renderReports`/`afterReports`; pipeline PURO `slaExecReports` = `reportsFilter`
+> (execApplyFilters + soAtrasados + concluidas) → `slaExecAggregate({periodo:'all'})` +
+> `execPeriodBuckets(repPeriodDays)` (hoje=1·30d=30·**all=30**·senão 7); KPIs literais
+> (atrasoMedio=round(mean(overdueMin)); pctNoPrazo concl>0?round:**100**; reincidentes=
+> length TOTAL; criticas=totais.critico); reincidência REAL `execTaskLateCount` (history
+> atras|overdue|late|to=revisao + overdue→max(c,1); lc≥2, top 12; membership INDEPENDE do
+> estado atual — running com 2 hits entra, provado); histórico lc≥1 steps slice(−7) com
+> fallback ['enviado',label] e `repStepColor`; **THRESHOLD DO CRÍTICO REPROVADO
+> LITERALMENTE: `now>=finishMs+GRACE` em MS BRUTOS, GRACE POR SETOR (`SECTOR_SLA`:
+> cronograma/default 10min · edicao_midia 20min)** com boundary provado engine+UI
+> (599999ms NÃO crítica com overdueMin=10 · 600000ms CRÍTICA · 600001ms CRÍTICA · 15min
+> edicao_midia NÃO crítica apesar de >10 · 25min crítica — subtítulo ">10 min" é texto
+> herdado explicado pela lógica real). **Write map: read-only + EXPORT LOCAL ≠ backend
+> write** (Firestore/API 0 em toda a bateria incl. exports; storage novo 0). **Export
+> auditado byte a byte:** CSV `;` com escaping aspas-duplicadas provado (título com `"` e
+> `;`), campo vazio, header/ordem literais, 8 rows; JSON shape 9 chaves/tipos/counts;
+> filenames `relatorio-atraso-AAAA-MM-DD.*` + `execDownload` real (Blob) exercido; export
+> respeita filtro; **export vazio = '' SEM cabeçalho (literal; texto do empty promete
+> cabeçalho — imprecisão herdada documentada)**. **F11-D01 (defeito PRÉ-EXISTENTE
+> documentado, NÃO corrigido):** tabela "Atrasos por designer" com header de **5 th** ×
+> **7 td** do execDesRow (desalinhamento em produção; o Golden registra a dívida e desenha
+> as 7 reais; correção muda markup universal → decisão do owner). F11-E01: `.rep-pbn.z`
+> cosmético do Golden sem classe no produto. Implementação: **+45/−2** — seção CSS I3K
+> (19 seletores **19/19 gated**, 1 media min-width:1101px preservando a media REAL ≤1100,
+> **1 contra-!important escopado** devolvendo a cor inline #F2A93B ao 1º KPI da F11 contra
+> o :first-child da I3J) + **a11y mínima nos spans clicáveis REAIS** (toggle/exports:
+> role/tabindex/aria-pressed + keyables FOLHA com stopPropagation — invariante F9-D01;
+> pixel-inertes provados) — caixa do toggle via ::before (zero markup novo). Smoke
+> **48/48** (44 gates do mandato: KPIs 199min/50%/3/6 com recomputo manual; barras
+> 0,0,0,0,0,1,7=8 com normalização count/pmax e cores literais; rows
+> `Boaz50%005309 min`/`Felipe6100%12116 min` risco 15>8; 7 filtros isolados + combinação
+> bm+crítico {5·309min·1 row·barras …,1,4}; navegação F10↔F11↔F9↔F1 sem vazamento; zero
+> writes/storage; nested=0; teclado Enter/Espaço com defaultPrevented). Responsivo
+> 1920/1366/**win125** 0 overflow (≤1100 rege: KPIs 2col). Fidelidade **ISSUE=0**
+> (masonry do Golden = adaptação de apresentação declarada NO próprio Golden; DOM real
+> preservado; labels MM-DD do código real vencem o DD-MM desenhado). **Diff audit
+> F9-D01: ZERO toque em handlers/DOM F9** (grep nc-*/notif no diff = 0). Regressão base
+> `594cf02c`: **F1–F10 = 19 pares, 16 puro 0px** + f3p/f4b/f5b SÓ na bbox do sino
+> `(1443,29,1485,71)` com **A–E per-superfície auto-provado** (base×base/cur×cur divergem
+> sozinhos; 0px fora) · **legacy 11/11 = 0px PURO** (Relatórios+Executivo+Central 3 temas
+> + Detalhes/Agenda dark — atributos a11y pixel-inertes provados). Provas
+> F11-RELATORIOS-{1920, 1920-FILTERED, 1920-EMPTY, 1366, win125}.png +
+> F11-COMPARE-GOLDEN-vs-APP.png no chat. **Recomendação: GO.**
+> **Gate de saída: avaliação do owner. I3J = ✔ GO · F10 = CONGELADA @ `594cf02c` ·
+> I3K = ENTREGUE — AGUARDA OWNER · F11 = NÃO CONGELADA · F12 = NÃO INICIADO.**
 
 > — GO do owner (2026-08-20) com 4 correções
 > obrigatórias (amendment registrado; filtro parado como conflito-01; KPIs auditados acima;
