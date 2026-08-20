@@ -4010,6 +4010,46 @@ body.light-ui.desktop .exec-empty-mini{color:#98A1AD}
 /* foco visível nos controles nativos reais (button/select) */
 body.light-ui.desktop .exec-seg button:focus-visible,
 body.light-ui.desktop .exec-fl:focus-visible{outline:2px solid #4353D8;outline-offset:2px}
+/* ==========================================================================
+   LIGHT UI — I3K · F11 RELATÓRIOS (Golden Frame 11 sobre renderReports REAL)
+   Superfície real: renderReports (tab 'relatorios') — "Relatórios de Atraso ·
+   Operacional · read-only · exportável". Reusa o EXEC-CORE congelado: a skin
+   exec-* da I3J aplica pela guarda de classe; esta seção cobre APENAS as
+   classes rep-* (REP_CSS dark hardcoded injetado por repEnsureStyle) e
+   ajustes escopados à guarda .rep-wrap (wrap exclusivo da F11). KPIs em 4
+   colunas (Golden k4) SÓ acima de 1100px — a media query real ≤1100px do
+   EXEC_CSS (2 col) permanece regendo. Único !important: contra-!important
+   escopado que devolve ao 1º KPI ("Atraso médio") sua cor inline real
+   #F2A93B (execSevHex laranja), neutralizando na F11 o :first-child da I3J
+   (específico do KPI "Ativas" do Executivo). Cores de severidade inline
+   (execSevHex/repStepColor) preservadas — tratamento congelado da F10.
+   Caixa do toggle via ::before decorativo (zero markup novo). Nada
+   fabricado; exportação = download local read-only.
+   ========================================================================== */
+body.light-ui.desktop .rep-wrap{padding:22px 26px 32px}
+@media(min-width:1101px){body.light-ui.desktop .rep-wrap .exec-kpis{grid-template-columns:repeat(4,1fr)}}
+body.light-ui.desktop .rep-wrap .exec-kpis .exec-kpi:first-child .exec-kpi-v{color:#F2A93B !important}
+/* toggle chip "Só atrasados" (Golden rep-tg; estado on = tint vermelho) */
+body.light-ui.desktop .rep-tg{display:inline-flex;align-items:center;gap:9px;height:38px;padding:0 14px;border-radius:10px;font-size:12.5px;font-weight:600;color:#4B5364;background:#FFFFFF;border-color:#E4E8EF}
+body.light-ui.desktop .rep-tg::before{content:"";width:15px;height:15px;border-radius:5px;box-shadow:inset 0 0 0 1.6px #C7CDD8;background:#fff;flex:none}
+body.light-ui.desktop .rep-tg:hover{border-color:#B9C4F4}
+body.light-ui.desktop .rep-tg.on{color:#C4302B;background:#FDEDED;border-color:#F3B8B8}
+body.light-ui.desktop .rep-tg.on::before{background:#EF4444;box-shadow:none}
+/* ação contextual de exportação (verde, secundária — não compete com CTA) */
+body.light-ui.desktop .rep-exp{display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 15px;border-radius:10px;font-size:12.5px;font-weight:700;color:#22A06B;background:#EDF9F3;border-color:#BFE7D4}
+body.light-ui.desktop .rep-exp:hover{background:#E2F5EC}
+/* gráfico de barras — "Atrasos por período" (equivalente textual real: rep-pbn/rep-pbl) */
+body.light-ui.desktop .rep-pbars{height:118px;gap:16px;padding:6px 6px 0;border-bottom:1px solid #EFF1F6}
+body.light-ui.desktop .rep-pbfill{width:62%;border-radius:7px 7px 0 0;box-shadow:inset 0 1px 0 rgba(255,255,255,.35)}
+body.light-ui.desktop .rep-pbn{font-size:12.5px;font-weight:750;color:#14181F}
+body.light-ui.desktop .rep-pbl{color:#A8AFBC}
+/* linha do tempo de SLA (histórico) — passos com dot inline repStepColor */
+body.light-ui.desktop .rep-tlstep{font-size:11.5px;color:#4B5364}
+body.light-ui.desktop .rep-tlstep i{box-shadow:0 0 0 2px #fff}
+body.light-ui.desktop .rep-tlsep{width:16px;height:1.5px;background:#E8EBF1;margin:0 2px}
+/* foco visível nos controles de teclado da superfície (toggle/export) */
+body.light-ui.desktop .rep-tg:focus-visible,
+body.light-ui.desktop .rep-exp:focus-visible{outline:2px solid #4353D8;outline-offset:2px}
 </style>
 </head>
 <body>
@@ -6956,8 +6996,8 @@ function renderReports(){
   var dl='<svg viewBox="0 0 24 24" fill="none" style="width:1em;height:1em;vertical-align:-2px"><path d="M12 3v12M7 11l5 5 5-5M5 21h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   var h='<div class="scr rep-wrap"><div class="exec-head"><div><div class="exec-ttl">Relatórios de Atraso</div><div class="exec-sub"><i></i>Operacional · read-only · exportável</div></div><div class="exec-seg">'+per+'</div></div>'
     +'<div class="exec-filters">'+optSel('designer','Designer',desMap,true)+optSel('cliente','Cliente',cliMap,false)+optSel('tipo','Tipo',tipoMap,false)+statusSel+conclSel
-    +'<span class="rep-tg'+(reportFilters.soAtrasados?' on':'')+'" data-rep-toggle="soAtrasados">Só atrasados</span>'
-    +'<span style="flex:1"></span><span class="rep-exp" data-rep-export="csv">'+dl+'Exportar CSV</span><span class="rep-exp" data-rep-export="json">'+dl+'Exportar JSON</span></div>';
+    +'<span class="rep-tg'+(reportFilters.soAtrasados?' on':'')+'" data-rep-toggle="soAtrasados" role="button" tabindex="0" aria-pressed="'+(reportFilters.soAtrasados?'true':'false')+'">Só atrasados</span>'
+    +'<span style="flex:1"></span><span class="rep-exp" data-rep-export="csv" role="button" tabindex="0">'+dl+'Exportar CSV</span><span class="rep-exp" data-rep-export="json" role="button" tabindex="0">'+dl+'Exportar JSON</span></div>';
   if(R.count===0){ h+='<div class="exec-empty"><div class="exec-empty-ic">'+svg('bars')+'</div><div class="exec-empty-t">Sem dados no período selecionado</div><div class="exec-empty-s">Nenhuma tarefa nos filtros atuais. Ajuste o período/filtros — a exportação gera um arquivo vazio com cabeçalho.</div></div></div>'; return h; }
   var K=R.kpis;
   h+='<div class="exec-kpis">'+execKpi('Atraso médio',(K.atrasoMedio||0)+' min',execSevHex('laranja'),'no período')+execKpi('% entrega no prazo',(K.pctNoPrazo||0)+'%',execSevHex('azul'),'concluídas no prazo')+execKpi('Reincidentes',K.reincidentes,execSevHex('vermelho'),'≥ 2 atrasos')+execKpi('Críticas',K.criticas,execSevHex('critico'),'atraso > 10 min')+'</div>';
@@ -6974,6 +7014,9 @@ function afterReports(){
   var fs=document.querySelectorAll('[data-rep-filter]'); for(var j=0;j<fs.length;j++){ (function(sel){ sel.onchange=function(){ reportFilters[sel.getAttribute('data-rep-filter')]=sel.value; render(); }; })(fs[j]); }
   var tg=document.querySelectorAll('[data-rep-toggle]'); for(var k=0;k<tg.length;k++){ (function(b){ b.onclick=function(){ var n=b.getAttribute('data-rep-toggle'); reportFilters[n]=!reportFilters[n]; render(); }; })(tg[k]); }
   var ex=document.querySelectorAll('[data-rep-export]'); for(var m=0;m<ex.length;m++){ (function(b){ b.onclick=function(){ var u=state.user; var now=Date.now(); var vis=(typeof visibleTasks==='function')?visibleTasks(u,state.tasks||[]):(state.tasks||[]); var R=slaExecReports(vis,state.users||[],now,reportFilters); var kind=b.getAttribute('data-rep-export'); var stamp=new Date().toISOString().slice(0,10); if(kind==='csv'){ execDownload('relatorio-atraso-'+stamp+'.csv','text/csv;charset=utf-8',toCSV(R.taskRows)); } else { execDownload('relatorio-atraso-'+stamp+'.json','application/json;charset=utf-8',JSON.stringify({geradoEm:new Date().toISOString(),filtros:reportFilters,kpis:R.kpis,porDesigner:R.porDesigner,porCliente:R.porCliente,porTipo:R.porTipo,periodo:R.periodo,reincidentes:R.reincidentes,tarefas:R.taskRows},null,2)); } }; })(ex[m]); }
+  /* Teclado nos controles span reais (toggle "Só atrasados" + exports): folhas da toolbar, sem
+     ancestral interativo (nested=0); stopPropagation é invariante de teclado em handlers Enter/Espaço. */
+  var ky=document.querySelectorAll('[data-rep-toggle],[data-rep-export]'); for(var q=0;q<ky.length;q++){ (function(el){ el.onkeydown=function(e){ var k=e.key||''; if(k==='Enter'||k===' '||k==='Spacebar'){ e.preventDefault(); e.stopPropagation(); el.click(); } }; })(ky[q]); }
 }
 /* ════════════════════════ F3.3.9-REPORTS-CORE END ════════════════════════ */
 
