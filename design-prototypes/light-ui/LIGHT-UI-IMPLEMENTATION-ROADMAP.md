@@ -845,8 +845,35 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > GO CONDICIONADO para RC** — condições são trabalho DA RC (mecanismo de ativação
 > controlada + decisões do owner sobre M1/B2); Light UI permanece INATIVA; nenhum
 > build/installer/deploy/tag/bump gerado.
-> **Estado: I3M = ENTREGUE (contexto I4 do owner: "F1–F13 concluídos") · I4 = AUDITORIA
-> ENTREGUE — AGUARDA DECISÃO DE RC DO OWNER · RC = NÃO INICIADA.**
+> **Estado: I3M = ✔ GO · F13 = CONGELADA @ `899862a2` · I4 = ✔ GO CONDICIONADO (PASS) ·
+> RC-0 (I5A) = ver bloco abaixo.**
+
+## I5A · RC-0 — CONTROLLED ACTIVATION GATE + RELEASE DEBT CLOSURE ▶ ENTREGUE (aguarda owner)
+> **Mandato do owner (GO explícito).** Base DIRETA `899862a2` · branch
+> `rc/light-ui-activation-hardening-1.0.246` · **checkpoint `ae6fc7b0`**
+> (`feat(rc): add controlled light-ui activation and release hardening`; 1 arquivo, 34+/11−)
+> · relatório `LIGHT-UI-I5A-RC0-ACTIVATION-HARDENING-REPORT.md`. **Entregas:** (A) feature
+> flag interna `luiPreview` DENTRO de `idseven.desktop.appearance` (padrão real de
+> preferências; default OFF provado em 3 variantes de máquina; opt-in/kill via `appearSet`;
+> guard rail `.desktop` fechado + reavaliação na MQ; A1–A6 todos PASS — kill×legacy 0px,
+> mecanismo×injeção 0px sob paint igual, first paint sem flash, logout/isolamento no padrão
+> do produto); (B) dívidas: **B1 F10/F11 copy verdadeira em 5 pontos** (KPI só critical por
+> setor; cards "Atrasos recentes"/"críticas primeiro" — decomposição base+copy×HEAD=0px);
+> **B2 F13 saveProduction confiável** (await antes de fechar; busy acessível; falha→retry
+> integral; 19/19 gates); **B3 sem mudança** (padrão real: nenhuma sheet fecha com Escape);
+> **B4 → RC-D02 STOP** (recovery NÃO implementável sem backend novo — decisão do owner:
+> copy honesta / ocultar link / endpoint futuro); **B5 CDN provado em 3 cenários**
+> (guard offline F3.5.5C-H1 real: splash honesto + auto-reload; risco M1 aceito com
+> fallback; vendorização não aplicada); (C) QA com mecanismo REAL: smokes 265/265 + 62
+> gates novos · navegação global 15/15 × 3 viewports · write map: única escrita nova =
+> campo `luiPreview` (só em `appearSet` explícito) · a11y nested=0 · F9-D01 ok; (D) legado
+> OFF base×HEAD: byte-idêntico fora das 5 strings B1 (decomposição 0px; 12×0px estrito);
+> (E) F1–F13 flag ON: 24×0px + 3 copy-proven + sino via política A–E (f4main provado
+> não-determinístico por base×base na bbox conhecida). **Veredito: I5A = GO. RC
+> tecnicamente autorizável (SIM), condicionada às decisões do owner: RC-D02 (recovery) +
+> aceite M1.**
+> **Estado: I5A = ENTREGUE — AGUARDA OWNER · Light UI = INATIVA POR PADRÃO ·
+> RC BUILD / PACKAGE / RELEASE / DEPLOY = NÃO INICIADOS (HARD STOP).**
 
 > — GO do owner (2026-08-20) com 4 correções
 > obrigatórias (amendment registrado; filtro parado como conflito-01; KPIs auditados acima;
