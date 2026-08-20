@@ -3926,7 +3926,7 @@ body.light-ui.desktop .nc-row{background:#FFFFFF;border-color:#EFF1F6;box-shadow
 body.light-ui.desktop .nc-row:hover{background:#FAFBFD;border-color:#E4E8EF;box-shadow:0 6px 18px rgba(19,24,38,.07)}
 body.light-ui.desktop .nc-row.unread{background:#FBFBFF}
 body.light-ui.desktop .nc-row.unread:hover{background:#F6F7FF}
-body.light-ui.desktop .nc-row:focus-visible,body.light-ui.desktop .nc-open:focus-visible,
+body.light-ui.desktop .nc-row .nc-body:focus-visible,body.light-ui.desktop .nc-open:focus-visible,
 body.light-ui.desktop .nc-act:focus-visible,body.light-ui.desktop .nc-dx:focus-visible,
 body.light-ui.desktop .nc-dcta:focus-visible{outline:2px solid #4353D8;outline-offset:2px}
 body.light-ui.desktop .nc-av{box-shadow:0 0 0 2px #FFFFFF,0 0 0 3px #EDF0F6}
@@ -7023,10 +7023,13 @@ function ncRow(x){ var col=ncSev(x.severity); var tp=notifTypeLabel(x); var tph=
      ligados no afterNotifCentral (delegação por propriedade, como os onclick existentes).
      Atributos são pixel-inertes (regressão 0px provada nos 3 temas legados). */
   var lbl='Notificação'+(x.read?'':' não lida')+': '+(x.title||tp)+' · '+tp+' · '+ncTimeHM(x.createdAt);
-  return '<div class="nc-row'+(x.read?'':' unread')+'" data-nc-open="'+esc(x.eventId)+'" role="button" tabindex="0" aria-label="'+esc(lbl)+'">'
+  /* I3I.2 (F9-D01) — SEM nested-interactive: a row é container puro (mouse via onclick);
+     a ação ACESSÍVEL de abrir o detalhe vive no filho REAL .nc-body (irmão do controle
+     "Abrir tarefa" — nenhum button dentro de button). */
+  return '<div class="nc-row'+(x.read?'':' unread')+'" data-nc-open="'+esc(x.eventId)+'">'
     +'<div class="nc-acc" style="background:'+col+'"></div>'
     +ncAvatar(x.responsibleAvatar||x.actorAvatar,x.responsibleName||x.actorName||x.taskTitle,40)
-    +'<div class="nc-body"><div class="nc-l1"><span class="nc-type" style="color:'+tph+';background:'+tph+'1f">'+esc(tp)+'</span><b>'+esc(x.title||tp)+'</b>'+(crit?'<span class="nc-crit">CRÍTICO</span>':'')+'</div>'
+    +'<div class="nc-body" role="button" tabindex="0" aria-label="'+esc(lbl)+'"><div class="nc-l1"><span class="nc-type" style="color:'+tph+';background:'+tph+'1f">'+esc(tp)+'</span><b>'+esc(x.title||tp)+'</b>'+(crit?'<span class="nc-crit">CRÍTICO</span>':'')+'</div>'
     +'<div class="nc-sub">'+esc(x.subtitle||((x.clientName?x.clientName+' · ':'')+(x.taskTitle||'')))+'</div>'+(x.context?'<div class="nc-ctx" style="color:'+col+'">'+esc(x.context)+'</div>':'')+'</div>'
     +'<div class="nc-right"><div class="nc-time">'+ncTimeHM(x.createdAt)+'</div>'+(x.read?'':'<div class="nc-ur"></div>')+(x.deep?'<div class="nc-open" data-nc-deep="'+esc(x.deep)+'" data-nc-id="'+esc(x.eventId)+'" role="button" tabindex="0">Abrir tarefa '+svg('arr')+'</div>':'')+'</div></div>';
 }
@@ -7083,8 +7086,11 @@ function afterNotifCentral(){
   /* I3I (a11y) — Enter/Espaço acionam os controles da Central (mesmo padrão do .evc real da
      Agenda). Propriedade onkeydown por elemento (idêntico ao esquema onclick desta função —
      re-render recria; sem acúmulo de listener). Universal (dark e light): correção de débito. */
-  var keyables=document.querySelectorAll('[data-nc-open],[data-nc-deep],[data-nc-markall],[data-nc-clear],[data-nc-close]');
-  for(var kk=0;kk<keyables.length;kk++){ (function(el){ el.onkeydown=function(e){ if(e.key!=='Enter'&&e.key!==' ')return; e.preventDefault(); el.click(); }; })(keyables[kk]); }
+  /* I3I.2 (F9-D01) — teclado nos ALVOS FOLHA (nc-body = abrir detalhe; controles), com
+     stopPropagation: o keydown de um controle interno nunca alcança a row/ancestrais.
+     O click() do nc-body bubbla até a row [data-nc-open] e aciona o onclick real 1×. */
+  var keyables=document.querySelectorAll('.nc-row .nc-body[role="button"],[data-nc-deep],[data-nc-markall],[data-nc-clear],[data-nc-close]');
+  for(var kk=0;kk<keyables.length;kk++){ (function(el){ el.onkeydown=function(e){ if(e.key!=='Enter'&&e.key!==' ')return; e.preventDefault(); e.stopPropagation(); el.click(); }; })(keyables[kk]); }
 }
 /* registro do canal de captura 100% (hub do main → histórico local). Capture-only. */
 try{ if(window.desktopAPI&&typeof window.desktopAPI.onNotifHistory==='function'){ window.desktopAPI.onNotifHistory(function(p){ try{ notifHistoryAppend(p); }catch(_){} try{ if(!(p&&p._groupUpdate)&&(typeof document==='undefined'||(typeof document.hasFocus==='function'?document.hasFocus():document.visibilityState!=='hidden'))) notifToastOnce(p); }catch(_){} }); } }catch(_){}   /* F3.5.4K — compensação do toast in-app SÓ com FOCO real (não apenas "visível"): quando o Agenda está atrás de outro programa/minimizado, o MAIN já entrega pela JANELA PREMIUM always-on-top; sem foco NÃO se levanta um toast in-app invisível que duplicaria o overlay. O sino (notifHistoryAppend) continua SEMPRE. F3.5.4O — eventos de ATUALIZAÇÃO de grupo (_groupUpdate) NÃO levantam 2º toast pela compensação: o main já envia notif-group-update que morfa o toast existente; o sino segue registrando CADA evento. */
