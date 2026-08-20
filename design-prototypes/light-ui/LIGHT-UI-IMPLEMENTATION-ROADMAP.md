@@ -322,7 +322,7 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > 1366, win125}.png + comparação no chat. **I3D = ✔ GO DO OWNER (registrado).
 > F4 = IMPLEMENTADO / GOLDEN / CONGELADO.**
 
-## I3E · F5 — SETORES ▶ ENTREGUE (aguarda owner)
+## I3E · F5 — SETORES — ✔ GO DO OWNER (CONGELADA)
 > **GO do owner recebido (F5 somente; F6+ NÃO autorizadas).** **Branch:**
 > `impl/light-ui-f5-setores-1.0.246` de `6d4796ff` (HEAD confirmado; worktree limpa) ·
 > **checkpoint único `f6915110`** ("feat(light-ui): implement F5 setores golden") ·
@@ -341,7 +341,54 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > ~40×40; **0px fora**) · legado **0px nas CINCO superfícies** (mesma política) ·
 > 1920/1366/win125 sem overflow · zero write · matriz ZERO ISSUE. Provas
 > F5-SETORES-{1920, 1920-PANEL, 1920-OUTRO-SETOR, 1366, win125}.png + comparação no
-> chat. **Gate de saída: avaliação do owner.** **I3F/F6 = NÃO INICIADA.** — GO do owner (2026-08-20) com 4 correções
+> chat. **I3E = ✔ GO DO OWNER (registrado 2026-08-20). F5 = IMPLEMENTADO / GOLDEN /
+> CONGELADO (checkpoint `f6915110`).**
+
+## I3F · F6 — DETAILS ▶ ENTREGUE (aguarda owner)
+> **GO do owner recebido (F6 somente; F7+ NÃO autorizadas).** **Branch:**
+> `impl/light-ui-f6-details-1.0.246` de `f6915110` (HEAD confirmado; worktree limpa) ·
+> **checkpoint único `8e288c6b`** ("feat(light-ui): implement F6 details golden") ·
+> relatório `LIGHT-UI-I3F-F6-DETAILS-REPORT.md`. **HARD GATE de acoplamento APROVADO
+> com prova por código:** `data-detorigin` é emitido SÓ em `state.tab==='tarefas'` com
+> sub-tab ∈ {mine, client, designers, socials, hub+boardSector} (expressão literal do
+> `openDetails`); toda abertura real fora disso — Minhas Prioridades (`data-priopen`),
+> deep-link/notificação `detail/<id>` (`notifRoute`), hub raiz sem setor — abre a MESMA
+> Central como **modal central DEFAULT sem o atributo**. Superfície do Golden F6 = essa
+> apresentação default (funções da equipe: Legendas e artes/`prod`, Enviar ao cliente,
+> Editar prazo, Mover status, Remover — todas da Central real; `renderClientView` é
+> superfície DISTINTA com ações de cliente e permanece intocada — referência estrutural
+> do protótipo, registrada). **Escopo CSS estrito `:not([data-detorigin])`** — disjunto
+> por construção dos 5 painéis congelados; paleta Golden por override de custom
+> properties no subtree do sheet default; regras extras só onde o base tinha cor dark
+> hardcoded (det-x hover, numerais, timeline, rodapé, slaedit-btn de CSS lazy); CTA de
+> fase no gradiente do amendment (`--lui-grad`); rodapé compacto com destrutivo à
+> direita (sem reordenar DOM). A11y real: dialog/aria-modal/nome acessível e
+> trap/Esc/retorno de foco JÁ existiam na Central; dívidas quitadas = `aria-label`
+> "Fechar detalhes" no X (pixel-inerte; provado 0px em dark/light/hc e nos 5 painéis
+> light) + reduced-motion escopado ao modal default; a superfície real não tem tabs
+> (nada inventado). Adaptações registradas: **F6-E01** Golden é página 3 colunas →
+> modal central real 1240×88vh em coluna única (corpo linear condicional; Operação/
+> Timeline vivem no `<details>` real colapsável "Detalhes do fluxo" — função
+> preservada); **F6-E02** pill "MONITOR SLA · AO VIVO" e os 4 chips do hero não
+> fabricados (1 chip de estado real + cron label; setor no det-badge; SLA/fase nos
+> blocos reais); **F6-E03** resumo editorial com Feed/Story/situação por item pertence
+> à `renderClientView` real (não fabricado na Central); **F6-E04** contadores reais
+> `N / M` (não "12 temas · 7 legendas · 5 pendentes"). Gates: smoke **41/41**
+> (abertura pelas 2 superfícies reais + origem ausente também no hub raiz, conteúdo da
+> task clicada, campos reais, **Entregue≠Concluída**, RBAC admin×designer, CTA gating
+> ativo/locked real `canSendToClient`, pós-conclusão H16/H17, X/Esc/trap/retorno/
+> reabrir, zero writes) · regressão congelada **F1 board+painel, F2 board+painel, F3
+> board+painel, F4 board+painel, F5 board+painel = 0px** (F4: flake do sino reprovado
+> pela política A–E — base×base diverge sozinho na MESMA região ~1443,29→1485,71;
+> known async bell flake; **0px fora da região comprovada**) · legado **0px** (Central
+> aberta em dark/light/hc + boards; hc/light com o mesmo flake na região fechada
+> 1460,30→1500,72, 0px fora) · 1920/1366/win125 = modal central real (sem dock ≥1760:
+> nem contrato real nem Golden o determinam para o default) · matriz ZERO ISSUE com
+> F6-E01..E04. Provas F6-DETAILS-{1920, 1920-ALT-STATE, 1920-SCROLL, 1366, win125,
+> A11Y-FOCUS}.png + F6-COMPARE-GOLDEN-vs-APP.png no chat (política: não versionar).
+> **Gate de saída: avaliação do owner.** **F7+ = NÃO INICIADA.**
+
+> — GO do owner (2026-08-20) com 4 correções
 > obrigatórias (amendment registrado; filtro parado como conflito-01; KPIs auditados acima;
 > sidebar 266px como calibração compartilhada do Light Shell sob `body.light-ui`, validada
 > em 1920/1366/win125). Painel lateral: MESMA Central de Detalhes real DOCADA como 5ª
