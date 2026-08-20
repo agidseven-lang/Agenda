@@ -939,7 +939,29 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > aberta (CDN normal); OU autorizar fase corretiva mínima (workflow RC dedicado).
 > **Veredito: I5C = NO-GO · "RC aprovado para RELEASE FINAL?" = NÃO (ainda não — gates de
 > ambiente abertos; nenhuma reprovação de produto).**
-> **Estado: I5C = ENTREGUE — AGUARDA OWNER · RC SOURCE = `dcc019ca` (imutável) ·
+> **Estado: I5C = NO-GO — RC-A01/RC-A02 (ambientais).**
+
+### I5C.1 · RC ENVIRONMENTAL ACCEPTANCE CLOSURE ▶ ENTREGUE — **NO-GO (ambiente segue indisponível)**
+> **Mandato do owner (GO explícito) — fechar RC-A01/RC-A02. ZERO SOURCE CHANGES**
+> (source segue `dcc019ca`; SHAs re-verificados; 0 tags/release/deploy). Relatório
+> `LIGHT-UI-I5C1-ENVIRONMENTAL-CLOSURE-REPORT.md`. **Fatos da sessão:** continua um
+> container LINUX (0 binários Windows) ⇒ Fases Windows (build/NSIS/MSI/install/uninstall/
+> reinstall/Win125 nativo) inexecutáveis — **RC-A01 = OPEN**; CDN do app re-provado às
+> 23:51Z — `www.gstatic.com` **403 pelo proxy mandatório da sessão** ⇒ **RC-A02 = OPEN**
+> (CDN blocked segue PASS por bytes). **Reaudit literal do CI (Fase 1, sem editar):**
+> `desktop-build.yml` pinado à 1.0.183 (linha 66); `desktop-build-f356bh2.yml` com gate de
+> branch fixo (42) + isolamento "só 2 renderers vs 1.0.245" (162-168) ⇒ `dcc019ca` falha
+> por construção; **processo de release REAL = par build+release POR VERSÃO (25 pares no
+> repo; release gated NÃO recompila, pina run id/hashes/tag, Gate 2 só aceita commits do
+> próprio workflow)** ⇒ classificação **B** — publicar a RC exige CRIAR o par da linhagem
+> RC → **RC-A03 = OPEN (CI RELEASE PIPELINE REQUIRES OWNER-AUTHORIZED CHANGE)**, alteração
+> NÃO executada. **Caminho de fechamento (owner):** máquina Windows x64 real (~15 min:
+> roteiro no relatório) fecha A01+A02; autorização do par de workflows RC fecha A03 (ou
+> workflow de build RC `windows-latest` fecha A01+A03 de uma vez).
+> **Veredito: I5C.1 = NO-GO · RC-A01 OPEN · RC-A02 OPEN · RC-A03 OPEN · "RC aprovado para
+> RELEASE FINAL?" = NÃO** (produto sem defeito conhecido; pendências 100% de ambiente/
+> processo).
+> **Estado: I5C.1 = ENTREGUE — AGUARDA OWNER · RC SOURCE = `dcc019ca` (imutável) ·
 > NSIS I5B = artefato de referência (hash `82576b18…`) · M1 = ACCEPTED · TAG = NÃO ·
 > GITHUB RELEASE = NÃO · DEPLOY = NÃO · BUMP = NÃO · RELEASE FINAL = NÃO INICIADA.**
 
