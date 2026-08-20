@@ -103,3 +103,7 @@ Defeitos abertos da F11 (ambos PRÉ-EXISTENTES no produto, nenhum introduzido pe
 **Recomendação: FIX BEFORE FREEZE** — autorizar mandato curto (I3K.2) aplicando a opção **B** (thead de 7 headers reais + `colspan="7"` no empty, espelhando o Golden aprovado e o thead que a F10 real já usa) e resolvendo **D02** (ajuste da string do empty OU header em CSV vazio — 1 mudança mínima), com re-prova dirigida (tabela + export + legacy da F11 com diff esperado documentado + regressão F1–F10 0px). Custo total ≈ 2 linhas; remove uma dívida MEDIUM de a11y ANTES do congelamento. Alternativa válida se o owner preferir congelar já: ACCEPT DEBT + FREEZE com D01/D02 formalizados (o C7 §21 já os destina a fase funcional futura).
 
 **HARD STOP.** D01 NÃO corrigido · F12 NÃO iniciado · aguardando decisão explícita do owner.
+
+---
+
+**[ATUALIZAÇÃO I3K.2]** O owner autorizou FIX BEFORE FREEZE. **F11-D01 e F11-D02 RESOLVIDOS em `cdea6da5`** (branch `fix/light-ui-f11-d01-d02-1.0.246`; opção B do GATE 5 + copy verdadeira; F10/execDesRow/exports provados invariantes) — ver `LIGHT-UI-I3K2-F11-D01-D02-FIX-REPORT.md`.

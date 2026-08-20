@@ -716,6 +716,39 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > ENTREGUE · I3K.1 = HARDENING ENTREGUE — AGUARDA OWNER · F11 = NÃO CONGELADA ·
 > CHECKPOINT CANDIDATO = `db53881a` · F12 = NÃO INICIADO.**
 
+## I3K.2 · F11 — D01+D02 SURGICAL FIX ▶ ENTREGUE (aguarda owner)
+> **I3K.1 = ✔ GO do owner (FIX BEFORE FREEZE autorizado).** **Branch:**
+> `fix/light-ui-f11-d01-d02-1.0.246` DIRETO de `db53881a` (HEAD exato; worktree limpa;
+> 1.0.246; NÃO partiu do commit de docs) · **checkpoint único `cdea6da5`**
+> ("fix(reports): resolve F11 table headers and empty export copy") · relatório
+> `LIGHT-UI-I3K2-F11-D01-D02-FIX-REPORT.md`. **Diff cirúrgico: 1 arquivo, 2 linhas
+> (+2/−2), ZERO CSS, ZERO funções** — linha 7001 (copy D02) e linha 7006 (thead+colspan
+> D01). **D01 RESOLVIDO:** thead da F11 5→7 com os labels/classes EXATOS da fonte dupla
+> inequívoca (Golden `efb264a4` linha 330 ≡ thead REAL da F10 sobre o MESMO execDesRow):
+> `Designer·Carga(.c)·% no prazo·Lar.(.c)·Atr.(.c)·Crít.(.c)·Atraso méd.(.c)` + colspan
+> do empty interno 5→7; scope não aplicado (não é padrão real). Prova DOM: **th=7 · td=7
+> · mapping 7/7 · 0 órfãs · 0 deslocado · colspan=7**; F10 INVARIANTE before×after
+> (thead/row0/`execDesRow.toString()` byte-idênticos); rows/sort/valores idênticos.
+> **D02 RESOLVIDO:** copy do empty → "…as exportações continuam disponíveis."
+> (verdadeira p/ CSV E JSON; preferência funcional do mandato — Golden não tinha
+> alternativa verdadeira); mecanismo de export INTOCADO: CSV vazio `''` 0 bytes idem ·
+> JSON vazio byte-idêntico · **CSV normal byte-idêntico (===)** · JSON normal
+> byte-idêntico exceto `geradoEm` (relógio real do handler) · filenames/MIMEs idênticos.
+> **Invariância:** boundary cron 600000ms e edicao_midia 1200000ms ±1ms idênticos;
+> KPIs 199min/50%/3/6 idênticos; smoke I3K **48/48** + **27 gates fix** = **75 PASS**;
+> a11y 7/7 pela estrutura real (sem ARIA paralela), teclado/nested/focus preservados;
+> zero writes/storage. **Visual bounded provado por bbox⊆rect:** populated/1366/legacy
+> dark-light-hc SÓ dentro do card da tabela; empty SÓ na linha da copy; win125 0px
+> (thead abaixo do fold); **KPIs/filtros/barras/laterais/footer = 0px**. **Regressão
+> F1–F10 base `db53881a`: 24/28 = 0px PURO com HARD GATES F10 main+empty = 0px e F9 =
+> 0px**; f3b/f3p/f4p/f5b só nas bboxes do sino com A–E auto-provado (0px fora).
+> **Golden: D01 → MATCH; D02 → adaptação funcional justificada; fidelity ZERO ISSUE.**
+> Provas F11-FIXED-{1920, 1920-EMPTY, 1366, win125, A11Y-TABLE, COMPARE}.png no chat.
+> **Recomendação: GO.**
+> **Gate de saída: GO do owner p/ congelar. I3K.1 = ✔ GO · D01 = RESOLVIDO · D02 =
+> RESOLVIDO · F11 = ENTREGUE — AGUARDA OWNER (NÃO CONGELADA até GO explícito) ·
+> CHECKPOINT CANDIDATO = `cdea6da5` · F12 = NÃO INICIADO.**
+
 > — GO do owner (2026-08-20) com 4 correções
 > obrigatórias (amendment registrado; filtro parado como conflito-01; KPIs auditados acima;
 > sidebar 266px como calibração compartilhada do Light Shell sob `body.light-ui`, validada
