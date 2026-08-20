@@ -319,8 +319,29 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > strip) · legado 0px nas QUATRO superfícies (F3-dark 0px fora de zona-flake ambiental
 > 40×40 no cluster, comprovada base×base) · 1920/1366/win125 sem overflow · zero write ·
 > matriz ZERO ISSUE. Provas F4-SOCIAL-MEDIAS-{1920, 1920-PANEL, 1920-OUTRO-USUARIO,
-> 1366, win125}.png + comparação no chat. **Gate de saída: avaliação do owner.**
-> **I3E/F5 Setores = NÃO INICIADA.** — GO do owner (2026-08-20) com 4 correções
+> 1366, win125}.png + comparação no chat. **I3D = ✔ GO DO OWNER (registrado).
+> F4 = IMPLEMENTADO / GOLDEN / CONGELADO.**
+
+## I3E · F5 — SETORES ▶ ENTREGUE (aguarda owner)
+> **GO do owner recebido (F5 somente; F6+ NÃO autorizadas).** **Branch:**
+> `impl/light-ui-f5-setores-1.0.246` de `6d4796ff` (HEAD confirmado; worktree limpa) ·
+> **checkpoint único `f6915110`** ("feat(light-ui): implement F5 setores golden") ·
+> relatório `LIGHT-UI-I3E-F5-SETORES-REPORT.md`. Reauditoria real: rota = taskChips
+> "hub" → `renderHub` (índice real) → `[data-sector]` → `renderBoard` (board canônico);
+> **colunas = const `STATUS` própria** (A Fazer/Em andamento/Revisão/**Concluído** — não
+> SOCIAL_COLS4); **setores reais ativos:** Edição de vídeos `#60A5FA` · Cronograma
+> `#34D399` · Edição de Cards `#F472B6` (descontinuados preservados p/ histórico e nunca
+> expostos); critério task→setor = `secOf`+`visibleTasks` (permissão real); "Minhas
+> tarefas" = chip real `boardMine` (efeito provado); sem autoload próprio (real: hub →
+> clique). **Strip de setores = reapresentação GATED da navegação real** (mesmo handler
+> `[data-sector]`, mesma lista, counts reais — nenhuma função nova). Painel = MESMA
+> Central real (drawer <1760 / docada ≥1760, 240..1027; X/Esc/foco provados). Gates:
+> smoke **24/24** · F1/F2 regression **0px** · F3/F4 regression **0px** (painéis: flake
+> do sino reprovado pela política A–E — base×base e atual×atual divergem na MESMA região
+> ~40×40; **0px fora**) · legado **0px nas CINCO superfícies** (mesma política) ·
+> 1920/1366/win125 sem overflow · zero write · matriz ZERO ISSUE. Provas
+> F5-SETORES-{1920, 1920-PANEL, 1920-OUTRO-SETOR, 1366, win125}.png + comparação no
+> chat. **Gate de saída: avaliação do owner.** **I3F/F6 = NÃO INICIADA.** — GO do owner (2026-08-20) com 4 correções
 > obrigatórias (amendment registrado; filtro parado como conflito-01; KPIs auditados acima;
 > sidebar 266px como calibração compartilhada do Light Shell sob `body.light-ui`, validada
 > em 1920/1366/win125). Painel lateral: MESMA Central de Detalhes real DOCADA como 5ª
