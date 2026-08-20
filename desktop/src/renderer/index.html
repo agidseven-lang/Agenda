@@ -4619,13 +4619,15 @@ function retiredModuleNotice(taskId,sectorKey){
 }
 
 /* ---- LOGIN UI ---- */
-let loginMode='login',forgotStep=1,forgotEmail='';
+let loginMode='login';
 function renderLogin(){
   /* F3.3.56-G2: modos 'register' e 'pending' removidos — cadastro interno é
-     admin-driven e a troca de senha é server-side (perfil → Trocar senha). */
-  const titles={login:'Entrar',forgot:forgotStep===2?'Confirmar código':'Redefinir senha'};
-  const subs={login:'Acesse sua agenda e tarefas da equipe',
-    forgot:forgotStep===2?('Informe o código de 6 dígitos enviado para '+forgotEmail+' e crie uma nova senha.'):'Informe o e-mail cadastrado e enviaremos um código de 6 dígitos para você criar uma nova senha.'};
+     admin-driven e a troca de senha é server-side (perfil → Trocar senha).
+     I5A.1 RC-D02: modo 'forgot' REMOVIDO por decisão do owner — era stub sem backend
+     (nenhum envio real de código); a UI não pode oferecer função inexistente. A troca
+     de senha real continua no perfil (server-side) e o hint abaixo orienta o acesso. */
+  const titles={login:'Entrar'};
+  const subs={login:'Acesse sua agenda e tarefas da equipe'};
   document.getElementById('loginTitle').textContent=titles[loginMode];
   document.getElementById('loginSub').textContent=subs[loginMode];
   const f=document.getElementById('loginForm');let h='';
@@ -4633,18 +4635,7 @@ function renderLogin(){
   if(loginMode==='login'){
     h+='<div class="fld"><label for="liId">E-mail ou WhatsApp</label><input class="inp" id="liId" placeholder="E-mail ou WhatsApp" inputmode="email" autocomplete="username"></div>'+pw('liPw',null,'current-password')+
       '<div style="height:10px"></div><button class="btn" id="btnLogin">Entrar</button>'+
-      '<button class="txtbtn accent" data-mode="forgot">Esqueci minha senha</button>'+
       '<div style="margin-top:10px;font-size:12.5px;color:var(--soft);text-align:center">Cadastro interno desativado. Solicite acesso ao administrador.</div>';
-  }else if(loginMode==='forgot'&&forgotStep===1){
-    h+='<div class="fld"><label for="fEmail">E-mail cadastrado</label><input class="inp" id="fEmail" placeholder="E-mail cadastrado" inputmode="email" autocomplete="email"></div>'+
-      '<div style="height:10px"></div><button class="btn" id="btnFreq">Enviar código</button>'+
-      '<button class="txtbtn soft" data-mode="login">Voltar ao login</button>';
-  }else if(loginMode==='forgot'){
-    h+='<div class="fld"><label for="fCode">Código de 6 dígitos</label><input class="inp" id="fCode" placeholder="Código de 6 dígitos" inputmode="numeric" maxlength="6" autocomplete="one-time-code"></div>'+
-      pw('fPw','Nova senha')+pw('fPw2','Confirmar nova senha')+
-      '<div style="height:10px"></div><button class="btn" id="btnFconf">Criar nova senha</button>'+
-      '<button class="txtbtn accent" id="btnResend">Reenviar código</button>'+
-      '<button class="txtbtn soft" data-mode="login">Voltar ao login</button>';
   }
   f.innerHTML=h;
 }
@@ -4652,14 +4643,10 @@ function banner(msg,ok){document.getElementById('loginBanner').innerHTML=msg?'<d
 function loading(btn,on){if(!btn)return;btn.disabled=on;btn.innerHTML=on?'<span class="spinner"></span>':btn.dataset.t;}
 function val(id){const e=document.getElementById(id);return e?e.value:'';}
 document.getElementById('login').addEventListener('click',async e=>{
-  const t=e.target.closest('[data-mode]');if(t){loginMode=t.dataset.mode;forgotStep=1;banner('');renderLogin();return;}
   const tg=e.target.closest('[data-toggle]');if(tg){const inp=document.getElementById(tg.dataset.toggle);const sh=inp.type==='password';inp.type=sh?'text':'password';tg.textContent=sh?'Ocultar':'Mostrar';return;}
   const btn=e.target.closest('button');if(!btn||!btn.id||btn.dataset.toggle)return;btn.dataset.t=btn.textContent;
   try{
     if(btn.id==='btnLogin'){banner('');loading(btn,true);const u=await doLogin(val('liId'),val('liPw'));startApp(u);}
-    else if(btn.id==='btnFreq'){forgotEmail=val('fEmail');if(!/.+@.+\..+/.test(forgotEmail)){banner('Informe um e-mail válido.');return;}forgotStep=2;renderLogin();banner('Se o e-mail existir, enviamos um código. (O backend de reset roda nas Cloud Functions de produção — não alterado nesta prévia.)',true);}
-    else if(btn.id==='btnResend'){banner('Código reenviado (se o e-mail existir).',true);}
-    else if(btn.id==='btnFconf'){banner('A redefinição usa as Cloud Functions de produção, que não são tocadas nesta homologação. Use sua senha atual para entrar.',true);}
   }catch(err){banner(typeof err==='string'?err:('Não foi possível agora. '+(err&&err.message||err)));}
   finally{loading(btn,false);}
 });
