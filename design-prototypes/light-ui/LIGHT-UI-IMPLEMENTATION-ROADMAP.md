@@ -242,7 +242,7 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > preservados sem a polyline) — **reportado ao owner nesta seção antes de qualquer dado
 > fictício**, conforme ordem.
 >
-> **Fase em execução: I3A.3 · F1 V4 PORT** — GO do owner (2026-08-20) com 4 correções
+> **Fase: I3A.3 · F1 V4 PORT ▶ ENTREGUE (checkpoint único `93ffc235`; relatório `LIGHT-UI-I3A-3-V4-PORT-REPORT.md`; gate de fidelidade ZERO ISSUE; aguarda owner)** — GO do owner (2026-08-20) com 4 correções
 > obrigatórias (amendment registrado; filtro parado como conflito-01; KPIs auditados acima;
 > sidebar 266px como calibração compartilhada do Light Shell sob `body.light-ui`, validada
 > em 1920/1366/win125). Painel lateral: MESMA Central de Detalhes real DOCADA como 5ª
