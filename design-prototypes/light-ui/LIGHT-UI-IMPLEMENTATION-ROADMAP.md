@@ -916,10 +916,32 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > logs/artefatos. **RC-B01 (ambiental):** MSI requer Windows/WiX — coberto pelo CI oficial
 > `windows-latest`; install/uninstall do NSIS em Windows real + MSI + CDN em rede aberta =
 > conteúdo da I5C. **Veredito: I5B = GO — RC apto a seguir para I5C (SIM).**
-> **Estado: I5B = ENTREGUE — AGUARDA OWNER · F13 = FROZEN @ `899862a2` · I4 = PASS ·
-> M1 = OWNER ACCEPTED FOR 1.0.246 · RC-D02 = RESOLVED · Light UI = OFF POR PADRÃO NO
-> PACOTE · TAG = NÃO CRIADA · GITHUB RELEASE = NÃO CRIADO · DEPLOY = NÃO REALIZADO ·
-> VERSION = 1.0.246 INALTERADA · I5C = NÃO INICIADA (HARD STOP).**
+> **Estado: I5B = ✔ GO (owner).**
+
+### I5C · RC ACCEPTANCE & FINAL QA ▶ ENTREGUE — **NO-GO (blockers ambientais; zero defeito de código)**
+> **Mandato do owner (GO explícito). ZERO modificações de source** (regra central cumprida;
+> HEAD segue `dcc019ca`; SHAs renderer/lockfile idênticos à I5B; nenhum commit de produto).
+> Relatório `LIGHT-UI-I5C-RC-ACCEPTANCE-REPORT.md`. **QA executável = 68/68 efetivos sobre o
+> MESMO binário da I5B (hashes re-verificados):** boot/versão/IPC · default OFF absoluto ·
+> ON controlado + reload · kill + reopen A-C persistentes · global flow 2 voltas (F1/F6/F7
+> wizard caminho completo/F8/F9/F10/F11) · **RC-D02 dinâmico com auth REAL do pacote**
+> (blank local, busy determinístico, erro de rede honesto, retry, nunca authed falso) ·
+> **F13 B2 completo no pacote** (busy/await/falha mantém modal+conteúdo/retry grava) ·
+> 1920+1366+Win125 · CDN blocked honesto · storage sem chave nova · security limpa ·
+> perf sanity ok. **BLOCKERS FORMAIS (decisão do owner):** **RC-A01** — ambiente Windows
+> real INDISPONÍVEL na sessão (Linux): pipeline `windows-latest`, NSIS install/uninstall/
+> reinstall, MSI (RC-B01) e first-boot do INSTALADO inexecutáveis; workflows oficiais não
+> disparáveis para o RC por construção (gate de versão 1.0.183 no canônico; gate de branch +
+> isolamento vs 1.0.245 no f356bh2) e alterá-los/criar novo = vedado pela regra central.
+> **RC-A02** — CDN normal inexecutável (proxy 403 gstatic). **Roteiro sugerido ao owner
+> (fecha tudo):** em Windows real: `git checkout dcc019ca && cd desktop && npm ci && npm run
+> dist` → instalar NSIS → versão/OFF/ON/kill → uninstall/reinstall → MSI → 1 boot em rede
+> aberta (CDN normal); OU autorizar fase corretiva mínima (workflow RC dedicado).
+> **Veredito: I5C = NO-GO · "RC aprovado para RELEASE FINAL?" = NÃO (ainda não — gates de
+> ambiente abertos; nenhuma reprovação de produto).**
+> **Estado: I5C = ENTREGUE — AGUARDA OWNER · RC SOURCE = `dcc019ca` (imutável) ·
+> NSIS I5B = artefato de referência (hash `82576b18…`) · M1 = ACCEPTED · TAG = NÃO ·
+> GITHUB RELEASE = NÃO · DEPLOY = NÃO · BUMP = NÃO · RELEASE FINAL = NÃO INICIADA.**
 
 > — GO do owner (2026-08-20) com 4 correções
 > obrigatórias (amendment registrado; filtro parado como conflito-01; KPIs auditados acima;
