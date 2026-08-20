@@ -215,7 +215,7 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > canvas anterior (→ `#FDFEFE`). O código real segue vencendo SOMENTE em: função, dados,
 > permissões e workflow.
 >
-> **V4-FUNCTIONAL-CONFLICT-01 — RESPONSIBLE FILTER (item PARADO para decisão do owner).**
+> **V4-FUNCTIONAL-CONFLICT-01 — RESPONSIBLE FILTER — ✔ RESOLVIDO PELO OWNER (2026-08-20 · resolution: IMPLEMENT RESPONSIBLE FILTER; implementado na I3A.4, commit `f10aabe0`).** Registro original da parada mantido para rastreabilidade:
 > Reauditoria objetiva (base real `58847c85`, pré-adições): o Meu Quadro real **NÃO possui
 > filtro por responsável** — nenhuma função/handler/state: a seleção de tasks é fixa do
 > dono do board (`t.assigneeId===pid||t.by===pid`, L6578), o único filtro de board é
@@ -242,7 +242,30 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > preservados sem a polyline) — **reportado ao owner nesta seção antes de qualquer dado
 > fictício**, conforme ordem.
 >
-> **Fase: I3A.3 · F1 V4 PORT ▶ ENTREGUE (checkpoint único `93ffc235`; relatório `LIGHT-UI-I3A-3-V4-PORT-REPORT.md`; gate de fidelidade ZERO ISSUE; aguarda owner)** — GO do owner (2026-08-20) com 4 correções
+> **Fase: I3A.3 · F1 V4 PORT — ✔ APROVADA PELO OWNER (checkpoint `93ffc235`; "o porte visual integral do F1 v4 está APROVADO")**
+
+### I3A.4 · F1 V4 FUNCTIONAL CLOSURE — ✔ GATES PASS · **F1 V4 = IMPLEMENTADO / GOLDEN / CONGELADO**
+> **Branch:** `impl/light-ui-f1-v4-final-1.0.246` (de `93ffc235`) · **checkpoint único
+> `f10aabe0`** ("feat(light-ui): complete F1 v4 with responsible filter") ·
+> relatório `LIGHT-UI-I3A-4-F1-CLOSURE-REPORT.md`.
+> **Decisão 1 (conflito-01 RESOLVIDO):** filtro por responsável IMPLEMENTADO como função
+> nova autorizada — exclusivo do F1, client-side/in-memory, semântica `respOf()` real
+> (responsável primário do produto), chips das próprias tasks do board (visibilidade real),
+> seleção única + "Todos", busca E filtro compõem (interseção), counts/KPIs refletem a
+> visão filtrada, empty state real, estado só na surface (reset junto ao `boardQuery`),
+> **zero escrita** (Firestore/Functions/Worker/API), gated por `body.light-ui`.
+> **Decisão 2:** KPIs permanecem 100% dados reais (sem 78%/98%/deltas/sparklines
+> fabricados; SLA como estado real). **Decisão 3:** "ID Seven · Agência" e "Plano Business
+> 80%" = **VISUAL REFERENCE — FUNCTION NOT AVAILABLE** (nenhuma função fictícia criada; a
+> ausência não invalida o layout do F1).
+> **Gate final do F1 (todas as condições PASS):** v4 visual MATCH (zone metrics = zero
+> regressão vs `93ffc235`) · filtro funciona (teste funcional 14/14: Todos→A→B→Todos,
+> busca+filtro, counts, empty, seleção, painel) · KPIs reais · painel docado intacto
+> (392px, extensão exata das colunas 230..911; Esc/fechar/foco/clique-fora PASS) ·
+> responsive PASS (1920/1366/win125 sem overflow) · legado **0px** (dark/light/hc,
+> relógio congelado) · zero backend write. Provas F1-V4-FINAL-{1920-TODOS,
+> 1920-RESPONSAVEL, 1366, win125, 1920-PANEL}.png no chat.
+> **Próximo:** I3B — F2 Cliente **SOMENTE após GO explícito do owner** (não iniciada).** — GO do owner (2026-08-20) com 4 correções
 > obrigatórias (amendment registrado; filtro parado como conflito-01; KPIs auditados acima;
 > sidebar 266px como calibração compartilhada do Light Shell sob `body.light-ui`, validada
 > em 1920/1366/win125). Painel lateral: MESMA Central de Detalhes real DOCADA como 5ª
