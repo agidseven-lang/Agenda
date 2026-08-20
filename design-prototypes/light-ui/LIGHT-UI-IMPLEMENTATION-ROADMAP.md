@@ -344,7 +344,7 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > chat. **I3E = ✔ GO DO OWNER (registrado 2026-08-20). F5 = IMPLEMENTADO / GOLDEN /
 > CONGELADO (checkpoint `f6915110`).**
 
-## I3F · F6 — DETAILS ▶ ENTREGUE (aguarda owner)
+## I3F · F6 — DETAILS — ✔ GO DO OWNER (CONGELADA)
 > **GO do owner recebido (F6 somente; F7+ NÃO autorizadas).** **Branch:**
 > `impl/light-ui-f6-details-1.0.246` de `f6915110` (HEAD confirmado; worktree limpa) ·
 > **checkpoint único `8e288c6b`** ("feat(light-ui): implement F6 details golden") ·
@@ -386,7 +386,48 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > nem contrato real nem Golden o determinam para o default) · matriz ZERO ISSUE com
 > F6-E01..E04. Provas F6-DETAILS-{1920, 1920-ALT-STATE, 1920-SCROLL, 1366, win125,
 > A11Y-FOCUS}.png + F6-COMPARE-GOLDEN-vs-APP.png no chat (política: não versionar).
-> **Gate de saída: avaliação do owner.** **F7+ = NÃO INICIADA.**
+> **I3F = ✔ GO DO OWNER (registrado 2026-08-20). F6 = IMPLEMENTADO / GOLDEN /
+> CONGELADO (checkpoint `8e288c6b`).**
+
+## I3G · F7 — WIZARD ▶ ENTREGUE (aguarda owner)
+> **GO do owner recebido (F7 somente; F8+ NÃO autorizadas).** **Branch:**
+> `impl/light-ui-f7-wizard-1.0.246` de `8e288c6b` (HEAD confirmado; worktree limpa) ·
+> **checkpoint único `c4c114e9`** ("feat(light-ui): implement F7 wizard golden") ·
+> relatório `LIGHT-UI-I3G-F7-WIZARD-REPORT.md`. **Reauditoria literal ANTES de editar:**
+> superfície real = `renderForm` (rota `state.form`, PÁGINA com card `.form-wrap`; um único
+> wizard p/ criação e edição); entry points `[data-fab]` (CTA sidebar/FAB/coluna kanban) →
+> `openNewTaskWizard` (reset canônico F3.3.75A); **4 etapas reais** Setor→Dados→Briefing→
+> Revisão; setores ativos reais = Edição de vídeos/Cronograma/Edição de Cards (gated
+> `canCreateCards`; descontinuados nunca); Dados por setor (titleLabel real, clientRequired,
+> assignee gated, chips STATUS, períodos, prioridade; Cards 1..50 travada na edição);
+> Briefing real (quantidades personalizadas c/ `#cqErr role=alert`, fields reais "Período de
+> referência"/"Canais" do `synthCronSub`, `rteField`, cards c/ intervalo obrigatório);
+> Revisão real (`rev-*`, contador N/M, `canSendToClient` + hint literal, "Salvar tarefa"/
+> "Criar N tarefas"); validações reais via alert()+erro inline; submit `saveTask` (draft id
+> estável → set → read-back) e `saveCardsBatch` (batch atômico); **Esc NÃO fecha (página);
+> X fecha direto** — comportamentos preservados. **Escopo estrito:** `body.light-ui.desktop
+> #app > .content > .form-wrap` + modais exclusivos `:has([data-pickasg])`/
+> `:has([data-sqshrinkok])` — 66 seletores 100% escopados, 0 global, balanço 0; nenhuma
+> superfície F1–F6 atingida. Skin C1 (stepper premium com estados reais, inputs h46 foco
+> ring, labels sentence-case, pill obrigatório, option-cards, chips h32 c/ dot, switch,
+> vqty, revisão clara) + CTA no gradiente do amendment; grupos FLAT e Dados em 2 colunas de
+> grupos (grid :has dense, ordem real). **A11y:** 9 rótulos da etapa Dados viram
+> `<label for>` REAIS (pixel-inerte com display:block; provado 0px no legado) + reduced
+> motion escopado; nada de dialog/trap/Esc inventado (é página). Exceções F7-E01..E06
+> (texto real do subtítulo; topbar do Golden fora do wizard; alert() real preservado; X sem
+> confirmação/Esc real; rte em tema E legenda; modais pós-save fora do escopo). Gates:
+> smoke **35/35** (2 caminhos reais de abertura, RBAC designer sem Cards, validações
+> literais, gate real da quantidade, disabled real, roundtrip, Esc real, **submit stubado:
+> exatamente 1 set com payload de 31 chaves validado** — workflowPhase themes_preparation,
+> cronStatus rascunho_social, clientFlowStatus afazer — e zero writes além do esperado) ·
+> responsivo 1920/**1366**/**win125 1093×614** sem overflow e CTAs visíveis · regressão
+> congelada **F1–F6 board+painel+strip+default = 0px** (21 pares; flake do sino em f5/f5p e
+> legado-light na região exata documentada — política A–E cumprida, 0px fora, máscara não
+> ampliada) · legado **0px** incluindo o WIZARD nos 3 temas (labels novas comprovadamente
+> pixel-inertes). Provas F7-WIZARD-{1920, ETAPA-INTERMEDIARIA-1920, BRIEFING-1920,
+> REVISAO-1920, VALIDACAO-1920, 1366, win125, A11Y-FOCUS}.png + F7-COMPARE-GOLDEN-vs-APP.png
+> no chat (política: não versionar). **Gate de saída: avaliação do owner.**
+> **F8+ = NÃO INICIADA.**
 
 > — GO do owner (2026-08-20) com 4 correções
 > obrigatórias (amendment registrado; filtro parado como conflito-01; KPIs auditados acima;
