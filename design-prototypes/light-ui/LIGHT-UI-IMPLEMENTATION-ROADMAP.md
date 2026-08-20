@@ -549,6 +549,28 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > win125, DETAIL-1920, A11Y-FOCUS}.png + F9-COMPARE-GOLDEN-vs-APP.png no chat.
 > **Gate de saída: avaliação do owner. F9 = NÃO CONGELADO até owner GO. F10 = NÃO
 > INICIADO.**
+>
+> **I3I.1 — F9 FUNCTIONAL HARDENING (harness/docs only, código = `d74b7fcf` INALTERADO):
+> ⚠ STOP — F9 NÃO CONGELAR.** 48/49 gates PASS: diff literal auditado (83+/5−; CSS
+> 55/55 gated, 0 global, 0 !important; 5 pontos de atributos a11y; 1 bloco onkeydown;
+> **zero mutations tocadas**); write map local completo com idempotências LITERAIS
+> (markRead: 1 write/0 se já lida via flag `ch`; markAll: 1 write SEMPRE, sem flag;
+> clear: setItem '[]', não removeItem; cancelar confirm = 0 writes); failure de
+> setItem: sem crash, **sem falso sucesso** (UI relê o storage), retry ok; deep
+> ordering literal (markRead ANTES do route; task inexistente = write+no-op sem crash;
+> route malformada cai no ramo `board/` do parser real — documentado); keyboard na ROW
+> ok (Espaço com preventDefault, zero scroll, 1 ativação); read-side robusto
+> (corrompido→[]; TTL literal SÓ no append; cap 300; dedup; sev/tipo desconhecidos
+> renderizam); source of truth única (navbadge==unread inclusive sob falha); filtros
+> combinados sem writes; **legacy 6/6 = 0px puro sem máscara** (3 temas × populada/
+> filtrada-empty); zero Firestore. **1 BUG REAL: F9-D01 — dupla ativação por TECLADO
+> no controle interno "Abrir tarefa"** (Enter/Espaço no link interno abre o destino E
+> o painel da row atrás — bubbling do onkeydown da I3I sem stopPropagation sobre
+> nested-interactive pré-existente; mouse não afetado; sem writes duplicados;
+> reproduzido estável no harness; **NÃO corrigido** conforme mandato). Adendo:
+> `LIGHT-UI-I3I1-F9-FUNCTIONAL-HARDENING-REPORT.md`.
+> **I3I.1 = STOP · F9 = NÃO CONGELAR · aguarda decisão do owner sobre F9-D01 · F10
+> NÃO INICIADO.**
 
 > — GO do owner (2026-08-20) com 4 correções
 > obrigatórias (amendment registrado; filtro parado como conflito-01; KPIs auditados acima;
