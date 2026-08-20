@@ -75,6 +75,9 @@
   .brand .sub{color:var(--soft);font-size:13px;font-weight:500}
   #login .title{font-size:22px;font-weight:800;margin:28px 0 4px}
   #login .subtitle{font-size:13px;color:var(--soft);text-align:center;line-height:1.5;max-width:380px}
+  /* wrapper estrutural do conteúdo do login (brand→form): reproduz o contexto flex da
+     coluna — pixel-inerte nos temas legados; o visual de card existe SÓ no Light UI. */
+  .login-card{display:flex;flex-direction:column;align-items:center;width:100%}
   /* telas baixas (escala 125% ≈ 614px úteis): login compacto SEM scroll — escopo restrito a #login */
   @media(max-height:660px){
     #login{padding:18px 26px}
@@ -4050,6 +4053,48 @@ body.light-ui.desktop .rep-tlsep{width:16px;height:1.5px;background:#E8EBF1;marg
 /* foco visível nos controles de teclado da superfície (toggle/export) */
 body.light-ui.desktop .rep-tg:focus-visible,
 body.light-ui.desktop .rep-exp:focus-visible{outline:2px solid #4353D8;outline-offset:2px}
+/* ==========================================================================
+   LIGHT UI — I3L · F12 LOGIN (Golden Frame 12 sobre o Login REAL standalone)
+   Superfície real: #login (pré-auth; renderLogin/doLogin server-side via main).
+   O login é estilizado por CSS VARS do tema — esta seção redefine as vars NO
+   ESCOPO body.light-ui.desktop #login (nada vaza) + overrides pontuais do
+   Golden `6e52905`: canvas claro com véu radial ≤5%, conteúdo em CARD Golden
+   (.login-card — wrapper estrutural pixel-inerte; card visual SÓ aqui),
+   labels C1 sentence-case 13/600, inputs claros com focus #6E5EF3, CTA com
+   --lui-grad (autoridade F1 v4 sobre gradiente de protótipo), banner err/ok
+   tint, vfooter pill. Logo PNG oficial (--logo) preservada. Nenhuma mudança
+   de auth/fluxo aqui (CSS-only); zero !important.
+   ========================================================================== */
+body.light-ui.desktop #login{max-width:none;background:
+  radial-gradient(720px 420px at 50% 12%,rgba(110,94,243,.05),transparent 68%),
+  radial-gradient(900px 520px at 50% 108%,rgba(91,124,250,.035),transparent 70%),#F5F6F9;
+  --accent:#5B7CFA;--soft:#767E8D;--faint:#A8AFBC;--surface:#FFFFFF;--line:#DFE3EB;
+  --ink:#14181F;--red:#C4302B;--green:#12784C}
+body.light-ui.desktop #login .login-card{width:464px;max-width:100%;background:#FFFFFF;border-radius:18px;
+  box-shadow:0 0 0 1px #E8EBF1,0 2px 6px rgba(19,24,38,.06),0 16px 34px rgba(19,24,38,.085);
+  padding:42px 44px 34px}
+body.light-ui.desktop #login .brand h1{color:#14181F}
+body.light-ui.desktop #login .title{color:#14181F}
+body.light-ui.desktop #login .subtitle{color:#767E8D}
+/* C1 Golden: label 13/600 sentence-case (literais preservados) */
+body.light-ui.desktop #login .fld label{font-size:13px;font-weight:600;color:#4B5364;letter-spacing:0;text-transform:none}
+body.light-ui.desktop #login .inp{color-scheme:light}
+body.light-ui.desktop #login .inp:focus{border-color:#6E5EF3;box-shadow:0 0 0 2.5px rgba(110,94,243,.11)}
+/* CTA primário — gradiente compartilhado do Light UI (F1 v4) */
+body.light-ui.desktop #login .btn{background:var(--lui-grad);box-shadow:0 8px 20px rgba(110,94,243,.28)}
+body.light-ui.desktop #login .btn[disabled]{opacity:.62}
+body.light-ui.desktop #login .banner.err{background:#FDEEF0;box-shadow:inset 0 0 0 1px #F6CDD3}
+body.light-ui.desktop #login .banner.ok{background:#EDF9F3;box-shadow:inset 0 0 0 1px #BFE7D4}
+body.light-ui.desktop #login .vfooter{color:#A8AFBC}
+body.light-ui.desktop #login .pill-ver{background:#EBEFFE;color:#4E63D8;box-shadow:inset 0 0 0 1px #C9D4FB}
+/* foco visível nos controles não-input (toggle "Mostrar", links, CTA) */
+body.light-ui.desktop #login .toggle:focus-visible,
+body.light-ui.desktop #login .txtbtn:focus-visible,
+body.light-ui.desktop #login .btn:focus-visible{outline:2px solid #4353D8;outline-offset:2px}
+/* telas baixas (win125): card compacto — a media real ≤660px do login segue regendo */
+@media(max-height:660px){
+  body.light-ui.desktop #login .login-card{padding:24px 30px 20px}
+}
 </style>
 </head>
 <body>
@@ -4069,6 +4114,7 @@ body.light-ui.desktop .rep-exp:focus-visible{outline:2px solid #4353D8;outline-o
 </section>
 
 <section id="login" class="hidden">
+  <div class="login-card">
   <div class="brand">
     <div class="logo lg brandlogo"></div>
     <h1>ID Seven</h1>
@@ -4076,8 +4122,9 @@ body.light-ui.desktop .rep-exp:focus-visible{outline:2px solid #4353D8;outline-o
   </div>
   <div class="title" id="loginTitle">Entrar</div>
   <div class="subtitle" id="loginSub">Acesse sua agenda e tarefas da equipe</div>
-  <div id="loginBanner" style="width:100%"></div>
+  <div id="loginBanner" style="width:100%" role="alert"></div>
   <div id="loginForm" style="width:100%"></div>
+  </div>
   <div class="vfooter">
     <span class="pill-ver">Desktop</span><br>
     <span class="vfooter-apk">ID Seven</span>
@@ -4542,18 +4589,18 @@ function renderLogin(){
   document.getElementById('loginTitle').textContent=titles[loginMode];
   document.getElementById('loginSub').textContent=subs[loginMode];
   const f=document.getElementById('loginForm');let h='';
-  const pw=(id,ph)=>'<div class="fld"><label>'+(ph||'Senha')+'</label><div class="pwwrap"><input class="inp" id="'+id+'" type="password" placeholder="'+(ph||'Senha')+'"><button class="toggle" data-toggle="'+id+'">Mostrar</button></div></div>';
+  const pw=(id,ph,ac)=>'<div class="fld"><label for="'+id+'">'+(ph||'Senha')+'</label><div class="pwwrap"><input class="inp" id="'+id+'" type="password" placeholder="'+(ph||'Senha')+'" autocomplete="'+(ac||'new-password')+'"><button class="toggle" data-toggle="'+id+'">Mostrar</button></div></div>';
   if(loginMode==='login'){
-    h+='<div class="fld"><label>E-mail ou WhatsApp</label><input class="inp" id="liId" placeholder="E-mail ou WhatsApp" inputmode="email"></div>'+pw('liPw')+
+    h+='<div class="fld"><label for="liId">E-mail ou WhatsApp</label><input class="inp" id="liId" placeholder="E-mail ou WhatsApp" inputmode="email" autocomplete="username"></div>'+pw('liPw',null,'current-password')+
       '<div style="height:10px"></div><button class="btn" id="btnLogin">Entrar</button>'+
       '<button class="txtbtn accent" data-mode="forgot">Esqueci minha senha</button>'+
       '<div style="margin-top:10px;font-size:12.5px;color:var(--soft);text-align:center">Cadastro interno desativado. Solicite acesso ao administrador.</div>';
   }else if(loginMode==='forgot'&&forgotStep===1){
-    h+='<div class="fld"><label>E-mail cadastrado</label><input class="inp" id="fEmail" placeholder="E-mail cadastrado" inputmode="email"></div>'+
+    h+='<div class="fld"><label for="fEmail">E-mail cadastrado</label><input class="inp" id="fEmail" placeholder="E-mail cadastrado" inputmode="email" autocomplete="email"></div>'+
       '<div style="height:10px"></div><button class="btn" id="btnFreq">Enviar código</button>'+
       '<button class="txtbtn soft" data-mode="login">Voltar ao login</button>';
   }else if(loginMode==='forgot'){
-    h+='<div class="fld"><label>Código de 6 dígitos</label><input class="inp" id="fCode" placeholder="Código de 6 dígitos" inputmode="numeric" maxlength="6"></div>'+
+    h+='<div class="fld"><label for="fCode">Código de 6 dígitos</label><input class="inp" id="fCode" placeholder="Código de 6 dígitos" inputmode="numeric" maxlength="6" autocomplete="one-time-code"></div>'+
       pw('fPw','Nova senha')+pw('fPw2','Confirmar nova senha')+
       '<div style="height:10px"></div><button class="btn" id="btnFconf">Criar nova senha</button>'+
       '<button class="txtbtn accent" id="btnResend">Reenviar código</button>'+
@@ -4575,6 +4622,17 @@ document.getElementById('login').addEventListener('click',async e=>{
     else if(btn.id==='btnFconf'){banner('A redefinição usa as Cloud Functions de produção, que não são tocadas nesta homologação. Use sua senha atual para entrar.',true);}
   }catch(err){banner(typeof err==='string'?err:('Não foi possível agora. '+(err&&err.message||err)));}
   finally{loading(btn,false);}
+});
+/* Enter submete o modo atual pelo MESMO botão primário real (caminho único do handler
+   delegado acima — sem segundo fluxo). Botão disabled durante o loading não dispara
+   click() ⇒ Enter repetido/durante busy = zero chamadas extras. Só reage a INPUT do
+   #loginForm (não interfere no toggle "Mostrar", que é button nativo). */
+document.getElementById('login').addEventListener('keydown',e=>{
+  if(e.key!=='Enter')return;
+  const t=e.target;if(!t||t.tagName!=='INPUT'||!t.closest('#loginForm'))return;
+  e.preventDefault();
+  const b=document.querySelector('#loginForm .btn');
+  if(b&&!b.disabled)b.click();
 });
 /* F3.3.56-G2 — TROCA DE SENHA SERVER-SIDE (perfil → "Trocar senha").
    Substitui o antigo fluxo 'pending' (que gravava pass/salt no cliente): a senha
