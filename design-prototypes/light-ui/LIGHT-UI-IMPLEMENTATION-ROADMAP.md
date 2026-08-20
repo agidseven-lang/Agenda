@@ -571,6 +571,25 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > `LIGHT-UI-I3I1-F9-FUNCTIONAL-HARDENING-REPORT.md`.
 > **I3I.1 = STOP · F9 = NÃO CONGELAR · aguarda decisão do owner sobre F9-D01 · F10
 > NÃO INICIADO.**
+>
+> **I3I.2 — F9-D01 FIX (GO do owner; correção cirúrgica): ✔ PASS.** Branch
+> `fix/light-ui-f9-d01-keyboard-1.0.246` de `d74b7fcf`; **checkpoint `ad8dd9d3`**
+> ("fix(light-ui): resolve F9 notification keyboard activation"); diff **+11/−5 em 4
+> pontos** (a11y da row → filho REAL `.nc-body`; keyables folha com stopPropagation; 1
+> seletor de focus-visible F9-gated) — zero incidental. **Nested-interactive ELIMINADO
+> estruturalmente** (prova no DOM: nenhum interactive descendente de role=button);
+> invariantes medidos: row/detalhe e "Abrir tarefa" com 1 ativação exata por mouse/
+> Enter/Espaço (preventDefault, zero scroll, zero painel fantasma — antes
+> `{modal:1,panelAlso:true}`, depois `{modal:1,panelAlso:false}`); write invariance
+> preservada; foco/tab order/nomes distintos ✓. **Visual before×after 4/4 = 0px**
+> (1920/1366/win125/detail). **Hardening completo re-rodado: 54/54** (49 da I3I.1 + 5
+> invariantes novos; contagem explicada) · smoke 28/28 · **legacy 7/7 = 0px sem
+> máscara** · **regressão F1–F8 = 0px** (17 pares puros; F3/F4/F5 board+painel só na
+> zona do sino com A–E provado PER-SUPERFÍCIE — o próprio base×base divergiu sozinho
+> na bbox exata, incl. f3b 1458,26→1500,68; 0px fora; máscara não ampliada). Relatório:
+> `LIGHT-UI-I3I2-F9-D01-FIX-REPORT.md`.
+> **I3I.2 = PASS · F9-D01 = RESOLVIDO · F9 = PRONTO PARA CONGELAMENTO DO OWNER ·
+> CHECKPOINT CANDIDATO = `ad8dd9d3` · F10 = NÃO INICIADO.**
 
 > — GO do owner (2026-08-20) com 4 correções
 > obrigatórias (amendment registrado; filtro parado como conflito-01; KPIs auditados acima;
