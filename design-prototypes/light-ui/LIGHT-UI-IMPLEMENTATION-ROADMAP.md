@@ -506,6 +506,49 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > !important). Adendo: `LIGHT-UI-I3H1-F8-FUNCTIONAL-HARDENING-REPORT.md`.
 > **I3H.1 = PASS · F8 = PRONTO PARA CONGELAMENTO DO OWNER · CHECKPOINT CANDIDATO =
 > `1cf13637`.** **F9+ = NÃO INICIADA.**
+>
+> **I3H = ✔ GO DO OWNER (registrado). F8 AGENDA = GOLDEN / CONGELADO @ `1cf13637`.**
+
+## I3I · F9 — CENTRAL DE NOTIFICAÇÕES ▶ ENTREGUE (aguarda owner)
+> **GO do owner recebido (F9 somente; F10+ NÃO autorizadas).** **Branch:**
+> `impl/light-ui-f9-notificacoes-1.0.246` de `1cf13637` (HEAD confirmado; worktree
+> limpa) · **checkpoint único `d74b7fcf`** ("feat(light-ui): port F9 notifications
+> golden") · relatório `LIGHT-UI-I3I-F9-NOTIFICACOES-REPORT.md` · Golden
+> `proposta-c-frame9-notificacoes.html` (freeze `8173940`, renderizado antes de
+> editar). Reauditoria literal: entry `state.tab==='notificacoes'` →
+> `renderNotifCentral`/`afterNotifCentral`; helpers históricos REVALIDADOS com os
+> mesmos nomes (ncRow/notifHistory*/notifTypeLabel/ncSev/ncTypeHex/ncDayLabel/
+> ncAvatar); **fonte 100% LOCAL** (`localStorage NOTIF_HIST_KEY`, read-side, dedup por
+> dedupKey, retenção 300/30d, captura passiva ncCaptureBusy — o rodapé do Golden
+> estampa exatamente essa semântica); tipos reais Atribuição/Fluxo/SLA/Sistema e
+> severidades critical/warning/success/info; grupos Hoje/Ontem/data (ncDayLabel);
+> detalhe real = painel lateral fixo 416px (não-modal — semântica preservada); bell da
+> sidebar (navbadge-notif) = MESMA fonte notifHistoryUnread (sem contador paralelo; o
+> slaib-bell é superfície separada de SLA e não foi tocado). **Achado estrutural: o
+> CSS real da Central (NC_CSS/ncEnsureStyle) é DARK HARDCODED injetado por JS** — a
+> seção I3I sobrescreve as classes nc-* (exclusivas = guarda natural): **55 seletores,
+> 55/55 gated `body.light-ui.desktop`, 0 leakage, 0 global, 0 !important**. Matriz:
+> A massivo (Golden e código já nasceram alinhados); B/C = dot de não lida no vermelho
+> do Golden, "Abrir tarefa" como link, badge de não lidas em tint clara, largura 1200;
+> **E = ZERO exceções**. **A11y — débito histórico de teclado REVALIDADO e quitado com
+> o padrão REAL do .evc da Agenda:** role=button + tabindex=0 + aria-label descritivo
+> nas rows/controles + Enter/Espaço por onkeydown (esquema dos onclick existentes);
+> universal (dark e light); **Central legada 0px provada em dark/light/hc**. Mutations
+> (todas LOCAIS, tabela no relatório): abrir/markRead = 1 setItem; markall = 1; clear
+> = confirm REAL (cancelar = 0 writes provado; confirmar = 1 + empty real); **zero
+> Firestore/API** (contador do stub = 0 na bateria inteira). Smoke **28/28** (entry
+> real; grouping exato; unread 4→3→0 com navbadge coerente; filtros reais um a um +
+> busca + "Nada encontrado"; abrir por MOUSE e por TECLADO; **destinos reais: deep
+> detail/k1 abre a Central de Detalhes F6 VERDADEIRA sem origem + deep agenda troca de
+> tab**; retorno F9→Tarefas→Agenda→F9 com filtros preservados). Responsivo
+> 1920/1366/**win125 1093×614** sem overflow. Fidelidade ISSUE=0 (medidas no
+> relatório). Regressão congelada base `1cf13637`: **F1–F8 = 0px** (15/18 puro; F3/F4/
+> F5 painel só na região exata do flake do sino — A–E cumprida com base×base
+> divergindo sozinha; 0px fora) · **legado 8/8 = 0px puro** (incl. a Central de
+> Notificações nos 3 temas com o markup novo). Provas F9-NOTIFICACOES-{1920, 1366,
+> win125, DETAIL-1920, A11Y-FOCUS}.png + F9-COMPARE-GOLDEN-vs-APP.png no chat.
+> **Gate de saída: avaliação do owner. F9 = NÃO CONGELADO até owner GO. F10 = NÃO
+> INICIADO.**
 
 > — GO do owner (2026-08-20) com 4 correções
 > obrigatórias (amendment registrado; filtro parado como conflito-01; KPIs auditados acima;
