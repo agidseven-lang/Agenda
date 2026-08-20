@@ -429,6 +429,28 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > no chat (política: não versionar). **Gate de saída: avaliação do owner.**
 > **F8+ = NÃO INICIADA.**
 
+### I3G.1 · F7 FUNCTIONAL HARDENING — ✔ PASS (harness-only; produção intocada)
+> Visual da I3G aceito pelo owner; hard gate funcional fechado SEM alterar código:
+> **EDIT MODE PASS (22/22)** — entry real `data-cardedit` (Central + menu do card) →
+> `openCardsEdit` (form factory-fresh, `f.id`, SEM `_draftId`), pré-preenchimento real,
+> **quantidade travada por MODO EDIÇÃO** (`#fCardsQty disabled value=1 title literal`,
+> distinguida do disabled do "−" por N=1), stepper/roundtrip/Revisão "Salvar alterações";
+> gravação real `update(f.id)` + read-back do prazo: **1 update, zero criação**, patch de
+> 26 chaves (tema+prazo, `cardDeadlineRev 1→2`, `deadlineVersion 0→1`, history ADITIVO
+> kind:'edited' fields=[titulo,prazo] com prev/new, `designerAssignment` intervalo
+> atualizado SEM reatribuição) e preservação provada de by/createdAt/status/checklist/src.
+> **CARDS BATCH PASS (16/16)** — fluxo real N=3 (designer pelo modal `data-pickasg`,
+> "Criar 3 tarefas"): `saveCardsBatch` real com **3 `batch.set` + 1 `batch.commit`
+> atômico**, ids distintos, `cardsBatchId` único, `cardIndex 1..3`, campos comuns/
+> distintos validados, AUSÊNCIA de workflowPhase/cronStatus/clientFlowStatus/token/
+> designerSla (setor interno), tabela sem duplicação. **BATCH ATOMICITY PASS (5/5)** —
+> commit rejeitado no stub (semântica Firestore) ⇒ **0 de 3 persistidos**, alerta real
+> "(nada foi criado)", form preservado p/ retry, `_saving` resetado — atomicidade do
+> próprio `db.batch()` real, nenhuma correção necessária. **ZERO REAL WRITES.**
+> **Produção NÃO alterada** — HEAD segue `c4c114e9` (worktree limpa; F1–F6 congelados;
+> 1.0.246; Light UI inativa). Adendo: `LIGHT-UI-I3G1-F7-FUNCTIONAL-HARDENING-REPORT.md`.
+> **I3G.1 = PASS · F7 = READY FOR OWNER FREEZE · CODE CHECKPOINT = `c4c114e9`.**
+
 > — GO do owner (2026-08-20) com 4 correções
 > obrigatórias (amendment registrado; filtro parado como conflito-01; KPIs auditados acima;
 > sidebar 266px como calibração compartilhada do Light Shell sob `body.light-ui`, validada
