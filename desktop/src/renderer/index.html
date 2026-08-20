@@ -3367,6 +3367,95 @@ body.light-ui.desktop .lui-legend .lui-kpi-tx span{white-space:normal;font-size:
   body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-sheet{position:fixed;top:230px;right:26px;bottom:169px;left:auto;width:392px;height:auto;max-height:none;border-radius:14px;border:1px solid var(--lui-hair);box-shadow:0 4px 14px rgba(16,24,40,.08)}
   body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-title{font-size:19.5px;font-weight:800;letter-spacing:-.2px;line-height:1.25}
 }
+/* ============================================================================
+   LIGHT UI — I3B · F2 CLIENTE (Golden Frame 2 sobre as FUNÇÕES REAIS)
+   Fonte visual F2: proposta-c-frame2-cliente.html (Frame 2 aprovado); shell/
+   toolbar/board/cards-foundation compartilhados = F1 v4 (amendment vigente).
+   Escopo estrito: .scr-client (hook aditivo do renderClientFlowBoard),
+   header via #content:has(.scr-client), painel via [data-detorigin="client"].
+   Funções 100% reais: wfApprovalsBarHtml (faixa), CLIENT_COLS4 (colunas),
+   kbv2Card(t,'client') (cards), wfExternalInfo (visualização/espera externa —
+   SLA neutro real "Aguardando cliente"), Central de Detalhes (painel).
+   Nenhum seletor F3+/Agenda/Notif/Exec/Reports/Wizard/Login/F13.
+   ========================================================================== */
+/* ---- HEADER CLIENTE (tile de olho teal do Golden) ---- */
+body.light-ui.desktop #content:has(.scr-client) .d-bh-icon{width:46px;height:46px;border-radius:13px;background:#E6F7F3 !important;color:#12A38B !important;box-shadow:0 0 0 1px #D9F0EA;display:flex;align-items:center;justify-content:center}
+body.light-ui.desktop #content:has(.scr-client) .d-bh-icon svg{width:20px;height:20px}
+/* ---- FAIXA "APROVAÇÕES PENDENTES" (wfap real, skin Golden em linha única) ---- */
+body.light-ui.desktop .scr-client .wfap-bar{display:flex;align-items:center;gap:12px;background:var(--lui-surface);border:1px solid var(--lui-hair);border-radius:13px;box-shadow:0 1px 3px rgba(16,24,40,.04);padding:9px 14px;margin:12px 0 0}
+body.light-ui.desktop .scr-client .wfap-ic{width:38px;height:38px;flex:none;border-radius:11px;background:#E6F7F3;color:#12A38B;display:flex;align-items:center;justify-content:center}
+body.light-ui.desktop .scr-client .wfap-ic svg{width:18px;height:18px}
+body.light-ui.desktop .scr-client .wfap-bt{display:flex;align-items:center;gap:16px;flex:1;min-width:0}
+body.light-ui.desktop .scr-client .wfap-row1{display:flex;align-items:center;gap:8px;flex:none}
+body.light-ui.desktop .scr-client .wfap-tt{font-size:13px;font-weight:800;color:var(--lui-tx-1)}
+body.light-ui.desktop .scr-client .wfap-badge{background:#E9F8F0;color:#12A150;font-size:11px;font-weight:800;min-width:22px;height:20px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;padding:0 6px}
+body.light-ui.desktop .scr-client .wfap-badge-zero{background:#F2F4F7;color:#98A1AD}
+body.light-ui.desktop .scr-client .wfap-summary{display:flex;align-items:center;gap:12px;font-size:11px;font-weight:650;color:#667085;white-space:nowrap;overflow:hidden;min-width:0}
+body.light-ui.desktop .scr-client .wfap-seg{display:inline-flex;align-items:center}
+body.light-ui.desktop .scr-client .wfap-dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:5px}
+body.light-ui.desktop .scr-client .wfap-urg{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;font-weight:750;color:#B54708;white-space:nowrap;flex:none}
+body.light-ui.desktop .scr-client .wfap-urg svg{width:13px;height:13px}
+body.light-ui.desktop .scr-client .wfap-open{flex:none;height:38px;border-radius:10px;border:1px solid var(--lui-hair-2);background:var(--lui-surface);color:#1D2939;font-size:12px;font-weight:750;padding:0 14px;display:inline-flex;align-items:center;gap:7px;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+body.light-ui.desktop .scr-client .wfap-open:hover{border-color:#D8E4F9;color:#2E5FD0}
+body.light-ui.desktop .scr-client .wfap-arr{font-weight:800}
+body.light-ui.desktop .scr-client .wfap-empty .wfap-sub{font-size:11px;color:#98A1AD;margin-top:2px}
+/* ---- COLUNAS: cores REAIS do eixo Cliente (desfaz a paleta F1 por posição) ---- */
+body.light-ui.desktop .scr-client .kbv2-column:nth-child(1),
+body.light-ui.desktop .scr-client .kbv2-column:nth-child(2),
+body.light-ui.desktop .scr-client .kbv2-column:nth-child(3),
+body.light-ui.desktop .scr-client .kbv2-column:nth-child(4){--kc2:var(--kc)}
+/* ---- CARD CLIENTE (anatomia Golden F2 sobre a foundation v4) ----
+   cliente primeiro → título → sinal de visualização real → próxima ação real →
+   avatares com anel + contagem de conteúdo. Prazo/barra/chips de setor → painel. */
+body.light-ui.desktop .scr-client .kbv2-card-main{padding-right:8px}
+body.light-ui.desktop .scr-client .kbv2-title{order:2;font-size:14px;margin-top:3px;padding-right:22px}
+body.light-ui.desktop .scr-client .kbv2-tier{order:1;font-size:12px;font-weight:750;color:#1D2939;padding-right:110px}
+body.light-ui.desktop .scr-client .kbv2-tier::before{display:none}
+body.light-ui.desktop .scr-client .kbv2-status{display:inline-flex;align-items:center;gap:5px;position:absolute;top:12px;right:36px;max-width:44%;font-size:9px;font-weight:800;letter-spacing:.2px;padding:4px 9px;border-radius:8px;border-width:0 !important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;z-index:1}
+body.light-ui.desktop .scr-client .kbv2-status-dot{width:6px;height:6px;flex:none}
+body.light-ui.desktop .scr-client .kbv2-card-chips{display:none}
+body.light-ui.desktop .scr-client .kbv2-card .kbv2-sla{display:none}
+body.light-ui.desktop .scr-client .kbv2-card-date{display:none}
+body.light-ui.desktop .scr-client .kbv2-card-rail,
+body.light-ui.desktop .scr-client .kbv2-pct{display:none !important}
+body.light-ui.desktop .scr-client .kbv2-column:last-child .kbv2-card{padding-right:13px}
+/* sinal REAL de visualização/ajuste (hook .kbv2-cliview) */
+body.light-ui.desktop .scr-client .kbv2-cliview{display:flex !important;align-items:center;gap:6px;order:3;margin-top:10px;font-size:11.5px;color:#344054;min-width:0}
+body.light-ui.desktop .scr-client .kbv2-cliview:empty{display:none !important}
+body.light-ui.desktop .scr-client .kbv2-cliview svg{width:13px;height:13px;color:#12A38B;flex:none}
+body.light-ui.desktop .scr-client .kbv2-cliview b{font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.light-ui.desktop .scr-client .kbv2-cliview em{font-style:normal;color:#98A1AD;font-weight:600;margin-left:auto;flex:none}
+/* próxima ação REAL: só a linha "próxima" do stage2, compacta */
+body.light-ui.desktop .scr-client .kbv2-stage2{display:block;order:4;margin:8px 0 0;padding:0;background:transparent;border:0}
+body.light-ui.desktop .scr-client .kbv2-st2-row{display:none}
+body.light-ui.desktop .scr-client .kbv2-st2-row:has(.kbv2-st2-ic-next){display:flex;align-items:center;gap:7px}
+body.light-ui.desktop .scr-client .kbv2-st2-ic{width:16px;height:16px;border-radius:0;background:transparent !important;color:#98A1AD !important;flex:none;display:flex;align-items:center;justify-content:center}
+body.light-ui.desktop .scr-client .kbv2-st2-ic svg{width:13px;height:13px}
+body.light-ui.desktop .scr-client .kbv2-st2-tx{display:flex;min-width:0;flex:1}
+body.light-ui.desktop .scr-client .kbv2-st2-k{display:none}
+body.light-ui.desktop .scr-client .kbv2-st2-next{font-size:11.5px;color:#667085;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* ---- PAINEL: MESMA Central real, drawer (<1760) e docada (≥1760) p/ origem client ---- */
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"]{background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none;align-items:stretch;justify-content:flex-end}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-sheet{width:416px;max-width:94vw;height:100%;max-height:none;border-radius:0;box-shadow:var(--lui-sh-drawer)}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-head{padding-bottom:16px;box-shadow:0 1px 0 var(--lui-hair)}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-actions{border-top:0;box-shadow:0 -1px 0 var(--lui-hair)}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-title{font-size:23px;font-weight:700;letter-spacing:-.02em;line-height:1.28}
+/* R8 F2 — derivações responsivas (escopo .scr-client; F1 intocado) */
+@media (max-width:1500px){
+  body.light-ui.desktop .scr-client~* .bsearch-wrap,body.light-ui.desktop .scr-client .bsearch-wrap{max-width:27vw}
+}
+@media (max-width:1239.98px){
+  body.light-ui.desktop .scr-client .wfap-bar{flex-wrap:wrap;row-gap:8px}
+  body.light-ui.desktop .scr-client .wfap-bt{flex-wrap:wrap;row-gap:6px}
+  body.light-ui.desktop .scr-client .wfap-summary{white-space:normal;flex-wrap:wrap;row-gap:4px}
+  body.light-ui.desktop .scr-client .wfap-urg{margin-left:0;flex:1 0 100%}
+}
+@media (min-width:1760px){
+  body.light-ui.desktop:has(.modal-back[data-detmodal][data-detorigin="client"]) .kbv2-board-surface{margin-right:408px}
+  body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"]{padding:0}
+  body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-sheet{position:fixed;top:244px;right:26px;bottom:53px;left:auto;width:392px;height:auto;max-height:none;border-radius:14px;border:1px solid var(--lui-hair);box-shadow:0 4px 14px rgba(16,24,40,.08)}
+  body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-title{font-size:19.5px;font-weight:800;letter-spacing:-.2px;line-height:1.25}
+}
 </style>
 </head>
 <body>
@@ -7100,7 +7189,7 @@ function renderClientFlowBoard(){
     '<div class="scr-head"><div class="d-board-head">'+
     '<div class="d-bh-icon" style="background:'+withAlpha('#22D3B8',.18)+';color:#22D3B8">'+svg('eye')+'</div>'+
     '<div style="flex:1;min-width:0"><div class="d-bh-title">Cliente</div><div class="d-bh-sub">Fica visível até a aprovação final — mesmo enviado ao designer · '+list.length+' tarefa'+(list.length===1?'':'s')+'</div></div></div></div>'+
-    '<div class="scr" style="padding-top:0">'+wfApprovalsBarHtml(list)+boardToolbar()+
+    '<div class="scr scr-client" style="padding-top:0">'+wfApprovalsBarHtml(list)+boardToolbar()+
     kbv2BoardHtml(CLIENT_COLS4.map((c,i)=>({label:c.label,color:c.color,key:c.key,tasks:byCol[i]})), t=>kbv2Card(t,'client'));
   return h+'</div>';
 }
@@ -8883,6 +8972,17 @@ function kbv2Card(t, persp){
        (cron&&cron.label&&cron.label!==s.label?'<span class="kbv2-chip kbv2-chip-soft">'+esc(cron.label)+'</span>':'')+
        (t.priority?'<span class="kbv2-chip" style="color:var(--kbv2-pri,#F87171);background:'+withAlpha('#EF4444',.18)+';border-color:'+withAlpha('#EF4444',.46)+'"><i class="kbv2-chip-dot" style="background:#EF4444"></i>Prioridade</span>':'')+
      '</div>';
+  /* LIGHT UI I3B (F2) — sinal REAL de visualização/ajuste do fluxo Cliente no card:
+     wfExternalInfo (rounds reais: sentAt/firstViewedAt/waitingMs) + clientReview. Span
+     ADITIVO nasce display:none (legado byte-idêntico); revelado só sob body.light-ui na
+     surface Cliente. Zero escrita; helpers reais (slaibFmtHM/wfFmtDur/svg). */
+  if(clientView){h+=(function(){try{
+    if(t.clientReview&&t.clientReview.status==='revisao'){var _aj=Number(t.clientReviewAt)||0;return '<span class="kbv2-cliview" style="display:none">'+svg('revise')+'<b>Ajuste solicitado</b>'+(_aj?'<em>há '+wfFmtDur(wfNow()-_aj)+'</em>':'')+'</span>';}
+    var ew=wfExternalInfo(t);
+    if(ew.active&&ew.sentAt){return ew.viewed
+      ?'<span class="kbv2-cliview" style="display:none">'+svg('eye')+'<b>Visualizado às '+slaibFmtHM(ew.firstViewedAt)+'</b>'+(ew.waitingMs?'<em>há '+wfFmtDur(ew.waitingMs)+'</em>':'')+'</span>'
+      :'<span class="kbv2-cliview" style="display:none">'+svg('clock')+'<b>Não visualizado</b><em>enviado há '+wfFmtDur(ew.waitingMs)+'</em></span>';}
+    return '';}catch(_){return '';}})();}
   /* F3.5.4W — SLOT CENTRAL DE CONTEÚDO: RESUMO compacto (apenas contagem). A lista/texto integral
      de temas/legendas/roteiros/vídeos e Legenda/Observações vai para a Central de Detalhes; NENHUM
      desses textos fica no DOM do card. O SHELL central universal é preservado (nunca some). */
@@ -9170,7 +9270,7 @@ function openDetails(taskId){
   /* I3A.1 (Light UI) — hook de CONTEXTO aditivo: marca a abertura feita a partir do MEU QUADRO
      (estado real via activeTab()) p/ o tema claro apresentar a MESMA Central como drawer lateral
      (CSS-only). Atributo inerte no tema dark (nenhuma regra o consome); zero mudança de lógica. */
-  const _detOrigin=(typeof activeTab==='function'&&state.tab==='tarefas'&&activeTab()==='mine')?' data-detorigin="mine"':'';
+  const _detOrigin=(typeof activeTab==='function'&&state.tab==='tarefas')?(activeTab()==='mine'?' data-detorigin="mine"':(activeTab()==='client'?' data-detorigin="client"':'')):'';
   let h='<div class="modal-back" data-modalbg="1" data-detmodal="1"'+_detOrigin+' data-detsector="'+esc(t.sector||'')+'" data-dettaskid="'+esc(t.id||'')+'"><div class="sheet det-sheet" role="dialog" aria-modal="true" aria-label="Central de Detalhes da tarefa">'+
     '<div class="det-head"><div class="det-badge" style="background:'+withAlpha(s.color,.16)+';color:'+s.color+'">'+svg(s.icon)+'<span>'+esc(s.label)+'</span></div>'+
       '<button class="iconbtn det-x" data-modalclose="1">'+svg('close')+'</button></div>'+
