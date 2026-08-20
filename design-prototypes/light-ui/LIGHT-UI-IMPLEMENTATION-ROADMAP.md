@@ -265,7 +265,25 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > responsive PASS (1920/1366/win125 sem overflow) · legado **0px** (dark/light/hc,
 > relógio congelado) · zero backend write. Provas F1-V4-FINAL-{1920-TODOS,
 > 1920-RESPONSAVEL, 1366, win125, 1920-PANEL}.png no chat.
-> **Próximo:** I3B — F2 Cliente **SOMENTE após GO explícito do owner** (não iniciada).** — GO do owner (2026-08-20) com 4 correções
+> **I3A.4 = ✔ GO DO OWNER (registrado; "A I3A.4 está APROVADA").
+> F1 = IMPLEMENTADO / GOLDEN / CONGELADO — NÃO REABRIR salvo regressão comprovada.**
+
+## I3B · F2 — CLIENTE ▶ ENTREGUE (aguarda owner)
+> **GO do owner recebido (F2 somente; F3+ NÃO autorizadas).** **Branch:**
+> `impl/light-ui-f2-cliente-1.0.246` de `f10aabe0` (HEAD confirmado) · **checkpoint único
+> `62613a29`** ("feat(light-ui): implement Golden Cliente surface") · relatório
+> `LIGHT-UI-I3B-F2-CLIENTE-REPORT.md`. Fonte visual F2 = Frame 2 aprovado
+> (`proposta-c-frame2-cliente.html`); shell/toolbar/board/card-foundation = F1 v4
+> compartilhado (amendment). Reauditoria real completa (colunas CLIENT_COLS4 = labels do
+> Golden; faixa "Aprovações pendentes" = wfApprovalsBarHtml REAL com nv/vs/aj + urgência
+> >24h + drawer real; visualização = rounds reais approvalRounds/wfExternalInfo; espera
+> externa JÁ neutra no SLA real; próxima ação = helper real). Card Cliente compacto
+> (anatomia Golden sobre foundation v4; sinal de visualização real via span aditivo
+> inerte). Painel = MESMA Central real (drawer <1760 / DOCADA ≥1760, 244..1027). Gates:
+> smoke 12/12 · **F1 REGRESSION 0px** (board+painel, relógio congelado) · legado 0px nos
+> DOIS boards (dark/light/hc) · 1920/1366/win125 sem overflow · zero escrita · matriz de
+> fidelidade ZERO ISSUE. Provas F2-CLIENTE-{1920,1920-PANEL,1366,win125}.png no chat.
+> **Gate de saída: avaliação do owner.** **I3C/F3 = NÃO INICIADA.** — GO do owner (2026-08-20) com 4 correções
 > obrigatórias (amendment registrado; filtro parado como conflito-01; KPIs auditados acima;
 > sidebar 266px como calibração compartilhada do Light Shell sob `body.light-ui`, validada
 > em 1920/1366/win125). Painel lateral: MESMA Central de Detalhes real DOCADA como 5ª
