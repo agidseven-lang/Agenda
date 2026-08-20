@@ -80,11 +80,14 @@
     (DOM real intacto); células retangulares min-height 92 com número ao topo (base
     real: aspect-ratio 1 centrado); hoje/selecionado no **gradiente do amendment**
     (`--lui-grad` — vence o roxo do protótipo, regra das fases); CTA "Novo compromisso"
-    no gradiente (o markup real usa style inline → `!important` pontual, registrado: 9
-    ocorrências na seção, todas contra inline styles reais).
+    no gradiente (o markup real usa style inline → `!important` pontual, registrado — correção I3H.1:
+    **8 ocorrências em 3 declarações**, todas contra inline styles reais).
 19. **C (dado real derivável):** count do painel do dia ("N compromissos") =
-    `dayEvs.length` real — span `.ag-count` **gated por `body.light-ui`** (legado gera
-    HTML byte-idêntico).
+    `dayEvs.length` real — span `.ag-count` **gated por `body.light-ui`** (o span não é
+    emitido sem a classe; já os wrappers `.ag-tools/.ag-body/.ag-day` SÃO emitidos
+    também no legado — correção I3H.1: o HTML legado NÃO é byte-idêntico; o correto é:
+    markup funcional legado preservado, wrappers aditivos pixel-inertes sem Light UI,
+    **regressão legacy comprovada 0px** — incl. deep-state I3H.1 9/9).
 20. **D (visual reference / function not available):** header de página do Golden
     (tile+“Agenda”+subtítulo+MONITOR SLA+sino) = shell/topbar (padrão D das fases
     F1–F7; o real usa o `.scr-head` com o título do MÊS + controles — mesma informação).
