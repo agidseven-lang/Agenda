@@ -3147,132 +3147,215 @@ body.light-ui.desktop .kbv2-btn:not(.kbv2-btn-main):not(.kbv2-btn-dots){flex:0 1
 body.light-ui.desktop .kbv2-btn-dots{width:28px;font-size:14px;margin-left:auto}
 
 /* ============================================================================
-   LIGHT UI — REFERENCE ALIGNMENT v2 (reprovação 100% do owner — reconstrução
-   na ESCALA/DENSIDADE da arte canônica): fundo claro geral, toolbar sem
-   moldura, sidebar estreita/compacta, colunas em CONTAINERS com barra
-   colorida sob o header, tipografia menor, % real na barra, participantes
-   reais (responsável+autor) no rodapé do card, KPIs estilo referência,
-   painel de detalhe como coluna. Dados 100% reais; spans novos do template
-   nascem display:none (legado byte-idêntico). Revertível por seção.
+   LIGHT UI — I3A.3 · F1 V4 PORT (OWNER-APPROVED DESIGN AMENDMENT)
+   Fonte visual: design-prototypes/light-ui/proposta-e-f1-card-golden-restoration.html
+   rev 0600303c (protótipo v4 aprovado = referência visual integral do F1; v4 VENCE
+   decisões visuais anteriores — amendment no roadmap). Código real vence em
+   função/dados/permissões/workflow. Esta seção SUBSTITUI integralmente a antiga
+   "REFERENCE ALIGNMENT v2" (superseded). Sem filtro por responsável
+   (V4-FUNCTIONAL-CONFLICT-01 — aguarda decisão do owner). Revertível por seção.
    ========================================================================== */
-/* ---- ESCALA GLOBAL ---- */
-body.light-ui{--d-side:264px;--lui-hd-h:80px;--lui-canvas:#F7F8FB}
-/* ---- SIDEBAR CLARA compacta ---- */
-body.light-ui.desktop .nav{background:var(--lui-surface);border-right:1px solid var(--lui-hair);box-shadow:none;padding:0 12px 10px;gap:1px}
-body.light-ui.desktop .nav .sb-brand{gap:11px;padding:20px 8px 14px}
-body.light-ui.desktop .nav .sb-brand .logo.sm{width:38px;height:38px}
-body.light-ui.desktop .nav .sb-brand .nm{color:var(--lui-tx-1);font-size:16px}
-body.light-ui.desktop .nav .sb-brand .nm-legacy{display:inline}
+/* ---- CALIBRAÇÃO COMPARTILHADA DO LIGHT SHELL (v4 vence: 284→266; canvas #FDFEFE;
+        gradiente CTA medido #3B5CF9→#E604AE supersede E4 para o tema claro) ---- */
+body.light-ui{--d-side:266px;--lui-canvas:#FDFEFE;--lui-hair:#EDF0F3;--lui-hair-2:#E9EDF2;
+  --lui-grad:linear-gradient(90deg,#3B5CF9,#E604AE);--lui-grad-shadow:0 8px 18px rgba(59,92,249,.35);
+  --lui-sb-tx:#A8C3C9;--lui-sb-dim:#6E939B}
+/* ---- SIDEBAR TEAL PETRÓLEO (gradiente medido da referência) ---- */
+body.light-ui.desktop .nav{background:linear-gradient(180deg,#0A4552 0%,#053845 48%,#03303B 100%);border-right:0;box-shadow:none;padding:0 12px 14px;gap:1px}
+body.light-ui.desktop .nav .sb-brand{gap:12px;padding:20px 6px 0}
+body.light-ui.desktop .nav .sb-brand .logo.sm{width:46px;height:46px;border-radius:50%}
+body.light-ui.desktop .nav .sb-brand .logo.brandlogo{box-shadow:0 0 0 3px rgba(255,255,255,.14),0 6px 14px rgba(0,0,0,.28) !important}
+body.light-ui.desktop .nav .sb-brand .nm{color:#F5FAFB;font-size:16.5px;font-weight:800;letter-spacing:.2px}
+body.light-ui.desktop .nav .sb-brand .nm-legacy{display:inline}  /* v4: brand "ID Seven" (supersede copy I2.2) */
 body.light-ui.desktop .nav .sb-brand .nm-lui{display:none !important}
-body.light-ui.desktop .nav .sb-brand .sy{color:var(--lui-tx-3);font-size:11.5px;margin-top:3px}
-body.light-ui.desktop .nav .sb-brand .logo.brandlogo{box-shadow:0 5px 14px rgba(94,110,243,.22) !important}
-body.light-ui.desktop .nav .new-task-btn{height:42px;margin:2px 4px 14px;border-radius:12px;font-size:13.5px;background:linear-gradient(90deg,#2E6BFF,#EC4899);box-shadow:0 8px 18px rgba(120,80,240,.28)}
-body.light-ui.desktop .nav .new-task-btn:hover{box-shadow:0 10px 22px rgba(120,80,240,.36)}
-body.light-ui.desktop .nav .sb-sect{font-size:10px;color:var(--lui-tx-4);padding:12px 12px 8px}
-body.light-ui.desktop .nav button.sb-item{height:38px;padding:0 12px !important;gap:11px !important;border-radius:10px;color:var(--lui-tx-2) !important;font-size:13.5px !important;font-weight:500 !important}
-body.light-ui.desktop .nav button.sb-item span{font-size:13.5px !important;font-weight:500 !important}
-body.light-ui.desktop .nav button.sb-item svg{width:17px !important;height:17px !important;color:var(--lui-tx-3)}
-body.light-ui.desktop .nav button.sb-item:hover{background:var(--lui-sunk);color:var(--lui-tx-1) !important}
-body.light-ui.desktop .nav button.sb-item.on{background:#E9F1FE !important;color:var(--lui-info-ink) !important;font-weight:650 !important;box-shadow:none}
-body.light-ui.desktop .nav button.sb-item.on span{font-weight:650 !important}
-body.light-ui.desktop .nav button.sb-item.on svg{color:var(--lui-info-ink)}
-body.light-ui.desktop .nav button.sb-item.on::before{display:none}
-body.light-ui.desktop .nav .nc-navbadge{background:#475569;color:#fff;height:18px;min-width:18px;font-size:10.5px}
-body.light-ui.desktop .nav .sb-user{background:var(--lui-surface-soft);border:1px solid var(--lui-hair);border-radius:12px;box-shadow:none;margin:auto 2px 0;padding:10px}
-body.light-ui.desktop .nav .sb-user .su-n{color:var(--lui-tx-1);font-size:13px}
-body.light-ui.desktop .nav .sb-user .su-r{color:var(--lui-tx-3);font-size:11.5px;margin-top:2px}
-body.light-ui.desktop .nav .sb-footer{color:var(--lui-tx-4);font-size:10px;border:1px solid var(--lui-hair);border-radius:10px;padding:8px 10px;margin:8px 2px 0}
-/* ---- HEADER 80px compacto + cluster com avatar ---- */
-body.light-ui.desktop #content.board-mode{padding-top:12px !important;padding-left:28px !important;padding-right:28px !important}
-body.light-ui.desktop #content.board-mode .d-board-head .d-bh-title{font-size:20px;font-weight:750;letter-spacing:-.02em}
-body.light-ui.desktop .d-board-head .d-bh-sub{font-size:12px}
-body.light-ui.desktop .d-board-head .iconbtn{width:36px;height:36px;border-radius:10px}
-body.light-ui.desktop #content.board-mode .d-board-head .av{width:40px !important;height:40px !important}
-body.light-ui.desktop #app > .content{padding:0 28px 40px !important}
-body.light-ui.desktop .corner-avatar{display:flex;top:21px !important;right:28px;box-shadow:0 0 0 2px rgba(91,124,250,.55)}
-body.light-ui.desktop .corner-avatar .av{width:38px !important;height:38px !important;font-size:14px !important}
-body.light-ui.desktop .slaib-bell{top:19px !important;right:76px;width:42px;height:42px;border-radius:12px}
-body.light-ui.desktop .slamon{top:17px !important;right:128px}
-body.light-ui.desktop .slamon-chip{height:46px;border-radius:12px}
-body.light-ui.desktop .slaib-count{background:var(--lui-info-ink)}
-/* ---- TOOLBAR SEM MOLDURA + busca longa com lupa ---- */
-body.light-ui.desktop .d-board-tools.tbar{background:transparent;border:0;box-shadow:none;padding:8px 0 0;margin:6px 0 0}
-body.light-ui.desktop .d-board-tools.tbar .bsearch-wrap{flex:0 1 560px}
-body.light-ui.desktop .d-board-tools.tbar .bsearch{max-width:none}
-body.light-ui.desktop .d-board-tools.tbar .tchips{margin-left:auto}
-body.light-ui.desktop .d-board-tools.tbar .bsearch{height:40px;background:#fff url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23697181' stroke-width='2' stroke-linecap='round'><circle cx='11' cy='11' r='7'/><path d='M20 20l-3.5-3.5'/></svg>") no-repeat 13px 50%/15px !important;border-color:var(--lui-hair) !important;box-shadow:0 1px 2px rgba(19,24,38,.03) !important;padding-left:38px !important;border-radius:11px}
-body.light-ui.desktop .tchip{height:38px;font-size:12.5px;background:var(--lui-surface)}
-/* ---- FILTER ROW (nomes na cor do responsável) ---- */
-body.light-ui.desktop .lui-frow{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:12px 0 2px;padding:0 2px}
-body.light-ui.desktop .lui-frow-k{font-size:12.5px;color:var(--lui-tx-3);margin-right:2px}
-body.light-ui.desktop .lui-rchip{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 12px 0 6px;border-radius:11px;background:var(--lui-surface);border:1px solid var(--lui-hair);font-size:12.5px;font-weight:650;color:color-mix(in srgb,var(--kresp,#5B6472) 58%,#1E2530);cursor:pointer}
-body.light-ui.desktop .lui-rchip .av{width:23px !important;height:23px !important;font-size:9px !important;box-shadow:0 0 0 2px var(--kresp,#C7CCD6) !important}
-body.light-ui.desktop .lui-rchip:hover{border-color:var(--lui-brand)}
-body.light-ui.desktop .lui-rchip.on{border:1.5px solid var(--lui-info);background:#F2F7FF}
-body.light-ui.desktop .lui-rchip-all{color:var(--lui-tx-2);padding:0 12px}
-body.light-ui.desktop .lui-rchip-all svg{width:14px;height:14px;color:var(--lui-tx-3)}
-/* ---- BOARD: colunas em CONTAINERS com barra colorida sob o header ---- */
-body.light-ui.desktop .kbv2-board-surface{padding:12px 2px 0;margin-top:8px}
-body.light-ui.desktop .kbv2-board{gap:14px}
-body.light-ui.desktop .kbv2-column{min-width:250px;background:var(--lui-surface);border:1px solid var(--lui-hair);border-radius:14px;box-shadow:0 1px 2px rgba(19,24,38,.03)}
-body.light-ui.desktop .kbv2-column-active{background:var(--lui-surface);border:1px solid var(--lui-hair);box-shadow:0 1px 2px rgba(19,24,38,.03)}
-body.light-ui.desktop .kbv2-column-header{position:relative;padding:13px 12px 11px;margin-bottom:6px}
-body.light-ui.desktop .kbv2-column-header::after{content:'';position:absolute;left:0;right:0;bottom:0;height:3px;background:var(--kc,#C7CCD6);opacity:.9}
-body.light-ui.desktop .kbv2-column-header .kbv2-ctitle{font-size:13.5px;font-weight:700}
-body.light-ui.desktop .kbv2-column-header .kbv2-ccount{background:none;box-shadow:none;color:var(--lui-tx-2);font-size:13px;font-weight:750;min-width:0;padding:0 2px}
-body.light-ui.desktop .kbv2-column-body{gap:10px;padding:8px 10px 10px;background:var(--lui-canvas);border-radius:0 0 13px 13px}
-body.light-ui.desktop .kbv2-column-add{height:38px;font-size:12.5px;border:1px solid var(--lui-hair);background:var(--lui-surface);margin:0 10px 10px;color:color-mix(in srgb,var(--kc,#5B6472) 55%,#1E2530)}
-body.light-ui.desktop .kbv2-column-add:hover{border-color:var(--kc);background:#fff}
-/* ---- CARD escala da referência ---- */
-body.light-ui.desktop .kbv2-card{gap:7px;padding:12px 13px 11px;border-radius:11px;background:var(--lui-surface);border:1px solid var(--lui-hair-2);box-shadow:0 1px 2px rgba(19,24,38,.04)}
-body.light-ui.desktop .kbv2-title{font-size:13px;font-weight:700;line-height:1.35}
-body.light-ui.desktop .kbv2-card-chips .kbv2-chip:first-child{font-size:8.5px;padding:2px 7px;border-radius:5px}
-body.light-ui.desktop .kbv2-chip-soft,body.light-ui.desktop .kbv2-card-chips .kbv2-chip{font-size:9.5px}
-body.light-ui.desktop .kbv2-tier{font-size:12px}
-body.light-ui.desktop .kbv2-tier::before{font-size:10.5px;display:block;margin-bottom:1px;content:'Cliente'}
-body.light-ui.desktop .kbv2-card-date{font-size:11.5px;font-weight:600}
-body.light-ui.desktop .kbv2-card-date svg{width:12px;height:12px}
-body.light-ui.desktop .kbv2-card-top{gap:5px}
-body.light-ui.desktop .kbv2-sla,body.light-ui.desktop .kbv2-due{font-size:10px;padding:3px 7px}
-/* barra + % real à direita */
-body.light-ui.desktop .kbv2-card-rail{order:4;margin-right:42px}
-body.light-ui.desktop .kbv2-pct{display:inline !important;order:4;align-self:flex-end;margin-top:-11px;font-size:10.5px;font-weight:650;color:var(--lui-tx-3);line-height:1}
-body.light-ui.desktop .kbv2-column:first-child .kbv2-pct,body.light-ui.desktop .kbv2-column:last-child .kbv2-pct{display:none !important}
-/* footer do card: participantes reais (responsável + autor) e microstats à direita */
-body.light-ui.desktop .kbv2-card-profile{order:8;border-top:1px solid var(--lui-hair-2);padding-top:9px;margin-top:1px;gap:0;min-height:26px;position:static}
-body.light-ui.desktop .kbv2-av .av{width:24px !important;height:24px !important;font-size:9.5px !important;box-shadow:0 0 0 2px var(--kresp,#C7CCD6),0 0 0 4px var(--lui-surface) !important}
+body.light-ui.desktop .nav .sb-brand .sy{color:#9FBCC2;font-size:11px;margin-top:3px}
+body.light-ui.desktop .nav .new-task-btn{height:46px;margin:16px 4px 0;border-radius:13px;font-size:13.5px;font-weight:800;color:#fff;background:var(--lui-grad);box-shadow:var(--lui-grad-shadow)}
+body.light-ui.desktop .nav .new-task-btn:hover{box-shadow:0 10px 22px rgba(59,92,249,.45)}
+body.light-ui.desktop .nav .sb-sect{font-size:9px;font-weight:800;letter-spacing:1.5px;color:var(--lui-sb-dim);padding:22px 10px 6px}
+body.light-ui.desktop .nav button.sb-item{position:relative;height:41px;padding:0 12px !important;gap:11px !important;border-radius:10px;color:var(--lui-sb-tx) !important;font-size:13px !important;font-weight:650 !important;box-shadow:none}
+body.light-ui.desktop .nav button.sb-item span{font-size:13px !important;font-weight:650 !important}
+body.light-ui.desktop .nav button.sb-item svg{width:16px !important;height:16px !important;color:var(--lui-sb-tx)}
+body.light-ui.desktop .nav button.sb-item:hover{background:rgba(255,255,255,.06);color:#EAF4F6 !important}
+body.light-ui.desktop .nav button.sb-item:hover svg{color:#EAF4F6}
+body.light-ui.desktop .nav button.sb-item.on{background:rgba(255,255,255,.10) !important;color:#FFFFFF !important;font-weight:750 !important;box-shadow:none}
+body.light-ui.desktop .nav button.sb-item.on span{font-weight:750 !important}
+body.light-ui.desktop .nav button.sb-item.on svg{color:#FFFFFF}
+body.light-ui.desktop .nav button.sb-item.on::before{content:'';display:block;position:absolute;left:0;top:50%;transform:translateY(-50%);width:4px;height:20px;border-radius:3px;background:#D9EEF6}
+body.light-ui.desktop .nav .nc-navbadge{background:rgba(255,255,255,.14);color:#EAF6FA;height:18px;min-width:18px;font-size:9.5px;font-weight:800}
+body.light-ui.desktop .nav .sb-user{background:rgba(255,255,255,.07);border:0;border-radius:12px;box-shadow:none;margin:auto 2px 0;padding:9px 11px}
+body.light-ui.desktop .nav .sb-user .su-n{color:#F2F7F8;font-size:12px;font-weight:750}
+body.light-ui.desktop .nav .sb-user .su-r{color:#9FBCC2;font-size:10.5px}
+body.light-ui.desktop .nav .sb-footer{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:10px;color:#9FBCC2;padding:9px 11px}
+body.light-ui.desktop .nav .sb-footer .ver{color:#9FC6E8;font-weight:700}
+body.light-ui.desktop .nav .sb-footer .sbf-dot{background:#22C55E}
+/* ---- CANVAS + HEADER DA SUPERFÍCIE (v4) ---- */
+body.light-ui.desktop .scr-head{background:transparent}
+body.light-ui.desktop .d-board-head{gap:14px}
+body.light-ui.desktop .d-board-head .iconbtn{width:38px;height:38px;border-radius:50%;background:var(--lui-surface);border:1px solid var(--lui-hair-2);box-shadow:0 1px 2px rgba(16,24,40,.06);color:#344054}
+body.light-ui.desktop .d-board-head>.av{width:46px !important;height:46px !important;border:2px solid var(--lui-surface);box-shadow:0 0 0 1px var(--lui-hair-2)}
+body.light-ui.desktop .d-bh-title{font-size:21px;font-weight:800;letter-spacing:-.2px;color:var(--lui-tx-1)}
+body.light-ui.desktop .d-bh-sub{font-size:11px;font-weight:650;color:#98A1AD}
+/* cluster: Monitor SLA (real) + sino (real) + avatar REAL do canto (função real: perfil).
+   v4 vence a ocultação visual da I2.2 — o elemento é real e navega para o Perfil. */
+body.light-ui.desktop #cornerAvatar{display:flex !important;box-shadow:0 0 0 2px var(--lui-surface),0 0 0 4.5px #5B54F2 !important;border-radius:50%}
+body.light-ui.desktop #sla-monitor{background:var(--lui-surface) !important;border:1px solid var(--lui-hair) !important;border-radius:13px !important;box-shadow:0 1px 3px rgba(16,24,40,.05) !important}
+body.light-ui.desktop #slaib-bell{width:44px !important;height:44px !important;border-radius:50% !important;background:var(--lui-surface) !important;border:1px solid var(--lui-hair-2) !important;box-shadow:0 1px 2px rgba(16,24,40,.05) !important}
+body.light-ui.desktop #sla-monitor .slamon-chip{background:var(--lui-surface) !important;border:0 !important;box-shadow:none !important}
+/* ---- TOOLBAR: busca longa com lupa + tabs (ativa em TINT azul, não sólida) ---- */
+body.light-ui.desktop .d-board-tools.tbar{background:transparent;border:0;box-shadow:none;padding:12px 0 0;margin:0;gap:10px}
+body.light-ui.desktop .d-board-tools .bsearch-wrap{flex:0 0 auto;width:574px;max-width:48vw;position:relative}
+body.light-ui.desktop .d-board-tools .inp.bsearch{width:100%;max-width:none;height:48px;border-radius:12px;background:var(--lui-surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2398A1AD' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='6.5'/%3E%3Cpath d='M20 20l-4.2-4.2'/%3E%3C/svg%3E") 14px center/16px no-repeat;border:1px solid var(--lui-hair-2);box-shadow:0 1px 2px rgba(16,24,40,.04);font-size:12.5px;color:var(--lui-tx-1);padding:0 52px 0 40px;height:48px !important;border-radius:12px !important}
+body.light-ui.desktop .d-board-tools .inp.bsearch::placeholder{color:#98A1AD}
+body.light-ui.desktop .d-board-tools .bsearch-kbd{font-size:10px;font-weight:700;color:#98A1AD;border:1px solid var(--lui-hair-2);border-radius:6px;padding:2px 6px;background:#FBFCFD}
+body.light-ui.desktop .tchips{margin-left:auto;gap:10px}
+body.light-ui.desktop .tchips .tchip{height:44px !important;border-radius:12px !important;padding:0 16px !important;background:var(--lui-surface);border:1px solid var(--lui-hair-2);font-size:12.5px;font-weight:750;color:#45505F;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+body.light-ui.desktop .tchips .tchip svg{width:15px;height:15px}
+body.light-ui.desktop .tchips .tchip:hover{border-color:#D8E4F9;color:#2E5FD0}
+body.light-ui.desktop .tchips .tchip.on{background:#E9F0FC;border-color:#D8E4F9;color:#2E5FD0;box-shadow:none}
+/* ---- BOARD: grid de 4 colunas iguais (v4); colunas = cartões brancos ---- */
+/* paleta v4 por posição (amendment: v4 vence a cor real do eixo APENAS na apresentação clara;
+   --kc real permanece como fallback e no legado) */
+body.light-ui.desktop .kbv2-column:nth-child(1){--kc2:#3D7BD1}
+body.light-ui.desktop .kbv2-column:nth-child(2){--kc2:#E97722}
+body.light-ui.desktop .kbv2-column:nth-child(3){--kc2:#9A54ED}
+body.light-ui.desktop .kbv2-column:nth-child(4){--kc2:#10B981}
+body.light-ui.desktop .kbv2-cdot{background:var(--kc2,var(--kc)) !important}
+body.light-ui.desktop .kbv2-board-surface{background:transparent;border:0;box-shadow:none;padding:0;margin-top:14px}
+body.light-ui.desktop .kbv2-board{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;align-items:stretch;overflow:visible;padding:0;height:100%;min-height:0}
+body.light-ui.desktop .kbv2-column{min-height:0;height:auto}
+body.light-ui.desktop .kbv2-column{display:flex;flex-direction:column;min-width:0;width:auto;max-width:none;background:var(--lui-surface);border:1px solid var(--lui-hair);border-radius:14px;box-shadow:0 1px 3px rgba(16,24,40,.04);padding:12px}
+body.light-ui.desktop .kbv2-column-header{display:flex;align-items:center;gap:8px;padding:2px 2px 0;margin:0 0 26px;position:relative;background:transparent;border:0}
+body.light-ui.desktop .kbv2-column-header::after{content:'';position:absolute;left:2px;top:calc(100% + 9px);width:76px;height:5px;border-radius:3px;background:var(--kc2,var(--kc))}
+body.light-ui.desktop .kbv2-cdot{width:8px;height:8px;box-shadow:none}
+body.light-ui.desktop .kbv2-ctitle{font-size:13.5px;font-weight:800;letter-spacing:-.1px;color:var(--lui-tx-1);text-transform:none}
+body.light-ui.desktop .kbv2-ccount{margin-left:auto;min-width:26px;height:22px;padding:0 7px;border:1px solid var(--lui-hair-2);border-radius:8px;background:var(--lui-surface);box-shadow:0 1px 2px rgba(16,24,40,.04);font-size:11.5px;font-weight:800;color:#1D2939;display:flex;align-items:center;justify-content:center}
+body.light-ui.desktop .kbv2-column-body{display:flex;flex-direction:column;gap:12px;padding:2px 2px 4px;background:transparent;flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden}
+body.light-ui.desktop .kbv2-column-add{margin-top:12px;height:38px;flex:none;border:1px solid var(--lui-hair);border-radius:10px;background:var(--lui-surface);color:var(--kc2,var(--kc));font-size:12.5px;font-weight:750;gap:6px;box-shadow:none}
+body.light-ui.desktop .kbv2-column-add:hover{background:#FBFCFD}
+body.light-ui.desktop .kbv2-empty{border:0;background:transparent}
+/* ---- CARD v4 (anatomia congelada): título → categoria → Cliente → Prazo →
+        barra+% → avatares com anel + microstats · funções reais preservadas ---- */
+body.light-ui.desktop .kbv2-card{position:relative;display:flex;flex-direction:column;background:var(--lui-surface);border:1px solid #EEF1F4;border-radius:12px;box-shadow:0 1px 2px rgba(16,24,40,.05);padding:13px 13px 11px;margin:0}
+body.light-ui.desktop .kbv2-card::after{display:none}
+body.light-ui.desktop .kbv2-card:hover{border-color:#E3E8EE;box-shadow:0 3px 10px rgba(16,24,40,.08);transform:none}
+body.light-ui.desktop .kbv2-card:focus-within{box-shadow:0 0 0 2.5px rgba(47,107,255,.45),0 1px 2px rgba(16,24,40,.05)}
+/* 1) título primeiro (clamp 2) + "Cliente" rótulo/nome */
+body.light-ui.desktop .kbv2-card-main{order:1;display:flex;flex-direction:column;margin:0;padding-right:30px}
+body.light-ui.desktop .kbv2-title{order:1;font-size:13.5px;font-weight:800;line-height:1.3;letter-spacing:-.1px;color:#101828;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+body.light-ui.desktop .kbv2-tier{order:2;margin:0;font-size:12px;font-weight:700;color:#1D2939;text-transform:none;letter-spacing:0}
+body.light-ui.desktop .kbv2-tier::before{content:'Cliente';display:block;font-size:10.5px;font-weight:550;color:#98A1AD;margin:10px 0 2px;letter-spacing:0}
+/* 2) chip de categoria (tint uppercase) logo após o título */
+body.light-ui.desktop .kbv2-card-chips{order:2;margin:9px 0 0;gap:6px}
+body.light-ui.desktop .kbv2-chip{font-size:8.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;padding:4px 8px;border-radius:6px;border-color:transparent !important}
+body.light-ui.desktop .kbv2-chip-dot{display:none}
+body.light-ui.desktop .kbv2-chip-soft{display:none}
+/* 3) topo real vira só o alerta de SLA (status/due pills → coluna/linha Prazo/drawer) */
+body.light-ui.desktop .kbv2-card-top{order:3;margin:0;padding:0;min-height:0}
+body.light-ui.desktop .kbv2-status{display:none}
+body.light-ui.desktop .kbv2-due{display:none}
+body.light-ui.desktop .kbv2-sla{margin-top:8px;font-size:9px}
+body.light-ui.desktop .kbv2-column:last-child .kbv2-sla-verde{display:none}
+/* 4) linha Prazo (dado real; prefixo apresentacional) */
+body.light-ui.desktop .kbv2-card-date{order:4;display:flex;align-items:center;gap:6px;margin:9px 0 0;padding:0;background:transparent;border:0;font-size:11.5px;font-weight:700;color:#344054}
+body.light-ui.desktop .kbv2-card-date svg{width:13px;height:13px;color:#667085}
+body.light-ui.desktop .kbv2-card-date span::before{content:'Prazo '}
+body.light-ui.desktop .kbv2-column:last-child .kbv2-card-date{color:#12A150}
+body.light-ui.desktop .kbv2-column:last-child .kbv2-card-date svg{color:#12A150}
+/* 5) trilho real como barra fina + % real à direita (colunas do meio) */
+body.light-ui.desktop .kbv2-card-rail{order:5;display:flex;align-items:center;gap:0;margin:11px 0 0;padding:0 46px 0 0;background:transparent}
+body.light-ui.desktop .kbv2-card-rail i{flex:1;width:auto;height:4.5px;border-radius:0;background:#F1F3F5;box-shadow:none !important;margin:0}
+body.light-ui.desktop .kbv2-card-rail i:first-child{border-radius:3px 0 0 3px}
+body.light-ui.desktop .kbv2-card-rail i:last-of-type{border-radius:0 3px 3px 0}
+body.light-ui.desktop .kbv2-card-rail i.done,body.light-ui.desktop .kbv2-card-rail i.cur{background:var(--kc2,var(--kc)) !important}
+body.light-ui.desktop .kbv2-card-rail .ln{display:none}
+body.light-ui.desktop .kbv2-card-rail i.att{flex:0 0 8px;height:8px;border-radius:50%;background:#F59E0B}
+body.light-ui.desktop .kbv2-pct{display:inline-block !important;order:6;align-self:flex-end;margin-top:-13px;font-size:11.5px;font-weight:800;color:#101828;line-height:1}
+body.light-ui.desktop .kbv2-column:first-child :is(.kbv2-card-rail,.kbv2-pct),
+body.light-ui.desktop .kbv2-column:last-child :is(.kbv2-card-rail,.kbv2-pct){display:none !important}
+/* 6) rodapé: avatares reais (responsável+autor) com ANEL da cor do responsável */
+body.light-ui.desktop .kbv2-card-profile{order:7;display:flex;align-items:center;margin:12px 0 0;padding:0;background:transparent;border:0}
+body.light-ui.desktop .kbv2-card-profile .kbv2-av .av{width:24px !important;height:24px !important;font-size:9.5px !important;box-shadow:0 0 0 1.5px var(--kresp,#C7CCD6),0 0 0 3.5px var(--lui-surface) !important}
+body.light-ui.desktop .kbv2-presence{display:none}
 body.light-ui.desktop .kbv2-av-by{display:inline-flex !important;margin-left:-6px}
-body.light-ui.desktop .kbv2-av-by .av{width:24px !important;height:24px !important;font-size:9.5px !important;box-shadow:0 0 0 2px var(--kby,#C7CCD6),0 0 0 4px var(--lui-surface) !important}
-body.light-ui.desktop .kbv2-card{position:relative}
-body.light-ui.desktop .kbv2-card-summary{position:absolute;right:13px;bottom:14px;margin:0}
-body.light-ui.desktop .kbv2-card-chk{position:absolute;right:13px;bottom:14px;font-size:11px}
-body.light-ui.desktop .kbv2-card:has(.kbv2-card-chk) .kbv2-card-summary{bottom:36px}
-body.light-ui.desktop .kbv2-card-summary .kbv2-sum-main{font-size:11px}
-/* ações: hover-reveal mantido (referência mostra card limpo) */
-body.light-ui.desktop .kbv2-btn-main{background:linear-gradient(90deg,#2E6BFF,#EC4899);box-shadow:0 6px 14px rgba(99,102,241,.25)}
-/* ---- KPI FOOTER estilo referência ---- */
-body.light-ui.desktop .lui-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin:16px 2px 4px}
-body.light-ui.desktop .lui-kpi{display:flex;align-items:center;gap:11px;padding:15px 16px;background:var(--lui-surface);border:1px solid var(--lui-hair);border-radius:13px;box-shadow:0 1px 2px rgba(19,24,38,.03);min-width:0}
-body.light-ui.desktop .lui-kpi-ic{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
-body.light-ui.desktop .lui-kpi-ic svg{width:18px;height:18px}
-body.light-ui.desktop .lui-ic-blue{background:rgba(37,99,235,.10);color:var(--lui-info-ink)}
-body.light-ui.desktop .lui-ic-green{background:rgba(18,120,76,.10);color:var(--lui-green-ink)}
-body.light-ui.desktop .lui-ic-red{background:rgba(196,48,43,.10);color:var(--lui-danger-ink)}
-body.light-ui.desktop .lui-ic-teal{background:rgba(13,148,136,.10);color:#0D9488}
+body.light-ui.desktop .kbv2-av-by .av{width:24px !important;height:24px !important;font-size:9.5px !important;box-shadow:0 0 0 1.5px var(--kby,#C7CCD6),0 0 0 3.5px var(--lui-surface) !important}
+body.light-ui.desktop .kbv2-pm{display:none}
+/* 7) microstats reais na linha dos avatares (conteúdo) + linha compacta (checklist) */
+body.light-ui.desktop .kbv2-card-summary{order:8;align-self:flex-end;display:flex;align-items:center;gap:5px;margin:-22px 0 0;padding:0;background:transparent;border:0}
+body.light-ui.desktop .kbv2-card-summary .kbv2-sum-k{display:flex;align-items:center;color:#98A1AD}
+body.light-ui.desktop .kbv2-card-summary .kbv2-sum-k svg{width:13px;height:13px}
+body.light-ui.desktop .kbv2-card-summary .kbv2-sum-k span{display:none}
+body.light-ui.desktop .kbv2-card-summary .kbv2-sum-v{display:flex;align-items:center;gap:4px}
+body.light-ui.desktop .kbv2-card-summary .kbv2-sum-main{font-size:11px;font-weight:650;color:#8A94A2}
+body.light-ui.desktop .kbv2-card-summary .kbv2-sum-sub{display:none}
+body.light-ui.desktop .kbv2-card-chk{order:9;align-self:flex-end;display:flex;align-items:center;gap:5px;margin:4px 0 0;padding:0;background:transparent;border:0;font-size:11px;font-weight:650;color:#8A94A2}
+body.light-ui.desktop .kbv2-card-chk svg{width:13px;height:13px;color:#98A1AD}
+/* 8) origem/ficha/etapas → drawer (DOM intacto) */
+body.light-ui.desktop .kbv2-card-origin{display:none}
+body.light-ui.desktop .kbv2-stage2{display:none}
+/* 9) ações reais preservadas na silhueta v4: Detalhes = cobertura invisível do card
+      (foco visível no card via :focus-within); Mover = pill revelada em hover/foco;
+      ⋯ real no canto superior direito (slot do bookmark do v4) */
+body.light-ui.desktop .kbv2-card-footer{order:10;display:block;margin:0;padding:0;opacity:1;max-height:none;overflow:visible;border:0;background:transparent}
+body.light-ui.desktop .kbv2-btn{transition:none}
+body.light-ui.desktop .kbv2-btn-main{position:absolute;inset:0;z-index:1;opacity:0;border-radius:12px;height:auto;padding:0;margin:0;border:0}
+body.light-ui.desktop .kbv2-btn[data-move]{position:absolute;right:10px;bottom:10px;z-index:2;height:26px;padding:0 10px;border-radius:8px;font-size:10.5px;font-weight:700;gap:4px;background:var(--lui-surface);border:1px solid var(--lui-hair-2);box-shadow:0 1px 3px rgba(16,24,40,.10);color:#475467;opacity:0;pointer-events:none}
+body.light-ui.desktop .kbv2-btn[data-move] svg{width:11px;height:11px}
+body.light-ui.desktop .kbv2-card:hover .kbv2-btn[data-move],
+body.light-ui.desktop .kbv2-card:focus-within .kbv2-btn[data-move]{opacity:1;pointer-events:auto}
+body.light-ui.desktop .kbv2-more{position:absolute;top:10px;right:10px;z-index:3;margin:0}
+body.light-ui.desktop .kbv2-btn-dots{width:24px;height:24px;border-radius:8px;background:var(--lui-surface);border:1px solid transparent;color:#AEB6C2;font-size:13px;padding:0;margin:0}
+body.light-ui.desktop .kbv2-btn-dots:hover{border-color:var(--lui-hair-2);color:#475467}
+/* concluída (coluna 4): selo verde real de estado no topo direito, antes do ⋯ */
+body.light-ui.desktop .kbv2-column:last-child .kbv2-card::before{content:'';display:block;left:auto;bottom:auto;opacity:1;position:absolute;top:11px;right:40px;width:20px;height:20px;border-radius:50%;background:#10B981 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center/11px no-repeat}
+body.light-ui.desktop .kbv2-column:last-child .kbv2-card{padding-right:13px}
+/* ---- KPI FOOTER (dados reais; grid alinhado às colunas + célula 392 da legenda) ---- */
+body.light-ui.desktop .lui-kpis{display:grid;grid-template-columns:repeat(4,1fr) 392px;gap:16px;margin:16px 0 4px}
+body.light-ui.desktop .lui-kpi{display:flex;align-items:center;gap:12px;background:var(--lui-surface);border:1px solid var(--lui-hair);border-radius:14px;box-shadow:0 1px 3px rgba(16,24,40,.04);padding:14px 16px;min-height:96px;min-width:0}
+body.light-ui.desktop .lui-kpi-ic{width:42px;height:42px;flex:none;border-radius:12px;display:flex;align-items:center;justify-content:center}
+body.light-ui.desktop .lui-kpi-ic svg{width:20px;height:20px}
+body.light-ui.desktop .lui-ic-blue{background:#EAF6FF;color:#2F6BFF}
+body.light-ui.desktop .lui-ic-green{background:#E9F8F0;color:#12A150}
+body.light-ui.desktop .lui-ic-red{background:#FDECEC;color:#E04444}
+body.light-ui.desktop .lui-ic-teal{background:#EAF9F1;color:#12A150}
 body.light-ui.desktop .lui-kpi-tx{display:flex;flex-direction:column;min-width:0;line-height:1.15}
-body.light-ui.desktop .lui-kpi-tx b{font-size:20px;font-weight:800;color:var(--lui-tx-1);letter-spacing:-.01em}
-body.light-ui.desktop .lui-kpi-tx span{font-size:11px;color:var(--lui-tx-3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-body.light-ui.desktop .lui-legend-avs{display:flex;align-items:center}
+body.light-ui.desktop .lui-kpi-tx b{font-size:21px;font-weight:800;color:#101828;letter-spacing:-.3px}
+body.light-ui.desktop .lui-kpi-tx span{font-size:10.5px;font-weight:600;color:#98A1AD;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.light-ui.desktop .lui-legend-avs{display:flex;align-items:center;flex:none}
 body.light-ui.desktop .lui-legend-avs>span{display:inline-flex}
 body.light-ui.desktop .lui-legend-avs>span+span{margin-left:-7px}
 body.light-ui.desktop .lui-legend-avs .av{width:26px !important;height:26px !important;font-size:10px !important;box-shadow:0 0 0 2px var(--kresp,#C7CCD6),0 0 0 4px var(--lui-surface) !important}
-body.light-ui.desktop .lui-legend .lui-kpi-tx b{font-size:12.5px;font-weight:750;line-height:1.25}
-body.light-ui.desktop .lui-legend .lui-kpi-tx span{white-space:normal;font-size:10.5px}
-/* ---- PAINEL DE DETALHE como coluna da referência ---- */
-body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"]{padding:160px 20px 20px 0}
-body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-sheet{width:340px;height:auto;max-height:100%;border-radius:14px;box-shadow:var(--lui-sh-elevated)}
-body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-title{font-size:18px}
-body.light-ui.desktop .det-sheet .send-go{background:linear-gradient(90deg,#2E6BFF,#EC4899)}
+body.light-ui.desktop .lui-legend .lui-kpi-tx b{font-size:11.5px;font-weight:750;letter-spacing:0;line-height:1.2}
+body.light-ui.desktop .lui-legend .lui-kpi-tx span{white-space:normal;font-size:9.5px;line-height:1.35;margin-top:4px}
+/* ---- PAINEL LATERAL v4 — MESMA Central de Detalhes real DOCADA como 5ª coluna no
+        desktop largo (composição v4). Board reserva a faixa; modal/foco/handlers reais
+        intactos (fora da faixa, o clique fecha — semântica real). Viewport reduzido:
+        permanece o drawer overlay da I3A.1 (derivação R8). ---- */
+/* R8 — derivações responsivas do layout v4 (sem destruir o board):
+   ≤1500: busca cede espaço às tabs; KPIs compactam rótulos.
+   ≤1240: board volta ao scroll-x legado; toolbar quebra em 2 linhas; KPIs em 2 colunas. */
+@media (max-width:1500px){
+  body.light-ui.desktop .d-board-tools .bsearch-wrap{max-width:32vw}
+  body.light-ui.desktop .lui-kpi{padding:12px 12px;gap:9px}
+  body.light-ui.desktop .lui-kpi-tx b{font-size:18px}
+  body.light-ui.desktop .lui-kpi-tx span{font-size:9.5px}
+}
+@media (max-width:1239.98px){
+  body.light-ui.desktop .kbv2-board{display:flex;overflow-x:auto}
+  body.light-ui.desktop .kbv2-board-surface{min-height:430px}
+  body.light-ui.desktop .kbv2-column{min-width:252px}
+  body.light-ui.desktop .d-board-tools.tbar{flex-wrap:wrap;row-gap:10px}
+  body.light-ui.desktop .d-board-tools .bsearch-wrap{max-width:none;width:100%;order:2}
+  body.light-ui.desktop .tchips{margin-left:0;order:1;flex-wrap:wrap}
+  body.light-ui.desktop .lui-kpis{grid-template-columns:repeat(2,1fr)}
+  body.light-ui.desktop .lui-kpi.lui-legend{grid-column:span 2}
+}
+
+@media (min-width:1760px){
+  body.light-ui.desktop:has(.modal-back[data-detmodal][data-detorigin="mine"]) .kbv2-board-surface{margin-right:408px}
+  body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"]{background:transparent;backdrop-filter:none;padding:0}
+  body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-sheet{position:fixed;top:160px;right:26px;bottom:169px;left:auto;width:392px;height:auto;max-height:none;border-radius:14px;border:1px solid var(--lui-hair);box-shadow:0 4px 14px rgba(16,24,40,.08)}
+  body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-title{font-size:19.5px;font-weight:800;letter-spacing:-.2px;line-height:1.25}
+}
 </style>
 </head>
 <body>
@@ -6800,12 +6883,12 @@ function renderPersonBoard(){
   const isMe=state.user&&state.user.id===pid;
   let list=state.tasks.filter(t=>t.assigneeId===pid||t.by===pid);
   if(boardQuery)list=list.filter(t=>((t.title||'')+(t.client||'')).toLowerCase().includes(boardQuery.toLowerCase()));
-  /* LIGHT UI (referência canônica do owner): filtro por responsável + KPIs derivados dos MESMOS
-     dados/helpers reais (respOf/taskDeadline/isTaskCompleted). Gated por body.light-ui: sem a
-     classe, nada disto entra no HTML (legado byte-idêntico). Leitura pura; zero escrita. */
+  /* LIGHT UI (I3A.3 v4 port): KPIs read-only derivados dos MESMOS dados/helpers reais
+     (taskDeadline/isTaskCompleted/respOf). Gated por body.light-ui: sem a classe, nada
+     disto entra no HTML (legado byte-idêntico). Leitura pura; zero escrita. O filtro por
+     responsável do v4 NÃO foi portado: V4-FUNCTIONAL-CONFLICT-01 (inexiste no código
+     real — aguarda decisão do owner; não inventar controle). */
   const _lui=document.body.classList.contains('light-ui');
-  const _list0=list.slice();
-  if(_lui&&boardRespFilter)list=list.filter(t=>{const a=respOf(t);return a&&a.id===boardRespFilter;});
   // F3.3.17-R5.1 — board do DESIGNER (dono é o designer em TODAS as suas tarefas de cronograma): usa o
   // EIXO do designer (DESIGNER_COLS4, que tem a coluna "Entregue") para a ENTREGA não ficar presa em
   // "Em andamento". Boards de Social/Admin seguem o eixo social (personBoardCol) — intacto.
@@ -6822,26 +6905,20 @@ function renderPersonBoard(){
     avatar(p,44)+
     '<div style="flex:1;min-width:0"><div class="d-bh-title">'+(isMe?'Meu quadro':'Quadro de '+esc((p.name||'').split(' ')[0]||'Responsável'))+'</div><div class="d-bh-sub">'+esc(p.role||'Fluxo individual')+'</div></div></div></div>'+
     '<div class="scr" style="padding-top:0">'+boardToolbar()+
-    (_lui?(function(){
-      const _rs=[...new Map(_list0.map(t=>{const a=respOf(t);return (a&&a.id)?[a.id,a]:null;}).filter(Boolean)).values()];
-      return '<div class="lui-frow"><span class="lui-frow-k">Filtrar por responsável:</span>'+
-        _rs.map(a=>'<button class="lui-rchip'+(boardRespFilter===a.id?' on':'')+'" data-bresp="'+a.id+'" style="--kresp:'+userColor(a.id)+'">'+avatar(a,22)+'<span>'+esc((a.name||'').split(' ')[0])+'</span></button>').join('')+
-        '<button class="lui-rchip lui-rchip-all'+(boardRespFilter?'':' on')+'" data-bresp="">'+svg('grid')+'<span>Todos</span></button></div>';
-    })():'')+
     // role-aware: no "Meu quadro" de um DESIGNER, a tarefa atribuída a ele aparece na
     // perspectiva do designer; tarefas onde ele NÃO é o designer seguem operacional.
     kbv2BoardHtml(COLS.map((st,i)=>({label:st.label,color:st.color,key:st.key,tasks:byStatus[i]})),
       t=>(hasDesigner(t)&&designerOf(t)===pid)?kbv2Card(t,'designer'):kbv2Card(t))+
     (_lui?(function(){
-      const _tot=_list0.length;const _dn=_list0.filter(t=>isTaskCompleted(t)||t.status==='concluido').length;
-      const _pct=_tot?Math.round(_dn*100/_tot):0;const _lt=_list0.filter(t=>{const d0=taskDeadline(t);return d0&&d0.late;}).length;
-      const _rs=[...new Map(_list0.map(t=>{const a=respOf(t);return (a&&a.id)?[a.id,a]:null;}).filter(Boolean)).values()];
+      const _tot=list.length;const _dn=list.filter(t=>isTaskCompleted(t)||t.status==='concluido').length;
+      const _pct=_tot?Math.round(_dn*100/_tot):0;const _lt=list.filter(t=>{const d0=taskDeadline(t);return d0&&d0.late;}).length;
+      const _rs=[...new Map(list.map(t=>{const a=respOf(t);return (a&&a.id)?[a.id,a]:null;}).filter(Boolean)).values()];
       return '<div class="lui-kpis">'+
         '<div class="lui-kpi"><span class="lui-kpi-ic lui-ic-blue">'+svg('flag')+'</span><div class="lui-kpi-tx"><b>'+(_tot-_dn)+'</b><span>Tarefas ativas</span></div></div>'+
         '<div class="lui-kpi"><span class="lui-kpi-ic lui-ic-green">'+svg('check')+'</span><div class="lui-kpi-tx"><b>'+_pct+'%</b><span>Conclusão geral</span></div></div>'+
         '<div class="lui-kpi"><span class="lui-kpi-ic lui-ic-red">'+svg('bell')+'</span><div class="lui-kpi-tx"><b>'+_lt+'</b><span>Atrasadas</span></div></div>'+
         '<div class="lui-kpi"><span class="lui-kpi-ic lui-ic-teal">'+SLAOP_SHIELD_SVG+'</span><div class="lui-kpi-tx"><b>'+(_lt?_lt+' alerta'+(_lt===1?'':'s'):'Em dia')+'</b><span>SLA da visão</span></div></div>'+
-        '<div class="lui-kpi lui-legend"><div class="lui-legend-avs">'+_rs.map(a=>'<span style="--kresp:'+userColor(a.id)+'">'+avatar(a,26)+'</span>').join('')+'</div><div class="lui-kpi-tx"><b>Legenda de responsáveis</b><span>Cores identificam quem é responsável</span></div></div>'+
+        '<div class="lui-kpi lui-legend"><div class="lui-legend-avs">'+_rs.map(a=>'<span style="--kresp:'+userColor(a.id)+'">'+avatar(a,26)+'</span>').join('')+'</div><div class="lui-kpi-tx"><b>Legenda de responsáveis</b><span>Cores ajudam a identificar quem é responsável</span></div></div>'+
       '</div>';
     })():'');
   return h+'</div>';
@@ -7722,7 +7799,6 @@ function renderSocialBoard(){
 
 /* ---- KANBAN ---- */
 let boardCol=0,boardMine=false,boardQuery='';
-let boardRespFilter='';   /* LIGHT UI (referência canônica do owner): filtro por responsável do Meu Quadro — chips só existem sob body.light-ui */
 function renderBoard(){
   const s=secOf(state.boardSector);const u=state.user;
   let list=visibleTasks(u,state.tasks).filter(t=>secOf(t.sector).key===s.key);
@@ -13012,7 +13088,6 @@ document.addEventListener('click',async e=>{
     render();return;}
   if(el=g('[data-bcol]')){boardCol=+el.dataset.bcol;render();return;}
   if(el=g('[data-bmine]')){boardMine=!boardMine;render();return;}
-  if(el=g('[data-bresp]')){boardRespFilter=el.dataset.bresp||'';render();return;}   /* LIGHT UI ref: chips do filtro (DOM só sob body.light-ui) */
   if(el=g('[data-ag]')){const a=el.dataset.ag;if(a==='new'){openEventForm();return;}if(a==='togglecancel'){agShowCancelled=!agShowCancelled;render();return;}if(a==='today'){agCursor=new Date();agSel=todayStr();}else if(a==='prev')agCursor.setMonth(agCursor.getMonth()-1);else if(a==='next')agCursor.setMonth(agCursor.getMonth()+1);else if(a==='vmonth')agView='month';else if(a==='vlist')agView='list';render();return;}
   // F3.5.5B — menu "Mais opções" (⋯) do detalhe do compromisso: toggle + fechar ao
   // clicar fora dele (os itens internos têm data-evfinish/data-evdelete e seguem
