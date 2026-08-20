@@ -749,6 +749,44 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > RESOLVIDO · F11 = ENTREGUE — AGUARDA OWNER (NÃO CONGELADA até GO explícito) ·
 > CHECKPOINT CANDIDATO = `cdea6da5` · F12 = NÃO INICIADO.**
 
+## I3L · F12 — LOGIN ▶ ENTREGUE (aguarda owner)
+> **I3K.2 = ✔ GO do owner. F11 = CONGELADA @ `cdea6da5`.** **Branch:**
+> `impl/light-ui-f12-login-1.0.246` DIRETO de `cdea6da5` (HEAD exato; worktree limpa;
+> 1.0.246) · **checkpoint único `6a677133`** ("feat(light-ui): port F12 login golden") ·
+> relatório `LIGHT-UI-I3L-F12-LOGIN-REPORT.md` · Golden `proposta-c-frame12-login.html`
+> (freeze `6e52905`; renderizado antes de editar). Reauditoria A–Q do fluxo REAL:
+> `renderLogin`/`doLogin` server-side via main (IPC authLogin → Cloud Run; renderer nunca
+> vê hash/token; erros literais mapeados); `startApp` → tab 'hoje' + saveSession
+> (wp_uid/wp_name) + sessionLogin; acquireTeamSession fire-and-forget (wp_team_jwt);
+> WRITE/AUTH MAP completo — NENHUMA função de auth nova. **HARD GATE A (Enter):** BEFORE
+> provado EMPIRICAMENTE = 0 chamadas (zero form/keydown no arquivo) → correção cirúrgica
+> autorizada: keydown delegado no #login → click no `.btn` primário real do modo (caminho
+> único; preventDefault; disabled durante loading bloqueia repetição). AFTER: mouse=1 ·
+> Enter=1 (liId E liPw) · nenhum caminho=2. **HARD GATE B (auth stubada, zero rede):**
+> sucesso {payload com trim provado · loading disabled+spinner · rota 'hoje' · authed ·
+> sessão} e falha {5 mensagens literais byte a byte · retry · sem falso sucesso}.
+> **HARD GATE C (race):** duplo clique=1 · Enter repetido=1 · Enter/click durante busy=0
+> extras (bloqueio real disabled+pointer-events). **Implementação:** seção CSS I3L com
+> **redefinição de CSS vars NO ESCOPO** `body.light-ui.desktop #login` (nada vaza) —
+> **18 seletores 18/18 gated, 0 !important** — card Golden 464px sobre canvas com véu,
+> labels C1 sentence-case, focus #6E5EF3, **CTA --lui-grad** (F1 v4 vence gradiente de
+> protótipo), banners tint, pill; logo PNG oficial preservada; + markup mínimo
+> autorizado PIXEL-INERTE: wrapper `.login-card` (fidelidade estrutural prescrita pelo
+> Golden; regra base neutra), labels `for`, autocomplete username/current-password/
+> one-time-code, `role="alert"` no banner. **Smoke 27/27** (24 itens do mandato + toggle
+> Mostrar-Ocultar + role=alert; N/A literais documentados: sem validação client-side/
+> remember-me/SSO/cadastro — ausências provadas no DOM). Responsive 1920/1366/win125
+> scrollW==vw; media real ≤660px rege + card compacto gated. **Legacy F12 dark/light/hc
+> = 0px PURO** (wrapper/attrs/keydown pixel-inertes provados). **Regressão F1–F11 base
+> `cdea6da5`: 32/36 = 0px PURO com HARD GATES F9 pop/det · F10 main/empty · F11
+> main/empty = 0px**; f3b/f3p/f4b/f5p só nas bboxes do sino com A–E auto-provado (0px
+> fora). Diff audit: 1 arquivo +63/−5; zero toque em F9-D01/F10/F11-D01-D02/SLA/exports/
+> routing (greps=0; doLogin só em comentário). Provas F12-LOGIN-{1920, 1366, win125,
+> ERROR, LOADING, A11Y-FOCUS}.png + F12-COMPARE no chat. **Recomendação: GO.**
+> **Gate de saída: avaliação do owner. I3K.2 = ✔ GO · F11 = CONGELADA @ `cdea6da5` ·
+> I3L = ENTREGUE — AGUARDA OWNER · F12 = NÃO CONGELADA até GO explícito ·
+> CHECKPOINT CANDIDATO = `6a677133` · F13 = NÃO INICIADO.**
+
 > — GO do owner (2026-08-20) com 4 correções
 > obrigatórias (amendment registrado; filtro parado como conflito-01; KPIs auditados acima;
 > sidebar 266px como calibração compartilhada do Light Shell sob `body.light-ui`, validada
