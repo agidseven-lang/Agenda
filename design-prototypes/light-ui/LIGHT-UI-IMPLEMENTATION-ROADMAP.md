@@ -203,16 +203,54 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > workflow; **protótipo v4 aprovado = apresentação visual e layout**. Conflito funcional →
 > preservar a função real e adaptar visualmente **sem descaracterizar o v4**.
 >
-> **Supersede:** a seção "REFERENCE ALIGNMENT v2" do branch
-> `impl/light-ui-f1-golden-cards-1.0.246` (sidebar clara etc. — leitura errada, reprovada) e,
-> onde conflitar, decisões visuais anteriores de shell/canvas para o F1. Nota de coerência:
-> o v4 RESTAURA a direção da I2 aprovada (sidebar gradiente petróleo), agora com cores e
-> medidas exatas da referência (`#0A4552→#03303B`, 266px, canvas `#FDFEFE`).
+> **AMENDMENT CANÔNICO DO DESIGN (ordem do owner, 2026-08-20):**
+> **F1 v4 = OWNER-APPROVED DESIGN AMENDMENT = referência visual integral e canônica do F1.**
+> Quando o v4 divergir de QUALQUER decisão visual anterior do F1 — sidebar/calibração,
+> enquadramento, header, toolbar, grid, 4 colunas, painel lateral integrado, cards,
+> "Adicionar tarefa", KPIs, legenda, spacing, proporções, cores, tipografia — **o v4 VENCE
+> e SUPERSEDE a decisão anterior** (aprovação explícita do owner; não é mera "coerência
+> com I2"). Isto supersede, entre outras: a seção "REFERENCE ALIGNMENT v2" (reprovada), a
+> calibração de sidebar da I2 (284px → **266px v4**, calibração COMPARTILHADA do Light
+> Shell), o copy de brand da I2.2 ("Agenda ID Seven" → **"ID Seven"** como no v4) e o
+> canvas anterior (→ `#FDFEFE`). O código real segue vencendo SOMENTE em: função, dados,
+> permissões e workflow.
 >
-> **Próxima fase: I3A.3 · F1 V4 PORT** — portar o v4 INTEIRO para o app real
-> (`desktop/src/renderer/index.html`, bloco light-ui, namespace `body.light-ui`), medindo do
-> HTML aprovado; plano de porte apresentado ao owner em 2026-08-20. **Gate de entrada da
-> implementação: GO do owner sobre o plano.**
+> **V4-FUNCTIONAL-CONFLICT-01 — RESPONSIBLE FILTER (item PARADO para decisão do owner).**
+> Reauditoria objetiva (base real `58847c85`, pré-adições): o Meu Quadro real **NÃO possui
+> filtro por responsável** — nenhuma função/handler/state: a seleção de tasks é fixa do
+> dono do board (`t.assigneeId===pid||t.by===pid`, L6578), o único filtro de board é
+> `boardQuery` (busca textual, state L7477, handler `afterBoard()` L8603) e `taskChips()`
+> é NAVEGAÇÃO entre quadros, não filtro; `boardMine` existe só em boards de setor. Confirma
+> F1-E01. Conforme a ordem: **não criar controle falso, não inventar JS** — a linha de
+> chips do v4 fica FORA do porte até decisão do owner; o JS gated adicionado na
+> reconstrução (`boardRespFilter`) será REMOVIDO no porte. O restante do porte prossegue
+> (independente).
+>
+> **AUDITORIA DE KPIs (dados reais; nenhum mock em runtime):**
+> | KPI v4 | Campo(s) real(is) | Fórmula | Fonte | Determinístico? |
+> |---|---|---|---|---|
+> | Tarefas ativas | lista do board + `isTaskCompleted(t)` | `list.filter(t=>!done).length` | estado real do board | SIM |
+> | Conclusão geral | idem | `round(100*done/total)` (0 se total=0) | idem | SIM |
+> | Atrasadas | `taskDeadline(t).late` (prazo real vs relógio) | `list.filter(late).length` | helper real L3225 | SIM (dado o relógio) |
+> | SLA em dia (98%) | **inexiste % real** — SLA real é estado/contagem (`slaMonData().total`, "Tudo em dia" L4317) | estado real: "Em dia"/`N alertas` | mesma família do Monitor SLA | SIM (estado), **% NÃO portável** |
+> | Deltas "vs mês passado" | tasks NÃO carregam `createdAt` confiável (grava-se em events/notifs; `doneAt` só num caminho de conclusão) | — | — | **NÃO derivável → NÃO renderizar** |
+> | Sparklines (séries) | exigiria série histórica; `doneAt`/`designerSla.finishedAt` não cobrem todas as formas de conclusão de `isTaskCompleted` | — | — | **NÃO derivável → NÃO renderizar** |
+> | Legenda de responsáveis | `respOf(t)`/`userColor(id)`/`state.users` | usuários reais da visão | estado real | SIM |
+>
+> Decisão registrada: KPIs 1–3 e legenda = números/dados REAIS; KPI-4 = estado real (sem %
+> inventado); deltas e sparklines NÃO são renderizados no runtime real (slots/layout do v4
+> preservados sem a polyline) — **reportado ao owner nesta seção antes de qualquer dado
+> fictício**, conforme ordem.
+>
+> **Fase em execução: I3A.3 · F1 V4 PORT** — GO do owner (2026-08-20) com 4 correções
+> obrigatórias (amendment registrado; filtro parado como conflito-01; KPIs auditados acima;
+> sidebar 266px como calibração compartilhada do Light Shell sob `body.light-ui`, validada
+> em 1920/1366/win125). Painel lateral: MESMA Central de Detalhes real DOCADA como 5ª
+> coluna no desktop largo; viewport reduzido = drawer overlay responsivo (derivação R8).
+> Card anatomy v4 congelada. UI UX Pro Max como auxiliar (v4 vence a skill). UM checkpoint
+> final de implementação após todos os gates; provas F1-V4-PORT-{1920,1366,win125}.png +
+> comparação por zonas medida numericamente; gate de fidelidade por zona
+> (MATCH/ADAPTAÇÃO/ISSUE, alvo ZERO ISSUE). **STOP pós-provas para avaliação do owner.**
 > **Status:** branch `impl/light-ui-core-shell-1.0.246` criado EXATAMENTE de `0dc87ccb` (I1
 > aprovada). Commit `6a4ea142`: 1 arquivo, **+80/−0, 1 hunk**, seção SHELL comentada dentro do
 > MESMO bloco `<style id="light-ui-foundation">`. Escopo cumprido = SÓ camada compartilhada
