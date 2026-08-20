@@ -3715,6 +3715,110 @@ body.light-ui.desktop .modal-back[data-detmodal]:not([data-detorigin]) .slaedit-
 @media (prefers-reduced-motion:reduce){
   body.light-ui.desktop .modal-back[data-detmodal]:not([data-detorigin]) .det-sheet{animation:none}
 }
+/* ============================================================================
+   LIGHT UI — I3G · F7 WIZARD (Golden Frames 7A/7B V2/7C/7D V2 sobre o wizard REAL)
+   Superfície real: renderForm (rota state.form em #content) — página com card
+   central .form-wrap 4 etapas REAIS Setor→Dados→Briefing→Revisão (STEPS/stepper/
+   stepSector/stepDados/stepBriefing/stepReview), navegação data-form
+   close/back/next/save e submit real saveTask/saveCardsBatch. ESCOPO ESTRITO:
+   body.light-ui.desktop #app > .content > .form-wrap (o wizard inteiro vive
+   nesse card) + os DOIS modais exclusivos do wizard, guardados por conteúdo
+   único (:has([data-pickasg]) = Responsável; :has([data-sqshrinkok]) =
+   confirmação de corte de roteiros) — nenhum modal compartilhado é atingido.
+   Paleta Golden por override de custom properties no subtree (mesma receita
+   aprovada da I3F); regras extras só onde o base é dark hardcoded ou o C1
+   define shape (stepper premium, inputs h46, chips h32 com dot, switch,
+   option-cards, quantidade, rodapé com CTA no gradiente do amendment).
+   Nenhuma etapa/campo/validação/CTA inventado; textos 100% reais.
+   ========================================================================== */
+body.light-ui.desktop #app > .content > .form-wrap{max-width:920px;--surface:#FFFFFF;--surface2:#FAFBFD;--ink:#14181F;--soft:#4B5364;--faint:#767E8D;--text:#2A3140;--line:#DFE3EB;--line-soft:#EFF1F6;--accent:#4353D8;--green:#22A06B;--red:#E5484D;background:#FFFFFF;border-color:#E8EBF1;box-shadow:0 0 0 1px #E8EBF1,0 2px 6px rgba(19,24,38,.05),0 16px 34px rgba(19,24,38,.08)}
+body.light-ui.desktop #app > .content > .form-wrap .scr-head .iconbtn{width:40px;height:40px;border-radius:12px}
+/* stepper premium C1 (estados reais on/done; kicker textual deriva das classes reais) */
+body.light-ui.desktop #app > .content > .form-wrap .stepper{padding:16px 6px 18px;gap:10px}
+body.light-ui.desktop #app > .content > .form-wrap .stepper .st{gap:10px}
+body.light-ui.desktop #app > .content > .form-wrap .stepper .sc{width:30px;height:30px;font-size:12.5px;background:#FFFFFF;border:1.5px solid #E8EBF1;color:#A8AFBC}
+body.light-ui.desktop #app > .content > .form-wrap .stepper .sc.on{background:var(--lui-grad);border-color:transparent;color:#fff;box-shadow:0 6px 16px rgba(110,94,243,.32)}
+body.light-ui.desktop #app > .content > .form-wrap .stepper .sc.done{background:#DFF3E9;border-color:#B5E3CD;color:#12784C}
+body.light-ui.desktop #app > .content > .form-wrap .stepper .slab{font-size:13.5px;color:#767E8D;font-weight:600}
+body.light-ui.desktop #app > .content > .form-wrap .stepper .slab.on{color:#14181F;font-weight:700}
+body.light-ui.desktop #app > .content > .form-wrap .stepper .slab.on::before{content:'ETAPA ATUAL';display:block;font-size:9px;font-weight:800;letter-spacing:.09em;color:#6E5EF3}
+body.light-ui.desktop #app > .content > .form-wrap .stepper .st:has(.sc.done) .slab::before{content:'CONCLUÍDA';display:block;font-size:9px;font-weight:800;letter-spacing:.09em;color:#2E8F63}
+body.light-ui.desktop #app > .content > .form-wrap .stepper .ln{height:2px;background:#E8EBF1;border-radius:2px}
+body.light-ui.desktop #app > .content > .form-wrap .stepper .ln.done{background:#A9DFC4}
+/* etapa DADOS: 2 colunas de GRUPOS (layout do Golden 7B; ordem/agrupamento reais) */
+body.light-ui.desktop #app > .content > .form-wrap .scr:has(> .fgroup){display:grid;grid-template-columns:1fr 1fr;gap:16px 26px;grid-auto-flow:dense;align-items:start}
+body.light-ui.desktop #app > .content > .form-wrap .scr > .fgroup{margin-bottom:0}
+body.light-ui.desktop #app > .content > .form-wrap .scr > .fgroup:nth-of-type(1),
+body.light-ui.desktop #app > .content > .form-wrap .scr > .fgroup:nth-of-type(2){grid-column:1}
+body.light-ui.desktop #app > .content > .form-wrap .scr > .fgroup:nth-of-type(3),
+body.light-ui.desktop #app > .content > .form-wrap .scr > .fgroup:nth-of-type(4){grid-column:2}
+/* grupos FLAT como no Golden 7B (o card fica no wizard, não nos grupos) */
+body.light-ui.desktop #app > .content > .form-wrap .fgroup{background:transparent;border:0;box-shadow:none;padding:6px 2px}
+body.light-ui.desktop #app > .content > .form-wrap .fgroup .fgroup-h::before{display:none}
+/* rótulos C1: sentence-case 12.5/600 + pill "obrigatório" âmbar */
+body.light-ui.desktop #app > .content > .form-wrap .lbl{font-size:12.5px;font-weight:600;letter-spacing:0;text-transform:none;color:#4B5364;margin:0 0 7px}
+body.light-ui.desktop #app > .content > .form-wrap .fgroup .fgroup-h{color:#767E8D;font-size:11px;letter-spacing:.1em}
+body.light-ui.desktop #app > .content > .form-wrap .req{font-size:9.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#B45309;background:#FDF3E1;padding:2.5px 8px;border-radius:999px;margin-left:4px}
+/* inputs C1: h46 r12 hairline; foco ring roxo com halo */
+body.light-ui.desktop #app > .content > .form-wrap input.inp{height:46px;padding:0 14px;font-size:14px}
+body.light-ui.desktop #app > .content > .form-wrap textarea.inp{min-height:96px;padding:12px 14px;font-size:14px}
+body.light-ui.desktop #app > .content > .form-wrap .inp:focus{border-color:#6E5EF3;box-shadow:0 0 0 2.5px rgba(110,94,243,.11)}
+body.light-ui.desktop #app > .content > .form-wrap .inp::placeholder{color:#98A1AD}
+body.light-ui.desktop #app > .content > .form-wrap .dt-field svg{color:#767E8D}
+/* option-cards do setor (C1): tile 48, tipografia Golden; seleção real via inline tint */
+body.light-ui.desktop #app > .content > .form-wrap .sector-card{padding:16px 18px;border-radius:14px;margin-bottom:10px}
+body.light-ui.desktop #app > .content > .form-wrap .sector-card .icb{width:48px;height:48px;border-radius:13px}
+body.light-ui.desktop #app > .content > .form-wrap .sector-card .icb svg{width:22px;height:22px}
+body.light-ui.desktop #app > .content > .form-wrap .sector-card .sl{font-size:15.5px;font-weight:650;color:#14181F}
+body.light-ui.desktop #app > .content > .form-wrap .sector-card .sd{font-size:12.5px;color:#767E8D;margin-top:2px}
+body.light-ui.desktop #app > .content > .form-wrap .sector-card.sel{box-shadow:0 4px 14px rgba(19,24,38,.07)}
+body.light-ui.desktop #app > .content > .form-wrap .sector-card.sel > div:last-child{font-size:16px;font-weight:800}
+body.light-ui.desktop #app > .content > .form-wrap .sector-card[data-assignee]::after{content:'▾';color:#A8AFBC;font-size:12px;margin-left:8px}
+/* chips reais (Etapa/Canais): h32 pill + dot derivado da cor corrente */
+body.light-ui.desktop #app > .content > .form-wrap .chip{height:32px;display:inline-flex;align-items:center;gap:7px;padding:0 12px;font-size:12px;font-weight:600;color:#767E8D}
+body.light-ui.desktop #app > .content > .form-wrap .chip::before{content:'';width:6.5px;height:6.5px;border-radius:50%;background:currentColor;opacity:.6;flex:none}
+/* switch C1 */
+body.light-ui.desktop #app > .content > .form-wrap .switchrow{padding:12px 15px;border:1px solid #E4E8EF;border-radius:12px;background:#FFFFFF}
+body.light-ui.desktop #app > .content > .form-wrap .sw{background:#CDD3DE;box-shadow:inset 0 0 0 1px #C2C8D4}
+body.light-ui.desktop #app > .content > .form-wrap .sw.on{background:#5B7CFA}
+/* acordeões de conteúdo (briefing) */
+body.light-ui.desktop #app > .content > .form-wrap .content-card{border-radius:13px}
+body.light-ui.desktop #app > .content > .form-wrap .content-card .ch .cd{background:#DFE3EB}
+body.light-ui.desktop #app > .content > .form-wrap .content-card .ch .cd.fill{background:#22A06B}
+body.light-ui.desktop #app > .content > .form-wrap .content-card .ch .ct{font-weight:650;color:#14181F}
+/* quantidade personalizada (vqty) + erro real */
+body.light-ui.desktop #app > .content > .form-wrap .vqty-btn{width:38px;height:38px;border-radius:10px;font-size:18px;color:#4B5364}
+body.light-ui.desktop #app > .content > .form-wrap .vqty-btn:hover{border-color:#B9C4F4}
+body.light-ui.desktop #app > .content > .form-wrap .vqty-btn[disabled]{background:#F1F4F8;color:#A8AFBC}
+body.light-ui.desktop #app > .content > .form-wrap .vqty-input{font-size:15px}
+body.light-ui.desktop #app > .content > .form-wrap .vqty-suffix{color:#767E8D}
+body.light-ui.desktop #app > .content > .form-wrap .sq-err{color:#C43D3D;background:#FDF1F1;border-color:#F0C4C1}
+/* revisão (7D): cartões claros, ações, envio ao cliente em verde tint */
+body.light-ui.desktop #app > .content > .form-wrap .rev-card{background:#FFFFFF;border-color:#EFF1F6;box-shadow:0 1px 3px rgba(19,24,38,.05)}
+body.light-ui.desktop #app > .content > .form-wrap .rev-content{background:#FAFBFD;border-color:#EFF1F6}
+body.light-ui.desktop #app > .content > .form-wrap .rev-edit,
+body.light-ui.desktop #app > .content > .form-wrap .rev-edit2{background:#FFFFFF;border-color:#E8EBF1;color:#4B5364}
+body.light-ui.desktop #app > .content > .form-wrap .rev-edit:hover,
+body.light-ui.desktop #app > .content > .form-wrap .rev-edit2:hover{border-color:#B9C4F4;color:#14181F}
+body.light-ui.desktop #app > .content > .form-wrap .rev-send-btn{background:#E9F8F0;color:#12784C;box-shadow:inset 0 0 0 1px #BFE8D2}
+body.light-ui.desktop #app > .content > .form-wrap .rev-send-hint{color:#767E8D}
+/* rodapé: Voltar ghost à esquerda + CTA primário no gradiente do amendment à direita */
+body.light-ui.desktop #app > .content > .form-wrap .footer-nav{background:#FFFFFF;border-top:1px solid #EFF1F6}
+body.light-ui.desktop #app > .content > .form-wrap .footer-nav .btn{height:48px;border-radius:13px;font-size:14.5px;min-width:0;padding:0 28px}
+body.light-ui.desktop #app > .content > .form-wrap .footer-nav .btn:not(.ghost){margin-left:auto;background:var(--lui-grad);box-shadow:var(--lui-grad-shadow);border:0;color:#fff}
+body.light-ui.desktop #app > .content > .form-wrap .footer-nav .btn.ghost{background:#FFFFFF;border-color:#E8EBF1;color:#4B5364;padding:0 20px}
+/* modais EXCLUSIVOS do wizard, guardados por conteúdo único (Responsável / corte de roteiros) */
+body.light-ui.desktop .modal-back:has([data-pickasg]) .sheet,
+body.light-ui.desktop .modal-back:has([data-sqshrinkok]) .sheet{--surface:#FFFFFF;--surface2:#F8FAFC;--ink:#14181F;--soft:#4B5364;--faint:#767E8D;--text:#2A3140;--line:#E4E8EF;--line-soft:#EFF1F6;--accent:#4353D8;--red:#E5484D;background:#FFFFFF;border-color:#E8EBF1}
+/* a11y: sem microtransições quando o usuário pede movimento reduzido */
+@media (prefers-reduced-motion:reduce){
+  body.light-ui.desktop #app > .content > .form-wrap .sw,
+  body.light-ui.desktop #app > .content > .form-wrap .vqty-btn,
+  body.light-ui.desktop #app > .content > .form-wrap .rte,
+  body.light-ui.desktop #app > .content > .form-wrap .inp,
+  body.light-ui.desktop #app > .content > .form-wrap .rev-edit,
+  body.light-ui.desktop #app > .content > .form-wrap .rev-edit2{transition:none}
+}
 </style>
 </head>
 <body>
@@ -12462,8 +12566,8 @@ function stepDados(){const f=state.form;const t=tpl();
   if(isCards){
     return ''+
     '<div class="fgroup"><div class="fgroup-h">Identificação</div>'+
-      '<div class="lbl">Cliente / Empresa <span class="req">obrigatório</span></div><input class="inp" id="fClient" placeholder="Ex.: Hospital Visão" value="'+esc(f.client)+'">'+
-      '<div style="height:14px"></div><div class="lbl">Quantidade de tarefas <span class="req">obrigatório</span></div>'+
+      '<label class="lbl" style="display:block" for="fClient">Cliente / Empresa <span class="req">obrigatório</span></label><input class="inp" id="fClient" placeholder="Ex.: Hospital Visão" value="'+esc(f.client)+'">'+
+      '<div style="height:14px"></div><label class="lbl" style="display:block" for="fCardsQty">Quantidade de tarefas <span class="req">obrigatório</span></label>'+
       /* F3.5.4F — em EDIÇÃO (f.id) a quantidade fica TRAVADA em 1 (edita-se UMA tarefa existente). */
       (f.id?'<input class="inp" id="fCardsQty" type="number" value="1" disabled title="Edição de tarefa existente — quantidade fixa">':'<input class="inp" id="fCardsQty" type="number" min="1" max="'+CARDS_MAX_BATCH+'" step="1" inputmode="numeric" placeholder="Ex.: 5" value="'+esc(f.cardsQty||'')+'">')+
       '<div style="font-size:11.5px;color:var(--faint);margin-top:6px;line-height:1.45">Cada tarefa vira um <b style="color:var(--soft)">card individual</b> (tema, legenda, observações e <b style="color:var(--soft)">prazo próprios</b>), atribuído ao mesmo designer. Máx. '+CARDS_MAX_BATCH+' por lote.</div>'+
@@ -12476,8 +12580,9 @@ function stepDados(){const f=state.form;const t=tpl();
   const dt=(ic,id,type,val)=>'<div class="dt-field">'+svg(ic)+'<input class="inp dt" id="'+id+'" type="'+type+'" value="'+esc(val)+'"></div>';
   return ''+
   '<div class="fgroup"><div class="fgroup-h">Identificação</div>'+
-    '<div class="lbl">'+esc(t?t.titleLabel:'Título')+'</div><input class="inp" id="fTitle" placeholder="'+esc(t?t.titlePh:'Dê um nome claro à tarefa')+'" value="'+esc(f.title)+'">'+
-    '<div style="height:14px"></div><div class="lbl">Cliente / Empresa'+((t&&t.clientRequired)?' <span class="req">obrigatório</span>':'')+'</div><input class="inp" id="fClient" placeholder="Ex.: Hospital Visão" value="'+esc(f.client)+'">'+
+    /* I3G a11y — label/for REAIS (pixel-inerte: mesma classe + display:block explícito) */
+    '<label class="lbl" style="display:block" for="fTitle">'+esc(t?t.titleLabel:'Título')+'</label><input class="inp" id="fTitle" placeholder="'+esc(t?t.titlePh:'Dê um nome claro à tarefa')+'" value="'+esc(f.title)+'">'+
+    '<div style="height:14px"></div><label class="lbl" style="display:block" for="fClient">Cliente / Empresa'+((t&&t.clientRequired)?' <span class="req">obrigatório</span>':'')+'</label><input class="inp" id="fClient" placeholder="Ex.: Hospital Visão" value="'+esc(f.client)+'">'+
   '</div>'+
   (isRoteiro?'':(
   '<div class="fgroup"><div class="fgroup-h">Atribuição</div>'+
@@ -12489,14 +12594,14 @@ function stepDados(){const f=state.form;const t=tpl();
     '<div style="height:14px"></div><div class="lbl">Etapa</div><div class="chips" style="margin-bottom:0">'+STATUS.map(st=>'<button class="chip" data-fstatus="'+st.key+'" style="'+(f.status===st.key?'background:'+withAlpha(st.color,.18)+';color:'+st.color+';border-color:'+st.color:'')+'">'+st.label+'</button>').join('')+'</div>'+
   '</div>'+
   '<div class="fgroup"><div class="fgroup-h">'+(isMedia?'Prazo do Designer':'Período do cronograma')+'</div>'+
-    '<div class="row" style="gap:12px"><div style="flex:1"><div class="lbl">Data de início</div>'+dt('calendar','fStart','date',f.startDate)+'</div><div style="flex:1"><div class="lbl">Hora de início</div>'+dt('clock','fStartT','time',f.startTime)+'</div></div>'+
+    '<div class="row" style="gap:12px"><div style="flex:1"><label class="lbl" style="display:block" for="fStart">Data de início</label>'+dt('calendar','fStart','date',f.startDate)+'</div><div style="flex:1"><label class="lbl" style="display:block" for="fStartT">Hora de início</label>'+dt('clock','fStartT','time',f.startTime)+'</div></div>'+
     '<div style="height:12px"></div>'+
-    '<div class="row" style="gap:12px"><div style="flex:1"><div class="lbl">Data de término'+(isMedia?' <span class="req">obrigatório</span>':'')+'</div>'+dt('calendar','fEnd','date',f.endDate)+'</div><div style="flex:1"><div class="lbl">Hora de término'+(isMedia?' <span class="req">obrigatório</span>':'')+'</div>'+dt('clock','fEndT','time',f.endTime)+'</div></div>'+
+    '<div class="row" style="gap:12px"><div style="flex:1"><label class="lbl" style="display:block" for="fEnd">Data de término'+(isMedia?' <span class="req">obrigatório</span>':'')+'</label>'+dt('calendar','fEnd','date',f.endDate)+'</div><div style="flex:1"><label class="lbl" style="display:block" for="fEndT">Hora de término'+(isMedia?' <span class="req">obrigatório</span>':'')+'</label>'+dt('clock','fEndT','time',f.endTime)+'</div></div>'+
   '</div>'))+
   // F3.3.77A-R2 (B2) — Edição de mídia: o PRAZO do Designer é o término acima (planDueAt). Oculta o
   // "Prazo final" redundante (fDue) p/ não confundir; mantém só a Prioridade.
   '<div class="fgroup"><div class="fgroup-h">'+(isMedia?'Prioridade':'Prazo final &amp; prioridade')+'</div>'+
-    (isMedia?'':'<div class="row" style="gap:12px"><div style="flex:1"><div class="lbl">Data limite</div>'+dt('calendar','fDue','date',f.dueDate)+'</div><div style="flex:1"><div class="lbl">Hora limite</div>'+dt('clock','fDueT','time',f.dueTime)+'</div></div><div style="height:16px"></div>')+
+    (isMedia?'':'<div class="row" style="gap:12px"><div style="flex:1"><label class="lbl" style="display:block" for="fDue">Data limite</label>'+dt('calendar','fDue','date',f.dueDate)+'</div><div style="flex:1"><label class="lbl" style="display:block" for="fDueT">Hora limite</label>'+dt('clock','fDueT','time',f.dueTime)+'</div></div><div style="height:16px"></div>')+
     '<div class="switchrow"><div><div style="font-size:14px;font-weight:600">Prioridade alta</div><div style="font-size:12px;color:var(--faint);margin-top:1px">Destaca a tarefa nos quadros</div></div><button class="sw '+(f.priority?'on':'')+'" data-ftoggle="priority"></button></div>'+
   '</div>';
 }
