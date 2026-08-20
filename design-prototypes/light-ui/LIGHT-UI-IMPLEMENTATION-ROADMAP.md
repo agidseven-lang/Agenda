@@ -683,6 +683,39 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > **Gate de saída: avaliação do owner. I3J = ✔ GO · F10 = CONGELADA @ `594cf02c` ·
 > I3K = ENTREGUE — AGUARDA OWNER · F11 = NÃO CONGELADA · F12 = NÃO INICIADO.**
 
+## I3K.1 · F11 — DEBT HARDENING ▶ ENTREGUE (aguarda owner)
+> **HARNESS + AUDITORIA + DOCS ONLY sobre `db53881a` — ZERO mudanças em `desktop/src`**
+> (md5 do index.html idêntico ao commit antes/depois; worktree limpa; 1.0.246). Relatório
+> `LIGHT-UI-I3K1-F11-DEBT-HARDENING-REPORT.md` (+ relatório I3K atualizado: D02/adendo).
+> **F11-D01 fechado objetivamente:** matriz TH×TD provada no DOM — th=5 · td=7; associação
+> implícita (sem scope/headers/aria em TODA a tabela): **1/7 correta** (td2 carga sob
+> "Atrasadas", td3 pct sob "Críticas", td4 laranja sob "Atraso méd.", td5 atrasadas sob
+> "% no prazo"; **td6 críticas e td7 atraso médio = ÓRFÃS**, ambas informação REAL do
+> agregador); empty interno `colspan="5"` sob rows de 7; **severidade MEDIUM** (AT recebe
+> rótulos errados em 4 colunas + 2 sem rótulo; read-only e valores corretos mitigam).
+> **Autoridade literal:** Golden `efb264a4` registra a dívida como nota de auditoria; C7
+> `2516426` §21 — "o código segue com o bug até fase FUNCIONAL do owner" — e §22 — "a
+> dívida 5×7 é correção FUNCIONAL (thead), nunca 'consertada' só no CSS/visual" — ⇒ **o
+> contrato NÃO exige preservar 5×7, apenas registra**; estado-alvo visual aprovado tem 7
+> headers. **Opções modeladas (nada implementado):** A manter · **B thead 7 + colspan 7
+> (1 linha, zero risco F1–F10/export/sort, corrige 7/7 associações — canônica pelo C7)** ·
+> C descartada (execDesRow compartilhado/downgrade) · D headers/aria via afterReports
+> (0px, mas visual segue errado) · E CSS-only VETADA pelo §22. **Export vazio →
+> F11-D02 (LOW):** copy exata "…a exportação gera um arquivo vazio com cabeçalho" ×
+> realidade provada: CSV `''` (0 bytes, SEM cabeçalho) e JSON NÃO-vazio (shape completo,
+> 828 bytes; kpis {0,100,0,0}; 7 buckets); botões/handlers ATIVOS no empty. **E01
+> permanece só `.rep-pbn.z`.** Boundary reexecutado com constantes literais:
+> cron GRACE=600000ms e edicao_midia GRACE=1200000ms — ±1ms provado (false/true/true) com
+> display textual IDÊNTICO dos dois lados ("10 min"/"20 min" — critério real é ms-bruto).
+> Export hardening: payload byte-idêntico a `toCSV(R.taskRows)`/recomputo JSON; `\n` no
+> conteúdo escapado DENTRO de aspas; UTF-8/;;/aspas/zero-rows ok. Zero writes · zero
+> storage novo. Evidência da I3K permanece vinculada por hash (nenhuma mudança de
+> renderer). **Recomendação: FIX BEFORE FREEZE (I3K.2 = opção B + D02, ~2 linhas) —
+> alternativa: ACCEPT DEBT + FREEZE.**
+> **Gate de saída: decisão do owner. I3J = ✔ GO · F10 = CONGELADA @ `594cf02c` · I3K =
+> ENTREGUE · I3K.1 = HARDENING ENTREGUE — AGUARDA OWNER · F11 = NÃO CONGELADA ·
+> CHECKPOINT CANDIDATO = `db53881a` · F12 = NÃO INICIADO.**
+
 > — GO do owner (2026-08-20) com 4 correções
 > obrigatórias (amendment registrado; filtro parado como conflito-01; KPIs auditados acima;
 > sidebar 266px como calibração compartilhada do Light Shell sob `body.light-ui`, validada
