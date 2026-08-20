@@ -4095,6 +4095,46 @@ body.light-ui.desktop #login .btn:focus-visible{outline:2px solid #4353D8;outlin
 @media(max-height:660px){
   body.light-ui.desktop #login .login-card{padding:24px 30px 20px}
 }
+/* ==========================================================================
+   LIGHT UI — I3M · F13 MODAL "LEGENDAS E ARTES" (Golden Frame 13 sobre
+   renderProductionModal REAL). Padrão ev-sheet/login: as CSS VARS do tema são
+   redefinidas NO ESCOPO da .pr-sheet (nada vaza; o RTE interno — que consome
+   as mesmas vars — herda o claro AUTOMATICAMENTE; o RTE do wizard/F7 fora do
+   modal permanece intocado). Backdrop claro já vem da regra C2 do foundation.
+   Overrides pontuais do Golden `32103bd`: sheet r18/sh-2, ícone âmbar, nº
+   indigo, drop tracejado claro com focus-within (teclado do upload — gate A),
+   thumb/url claros, CTA "Salvar e reenviar" com --lui-grad (autoridade F1 v4
+   sobre o gradiente real de envio — precedente C2 PRIMARY). Zero !important.
+   ========================================================================== */
+body.light-ui.desktop .sheet.pr-sheet{--surface:#FFFFFF;--surface2:#F8FAFC;--ink:#14181F;--soft:#4B5364;--faint:#767E8D;--line:#DFE3EB;--line-soft:#EFF1F6;--accent:#4353D8;background:#FFFFFF;border-radius:18px;box-shadow:0 0 0 1px #E8EBF1,0 2px 6px rgba(19,24,38,.06),0 16px 34px rgba(19,24,38,.085)}
+body.light-ui.desktop .pr-sheet .sp-x{background:#FFFFFF;border-color:#EFF1F6;color:#767E8D}
+body.light-ui.desktop .pr-sheet .sp-title{color:#14181F;letter-spacing:-.014em}
+body.light-ui.desktop .pr-sheet .sp-sub{color:#767E8D}
+body.light-ui.desktop .pr-sheet .sp-sub b{color:#4B5364}
+body.light-ui.desktop .pr-sheet .pr-ic{background:#FEF3E2;color:#D97706;box-shadow:inset 0 0 0 1px #FBDFB3}
+body.light-ui.desktop .pr-sheet .pr-card{background:#F8FAFC;border-color:#EFF1F6}
+body.light-ui.desktop .pr-sheet .pr-n{background:#EBEFFE;color:#4E63D8}
+body.light-ui.desktop .pr-sheet .pr-tema{color:#14181F}
+body.light-ui.desktop .pr-sheet .pr-leg-l{color:#A8AFBC}
+body.light-ui.desktop .pr-sheet .pr-art-lbl{color:#A8AFBC}
+body.light-ui.desktop .pr-sheet .pr-drop{border-color:#CBD2DE;color:#767E8D;background:#FFFFFF}
+body.light-ui.desktop .pr-sheet .pr-drop:hover{border-color:#6E5EF3;color:#14181F}
+/* teclado do upload (gate A): o label focável do controle real — ring no drop */
+body.light-ui.desktop .pr-sheet .pr-drop:focus-visible{outline:2px solid #4353D8;outline-offset:2px;border-color:#6E5EF3;color:#14181F}
+body.light-ui.desktop .pr-sheet .pr-thumb{border-color:#E8EBF1;background:#FFFFFF}
+body.light-ui.desktop .pr-sheet .pr-url{background:#FFFFFF;border-color:#E4E8EF;color:#A8AFBC}
+body.light-ui.desktop .pr-sheet .pr-url:focus{border-color:#6E5EF3;color:#14181F;box-shadow:0 0 0 2.5px rgba(110,94,243,.11)}
+body.light-ui.desktop .pr-sheet .cvw-soft{color:#767E8D}
+body.light-ui.desktop .pr-sheet .btn.ghost{background:#FFFFFF;border-color:#DFE3EB;color:#4B5364}
+body.light-ui.desktop .pr-sheet .btn.sp-go{background:var(--lui-grad);box-shadow:var(--lui-grad-shadow)}
+/* RTE herda as vars claras do escopo; ajustes pontuais de sombra/foco do Golden */
+body.light-ui.desktop .pr-sheet .rte:focus-within{border-color:#6E5EF3;box-shadow:0 0 0 2.5px rgba(110,94,243,.11)}
+body.light-ui.desktop .pr-sheet .rte-menu{box-shadow:0 14px 30px rgba(19,24,38,.14)}
+body.light-ui.desktop .pr-sheet .rte-mi-go{background:#4353D8}
+/* foco visível nos controles do modal */
+body.light-ui.desktop .pr-sheet .btn:focus-visible,
+body.light-ui.desktop .pr-sheet .sp-x:focus-visible,
+body.light-ui.desktop .pr-sheet .pr-thumb-x:focus-visible{outline:2px solid #4353D8;outline-offset:2px}
 </style>
 </head>
 <body>
@@ -10751,7 +10791,7 @@ function artBox(i,kind){
     '<div class="pr-art-lbl">'+(kind==='feed'?'Feed':'Story')+' · '+spec+'</div>'+
     (url
       ? '<div class="pr-thumb '+cls+'"><img src="'+esc(url)+'" alt=""><button class="pr-thumb-x" data-prodclear="'+i+'|'+kind+'" title="Remover">'+svg('close')+'</button></div>'
-      : '<label class="pr-drop '+cls+'"><input type="file" accept="image/*" data-produp="'+i+'|'+kind+'" hidden>'+svg('plus')+'<span>Anexar '+(kind==='feed'?'Feed':'Story')+'</span></label>')+
+      : '<label class="pr-drop '+cls+'" tabindex="0" role="button" aria-label="Anexar arte '+(kind==='feed'?'Feed':'Story')+'"><input type="file" accept="image/*" data-produp="'+i+'|'+kind+'" hidden>'+svg('plus')+'<span>Anexar '+(kind==='feed'?'Feed':'Story')+'</span></label>')+
     '<input class="pr-url" type="url" data-produrl="'+i+'|'+kind+'" value="'+esc(url||'')+'" placeholder="ou cole a URL da arte…">'+
   '</div>';
 }
@@ -10762,8 +10802,8 @@ function renderProductionModal(){
     '<label class="pr-leg-l">Legenda</label>'+rteField('prod|'+i+'|legenda',it.legenda||'',it.legendaRich||'','Escreva a legenda deste conteúdo…')+
     '<div class="pr-arts">'+artBox(i,'feed')+artBox(i,'story')+'</div>'+
     '</div>').join(''):'<div class="cvw-soft">Nenhum conteúdo neste cronograma.</div>';
-  document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1"><div class="sheet pr-sheet">'+
-    '<button class="iconbtn sp-x" data-modalclose="1">'+svg('close')+'</button>'+
+  document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1"><div class="sheet pr-sheet" role="dialog" aria-modal="true" aria-label="Legendas e artes">'+
+    '<button class="iconbtn sp-x" data-modalclose="1" aria-label="Fechar">'+svg('close')+'</button>'+
     '<div class="pr-ic">'+svg('movie')+'</div>'+
     '<div class="sp-title">Legendas e artes</div>'+
     '<div class="sp-sub">Preencha a legenda e anexe as artes de cada conteúdo. Feed <b>1080×1440</b> e Story <b>1080×1920</b>. Depois reenvie ao cliente pelo mesmo link.</div>'+
@@ -10781,6 +10821,9 @@ function renderProductionModal(){
     try{const url=await ikUpload(file,'/cronogramas/'+p.taskId);if(k==='feed')state._prod.items[+i].feedImageUrl=url;else state._prod.items[+i].storyImageUrl=url;_prodKeepScroll();renderProductionModal();flashToast('Arte anexada.');}
     catch(err){console.warn('ikUpload',err);flashToast('Falha no upload. Cole a URL da arte como alternativa.');}
   }));
+  // Teclado no controle REAL de upload (label focável): Enter/Espaço abrem o MESMO file picker
+  // do clique (input.click() → change handler único). stopPropagation é invariante de teclado.
+  document.querySelectorAll('.pr-drop').forEach(el=>el.addEventListener('keydown',e=>{const k=e.key||'';if(k==='Enter'||k===' '||k==='Spacebar'){e.preventDefault();e.stopPropagation();const f=el.querySelector('[data-produp]');if(f)f.click();}}));
   // 1.0.110 — restaura o scroll da lista após re-render (não pula para o 1º post ao anexar arte).
   const _pl=document.querySelector('.pr-list');if(_pl&&state._prodScroll){try{_pl.scrollTop=state._prodScroll;}catch(_){}}
 }
