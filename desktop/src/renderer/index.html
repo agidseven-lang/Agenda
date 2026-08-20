@@ -4393,7 +4393,7 @@ const IS_ELECTRON_APP=!!(typeof window!=='undefined'&&window.api);
 function isDesktop(){return IS_ELECTRON_APP||DESKTOP_MQ.matches;}
 function applyDesktopClass(){document.body.classList.toggle('desktop',isDesktop());}
 applyDesktopClass();
-DESKTOP_MQ.addEventListener('change',()=>{applyDesktopClass();if(state.user)render();});
+DESKTOP_MQ.addEventListener('change',()=>{applyDesktopClass();try{applyAppearance();}catch(_){}if(state.user)render();});
 let unsub={users:null,events:null,tasks:null};
 
 /* ---- AUTH ---- */
@@ -7017,11 +7017,11 @@ function renderExecPanel(){
     +'<div class="exec-filters">'+optSel('designer','Designer',desMap,true)+optSel('cliente','Cliente',cliMap,false)+optSel('tipo','Tipo',tipoMap,false)+statusSel+'</div>';
   if(A.count===0){ h+='<div class="exec-empty"><div class="exec-empty-ic">'+svg('gauge')+'</div><div class="exec-empty-t">Sem dados no período selecionado</div><div class="exec-empty-s">Nenhuma tarefa com SLA nos filtros atuais. Ajuste o período ou os filtros acima.</div></div></div>'; return h; }
   var T=A.totais;
-  if(T.critico>0) h+='<div class="exec-alert"><span class="exec-alert-ic">'+svg('clock')+'</span><b>'+T.critico+' tarefa'+(T.critico>1?'s':'')+' crítica'+(T.critico>1?'s':'')+'</b> exigem ação imediata (atraso &gt; 10 min).</div>';
-  h+='<div class="exec-kpis">'+execKpi('Ativas',T.ativas,'#EEF2F8','no período')+execKpi('No prazo',T.prazo,execSevHex('azul'),(T.ativas?Math.round(T.prazo/T.ativas*100):0)+'% do total')+execKpi('Alerta laranja',T.laranja,execSevHex('laranja'),'≤ 30 min p/ vencer')+execKpi('Atrasadas',T.atras,execSevHex('vermelho'),'prazo vencido')+execKpi('Críticas',T.critico,execSevHex('critico'),'atraso &gt; 10 min')+'</div>';
+  if(T.critico>0) h+='<div class="exec-alert"><span class="exec-alert-ic">'+svg('clock')+'</span><b>'+T.critico+' tarefa'+(T.critico>1?'s':'')+' crítica'+(T.critico>1?'s':'')+'</b> exigem ação imediata (acima da tolerância do setor).</div>';
+  h+='<div class="exec-kpis">'+execKpi('Ativas',T.ativas,'#EEF2F8','no período')+execKpi('No prazo',T.prazo,execSevHex('azul'),(T.ativas?Math.round(T.prazo/T.ativas*100):0)+'% do total')+execKpi('Alerta laranja',T.laranja,execSevHex('laranja'),'≤ 30 min p/ vencer')+execKpi('Atrasadas',T.atras,execSevHex('vermelho'),'prazo vencido')+execKpi('Críticas',T.critico,execSevHex('critico'),'acima da tolerância')+'</div>';
   h+='<div class="exec-card"><div class="exec-card-h"><b>Distribuição de SLA</b><span class="exec-card-sub">tempo real · read-only</span></div>'+execDistBar(A.distribuicao)+'</div>';
   h+='<div class="exec-grid"><div class="exec-card exec-big"><div class="exec-card-h"><b>Ranking de designers</b><span class="exec-card-sub">'+A.porDesigner.length+' · por risco</span></div><table class="exec-tbl"><thead><tr><th>Designer</th><th class="c">Carga</th><th>% no prazo</th><th class="c">Lar.</th><th class="c">Atr.</th><th class="c">Crít.</th><th class="c">Atraso méd.</th></tr></thead><tbody>'+(A.porDesigner.map(execDesRow).join('')||'<tr><td colspan="7" style="color:#6E7480">Sem designers no período.</td></tr>')+'</tbody></table></div><div class="exec-col"><div class="exec-card"><div class="exec-card-h"><b>Clientes críticos</b></div>'+execMiniList(A.porCliente.slice(0,5).map(function(c){return {t:c.k,v:(c.critico?c.critico+' crít · ':'')+c.atras+' atraso'+(c.atras>1?'s':''),col:execSevHex(c.critico?'critico':'vermelho'),dot:execSevHex(c.critico?'critico':'vermelho')};}))+'</div><div class="exec-card"><div class="exec-card-h"><b>Tipos com mais atraso</b></div>'+execMiniList(A.porTipo.slice(0,5).map(function(x){return {t:x.k,v:x.atras+' atraso'+(x.atras>1?'s':''),col:execSevHex('laranja'),dot:execSevHex('laranja')};}))+'</div></div></div>';
-  h+='<div class="exec-grid exec-g2"><div class="exec-card"><div class="exec-card-h"><b>Próximos vencimentos</b><span class="exec-card-sub">por prazo final</span></div>'+execMiniList(A.proximosVencimentos.map(function(o){return {t:(o.t.client?o.t.client+' · ':'')+(o.t.title||o.t.id),v:'Vence em '+slaMMSSfmt(o.d.remainingMs,'up'),col:execSevHex(o.d.sev),dot:execSevHex(o.d.sev)};}))+'</div><div class="exec-card'+(T.critico>0?' exec-critbox':'')+'"><div class="exec-card-h"><b>Tarefas críticas recentes</b>'+(T.critico>0?'<span class="exec-card-sub" style="color:'+execSevHex('critico')+'">destaque</span>':'')+'</div>'+execMiniList(A.criticasRecentes.map(function(o){var dn=(state.users||[]).filter(function(x){return x.id===o.desId;})[0]; return {t:(o.t.client?o.t.client+' · ':'')+(o.t.title||o.t.id),v:'Atraso '+o.d.overdueMin+' min'+(dn?' · '+first(dn.name):''),col:execSevHex(o.d.critical?'critico':'vermelho'),dot:execSevHex(o.d.critical?'critico':'vermelho')};}))+'</div></div>';
+  h+='<div class="exec-grid exec-g2"><div class="exec-card"><div class="exec-card-h"><b>Próximos vencimentos</b><span class="exec-card-sub">por prazo final</span></div>'+execMiniList(A.proximosVencimentos.map(function(o){return {t:(o.t.client?o.t.client+' · ':'')+(o.t.title||o.t.id),v:'Vence em '+slaMMSSfmt(o.d.remainingMs,'up'),col:execSevHex(o.d.sev),dot:execSevHex(o.d.sev)};}))+'</div><div class="exec-card'+(T.critico>0?' exec-critbox':'')+'"><div class="exec-card-h"><b>Atrasos recentes</b>'+(T.critico>0?'<span class="exec-card-sub" style="color:'+execSevHex('critico')+'">destaque</span>':'')+'</div>'+execMiniList(A.criticasRecentes.map(function(o){var dn=(state.users||[]).filter(function(x){return x.id===o.desId;})[0]; return {t:(o.t.client?o.t.client+' · ':'')+(o.t.title||o.t.id),v:'Atraso '+o.d.overdueMin+' min'+(dn?' · '+first(dn.name):''),col:execSevHex(o.d.critical?'critico':'vermelho'),dot:execSevHex(o.d.critical?'critico':'vermelho')};}))+'</div></div>';
   h+='<div class="exec-foot"><i></i>Derivado do snapshot ao vivo · read-only · não grava no Firestore · não altera tarefas</div></div>';
   return h;
 }
@@ -7098,11 +7098,11 @@ function renderReports(){
     +'<span style="flex:1"></span><span class="rep-exp" data-rep-export="csv" role="button" tabindex="0">'+dl+'Exportar CSV</span><span class="rep-exp" data-rep-export="json" role="button" tabindex="0">'+dl+'Exportar JSON</span></div>';
   if(R.count===0){ h+='<div class="exec-empty"><div class="exec-empty-ic">'+svg('bars')+'</div><div class="exec-empty-t">Sem dados no período selecionado</div><div class="exec-empty-s">Nenhuma tarefa nos filtros atuais. Ajuste o período/filtros — as exportações continuam disponíveis.</div></div></div>'; return h; }
   var K=R.kpis;
-  h+='<div class="exec-kpis">'+execKpi('Atraso médio',(K.atrasoMedio||0)+' min',execSevHex('laranja'),'no período')+execKpi('% entrega no prazo',(K.pctNoPrazo||0)+'%',execSevHex('azul'),'concluídas no prazo')+execKpi('Reincidentes',K.reincidentes,execSevHex('vermelho'),'≥ 2 atrasos')+execKpi('Críticas',K.criticas,execSevHex('critico'),'atraso > 10 min')+'</div>';
+  h+='<div class="exec-kpis">'+execKpi('Atraso médio',(K.atrasoMedio||0)+' min',execSevHex('laranja'),'no período')+execKpi('% entrega no prazo',(K.pctNoPrazo||0)+'%',execSevHex('azul'),'concluídas no prazo')+execKpi('Reincidentes',K.reincidentes,execSevHex('vermelho'),'≥ 2 atrasos')+execKpi('Críticas',K.criticas,execSevHex('critico'),'acima da tolerância')+'</div>';
   var pmax=Math.max.apply(null,R.periodo.map(function(p){return p.count;}).concat([1]));
   h+='<div class="exec-card"><div class="exec-card-h"><b>Atrasos por período</b><span class="exec-card-sub">'+R.periodo.length+' dias · por prazo final</span></div><div class="rep-pbars">'+R.periodo.map(function(p){var col=p.count>=4?execSevHex('vermelho'):p.count>=2?execSevHex('laranja'):execSevHex('azul');return '<div class="rep-pb"><div class="rep-pbcol"><div class="rep-pbfill" style="height:'+Math.max(6,p.count/pmax*100)+'%;background:'+col+'"></div></div><div class="rep-pbn">'+p.count+'</div><div class="rep-pbl">'+esc(p.day.slice(5))+'</div></div>';}).join('')+'</div></div>';
   h+='<div class="exec-grid"><div class="exec-card exec-big"><div class="exec-card-h"><b>Atrasos por designer</b><span class="exec-card-sub">'+R.porDesigner.length+' · por risco</span></div><table class="exec-tbl"><thead><tr><th>Designer</th><th class="c">Carga</th><th>% no prazo</th><th class="c">Lar.</th><th class="c">Atr.</th><th class="c">Crít.</th><th class="c">Atraso méd.</th></tr></thead><tbody>'+(R.porDesigner.map(execDesRow).join('')||'<tr><td colspan="7" style="color:#6E7480">Sem designers.</td></tr>')+'</tbody></table></div><div class="exec-col"><div class="exec-card"><div class="exec-card-h"><b>Atrasos por cliente</b></div>'+execMiniList(R.porCliente.slice(0,6).map(function(c){return {t:c.k,v:(c.critico?c.critico+' crít · ':'')+c.atras+' atraso'+(c.atras>1?'s':''),col:execSevHex(c.critico?'critico':'vermelho'),dot:execSevHex(c.critico?'critico':'vermelho')};}))+'</div><div class="exec-card"><div class="exec-card-h"><b>Atrasos por tipo</b></div>'+execMiniList(R.porTipo.slice(0,6).map(function(x){return {t:x.k,v:x.atras+' atraso'+(x.atras>1?'s':''),col:execSevHex('laranja'),dot:execSevHex('laranja')};}))+'</div></div></div>';
-  h+='<div class="exec-grid exec-g2"><div class="exec-card"><div class="exec-card-h"><b>Tarefas críticas</b><span class="exec-card-sub">atraso &gt; 10 min</span></div>'+execMiniList(R.criticas.map(function(o){var dn=(state.users||[]).filter(function(x){return x.id===o.desId;})[0];return {t:(o.t.client?o.t.client+' · ':'')+(o.t.title||o.t.id),v:'Atraso '+o.d.overdueMin+' min'+(dn?' · '+first(dn.name):''),col:execSevHex(o.d.critical?'critico':'vermelho'),dot:execSevHex(o.d.critical?'critico':'vermelho')};}))+'</div><div class="exec-card"><div class="exec-card-h"><b>Reincidentes em atraso</b><span class="exec-card-sub">≥ 2 atrasos</span></div>'+execMiniList(R.reincidentes.map(function(r){return {t:(r.client?r.client+' · ':'')+r.title,v:r.lateCount+'× · '+(first(r.designer)||'—'),col:execSevHex(r.lateCount>=3?'critico':'laranja'),dot:execSevHex(r.lateCount>=3?'critico':'laranja')};}))+'</div></div>';
+  h+='<div class="exec-grid exec-g2"><div class="exec-card"><div class="exec-card-h"><b>Atrasos recentes</b><span class="exec-card-sub">críticas primeiro</span></div>'+execMiniList(R.criticas.map(function(o){var dn=(state.users||[]).filter(function(x){return x.id===o.desId;})[0];return {t:(o.t.client?o.t.client+' · ':'')+(o.t.title||o.t.id),v:'Atraso '+o.d.overdueMin+' min'+(dn?' · '+first(dn.name):''),col:execSevHex(o.d.critical?'critico':'vermelho'),dot:execSevHex(o.d.critical?'critico':'vermelho')};}))+'</div><div class="exec-card"><div class="exec-card-h"><b>Reincidentes em atraso</b><span class="exec-card-sub">≥ 2 atrasos</span></div>'+execMiniList(R.reincidentes.map(function(r){return {t:(r.client?r.client+' · ':'')+r.title,v:r.lateCount+'× · '+(first(r.designer)||'—'),col:execSevHex(r.lateCount>=3?'critico':'laranja'),dot:execSevHex(r.lateCount>=3?'critico':'laranja')};}))+'</div></div>';
   h+='<div class="exec-card"><div class="exec-card-h"><b>Histórico resumido por tarefa</b><span class="exec-card-sub">linha do tempo de SLA · derivado de history</span></div><table class="exec-tbl"><thead><tr><th>Tarefa</th><th>Responsável</th><th class="c">Atrasos</th><th>Linha do tempo</th></tr></thead><tbody>'+(R.historico.map(function(x){return '<tr><td>'+esc(x.title)+'</td><td style="color:#9FB0C8">'+esc(first(x.designer)||'—')+'</td><td class="c">'+execPill(x.lateCount+'×',x.lateCount>=3?'critico':x.lateCount>=2?'laranja':'verde')+'</td><td><div class="rep-tl">'+x.steps.map(function(s,i){return '<span class="rep-tlstep"><i style="background:'+repStepColor(s)+'"></i>'+esc(s)+'</span>'+(i<x.steps.length-1?'<span class="rep-tlsep"></span>':'');}).join('')+'</div></td></tr>';}).join('')||'<tr><td colspan="4" style="color:#6E7480">Sem histórico de atraso no período.</td></tr>')+'</tbody></table></div>';
   h+='<div class="exec-foot"><i></i>Derivado do snapshot ao vivo · read-only · exportação LOCAL (CSV/JSON via download) · não grava no Firestore</div></div>';
   return h;
@@ -10832,6 +10832,7 @@ function _prodKeepScroll(){const l=document.querySelector('.pr-list');state._pro
 function prodCollect(){return (state._prod&&state._prod.items||[]).map(it=>{const o={tema:it.tema||'',legenda:it.legenda||'',feedImageUrl:it.feedImageUrl||'',storyImageUrl:it.storyImageUrl||''};if(it.temaRich)o.temaRich=it.temaRich;if(it.legendaRich)o.legendaRich=it.legendaRich;return o;});}
 async function saveProduction(taskId,resend){
   const t=state.tasks.find(x=>x.id===taskId);if(!t)return;
+  if(state._prodSaving)return;   // RC-0 B2 — reentrância (Enter/clique duplo): 1 write lógico por acionamento
   const contents=prodCollect();const now=Date.now();const u=state.user||{};
   const tmp=Object.assign({},t,{cronContents:contents});   // p/ calcular pendências já com o novo conteúdo
   const pLeg=pendingLegend(tmp),pFeed=pendingFeed(tmp),pStory=pendingStory(tmp);
@@ -10853,9 +10854,25 @@ async function saveProduction(taskId,resend){
     // gravado 1× SÓ na confirmação real bem-sucedida (btnConfirmSend → wfConfirmClientSend ok). "Salvar e
     // reenviar" apenas salva o conteúdo (social_producao) + prepara o modal — não afirma envio.
   }
-  t.cronContents=contents;t.clientFlowStatus='producao';t.operationalStatus=opSnap;if(resend){t.cronStatus='ready_for_final_client_review';t.clientApprovalPhase='final';}   // otimista
+  // RC-0 B2 — CONFIRMAÇÃO ANTES DO FECHAMENTO: o modal só fecha (e o toast de sucesso só aparece)
+  // depois do update do Firestore RESOLVER. Falha => botões restaurados, toast de erro, modal ABERTO
+  // com o conteúdo digitado intacto (retry integral pelo mesmo botão). Busy acessível no padrão do
+  // produto (disabled + texto; aria-busy) bloqueia duplo clique/Enter durante o write.
+  const busyBtns=[].slice.call(document.querySelectorAll('[data-prodsave],[data-prodresend]'));
+  state._prodSaving=true;
+  busyBtns.forEach(b=>{b.dataset.t=b.innerHTML;b.disabled=true;b.setAttribute('aria-busy','true');});
+  const goBtn=busyBtns.filter(b=>b.matches(resend?'[data-prodresend]':'[data-prodsave]'))[0];
+  if(goBtn)goBtn.innerHTML=svg(resend?'send':'check')+'Salvando…';
+  try{await db.collection('tasks').doc(taskId).update(patch);}
+  catch(e){console.warn('saveProduction',e);
+    state._prodSaving=false;
+    busyBtns.forEach(b=>{b.disabled=false;b.removeAttribute('aria-busy');if(b.dataset.t!=null){b.innerHTML=b.dataset.t;delete b.dataset.t;}});
+    flashToast('Não foi possível salvar agora. Verifique a conexão e tente de novo.');
+    return;   // nada foi confirmado: sem mutação local, sem fechamento, sem toast de sucesso
+  }
+  state._prodSaving=false;
+  t.cronContents=contents;t.clientFlowStatus='producao';t.operationalStatus=opSnap;if(resend){t.cronStatus='ready_for_final_client_review';t.clientApprovalPhase='final';}   // otimista (pós-confirmação)
   closeModal();render();
-  try{await db.collection('tasks').doc(taskId).update(patch);}catch(e){console.warn('saveProduction',e);}
   if(resend){
     // ensureReviewToken pode lançar (token não confirmado): nesse caso openSendClientModal
     // re-tenta e aborta com aviso se ainda falhar — nunca reenvia link órfão.
@@ -11906,9 +11923,15 @@ function cfgTrayRowHtml(){
    desligado. applyAppearance roda no boot (sobrevive a fechar/reabrir) e a cada mudança. */
 const APPEAR_KEY='idseven.desktop.appearance';
 const APPEAR_FONTS={std:'',lg:'1.1',xl:'1.25'};
-function appearLoad(){try{const a=JSON.parse(localStorage.getItem(APPEAR_KEY)||'{}')||{};return{theme:a.theme==='light'?'light':'dark',font:(APPEAR_FONTS[a.font]!==undefined)?a.font:'std',hc:a.hc===true};}catch(_){return{theme:'dark',font:'std',hc:false};}}
-function appearSave(a){try{localStorage.setItem(APPEAR_KEY,JSON.stringify({theme:a.theme,font:a.font,hc:a.hc}));}catch(_){}}
-function applyAppearance(){try{const a=appearLoad();document.body.classList.toggle('light',a.theme==='light');document.body.classList.toggle('hc',a.hc===true);document.body.style.zoom=APPEAR_FONTS[a.font]||'';}catch(_){}}
+/* RC-0 (I5A) — FLAG DE PREVIEW DA LIGHT UI (interna, sem UI pública nesta build).
+   Campo namespaced `luiPreview` DENTRO da preferência de aparência existente (mesmo
+   padrão client-side: só localStorage, sem backend). Default FALSE; opt-in explícito
+   via appearSet({luiPreview:true}) e reversível via appearSet({luiPreview:false}).
+   A classe `light-ui` SÓ é aplicada quando a flag está ativa E body.desktop presente
+   (guard desktop-only; sem ativação parcial — reavaliado também na mudança da MQ). */
+function appearLoad(){try{const a=JSON.parse(localStorage.getItem(APPEAR_KEY)||'{}')||{};return{theme:a.theme==='light'?'light':'dark',font:(APPEAR_FONTS[a.font]!==undefined)?a.font:'std',hc:a.hc===true,luiPreview:a.luiPreview===true};}catch(_){return{theme:'dark',font:'std',hc:false,luiPreview:false};}}
+function appearSave(a){try{localStorage.setItem(APPEAR_KEY,JSON.stringify({theme:a.theme,font:a.font,hc:a.hc,luiPreview:a.luiPreview===true}));}catch(_){}}
+function applyAppearance(){try{const a=appearLoad();document.body.classList.toggle('light',a.theme==='light');document.body.classList.toggle('hc',a.hc===true);document.body.classList.toggle('light-ui',a.luiPreview===true&&document.body.classList.contains('desktop'));document.body.style.zoom=APPEAR_FONTS[a.font]||'';}catch(_){}}
 function appearSet(patch){const a=Object.assign(appearLoad(),patch||{});appearSave(a);applyAppearance();try{render();}catch(_){}}
 try{applyAppearance();}catch(_){}
 function renderConfig(){
