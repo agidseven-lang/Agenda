@@ -895,10 +895,31 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > f9 28 · f10 32 · f11 48 (copies B1 mantidas) · f13 21 + chooser (B2 mantido 19/19),
 > activation recheck 5/5 + 17/17 (flag intacta). **Veredito: I5A.1 = GO · RC Build
 > tecnicamente autorizável (SIM).**
-> **Estado: I5A.1 = ENTREGUE — AGUARDA OWNER · F13 = FROZEN @ `899862a2` · I4 = PASS ·
-> M1 = OWNER ACCEPTED FOR 1.0.246 · RC-D02 = RESOLVED · Light UI = INATIVA POR PADRÃO ·
-> RC BUILD = NÃO INICIADO · PACKAGE = NÃO INICIADO · INSTALLER = NÃO INICIADO ·
-> RELEASE = NÃO INICIADO · DEPLOY = NÃO INICIADO (HARD STOP).**
+> **Estado: I5A.1 = ✔ GO (owner) · RC-0 SOURCE FROZEN @ `dcc019ca`.**
+
+### I5B · RELEASE CANDIDATE BUILD ▶ ENTREGUE (aguarda owner)
+> **Mandato do owner (GO explícito) — primeiro artefato executável/instalável do RC a partir
+> do source congelado `dcc019ca`.** Relatório `LIGHT-UI-I5B-RC-BUILD-REPORT.md`. **Pipeline
+> npm OFICIAL** (`npm ci` 386 pkgs lockfile intocado → `npm run build` tsc strict exit 0 →
+> `electron-builder --win nsis --publish never`): **NSIS x64 GERADO —
+> `Agenda-ID-Seven-Desktop-1.0.246-x64.exe` · 82 618 621 B · SHA-256
+> `82576b18209dcc420968506a5e2d53245f136eef04107ebec6f3e781ac493f35` · UNSIGNED TEST RC
+> (sem code-sign POR DESIGN do projeto)** + blockmap + latest.yml (sha512/size conferem).
+> **Integridade fechada:** package.json empacotado=1.0.246; renderer do asar BYTE-IDÊNTICO à
+> fonte `dcc019ca`; flags do updater na ordem exigida; RC-D02=0 no asar; payload de DENTRO
+> do instalador == asar do build; source imutável (SHA `bd5001b1…` pré==pós). **Boot do
+> PACOTE provado** (asar do artefato + Electron 31.3.1 do lockfile, userData isolado):
+> janela/título/versão 1.0.246 via preload real, splash/login reais, **DEFAULT OFF absoluto
+> em perfil limpo**, ON pelo mecanismo real com reload persistente, kill switch íntegro,
+> F1/F8/F9/F10/F11/F12/F13 sem erro/overflow, **Win125 no pacote (dpr 1.25 · CSS ~1093)**,
+> guard CDN honesto, zero write real, zero chave nova de storage, zero segredo em
+> logs/artefatos. **RC-B01 (ambiental):** MSI requer Windows/WiX — coberto pelo CI oficial
+> `windows-latest`; install/uninstall do NSIS em Windows real + MSI + CDN em rede aberta =
+> conteúdo da I5C. **Veredito: I5B = GO — RC apto a seguir para I5C (SIM).**
+> **Estado: I5B = ENTREGUE — AGUARDA OWNER · F13 = FROZEN @ `899862a2` · I4 = PASS ·
+> M1 = OWNER ACCEPTED FOR 1.0.246 · RC-D02 = RESOLVED · Light UI = OFF POR PADRÃO NO
+> PACOTE · TAG = NÃO CRIADA · GITHUB RELEASE = NÃO CRIADO · DEPLOY = NÃO REALIZADO ·
+> VERSION = 1.0.246 INALTERADA · I5C = NÃO INICIADA (HARD STOP).**
 
 > — GO do owner (2026-08-20) com 4 correções
 > obrigatórias (amendment registrado; filtro parado como conflito-01; KPIs auditados acima;
