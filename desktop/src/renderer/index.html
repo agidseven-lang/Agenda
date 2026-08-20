@@ -3518,6 +3518,75 @@ body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="designers"] .de
   body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="designers"] .det-sheet{position:fixed;top:240px;right:26px;bottom:53px;left:auto;width:392px;height:auto;max-height:none;border-radius:14px;border:1px solid var(--lui-hair);box-shadow:0 4px 14px rgba(16,24,40,.08)}
   body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="designers"] .det-title{font-size:19.5px;font-weight:800;letter-spacing:-.2px;line-height:1.25}
 }
+/* ============================================================================
+   LIGHT UI — I3D · F4 SOCIAL MEDIAS (Golden Frame 4 sobre as FUNÇÕES REAIS)
+   Escopo estrito: .scr-socials (hook aditivo do renderSocialBoard) e
+   [data-detorigin="socials"]. Shell/toolbar/board/cards = F1 v4 + padrões
+   F2/F3 aprovados. Strip real f354SocialStrip (autoload real: seleção
+   salva → o próprio → 1º A-Z — ordem REAL preservada); colunas
+   SOCIAL_COLS4 reais (eixo OPERACIONAL: aprovação parcial do cliente
+   NUNCA vira Concluído — regra real); sinais reais (visualização/ajuste/
+   designer entregou); próxima ação real. Zero seletor F5+/demais.
+   ========================================================================== */
+/* ---- STRIP SOCIAL MEDIAS (função real re-skin Golden) ---- */
+body.light-ui.desktop .scr-socials .f354-dstrip{gap:9px;min-height:56px;padding:12px 2px;scrollbar-color:rgba(16,24,40,.18) transparent}
+body.light-ui.desktop .scr-socials .f354-dstrip::before{content:'Quadros de Social Media:';font-size:12px;font-weight:600;color:#667085;margin-right:4px;flex:0 0 auto;align-self:center}
+body.light-ui.desktop .scr-socials .f354-dchip{height:42px;padding:0 12px 0 8px;border-radius:12px;border:1.5px solid var(--lui-hair-2);background:var(--lui-surface);color:#1D2939;font-size:12.5px;font-weight:750;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+body.light-ui.desktop .scr-socials .f354-dchip .av{width:26px !important;height:26px !important;font-size:10px !important}
+body.light-ui.desktop .scr-socials .f354-dchip i{font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:8px;background:#F2F4F7;color:#475467}
+body.light-ui.desktop .scr-socials .f354-dchip:hover{background:var(--lui-surface);border-color:#D8E4F9;color:#2E5FD0}
+body.light-ui.desktop .scr-socials .f354-dchip:focus-visible{outline:0;box-shadow:0 0 0 2.5px rgba(47,107,255,.55)}
+body.light-ui.desktop .scr-socials .f354-dchip.on{border-color:#2E5FD0;background:#E9F0FC;color:#2E5FD0}
+body.light-ui.desktop .scr-socials .f354-dchip.on i{background:#D8E4F9;color:#2E5FD0}
+/* ---- COLUNAS: cores REAIS do eixo operacional (desfaz a paleta F1 por posição) ---- */
+body.light-ui.desktop .scr-socials .kbv2-column:nth-child(1),
+body.light-ui.desktop .scr-socials .kbv2-column:nth-child(2),
+body.light-ui.desktop .scr-socials .kbv2-column:nth-child(3),
+body.light-ui.desktop .scr-socials .kbv2-column:nth-child(4){--kc2:var(--kc)}
+/* ---- CARD SOCIAL (Golden F4 sobre a foundation v4) ----
+   cliente + pill de STATUS OPERACIONAL real (topo) → título → Prazo real +
+   chip SLA real na mesma linha → sinal real (visualização/ajuste/designer
+   entregou) → barra+% reais (fluxo operacional; cols 2–3) → próxima ação
+   real → avatares com anel do responsável primário + contagem real. ---- */
+body.light-ui.desktop .scr-socials .kbv2-card-main{padding-right:8px}
+body.light-ui.desktop .scr-socials .kbv2-title{order:2;font-size:14px;margin-top:3px;padding-right:22px}
+body.light-ui.desktop .scr-socials .kbv2-tier{order:1;font-size:12px;font-weight:750;color:#1D2939;padding-right:118px}
+body.light-ui.desktop .scr-socials .kbv2-tier::before{display:none}
+body.light-ui.desktop .scr-socials .kbv2-status{display:inline-flex;align-items:center;gap:5px;position:absolute;top:12px;right:36px;max-width:44%;font-size:9px;font-weight:800;letter-spacing:.2px;padding:4px 9px;border-radius:8px;border-width:0 !important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;z-index:1}
+body.light-ui.desktop .scr-socials .kbv2-status-dot{width:6px;height:6px;flex:none}
+body.light-ui.desktop .scr-socials .kbv2-card-chips{display:none}
+body.light-ui.desktop .scr-socials .kbv2-card-top{display:none}
+body.light-ui.desktop .scr-socials .kbv2-card-top:has(.kbv2-sla){display:flex;order:5;margin:-22px 0 0;padding:0;min-height:0;justify-content:flex-end;align-items:center}
+body.light-ui.desktop .scr-socials .kbv2-sla{margin:0;font-size:9px}
+body.light-ui.desktop .scr-socials .kbv2-card:has(.kbv2-sla) .kbv2-card-date{padding-right:96px}
+body.light-ui.desktop .scr-socials .kbv2-due{display:none}
+body.light-ui.desktop .scr-socials .kbv2-pct{order:5}
+body.light-ui.desktop .scr-socials .kbv2-cliview{display:flex !important;align-items:center;gap:6px;order:6;margin-top:9px;font-size:11.5px;color:#344054;min-width:0}
+body.light-ui.desktop .scr-socials .kbv2-cliview:empty{display:none !important}
+body.light-ui.desktop .scr-socials .kbv2-cliview svg{width:13px;height:13px;color:#12A38B;flex:none}
+body.light-ui.desktop .scr-socials .kbv2-cliview b{font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.light-ui.desktop .scr-socials .kbv2-cliview em{font-style:normal;color:#98A1AD;font-weight:600;margin-left:auto;flex:none}
+body.light-ui.desktop .scr-socials .kbv2-stage2{display:block;order:7;margin:8px 0 0;padding:0;background:transparent;border:0}
+body.light-ui.desktop .scr-socials .kbv2-st2-row{display:none}
+body.light-ui.desktop .scr-socials .kbv2-st2-row:has(.kbv2-st2-ic-next){display:flex;align-items:center;gap:7px}
+body.light-ui.desktop .scr-socials .kbv2-st2-ic{width:16px;height:16px;border-radius:0;background:transparent !important;color:#98A1AD !important;flex:none;display:flex;align-items:center;justify-content:center}
+body.light-ui.desktop .scr-socials .kbv2-st2-ic svg{width:13px;height:13px}
+body.light-ui.desktop .scr-socials .kbv2-st2-tx{display:flex;min-width:0;flex:1}
+body.light-ui.desktop .scr-socials .kbv2-st2-k{display:none}
+body.light-ui.desktop .scr-socials .kbv2-st2-next{font-size:11.5px;color:#667085;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.light-ui.desktop .scr-socials .kbv2-column:last-child .kbv2-card{padding-right:13px}
+/* ---- PAINEL: MESMA Central real p/ origem socials (drawer <1760 · docada ≥1760) ---- */
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="socials"]{background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none;align-items:stretch;justify-content:flex-end}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="socials"] .det-sheet{width:416px;max-width:94vw;height:100%;max-height:none;border-radius:0;box-shadow:var(--lui-sh-drawer)}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="socials"] .det-head{padding-bottom:16px;box-shadow:0 1px 0 var(--lui-hair)}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="socials"] .det-actions{border-top:0;box-shadow:0 -1px 0 var(--lui-hair)}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="socials"] .det-title{font-size:23px;font-weight:700;letter-spacing:-.02em;line-height:1.28}
+@media (min-width:1760px){
+  body.light-ui.desktop:has(.modal-back[data-detmodal][data-detorigin="socials"]) .kbv2-board-surface{margin-right:408px}
+  body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="socials"]{padding:0}
+  body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="socials"] .det-sheet{position:fixed;top:240px;right:26px;bottom:53px;left:auto;width:392px;height:auto;max-height:none;border-radius:14px;border:1px solid var(--lui-hair);box-shadow:0 4px 14px rgba(16,24,40,.08)}
+  body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="socials"] .det-title{font-size:19.5px;font-weight:800;letter-spacing:-.2px;line-height:1.25}
+}
 </style>
 </head>
 <body>
@@ -7965,7 +8034,7 @@ function renderSocialBoard(){
     '<div class="scr-head"><div class="d-board-head"><button class="iconbtn" data-board="flowsocials">'+svg('back')+'</button>'+
     avatar(p,44)+
     '<div style="flex:1;min-width:0"><div class="d-bh-title">Social · '+esc((p.name||'').split(' ')[0]||'Social Media')+'</div><div class="d-bh-sub">Fluxo operacional · '+list.length+' tarefa'+(list.length===1?'':'s')+(late>0?(' · '+late+' em atraso'):'')+'</div></div></div></div>'+
-    '<div class="scr" style="padding-top:0">'+f354SocialStrip(id)+boardToolbar()+
+    '<div class="scr scr-socials" style="padding-top:0">'+f354SocialStrip(id)+boardToolbar()+
     kbv2BoardHtml(SOCIAL_COLS4.map((c,i)=>({label:c.label,color:c.color,key:c.key,tasks:byCol[i]})));
   return h+'</div>';
 }
@@ -9038,12 +9107,13 @@ function kbv2Card(t, persp){
      wfExternalInfo (rounds reais: sentAt/firstViewedAt/waitingMs) + clientReview. Span
      ADITIVO nasce display:none (legado byte-idêntico); revelado só sob body.light-ui na
      surface Cliente. Zero escrita; helpers reais (slaibFmtHM/wfFmtDur/svg). */
-  if(clientView){h+=(function(){try{
+  if(clientView||(!designerView&&persp===undefined)){h+=(function(){try{
     if(t.clientReview&&t.clientReview.status==='revisao'){var _aj=Number(t.clientReviewAt)||0;return '<span class="kbv2-cliview" style="display:none">'+svg('revise')+'<b>Ajuste solicitado</b>'+(_aj?'<em>há '+wfFmtDur(wfNow()-_aj)+'</em>':'')+'</span>';}
     var ew=wfExternalInfo(t);
     if(ew.active&&ew.sentAt){return ew.viewed
       ?'<span class="kbv2-cliview" style="display:none">'+svg('eye')+'<b>Visualizado às '+slaibFmtHM(ew.firstViewedAt)+'</b>'+(ew.waitingMs?'<em>há '+wfFmtDur(ew.waitingMs)+'</em>':'')+'</span>'
       :'<span class="kbv2-cliview" style="display:none">'+svg('clock')+'<b>Não visualizado</b><em>enviado há '+wfFmtDur(ew.waitingMs)+'</em></span>';}
+    if(!clientView&&t.designerSla&&Number(t.designerSla.finishedAt)>0){return '<span class="kbv2-cliview" style="display:none">'+svg('check')+'<b>Designer entregou</b><em>'+fmtDateBR(new Date(Number(t.designerSla.finishedAt)).toISOString().slice(0,10))+'</em></span>';}
     return '';}catch(_){return '';}})();}
   /* F3.5.4W — SLOT CENTRAL DE CONTEÚDO: RESUMO compacto (apenas contagem). A lista/texto integral
      de temas/legendas/roteiros/vídeos e Legenda/Observações vai para a Central de Detalhes; NENHUM
@@ -9332,7 +9402,7 @@ function openDetails(taskId){
   /* I3A.1 (Light UI) — hook de CONTEXTO aditivo: marca a abertura feita a partir do MEU QUADRO
      (estado real via activeTab()) p/ o tema claro apresentar a MESMA Central como drawer lateral
      (CSS-only). Atributo inerte no tema dark (nenhuma regra o consome); zero mudança de lógica. */
-  const _detOrigin=(typeof activeTab==='function'&&state.tab==='tarefas')?(activeTab()==='mine'?' data-detorigin="mine"':(activeTab()==='client'?' data-detorigin="client"':(activeTab()==='designers'?' data-detorigin="designers"':''))):'';
+  const _detOrigin=(typeof activeTab==='function'&&state.tab==='tarefas')?(activeTab()==='mine'?' data-detorigin="mine"':(activeTab()==='client'?' data-detorigin="client"':(activeTab()==='designers'?' data-detorigin="designers"':(activeTab()==='socials'?' data-detorigin="socials"':'')))):'';
   let h='<div class="modal-back" data-modalbg="1" data-detmodal="1"'+_detOrigin+' data-detsector="'+esc(t.sector||'')+'" data-dettaskid="'+esc(t.id||'')+'"><div class="sheet det-sheet" role="dialog" aria-modal="true" aria-label="Central de Detalhes da tarefa">'+
     '<div class="det-head"><div class="det-badge" style="background:'+withAlpha(s.color,.16)+';color:'+s.color+'">'+svg(s.icon)+'<span>'+esc(s.label)+'</span></div>'+
       '<button class="iconbtn det-x" data-modalclose="1">'+svg('close')+'</button></div>'+
