@@ -787,6 +787,42 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > I3L = ENTREGUE — AGUARDA OWNER · F12 = NÃO CONGELADA até GO explícito ·
 > CHECKPOINT CANDIDATO = `6a677133` · F13 = NÃO INICIADO.**
 
+## I3M · F13 — MODAL LEGENDAS E ARTES ▶ ENTREGUE (aguarda owner)
+> **I3L = ✔ GO do owner. F12 = CONGELADA @ `6a677133`.** **Branch:**
+> `impl/light-ui-f13-legendas-artes-1.0.246` DIRETO de `6a677133` · **checkpoint único
+> `899862a2`** ("feat(light-ui): port F13 captions and artwork golden") · relatório
+> `LIGHT-UI-I3M-F13-LEGENDAS-ARTES-REPORT.md` · Golden
+> `proposta-c-frame13-modal-legendas-artes.html` (freeze `32103bd`; C2 `f9fe31a`;
+> renderizado antes de editar). Reauditoria real: `openProductionModal` (bloqueio H16
+> completed = toast + ZERO write, provado) → `renderProductionModal` (pilha .pr-list,
+> RTE real 'prod', artBox Feed/Story, footer 3 ações) → `saveProduction` (Salvar ≠
+> Enviar; H13 sem histórico falso de envio); matriz completa de side effects com
+> counts/payloads: upload = ikUpload stubado (folder `/cronogramas/{id}` + fileName
+> provados; erro/cancel literais), Salvar = 1 update (patch real capturado: pendências
+> recalculadas — opSnap 'aguardando_legenda' com pFeed), double-submit = 1 write
+> (closeModal síncrono — dívida "sem disabled" registrada no Golden), Reenviar = 1
+> update + 1 set do token {clientReviewToken,clientReviewUrl} + openSendClientModal 1×,
+> fechar 3 vias = 0 writes; Escape NÃO fecha (literal). **HARD GATE A:** BEFORE
+> empírico = teclado 0 caminhos (input hidden) → correção autorizada: LABEL focável
+> (tabindex/role/aria-label) + keydown mínimo → `input.click()` (mesmo picker/change);
+> **AFTER com filechooser REAL: mouse=1 · Enter=1 · Space=1**; 1ª técnica (input
+> sr-only focável) DESCARTADA pelo gate de legacy (box de form control muda o
+> antialiasing do sheet — bissecção provou; abordagem final 100% pixel-inerte).
+> Skin: **vars redefinidas no escopo da .pr-sheet** (RTE herda o claro; wizard/F7
+> intocado) — **26 seletores 26/26 gated, 0 !important**; CTA reenvio = --lui-grad;
+> a11y: role/aria-modal/aria-label na sheet + aria-label no X (padrão das sheets
+> reais). **Smoke 21/21.** Responsive 1920/1366/win125 scrollW==vw (lista com scroll
+> interno real 56vh). **Legacy deep-state 9/9 = 0px PURO** (host/modal/empty × 3
+> temas). **Regressão F1–F12: 29/31 = 0px PURO com TODOS os hard gates (F9 pop/det ·
+> F10 m/e · F11 m/e · F12 default/error/loading) = 0px**; f3b/f5b só no sino A–E
+> auto-provado (0px fora). Diff audit: 1 arquivo +46/−3; greps=0 em
+> login/reports/exec/F9/SLA/exports/saveProduction/ikUpload/routing/storage. Provas
+> F13-LEGENDAS-{1920, 1366, win125, EMPTY, A11Y-FOCUS}.png + F13-COMPARE no chat.
+> **Recomendação: GO.**
+> **Gate de saída: avaliação do owner. I3L = ✔ GO · F12 = CONGELADA @ `6a677133` ·
+> I3M = ENTREGUE — AGUARDA OWNER · F13 = NÃO CONGELADA até GO explícito ·
+> CHECKPOINT CANDIDATO = `899862a2` · etapa posterior = NÃO INICIADA.**
+
 > — GO do owner (2026-08-20) com 4 correções
 > obrigatórias (amendment registrado; filtro parado como conflito-01; KPIs auditados acima;
 > sidebar 266px como calibração compartilhada do Light Shell sob `body.light-ui`, validada
