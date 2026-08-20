@@ -283,7 +283,24 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > smoke 12/12 · **F1 REGRESSION 0px** (board+painel, relógio congelado) · legado 0px nos
 > DOIS boards (dark/light/hc) · 1920/1366/win125 sem overflow · zero escrita · matriz de
 > fidelidade ZERO ISSUE. Provas F2-CLIENTE-{1920,1920-PANEL,1366,win125}.png no chat.
-> **Gate de saída: avaliação do owner.** **I3C/F3 = NÃO INICIADA.** — GO do owner (2026-08-20) com 4 correções
+> **I3B = ✔ GO DO OWNER (registrado). F2 = IMPLEMENTADO / GOLDEN / CONGELADO.**
+
+## I3C · F3 — DESIGNERS ▶ ENTREGUE (aguarda owner)
+> **GO do owner recebido (F3 somente; F4+ NÃO autorizadas).** **Branch:**
+> `impl/light-ui-f3-designers-1.0.246` de `62613a29` (HEAD confirmado) · **checkpoint
+> único `05910f33`** ("feat(light-ui): implement Golden Designers surface") · relatório
+> `LIGHT-UI-I3C-F3-DESIGNERS-REPORT.md`. Fonte visual = Frame 3 aprovado; shell/cards =
+> F1 v4 + padrões F2. Reauditoria real: DESIGNER_COLS4 confirmado (labels do Golden;
+> "Recebido" inexiste); strip real `f354DesignerStrip` + autoload real
+> `f354DesignerAutoPick` (1º alfabético/seleção salva) com quadros POR designer isolados;
+> SLA real `kbv2SlaLocal` (Em prazo/Prazo próximo/Prazo encerrado/Entregue — **Entregue ≠
+> conclusão global**, regra REAL); próxima ação real; conteúdo real; rail/anel = respOf.
+> Card F3 = foundation v4 + anatomia Golden (setor no topo, Prazo+SLA na mesma linha,
+> barra+% cols 2–3, próxima ação compacta). Painel = MESMA Central real (drawer <1760 /
+> docada ≥1760, 240..1027). Gates: smoke 11/11 · **F1 REGRESSION 0px** · **F2 REGRESSION
+> 0px** (board+painel) · legado 0px nas 3 superfícies · 1920/1366/win125 sem overflow ·
+> zero escrita · matriz ZERO ISSUE. Provas F3-DESIGNERS-{1920,1920-PANEL,1920-BOAZ,1366,
+> win125}.png no chat. **Gate de saída: avaliação do owner.** **I3D/F4 = NÃO INICIADA.** — GO do owner (2026-08-20) com 4 correções
 > obrigatórias (amendment registrado; filtro parado como conflito-01; KPIs auditados acima;
 > sidebar 266px como calibração compartilhada do Light Shell sob `body.light-ui`, validada
 > em 1920/1366/win125). Painel lateral: MESMA Central de Detalhes real DOCADA como 5ª
