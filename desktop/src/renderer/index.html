@@ -3959,6 +3959,57 @@ body.light-ui.desktop .nc-navbadge{box-shadow:none}
   body.light-ui.desktop .nc-open,body.light-ui.desktop .nc-fl{transition:none}
   body.light-ui.desktop .nc-row:hover{transform:none}
 }
+/* ============================================================================
+   LIGHT UI — I3J · F10 EXECUTIVO (Golden Frame 10 sobre o Painel Executivo REAL)
+   Superfície real: renderExecPanel (tab 'exec') — "SLA & Produtividade · tempo
+   real · read-only". TODOS os números derivam do agregador puro slaExecAggregate
+   sobre resolveTaskDisplayState (a MESMA fonte única de SLA das fases) com
+   visibleTasks (dados por papel); períodos Hoje/7d/30d/Tudo e filtros Designer/
+   Cliente/Tipo/Status SLA reais (execApplyFilters/execWithinPeriod); ranking por
+   execRiskScore (crít×3 + atras×2 + laranja, desempate carga); footer real
+   "Derivado do snapshot ao vivo · read-only · não grava no Firestore". O CSS real
+   (EXEC_CSS) é DARK HARDCODED injetado por JS (padrão F9) — esta seção SOBRESCREVE
+   as classes exec-* (exclusivas = guarda natural). Único !important: o valor do
+   KPI "Ativas" usa color inline #EEF2F8 no markup real (primeiro card — regra
+   :first-child). Cores de severidade inline (execSevHex) preservadas — são as do
+   Golden. Nada fabricado; zero writes (read-only por construção).
+   ========================================================================== */
+body.light-ui.desktop .exec-wrap{padding:22px 26px 32px}
+body.light-ui.desktop .exec-ttl{font-size:27px;font-weight:800;letter-spacing:-.02em;color:#14181F}
+body.light-ui.desktop .exec-sub{color:#767E8D}
+body.light-ui.desktop .exec-seg{background:#F1F4F8;border:1px solid #E8EBF1;border-radius:11px;padding:3px;gap:2px}
+body.light-ui.desktop .exec-seg button{border-right:0;border-radius:8px;color:#767E8D}
+body.light-ui.desktop .exec-seg button.on{background:#FFFFFF;color:#14181F;box-shadow:0 1px 3px rgba(19,24,38,.10)}
+body.light-ui.desktop .exec-fl{background:#FFFFFF;border-color:#E4E8EF;color:#4B5364;border-radius:10px;height:38px}
+body.light-ui.desktop .exec-fl:hover{border-color:#B9C4F4}
+body.light-ui.desktop .exec-alert{background:#FDEEF0;border-color:#F6CDD3;color:#B42318}
+body.light-ui.desktop .exec-alert b{color:#8A1F17}
+body.light-ui.desktop .exec-alert-ic{color:#D92D20}
+body.light-ui.desktop .exec-kpi{background:#FFFFFF;border-color:#EFF1F6;box-shadow:0 1px 3px rgba(19,24,38,.05)}
+body.light-ui.desktop .exec-kpi-l{color:#767E8D}
+body.light-ui.desktop .exec-kpi-h{color:#98A1AD}
+body.light-ui.desktop .exec-kpis .exec-kpi:first-child .exec-kpi-v{color:#14181F !important}
+body.light-ui.desktop .exec-card{background:#FFFFFF;border-color:#EFF1F6;box-shadow:0 1px 3px rgba(19,24,38,.05)}
+body.light-ui.desktop .exec-card-h b{color:#14181F}
+body.light-ui.desktop .exec-card-sub{color:#98A1AD}
+body.light-ui.desktop .exec-dbar{background:#F1F4F8}
+body.light-ui.desktop .exec-lg{color:#4B5364}
+body.light-ui.desktop .exec-lg b{color:#14181F}
+body.light-ui.desktop .exec-tbl th{color:#767E8D;border-bottom-color:#EFF1F6}
+body.light-ui.desktop .exec-tbl td{color:#2A3140;border-bottom-color:#EFF1F6}
+body.light-ui.desktop .exec-dz b{color:#14181F}
+body.light-ui.desktop .exec-ptrack{background:#EEF1F6}
+body.light-ui.desktop .exec-ml{border-bottom-color:#EFF1F6}
+body.light-ui.desktop .exec-ml-k{color:#2A3140}
+body.light-ui.desktop .exec-critbox{border-color:#F6CDD3;box-shadow:0 0 0 1px #F6CDD3,0 8px 24px rgba(242,65,90,.10)}
+body.light-ui.desktop .exec-foot{color:#767E8D}
+body.light-ui.desktop .exec-empty-ic{background:#F1F4F8;color:#98A1AD}
+body.light-ui.desktop .exec-empty-t{color:#14181F}
+body.light-ui.desktop .exec-empty-s{color:#4B5364}
+body.light-ui.desktop .exec-empty-mini{color:#98A1AD}
+/* foco visível nos controles nativos reais (button/select) */
+body.light-ui.desktop .exec-seg button:focus-visible,
+body.light-ui.desktop .exec-fl:focus-visible{outline:2px solid #4353D8;outline-offset:2px}
 </style>
 </head>
 <body>
