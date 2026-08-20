@@ -590,6 +590,43 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > `LIGHT-UI-I3I2-F9-D01-FIX-REPORT.md`.
 > **I3I.2 = PASS · F9-D01 = RESOLVIDO · F9 = PRONTO PARA CONGELAMENTO DO OWNER ·
 > CHECKPOINT CANDIDATO = `ad8dd9d3` · F10 = NÃO INICIADO.**
+>
+> **I3I.2 = ✔ GO DO OWNER (registrado). F9 = CONGELADA @ `ad8dd9d3`.**
+
+## I3J · F10 — EXECUTIVO ▶ ENTREGUE (aguarda owner)
+> **GO do owner recebido (F10 somente; F11+ NÃO autorizadas).** **Branch:**
+> `impl/light-ui-f10-executivo-1.0.246` de `ad8dd9d3` (HEAD confirmado; worktree limpa) ·
+> **checkpoint único `594cf02c`** ("feat(light-ui): port F10 executive golden") ·
+> relatório `LIGHT-UI-I3J-F10-EXECUTIVO-REPORT.md` · Golden
+> `proposta-c-frame10-executivo.html` (freeze `9de9a6b`; C7 `2516426`; renderizado antes
+> de editar). Reauditoria literal: entry `state.tab==='exec'` → `renderExecPanel`;
+> agregador PURO `slaExecAggregate` sobre `resolveTaskDisplayState` (fonte única) +
+> `visibleTasks` (dados por papel); fórmulas LITERAIS documentadas (KPIs; ranking por
+> `execRiskScore`=crít×3+atr×2+lar com desempate carga; % no prazo por concl;
+> **atraso médio = média de TODOS os overdue, críticos INCLUÍDOS** — fórmula corrigida
+> na fase após prova empírica); filtros/períodos reais (`execApplyFilters`/
+> `execWithinPeriod` |fm−now|≤dias); vencimentos por finishMs asc; críticas por
+> critical→overdueMs; empty/footers literais; **deep-link NÃO existe na F10 real**
+> (nada fabricado; F6 não ampliada); **CSS real EXEC_CSS dark hardcoded injetado por
+> JS** (padrão F9) com media real ≤1100px. **Write map: READ-ONLY provado** (0
+> Firestore/API; storage novo 0 — só wp_uid/wp_name do saveSession real do auth,
+> documentado). Implementação **CSS-only (+51/−0)**: 35 seletores exec-* **35/35
+> gated, 0 global, 1 !important justificado** (color inline do KPI Ativas no markup
+> real); a11y real preservada (button/select nativos, th, legenda textual) +
+> focus-visible; **nenhum nested interactive (provado)**. Smoke **32/32 com PROVA
+> MATEMÁTICA** (fixture calibrada no relógio N: 7 ativas; 29%; distribuição 2|1|2|2;
+> Felipe risco 6 > Boaz 5; atraso méd 14/19 min; listas ordenadas; filtros um a um +
+> combinação; período hoje exclui fm+3d; empty real; coleção vazia sem crash; dataset
+> parcial seguro; navegação F9↔F10↔F1 sem vazamento; zero writes). Responsivo
+> 1920/1366/**win125** 0 overflow (media real ≤1100 rege). Fidelidade **ISSUE=0 ·
+> F10-E0x = NENHUMA** (Golden desenhado sobre o EXEC-CORE real; números do protótipo
+> são fictícios — o app prova os reais). Regressão base `ad8dd9d3`: **F1–F9 = 0px**
+> (15/17 puro; F5 board+painel só na bbox do sino com **A–E per-superfície** — base×
+> base divergiu sozinho; 0px fora) · **legacy 8/8 = 0px puro** (incl. Executivo 3
+> temas). Provas F10-EXECUTIVO-{1920, 1920-ALTERNATE, 1366, win125}.png +
+> F10-COMPARE-GOLDEN-vs-APP.png no chat (detail real não existe → ALTERNATE = empty
+> real, explicado). **Recomendação: GO.**
+> **Gate de saída: avaliação do owner. F10 = NÃO congelado. F11 = NÃO INICIADO.**
 
 > — GO do owner (2026-08-20) com 4 correções
 > obrigatórias (amendment registrado; filtro parado como conflito-01; KPIs auditados acima;
