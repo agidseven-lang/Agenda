@@ -3891,6 +3891,74 @@ body.light-ui.desktop .modal-back[data-evdmodal] .evd-err{color:#C43D3D;backgrou
   body.light-ui.desktop #content:has([data-ag="vmonth"]) .chip,
   body.light-ui.desktop .modal-back[data-evdmodal] .evd-btn{transition:none}
 }
+/* ============================================================================
+   LIGHT UI — I3I · F9 CENTRAL DE NOTIFICAÇÕES (Golden Frame 9 sobre a Central REAL)
+   Superfície real: renderNotifCentral (tab 'notificacoes') — histórico 100% LOCAL
+   (localStorage NOTIF_HIST_KEY, read-side, dedup, retenção 300/30d, NÃO grava
+   Firestore — o próprio Golden estampa essa semântica no rodapé). O CSS real da
+   Central (NC_CSS/ncEnsureStyle) é DARK HARDCODED e injetado por JS — a receita de
+   var-override não alcança; esta seção SOBRESCREVE as classes nc-* (exclusivas da
+   Central = guarda natural) sob body.light-ui.desktop, com especificidade maior que
+   o nc-style injetado. Tipos/severidades/labels/agrupamento/ordenação/contadores =
+   100% reais (ncSev/ncTypeHex/notifTypeLabel/ncDayLabel; tints inline preservadas).
+   Nada fabricado. Dot de não lida no vermelho do Golden (apresentação).
+   ========================================================================== */
+body.light-ui.desktop .nc-wrap{max-width:1200px;padding:24px 28px 40px}
+body.light-ui.desktop .nc-hic{background:#EEF0FF;border:1px solid #DFE3FA;color:#5B6CF0}
+body.light-ui.desktop .nc-ttl{color:#14181F}
+body.light-ui.desktop .nc-subh{color:#767E8D}
+body.light-ui.desktop .nc-badge{background:#FDEEF0;color:#D92D20;box-shadow:inset 0 0 0 1px #F6CDD3;font-weight:800}
+body.light-ui.desktop .nc-badge::before{content:'';display:inline-block;width:7px;height:7px;border-radius:50%;background:#F2415A;margin-right:7px}
+body.light-ui.desktop .nc-act{background:#FFFFFF;border-color:#E4E8EF;color:#4B5364}
+body.light-ui.desktop .nc-act:hover{background:#F7F8FC;color:#14181F}
+body.light-ui.desktop .nc-act.danger{color:#C43D3D}
+body.light-ui.desktop .nc-act.danger:hover{border-color:#F0C4C1;background:#FDF1F1}
+body.light-ui.desktop .nc-search{background:#FFFFFF;border-color:#E4E8EF}
+body.light-ui.desktop .nc-search:focus-within{border-color:#6E5EF3;box-shadow:0 0 0 2.5px rgba(110,94,243,.11)}
+body.light-ui.desktop .nc-search svg{color:#98A1AD}
+body.light-ui.desktop .nc-search input{color:#2A3140}
+body.light-ui.desktop .nc-search input::placeholder{color:#98A1AD}
+body.light-ui.desktop .nc-fl{background:#FFFFFF;border-color:#E4E8EF;color:#4B5364}
+body.light-ui.desktop .nc-fl:hover{border-color:#B9C4F4}
+body.light-ui.desktop .nc-day{color:#767E8D}
+body.light-ui.desktop .nc-day:after{background:#EFF1F6}
+body.light-ui.desktop .nc-row{background:#FFFFFF;border-color:#EFF1F6;box-shadow:0 1px 2px rgba(19,24,38,.04)}
+body.light-ui.desktop .nc-row:hover{background:#FAFBFD;border-color:#E4E8EF;box-shadow:0 6px 18px rgba(19,24,38,.07)}
+body.light-ui.desktop .nc-row.unread{background:#FBFBFF}
+body.light-ui.desktop .nc-row.unread:hover{background:#F6F7FF}
+body.light-ui.desktop .nc-row:focus-visible,body.light-ui.desktop .nc-open:focus-visible,
+body.light-ui.desktop .nc-act:focus-visible,body.light-ui.desktop .nc-dx:focus-visible,
+body.light-ui.desktop .nc-dcta:focus-visible{outline:2px solid #4353D8;outline-offset:2px}
+body.light-ui.desktop .nc-av{box-shadow:0 0 0 2px #FFFFFF,0 0 0 3px #EDF0F6}
+body.light-ui.desktop .nc-l1 b{color:#14181F}
+body.light-ui.desktop .nc-crit{color:#C4231B;background:#FDEEF0;border-color:#F6CDD3}
+body.light-ui.desktop .nc-sub{color:#4B5364}
+body.light-ui.desktop .nc-time{color:#98A1AD}
+body.light-ui.desktop .nc-ur{background:#F2415A;box-shadow:0 0 0 3px #FDEEF0}
+body.light-ui.desktop .nc-open{color:#4353D8;background:transparent;border-color:transparent;font-weight:800;padding:6px 4px}
+body.light-ui.desktop .nc-open:hover{background:#F3F6FE}
+body.light-ui.desktop .nc-empty .nc-eic{background:#EEF0FF;border-color:#DFE3FA;color:#5B6CF0}
+body.light-ui.desktop .nc-et{color:#14181F}
+body.light-ui.desktop .nc-es{color:#4B5364}
+body.light-ui.desktop .nc-foot{color:#767E8D}
+body.light-ui.desktop .nc-detail{background:#FFFFFF;border-left:1px solid #E8EBF1;box-shadow:-24px 0 60px rgba(19,24,38,.14)}
+body.light-ui.desktop .nc-dx{background:#F1F4F8;border-color:transparent;color:#4B5364}
+body.light-ui.desktop .nc-dx:hover{background:#E8EBF1;color:#14181F}
+body.light-ui.desktop .nc-dtitle{color:#14181F}
+body.light-ui.desktop .nc-dwhen{color:#767E8D}
+body.light-ui.desktop .nc-drow{border-bottom-color:#EFF1F6}
+body.light-ui.desktop .nc-drow span{color:#767E8D}
+body.light-ui.desktop .nc-drow b{color:#2A3140}
+body.light-ui.desktop .nc-dcta{background:var(--lui-grad);box-shadow:var(--lui-grad-shadow)}
+/* badge da sidebar (nc-navbadge): o ring dark era para o fundo #0E1320 — sobre a sidebar
+   teal do shell congelado o ring some (sem anel falso) */
+body.light-ui.desktop .nc-navbadge{box-shadow:none}
+/* a11y: reduced motion nas microtransições da Central */
+@media (prefers-reduced-motion:reduce){
+  body.light-ui.desktop .nc-row,body.light-ui.desktop .nc-act,
+  body.light-ui.desktop .nc-open,body.light-ui.desktop .nc-fl{transition:none}
+  body.light-ui.desktop .nc-row:hover{transform:none}
+}
 </style>
 </head>
 <body>
@@ -6950,12 +7018,17 @@ var NC_CSS='.nc-navbadge{display:inline-flex;align-items:center;justify-content:
 +'.nc-dcta{margin-top:20px;display:flex;align-items:center;justify-content:center;gap:8px;font-size:13px;font-weight:800;color:#fff;background:linear-gradient(135deg,#8A8FFF,#6C72F0);border-radius:12px;padding:13px;cursor:pointer;box-shadow:0 8px 22px rgba(124,131,255,.3)}.nc-dcta svg{width:15px;height:15px}.nc-dcta:hover{filter:brightness(1.07)}';
 function ncEnsureStyle(){ if(document.getElementById('nc-style'))return; var s=document.createElement('style'); s.id='nc-style'; s.textContent=NC_CSS; document.head.appendChild(s); }
 function ncRow(x){ var col=ncSev(x.severity); var tp=notifTypeLabel(x); var tph=ncTypeHex(tp); var crit=(x.severity==='critical'&&(x.eventType==='sla_critical'||x.status==='operational_block'));
-  return '<div class="nc-row'+(x.read?'':' unread')+'" data-nc-open="'+esc(x.eventId)+'">'
+  /* I3I (a11y) — débito histórico de teclado da Central quitado com o MESMO padrão real do
+     .evc da Agenda: role="button" + tabindex="0" + aria-label descritivo; Enter/Espaço são
+     ligados no afterNotifCentral (delegação por propriedade, como os onclick existentes).
+     Atributos são pixel-inertes (regressão 0px provada nos 3 temas legados). */
+  var lbl='Notificação'+(x.read?'':' não lida')+': '+(x.title||tp)+' · '+tp+' · '+ncTimeHM(x.createdAt);
+  return '<div class="nc-row'+(x.read?'':' unread')+'" data-nc-open="'+esc(x.eventId)+'" role="button" tabindex="0" aria-label="'+esc(lbl)+'">'
     +'<div class="nc-acc" style="background:'+col+'"></div>'
     +ncAvatar(x.responsibleAvatar||x.actorAvatar,x.responsibleName||x.actorName||x.taskTitle,40)
     +'<div class="nc-body"><div class="nc-l1"><span class="nc-type" style="color:'+tph+';background:'+tph+'1f">'+esc(tp)+'</span><b>'+esc(x.title||tp)+'</b>'+(crit?'<span class="nc-crit">CRÍTICO</span>':'')+'</div>'
     +'<div class="nc-sub">'+esc(x.subtitle||((x.clientName?x.clientName+' · ':'')+(x.taskTitle||'')))+'</div>'+(x.context?'<div class="nc-ctx" style="color:'+col+'">'+esc(x.context)+'</div>':'')+'</div>'
-    +'<div class="nc-right"><div class="nc-time">'+ncTimeHM(x.createdAt)+'</div>'+(x.read?'':'<div class="nc-ur"></div>')+(x.deep?'<div class="nc-open" data-nc-deep="'+esc(x.deep)+'" data-nc-id="'+esc(x.eventId)+'">Abrir tarefa '+svg('arr')+'</div>':'')+'</div></div>';
+    +'<div class="nc-right"><div class="nc-time">'+ncTimeHM(x.createdAt)+'</div>'+(x.read?'':'<div class="nc-ur"></div>')+(x.deep?'<div class="nc-open" data-nc-deep="'+esc(x.deep)+'" data-nc-id="'+esc(x.eventId)+'" role="button" tabindex="0">Abrir tarefa '+svg('arr')+'</div>':'')+'</div></div>';
 }
 function renderNotifCentral(){
   ncEnsureStyle();
@@ -6964,7 +7037,7 @@ function renderNotifCentral(){
   function sel(name,label,opts){ var cur=notifCentralFilters[name]||''; var o='<option value="">'+label+': Todos</option>'; opts.forEach(function(p){ var v=(p instanceof Array)?p[0]:p, t=(p instanceof Array)?p[1]:p; o+='<option value="'+esc(v)+'"'+(cur===v?' selected':'')+'>'+esc(label)+': '+esc(t)+'</option>'; }); return '<select class="nc-fl" data-nc-filter="'+name+'">'+o+'</select>'; }
   var h='<div class="scr nc-wrap"><div class="nc-head"><div class="nc-hic">'+svg('bell')+'</div><div class="nc-htxt"><div class="nc-ttl">Notificações</div><div class="nc-subh">Central e histórico · local</div></div><span class="nc-sp"></span>'
     +(unread>0?'<span class="nc-badge">'+unread+' não lidas</span>':'')
-    +'<span class="nc-act" data-nc-markall>'+svg('check')+'Marcar todas</span><span class="nc-act danger" data-nc-clear>'+svg('trash')+'Limpar histórico</span></div>';
+    +'<span class="nc-act" data-nc-markall role="button" tabindex="0">'+svg('check')+'Marcar todas</span><span class="nc-act danger" data-nc-clear role="button" tabindex="0">'+svg('trash')+'Limpar histórico</span></div>';
   if(all.length>0){
     h+='<div class="nc-tb"><div class="nc-search">'+svg('search')+'<input id="ncSearch" placeholder="Buscar por título, tarefa ou cliente…" value="'+esc(notifCentralFilters.q||'')+'"></div>'
       +sel('tipo','Tipo',['Atribuição','Fluxo','SLA','Sistema'])
@@ -6984,7 +7057,7 @@ function renderNotifCentral(){
   // detalhe
   if(notifDetailId){ var d=null; for(var j=0;j<all.length;j++) if(all[j].eventId===notifDetailId){ d=all[j]; break; }
     if(d){ var col=ncSev(d.severity), tp=notifTypeLabel(d), tph=ncTypeHex(tp), crit=(d.severity==='critical'&&(d.eventType==='sla_critical'||d.status==='operational_block'));
-      h+='<div class="nc-detail"><div class="nc-dh"><span class="nc-type" style="color:'+tph+';background:'+tph+'22">'+esc(tp)+'</span>'+(crit?'<span class="nc-crit">CRÍTICO</span>':'')+'<span class="nc-dx" data-nc-close>✕</span></div>'
+      h+='<div class="nc-detail"><div class="nc-dh"><span class="nc-type" style="color:'+tph+';background:'+tph+'22">'+esc(tp)+'</span>'+(crit?'<span class="nc-crit">CRÍTICO</span>':'')+'<span class="nc-dx" data-nc-close role="button" tabindex="0" aria-label="Fechar detalhe">✕</span></div>'
         +'<div class="nc-dtop">'+ncAvatar(d.responsibleAvatar||d.actorAvatar,d.responsibleName||d.actorName||d.taskTitle,52)+'<div><div class="nc-dtitle">'+esc(d.title||tp)+'</div><div class="nc-dwhen">'+esc(ncDayLabel(d.createdAt))+' · '+ncTimeHM(d.createdAt)+'</div></div></div>'
         +(d.taskTitle?'<div class="nc-drow"><span>Tarefa</span><b>'+esc(d.taskTitle)+'</b></div>':'')
         +(d.clientName?'<div class="nc-drow"><span>Cliente</span><b>'+esc(d.clientName)+'</b></div>':'')
@@ -6993,7 +7066,7 @@ function renderNotifCentral(){
         +(d.etapa?'<div class="nc-drow"><span>Etapa</span><b>'+esc(d.etapa)+'</b></div>':'')
         +'<div class="nc-drow"><span>Severidade</span><b style="color:'+col+'">'+esc(d.severity||'info')+'</b></div>'
         +((d.body||d.context)?'<div class="nc-drow"><span>Detalhe</span><b>'+esc(d.context||d.body)+'</b></div>':'')
-        +(d.deep?'<div class="nc-dcta" data-nc-deep="'+esc(d.deep)+'" data-nc-id="'+esc(d.eventId)+'">Abrir tarefa '+svg('arr')+'</div>':'')+'</div>';
+        +(d.deep?'<div class="nc-dcta" data-nc-deep="'+esc(d.deep)+'" data-nc-id="'+esc(d.eventId)+'" role="button" tabindex="0">Abrir tarefa '+svg('arr')+'</div>':'')+'</div>';
     }
   }
   h+='<div class="nc-foot"><i></i>Histórico LOCAL (localStorage) · read-only · dedup · retenção 300 itens/30 dias · não grava no Firestore</div></div>';
@@ -7007,6 +7080,11 @@ function afterNotifCentral(){
   var opens=document.querySelectorAll('[data-nc-deep]'); for(var k=0;k<opens.length;k++){ (function(b){ b.onclick=function(e){ if(e&&e.stopPropagation)e.stopPropagation(); notifHistoryMarkRead(b.getAttribute('data-nc-id')); notifBadgeRefresh(); var deep=b.getAttribute('data-nc-deep'); try{ if(typeof notifRoute==='function') notifRoute(deep); }catch(_){} }; })(opens[k]); }
   var rows=document.querySelectorAll('[data-nc-open]'); for(var r=0;r<rows.length;r++){ (function(rw){ rw.onclick=function(){ var id=rw.getAttribute('data-nc-open'); notifHistoryMarkRead(id); notifDetailId=id; var c=document.getElementById('content'); if(c){ c.innerHTML=renderNotifCentral(); afterNotifCentral(); } notifBadgeRefresh(); }; })(rows[r]); }
   var cx=document.querySelector('[data-nc-close]'); if(cx) cx.onclick=function(){ notifDetailId=null; var c=document.getElementById('content'); if(c){ c.innerHTML=renderNotifCentral(); afterNotifCentral(); } };
+  /* I3I (a11y) — Enter/Espaço acionam os controles da Central (mesmo padrão do .evc real da
+     Agenda). Propriedade onkeydown por elemento (idêntico ao esquema onclick desta função —
+     re-render recria; sem acúmulo de listener). Universal (dark e light): correção de débito. */
+  var keyables=document.querySelectorAll('[data-nc-open],[data-nc-deep],[data-nc-markall],[data-nc-clear],[data-nc-close]');
+  for(var kk=0;kk<keyables.length;kk++){ (function(el){ el.onkeydown=function(e){ if(e.key!=='Enter'&&e.key!==' ')return; e.preventDefault(); el.click(); }; })(keyables[kk]); }
 }
 /* registro do canal de captura 100% (hub do main → histórico local). Capture-only. */
 try{ if(window.desktopAPI&&typeof window.desktopAPI.onNotifHistory==='function'){ window.desktopAPI.onNotifHistory(function(p){ try{ notifHistoryAppend(p); }catch(_){} try{ if(!(p&&p._groupUpdate)&&(typeof document==='undefined'||(typeof document.hasFocus==='function'?document.hasFocus():document.visibilityState!=='hidden'))) notifToastOnce(p); }catch(_){} }); } }catch(_){}   /* F3.5.4K — compensação do toast in-app SÓ com FOCO real (não apenas "visível"): quando o Agenda está atrás de outro programa/minimizado, o MAIN já entrega pela JANELA PREMIUM always-on-top; sem foco NÃO se levanta um toast in-app invisível que duplicaria o overlay. O sino (notifHistoryAppend) continua SEMPRE. F3.5.4O — eventos de ATUALIZAÇÃO de grupo (_groupUpdate) NÃO levantam 2º toast pela compensação: o main já envia notif-group-update que morfa o toast existente; o sino segue registrando CADA evento. */
