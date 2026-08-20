@@ -486,6 +486,26 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > F8-AGENDA-{1920, LIST-1920, EVENT-DETAIL-1920, 1366, win125, A11Y-FOCUS}.png +
 > F8-COMPARE-GOLDEN-vs-APP.png no chat. **Gate de saída: avaliação do owner (F8 NÃO é
 > marcado congelado — quem congela é o owner).** **F9+ = NÃO INICIADA.**
+>
+> **I3H.1 — F8 FUNCTIONAL HARDENING (harness/docs only, código = `1cf13637` INALTERADO):
+> PASS.** Selector audit pelo diff literal do commit: **43/43 seletores individuais
+> gated com `body.light-ui.desktop`, 0 leakage, 0 global; `!important` = 8 ocorrências
+> em 3 declarações (todas contra styles inline reais; localizadas)**. Legacy deep-state
+> **9/9 = 0px SEM máscara** (dark/light/hc × month/detalhe aberto/form aberto; sem sino
+> nas capturas — A–E não necessária). Write map completo provado com stub: Criar = 1 add
+> `events` 14 chaves; Editar = 1 update no MESMO doc 12 chaves (branch add×update por
+> `evEditId`; pré-preenchimento real; zero duplicação); Iniciar = 1 update
+> {startedAt,startedBy}→`in_progress`; Finalizar = 1 update {done,doneAt,doneBy}→
+> `completed`; Cancelar = 0 antes da confirmação real, 1 update {status:'cancelled',
+> cancelledAt,cancelledBy}→`isEvCancelled`; Excluir = só admin, digitação EXCLUIR
+> (errada = 0 writes), semântica LITERAL = 1 update {deletedBy,deletedAt} + 1 delete
+> (documentada); failure paths 9 casos (erro inline/`.evd-err.show` role=alert, flags
+> resetadas, retry provado, falha no update do delete ⇒ zero delete); CTA/status matrix
+> real sem estados impossíveis; **zero writes reais**. Correção documental aplicada
+> (byte-identidade → wrappers emitidos no legado, pixel-inertes 0px; contagem de
+> !important). Adendo: `LIGHT-UI-I3H1-F8-FUNCTIONAL-HARDENING-REPORT.md`.
+> **I3H.1 = PASS · F8 = PRONTO PARA CONGELAMENTO DO OWNER · CHECKPOINT CANDIDATO =
+> `1cf13637`.** **F9+ = NÃO INICIADA.**
 
 > — GO do owner (2026-08-20) com 4 correções
 > obrigatórias (amendment registrado; filtro parado como conflito-01; KPIs auditados acima;
