@@ -872,8 +872,33 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > não-determinístico por base×base na bbox conhecida). **Veredito: I5A = GO. RC
 > tecnicamente autorizável (SIM), condicionada às decisões do owner: RC-D02 (recovery) +
 > aceite M1.**
-> **Estado: I5A = ENTREGUE — AGUARDA OWNER · Light UI = INATIVA POR PADRÃO ·
-> RC BUILD / PACKAGE / RELEASE / DEPLOY = NÃO INICIADOS (HARD STOP).**
+> **Estado: I5A = HOLD — NO-GO do owner para congelamento (superseded pela I5A.1 closure) ·
+> `ae6fc7b0` = candidato histórico, não congelado.**
+
+### I5A.1 · RC-0 CLOSURE ▶ ENTREGUE (aguarda owner)
+> **Mandato do owner (GO explícito) — fechamento cirúrgico dos 2 gates do NO-GO da I5A.**
+> Base `ae6fc7b0` verificada (ancestral `899862a2`) · **checkpoint `dcc019ca`**
+> (`fix(rc): close login recovery and win125 gates`; 1 arquivo, 7+/20−, 6 hunks todos no
+> bloco LOGIN UI) · relatório `LIGHT-UI-I5A1-RC0-CLOSURE-REPORT.md`. **Decisões formais do
+> owner registradas: M1/CDN = ACEITO PARA 1.0.246** (sem vendorização; vendorization =
+> dívida pós-1.0.246) · **A4 per-machine = ACEITO para RC/preview interno** (default OFF,
+> sem UI pública, kill switch; exposição pública = nova decisão) · **RC-D02 = REMOÇÃO do
+> stub autorizada.** **Entregas:** (1) **RC-D02 = RESOLVED** — fluxo "Esqueci minha senha"
+> removido semanticamente (botão + modos forgot + handlers btnFreq/btnResend/btnFconf +
+> listener [data-mode] + estado; zero handler órfão acessível; troca de senha real do
+> perfil intacta; smoke F12 29/29 com gates novos g25 recovery-target=0 e g26 tab order
+> limpa); (2) **WIN125 = PROVADO NO CENÁRIO CONGELADO EXATO** (CSS 1093×614 @ dsf 1.25,
+> mecanismo real: navegação 15/15 + login 6/6, zero overflow; evidências
+> I5A1-WIN125-1093x614-dsf125-*.png no chat); (3) regressão: F12 bounded à região
+> autorizada do card em 7 cenários (3 temas legacy + light default/error/loading/focus;
+> decomposição trivial — diff = só o removal), 12 superfícies críticas 0px estrito, smokes
+> f9 28 · f10 32 · f11 48 (copies B1 mantidas) · f13 21 + chooser (B2 mantido 19/19),
+> activation recheck 5/5 + 17/17 (flag intacta). **Veredito: I5A.1 = GO · RC Build
+> tecnicamente autorizável (SIM).**
+> **Estado: I5A.1 = ENTREGUE — AGUARDA OWNER · F13 = FROZEN @ `899862a2` · I4 = PASS ·
+> M1 = OWNER ACCEPTED FOR 1.0.246 · RC-D02 = RESOLVED · Light UI = INATIVA POR PADRÃO ·
+> RC BUILD = NÃO INICIADO · PACKAGE = NÃO INICIADO · INSTALLER = NÃO INICIADO ·
+> RELEASE = NÃO INICIADO · DEPLOY = NÃO INICIADO (HARD STOP).**
 
 > — GO do owner (2026-08-20) com 4 correções
 > obrigatórias (amendment registrado; filtro parado como conflito-01; KPIs auditados acima;
