@@ -3819,6 +3819,78 @@ body.light-ui.desktop .modal-back:has([data-sqshrinkok]) .sheet{--surface:#FFFFF
   body.light-ui.desktop #app > .content > .form-wrap .rev-edit,
   body.light-ui.desktop #app > .content > .form-wrap .rev-edit2{transition:none}
 }
+/* ============================================================================
+   LIGHT UI — I3H · F8 AGENDA (Golden Frame 8 sobre a Agenda REAL)
+   Superfície real: renderAgenda (tab 'agenda') — calendário mensal real
+   (calendarGrid 42 células, agcell dim/today/sel, dots por TYPES), lista real
+   (buckets Atrasados/Hoje/Próximos), toolbar real (Mês/Agenda, Novo
+   compromisso, Mostrar cancelados, busca, filtros por tipo), cards de evento
+   evc2-* (rail/data/horário/status/cliente/local/responsável/tipo — todos
+   campos reais), detalhe premium evd-* (dialog/foco/trap/Esc/retorno REAIS) e
+   form ev-sheet. GUARDAS ESTRITAS: página = #content:has([data-ag="vmonth"])
+   (o par de chips de visão só existe na Agenda); form = .ev-sheet (classe
+   exclusiva); detalhe = .modal-back[data-evdmodal]. Paleta pela receita
+   aprovada de override de custom properties no subtree; !important APENAS
+   onde o markup real usa style inline (CTA Novo compromisso e o toggle de
+   cancelados — registrado). Layout 2 colunas e toolbar via wrappers aditivos
+   neutros (.ag-tools/.ag-body/.ag-day — pixel-inertes no legado). Nenhum
+   evento/campo/contador fabricado; count do dia deriva de dayEvs.length real.
+   ========================================================================== */
+body.light-ui.desktop #content:has([data-ag="vmonth"]){--surface:#FFFFFF;--surface2:#FAFBFD;--ink:#14181F;--soft:#4B5364;--faint:#767E8D;--text:#2A3140;--line:#E4E8EF;--line-soft:#EFF1F6;--accent:#4353D8;--green:#22A06B;--red:#E5484D}
+/* cabeçalho do mês (real: h-title + Hoje/‹/› no scr-head) */
+body.light-ui.desktop #content:has([data-ag="vmonth"]) .h-title{font-size:27px;font-weight:800;letter-spacing:-.02em}
+body.light-ui.desktop #content:has([data-ag="vmonth"]) .badge-round[data-ag="today"]{height:38px;padding:0 16px;border-radius:11px;background:#FFFFFF;border-color:#E4E8EF;color:#14181F;font-size:13px;cursor:pointer}
+body.light-ui.desktop #content:has([data-ag="vmonth"]) .badge-round[data-ag="today"]:hover{border-color:#B9C4F4}
+body.light-ui.desktop #content:has([data-ag="vmonth"]) .iconbtn[data-ag]{width:38px;height:38px;border-radius:11px;cursor:pointer}
+/* toolbar Golden (ordem visual por CSS order; DOM real intacto) */
+body.light-ui.desktop #content:has([data-ag="vmonth"]) .ag-tools{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px;margin-bottom:14px}
+body.light-ui.desktop #content:has([data-ag="vmonth"]) .ag-tools > *{margin:0 !important}
+body.light-ui.desktop #content:has([data-ag="vmonth"]) .ag-tools > .chips:first-child{order:1;overflow:visible}
+body.light-ui.desktop #content:has([data-ag="vmonth"]) .ag-tools > #agSearch{order:2;flex:1 1 240px;width:auto;height:44px;padding:0 16px;font-size:13.5px}
+body.light-ui.desktop #content:has([data-ag="vmonth"]) .ag-tools > [data-ag="new"]{order:3;background:var(--lui-grad) !important;box-shadow:var(--lui-grad-shadow);height:44px !important;border-radius:12px !important}
+body.light-ui.desktop #content:has([data-ag="vmonth"]) .ag-tools > .chips:last-child{order:4;flex:1 1 62%;overflow:visible}
+body.light-ui.desktop #content:has([data-ag="vmonth"]) .ag-tools > [data-ag="togglecancel"]{order:5;margin-left:auto !important;height:38px !important;border-radius:11px !important;background:#FFFFFF !important}
+/* chips reais (visão + filtros de tipo) com dot derivado da cor corrente */
+body.light-ui.desktop #content:has([data-ag="vmonth"]) .chip{height:34px;display:inline-flex;align-items:center;gap:7px;padding:0 13px;font-size:12.5px;font-weight:650;color:#767E8D}
+body.light-ui.desktop #content:has([data-ag="vmonth"]) .chips[style*="margin-bottom:12px"] .chip::before{content:'';width:6.5px;height:6.5px;border-radius:50%;background:currentColor;opacity:.6;flex:none}
+/* card do calendário + células reais */
+body.light-ui.desktop #content:has([data-ag="vmonth"]) .ag-body > .card{background:#FFFFFF;border-color:#EFF1F6;border-radius:16px;box-shadow:0 1px 3px rgba(19,24,38,.05);padding:18px 14px}
+body.light-ui.desktop #content:has([data-ag="vmonth"]) .agcell{aspect-ratio:auto;min-height:92px;justify-content:flex-start;padding-top:12px;border-radius:10px;font-size:13px;gap:5px}
+body.light-ui.desktop #content:has([data-ag="vmonth"]) .agcell:hover{background:#F7F8FC}
+body.light-ui.desktop #content:has([data-ag="vmonth"]) .agcell-dim{border-color:transparent}
+body.light-ui.desktop #content:has([data-ag="vmonth"]) .agcell-today{border-color:#6E5EF3;box-shadow:inset 0 0 0 1px #6E5EF3}
+body.light-ui.desktop #content:has([data-ag="vmonth"]) .agcell-sel,
+body.light-ui.desktop #content:has([data-ag="vmonth"]) .agcell-sel:hover{background:var(--lui-grad);border-color:transparent;color:#fff;box-shadow:0 6px 16px rgba(110,94,243,.30)}
+/* layout 2 colunas do Golden (empilha nos viewports estreitos — adaptação funcional) */
+body.light-ui.desktop #content:has([data-ag="vmonth"]) .ag-body{display:grid;grid-template-columns:minmax(0,1fr) 416px;gap:20px;align-items:start}
+@media (max-width:1500px){ body.light-ui.desktop #content:has([data-ag="vmonth"]) .ag-body{grid-template-columns:1fr} }
+/* painel do dia: título real (dayShort) + count REAL derivável */
+body.light-ui.desktop #content:has([data-ag="vmonth"]) .ag-day .sect{display:flex;align-items:center;gap:10px;font-weight:800;color:#14181F}
+body.light-ui.desktop #content:has([data-ag="vmonth"]) .ag-count{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;background:#EEF2FF;color:#4353D8;font-size:11.5px;font-weight:750;letter-spacing:.01em}
+/* cards de evento (evc2-* — campos 100% reais; vars clareiam; hover suave) */
+body.light-ui.desktop #content:has([data-ag="vmonth"]) .evc{box-shadow:0 1px 2px rgba(19,24,38,.04)}
+body.light-ui.desktop #content:has([data-ag="vmonth"]) .evc:hover{background:#FAFBFD}
+/* form REAL do compromisso (classe exclusiva ev-sheet) */
+body.light-ui.desktop .sheet.ev-sheet{--surface:#FFFFFF;--surface2:#F8FAFC;--ink:#14181F;--soft:#4B5364;--faint:#767E8D;--text:#2A3140;--line:#DFE3EB;--line-soft:#EFF1F6;--accent:#4353D8;--red:#E5484D;background:#FFFFFF;border-color:#E8EBF1}
+body.light-ui.desktop .sheet.ev-sheet .lbl{font-size:12.5px;font-weight:600;letter-spacing:0;text-transform:none;color:#4B5364}
+body.light-ui.desktop .sheet.ev-sheet input.inp,body.light-ui.desktop .sheet.ev-sheet select.inp{height:46px;padding:0 14px;font-size:14px}
+body.light-ui.desktop .sheet.ev-sheet textarea.inp{padding:12px 14px;font-size:14px}
+body.light-ui.desktop .sheet.ev-sheet .inp:focus{border-color:#6E5EF3;box-shadow:0 0 0 2.5px rgba(110,94,243,.11)}
+body.light-ui.desktop .sheet.ev-sheet [data-evsave]{background:var(--lui-grad);box-shadow:var(--lui-grad-shadow);border:0;color:#fff}
+/* detalhe REAL do compromisso (backdrop data-evdmodal; dialog/foco/Esc já reais) */
+body.light-ui.desktop .modal-back[data-evdmodal] .evd-sheet{--surface:#FFFFFF;--surface2:#FAFBFD;--ink:#14181F;--soft:#4B5364;--faint:#767E8D;--text:#2A3140;--line:#E4E8EF;--line-soft:#EFF1F6;--accent:#4353D8;--red:#E5484D;background:#FFFFFF;border-color:#E8EBF1}
+body.light-ui.desktop .modal-back[data-evdmodal] .evd-x:hover{background:#F1F4F8;color:#14181F}
+body.light-ui.desktop .modal-back[data-evdmodal] .evd-btn.pri{background:var(--lui-grad);box-shadow:var(--lui-grad-shadow)}
+body.light-ui.desktop .modal-back[data-evdmodal] .evd-btn.sec{background:#FFFFFF}
+body.light-ui.desktop .modal-back[data-evdmodal] .evd-btn.danger-sec{border-color:#F0C4C1;color:#C43D3D;background:#FFFFFF}
+body.light-ui.desktop .modal-back[data-evdmodal] .evd-menu{background:#FFFFFF;border:1px solid #E4E8EF;box-shadow:0 12px 28px rgba(19,24,38,.14)}
+body.light-ui.desktop .modal-back[data-evdmodal] .evd-err{color:#C43D3D;background:#FDF1F1;border-color:#F0C4C1}
+/* a11y: reduced motion nas microtransições da superfície */
+@media (prefers-reduced-motion:reduce){
+  body.light-ui.desktop #content:has([data-ag="vmonth"]) .agcell,
+  body.light-ui.desktop #content:has([data-ag="vmonth"]) .chip,
+  body.light-ui.desktop .modal-back[data-evdmodal] .evd-btn{transition:none}
+}
 </style>
 </head>
 <body>
@@ -7246,7 +7318,13 @@ function renderAgenda(){
   if(agView==='month')h+='<div class="h-title">'+MONTHS[m]+' <span style="color:var(--soft)">'+y+'</span></div><div style="flex:1"></div>'+
     '<button class="badge-round" data-ag="today">Hoje</button><button class="iconbtn" data-ag="prev">'+svg('back')+'</button><button class="iconbtn" data-ag="next">'+svg('arr')+'</button>';
   else h+='<div class="h-title">Agenda</div>';
+  /* I3H (Light UI) — wrappers ADITIVOS neutros (.ag-tools/.ag-body/.ag-day): divs sem
+     estilo no legado (fluxo block idêntico; provado 0px); sob body.light-ui viram a
+     toolbar e o layout 2 colunas do Golden F8. Count do dia = dado REAL derivável
+     (dayEvs.length), gated pela classe (legado byte-idêntico no HTML gerado). */
+  const _lui=document.body.classList.contains('light-ui');
   h+='</div></div><div class="scr" style="padding-top:8px">'+
+    '<div class="ag-tools">'+
     '<div class="chips" style="margin-bottom:10px">'+
       '<button class="chip" data-ag="vmonth" style="'+(agView==='month'?'background:var(--accent);border-color:transparent;color:#fff':'')+'">Mês</button>'+
       '<button class="chip" data-ag="vlist" style="'+(agView==='list'?'background:var(--accent);border-color:transparent;color:#fff':'')+'">Agenda</button>'+
@@ -7255,12 +7333,14 @@ function renderAgenda(){
     '<button data-ag="togglecancel" style="display:inline-flex;align-items:center;height:40px;padding:0 14px;margin-left:8px;margin-bottom:10px;border-radius:11px;border:1px solid var(--line);background:'+(agShowCancelled?'var(--surface)':'transparent')+';color:var(--soft);font-size:13px;font-weight:700;cursor:pointer">'+(agShowCancelled?'Ocultar cancelados':'Mostrar cancelados')+'</button>'+
     '<input class="inp" id="agSearch" placeholder="Buscar compromisso…" value="'+esc(agQuery)+'" style="margin-bottom:10px">'+
     '<div class="chips" style="margin-bottom:12px"><button class="chip" data-agf="all" style="'+(agFilter==='all'?'background:var(--accent);border-color:transparent;color:#fff':'')+'">Todos</button>'+
-      TYPES.map(t=>'<button class="chip" data-agf="'+t.key+'" style="'+(agFilter===t.key?'background:'+withAlpha(t.color,.18)+';color:'+t.color+';border-color:'+t.color:'')+'">'+esc(t.label)+'</button>').join('')+'</div>';
+      TYPES.map(t=>'<button class="chip" data-agf="'+t.key+'" style="'+(agFilter===t.key?'background:'+withAlpha(t.color,.18)+';color:'+t.color+';border-color:'+t.color:'')+'">'+esc(t.label)+'</button>').join('')+'</div>'+
+    '</div>';
   if(agView==='month'){
-    h+=calendarGrid(y,m,evs);
     const dayEvs=evs.filter(e=>e.date===agSel).sort((a,b)=>(a.start||'').localeCompare(b.start||''));
-    h+='<div style="height:14px"></div><div class="sect" style="font-size:16px">'+dayShort(agSel)+'</div>';
-    h+=dayEvs.length?dayEvs.map(eventCard).join(''):emptyState('calendar','Dia livre','Nenhum compromisso para esta data.');
+    h+='<div class="ag-body">'+calendarGrid(y,m,evs);
+    h+='<div class="ag-day"><div style="height:14px"></div><div class="sect" style="font-size:16px">'+dayShort(agSel)+
+      (_lui&&dayEvs.length?'<span class="ag-count">'+dayEvs.length+(dayEvs.length===1?' compromisso':' compromissos')+'</span>':'')+'</div>';
+    h+=(dayEvs.length?dayEvs.map(eventCard).join(''):emptyState('calendar','Dia livre','Nenhum compromisso para esta data.'))+'</div></div>';
   }else{
     const td=todayStr();
     const buckets=[['Atrasados','#F87171',evs.filter(e=>!e.done&&e.date<td)],['Hoje','#F59E0B',evs.filter(e=>e.date===td)],['Próximos','#34D399',evs.filter(e=>e.date>td)]];
