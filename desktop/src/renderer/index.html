@@ -3661,6 +3661,60 @@ body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="sectors"] .det-
   body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="sectors"] .det-sheet{position:fixed;top:240px;right:26px;bottom:53px;left:auto;width:392px;height:auto;max-height:none;border-radius:14px;border:1px solid var(--lui-hair);box-shadow:0 4px 14px rgba(16,24,40,.08)}
   body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="sectors"] .det-title{font-size:19.5px;font-weight:800;letter-spacing:-.2px;line-height:1.25}
 }
+/* ============================================================================
+   LIGHT UI — I3F · F6 DETAILS (Golden Frame 6 sobre a Central de Detalhes REAL)
+   Fonte visual: proposta-c-frame6-detalhes.html (Frame 6 aprovado). Superfície
+   real: a MESMA Central (openDetails → .det-sheet) na apresentação DEFAULT —
+   modal central SEM data-detorigin (emitido só nos 5 boards congelados; fora
+   deles — Minhas Prioridades, sino de Alertas SLA, deep-link detail/<id> — a
+   Central abre sem o atributo). ESCOPO ESTRITO :not([data-detorigin]):
+   disjunto por construção dos painéis congelados F1–F5 (todos exigem
+   [data-detorigin="X"]). Paleta Golden entra por override de custom properties
+   no subtree do sheet (os consumos internos var(--ink|--soft|--faint|--surface2
+   |--line|--accent|--green) clareiam de uma vez); regras extras só onde o CSS
+   base tem cor dark hardcoded. Adaptação F6-E01: Golden é página 3 colunas; a
+   função real é modal overlay de corpo linear condicional — skin integral em
+   coluna única, largura/altura reais (min(1240px,92vw)×88vh) preservadas.
+   Nenhuma função/dado/permissão alterado; conteúdo 100% real.
+   ========================================================================== */
+body.light-ui.desktop .modal-back[data-detmodal]:not([data-detorigin]) .det-sheet{--surface:#FFFFFF;--surface2:#FAFBFD;--ink:#14181F;--soft:#4B5364;--faint:#767E8D;--text:#2A3140;--line:#E4E8EF;--line-soft:#EFF1F6;--accent:#4353D8;--green:#22A06B;--red:#E5484D;border-radius:16px;border-color:#E8EBF1;box-shadow:0 2px 6px rgba(19,24,38,.06),0 16px 34px rgba(19,24,38,.12)}
+/* head: X claro (hover base é #262a36 hardcoded) + título editorial do Golden */
+body.light-ui.desktop .modal-back[data-detmodal]:not([data-detorigin]) .det-x:hover{background:#E8EBF1;color:#14181F}
+body.light-ui.desktop .modal-back[data-detmodal]:not([data-detorigin]) .det-title{font-size:27px;font-weight:800;letter-spacing:-.022em;line-height:1.18}
+/* chips de estado: shape r8 do Golden (hchip) com ring neutro; cores reais inline */
+body.light-ui.desktop .modal-back[data-detmodal]:not([data-detorigin]) .rev-chip{border-radius:8px;font-size:11.5px;font-weight:750;box-shadow:inset 0 0 0 1px rgba(20,24,31,.05)}
+/* corpo: hovers/tints dark hardcoded → claros */
+body.light-ui.desktop .modal-back[data-detmodal]:not([data-detorigin]) .det-acc>summary:hover{background:rgba(20,24,31,.02)}
+body.light-ui.desktop .modal-back[data-detmodal]:not([data-detorigin]) .det-content-n{background:#FFFFFF;box-shadow:inset 0 0 0 1px #E8EBF1;color:#4B5364}
+/* hero: box "PRÓXIMA AÇÃO" lilás do Golden + CTA principal no gradiente do amendment */
+body.light-ui.desktop .modal-back[data-detmodal]:not([data-detorigin]) .det-hero-next{background:#F7F8FF;border-color:#E3E6FF}
+body.light-ui.desktop .modal-back[data-detmodal]:not([data-detorigin]) .det-hero-nk{color:#4353D8}
+body.light-ui.desktop .modal-back[data-detmodal]:not([data-detorigin]) .det-hero-ava.own-none{background:#F1F4F8;color:#98A1AD}
+body.light-ui.desktop .modal-back[data-detmodal]:not([data-detorigin]) .det-hero-actions .btn{width:auto;flex:0 1 auto;height:46px;border-radius:12px;font-size:13.5px;padding:0 20px}
+body.light-ui.desktop .modal-back[data-detmodal]:not([data-detorigin]) .det-hero-actions .dz-go{background:var(--lui-grad);box-shadow:var(--lui-grad-shadow)}
+body.light-ui.desktop .modal-back[data-detmodal]:not([data-detorigin]) .btn.cvw-open,
+body.light-ui.desktop .modal-back[data-detmodal]:not([data-detorigin]) .btn.ce-edit{color:#0E7490;background:#E9F8FB;border-color:#C6EBF2}
+body.light-ui.desktop .modal-back[data-detmodal]:not([data-detorigin]) .det-hero-actions .det-teamfix{background:#EAF7F1;border-color:#9BD8BC !important}
+/* linha do tempo operacional: nós claros do Golden (done tint verde / pend branco) */
+body.light-ui.desktop .modal-back[data-detmodal]:not([data-detorigin]) .det-tl-dot{background:#FFFFFF}
+body.light-ui.desktop .modal-back[data-detmodal]:not([data-detorigin]) .det-tl-row.done .det-tl-dot{background:#DFF3E9;color:#12784C}
+/* rodapé administrativo claro (Golden abtn): hairline superior, botões compactos,
+   destrutivo agrupado à direita (sem reordenar DOM) */
+body.light-ui.desktop .modal-back[data-detmodal]:not([data-detorigin]) .det-actions{border-top:0;box-shadow:0 -1px 0 #E8EBF1}
+body.light-ui.desktop .modal-back[data-detmodal]:not([data-detorigin]) .det-act-row .btn{flex:0 1 auto;min-width:0;padding:0 18px}
+body.light-ui.desktop .modal-back[data-detmodal]:not([data-detorigin]) .det-act-row .btn-danger{margin-left:auto;background:#FFFFFF;color:#C43D3D;border-color:#F0C4C1}
+body.light-ui.desktop .modal-back[data-detmodal]:not([data-detorigin]) .det-act-row .det-close{margin-left:auto}
+body.light-ui.desktop .modal-back[data-detmodal]:not([data-detorigin]) .det-act-row .btn-danger+.det-close{margin-left:0}
+/* "Editar prazo": o CSS base do slaedit-btn é injetado LAZY pelo slaib (só em contexto de
+   board kanban) — fora dos boards a superfície default ficaria sem shape; o escopo F6 traz o
+   shape completo + cores claras (o dark fora do escopo permanece como está em produção) */
+body.light-ui.desktop .modal-back[data-detmodal]:not([data-detorigin]) .slaedit-btn{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;border:1px solid #C9D6F6;background:#F3F6FE;color:#2E5FD0;border-radius:10px;padding:8px 13px;cursor:pointer}
+body.light-ui.desktop .modal-back[data-detmodal]:not([data-detorigin]) .slaedit-btn svg{width:15px;height:15px}
+body.light-ui.desktop .modal-back[data-detmodal]:not([data-detorigin]) .slaedit-btn:hover{background:#E9F0FC}
+/* a11y: sem animação de entrada quando o usuário pede movimento reduzido */
+@media (prefers-reduced-motion:reduce){
+  body.light-ui.desktop .modal-back[data-detmodal]:not([data-detorigin]) .det-sheet{animation:none}
+}
 </style>
 </head>
 <body>
@@ -9491,7 +9545,7 @@ function openDetails(taskId){
   const _detOrigin=(typeof activeTab==='function'&&state.tab==='tarefas')?(activeTab()==='mine'?' data-detorigin="mine"':(activeTab()==='client'?' data-detorigin="client"':(activeTab()==='designers'?' data-detorigin="designers"':(activeTab()==='socials'?' data-detorigin="socials"':((activeTab()==='hub'&&state.boardSector)?' data-detorigin="sectors"':''))))):'';
   let h='<div class="modal-back" data-modalbg="1" data-detmodal="1"'+_detOrigin+' data-detsector="'+esc(t.sector||'')+'" data-dettaskid="'+esc(t.id||'')+'"><div class="sheet det-sheet" role="dialog" aria-modal="true" aria-label="Central de Detalhes da tarefa">'+
     '<div class="det-head"><div class="det-badge" style="background:'+withAlpha(s.color,.16)+';color:'+s.color+'">'+svg(s.icon)+'<span>'+esc(s.label)+'</span></div>'+
-      '<button class="iconbtn det-x" data-modalclose="1">'+svg('close')+'</button></div>'+
+      '<button class="iconbtn det-x" data-modalclose="1" aria-label="Fechar detalhes">'+svg('close')+'</button></div>'+
     '<div class="det-title">'+esc(t.title||'Sem título')+'</div>'+
     (t.client?'<div class="det-client">'+svg('place')+'<span>'+esc(t.client)+'</span></div>':'')+
     '<div class="det-chips">'+((function(){
