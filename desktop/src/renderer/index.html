@@ -3212,6 +3212,17 @@ body.light-ui.desktop .tchips .tchip{height:44px !important;border-radius:12px !
 body.light-ui.desktop .tchips .tchip svg{width:15px;height:15px}
 body.light-ui.desktop .tchips .tchip:hover{border-color:#D8E4F9;color:#2E5FD0}
 body.light-ui.desktop .tchips .tchip.on{background:#E9F0FC;border-color:#D8E4F9;color:#2E5FD0;box-shadow:none}
+/* ---- FILTRO POR RESPONSÁVEL (I3A.4 — conflito-01 resolvido: função autorizada) ---- */
+body.light-ui.desktop .lui-frow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:14px 0 0;padding:0 2px}
+body.light-ui.desktop .lui-frow-k{font-size:12px;font-weight:600;color:#667085;margin-right:2px}
+body.light-ui.desktop .lui-rchip{display:inline-flex;align-items:center;gap:8px;height:42px;padding:0 15px 0 8px;border-radius:12px;background:var(--lui-surface);border:1.5px solid color-mix(in srgb,var(--kresp,#98A1AD) 30%,#FFFFFF);box-shadow:0 1px 2px rgba(16,24,40,.04);font-size:12.5px;font-weight:750;color:var(--kresp,#1D2939);cursor:pointer;transition:none}
+body.light-ui.desktop .lui-rchip .av{width:26px !important;height:26px !important;font-size:10px !important;box-shadow:0 0 0 2px var(--kresp,#C7CCD6) !important}
+body.light-ui.desktop .lui-rchip:hover{border-color:color-mix(in srgb,var(--kresp,#2F6BFF) 55%,#FFFFFF)}
+body.light-ui.desktop .lui-rchip:focus-visible{outline:0;box-shadow:0 0 0 2.5px rgba(47,107,255,.55)}
+body.light-ui.desktop .lui-rchip.on{border-color:var(--kresp,#2F6BFF);background:color-mix(in srgb,var(--kresp,#2F6BFF) 7%,#FFFFFF)}
+body.light-ui.desktop .lui-rchip-all{--kresp:#1D2939;padding:0 15px 0 13px;color:#1D2939}
+body.light-ui.desktop .lui-rchip-all svg{width:15px;height:15px;color:#475467}
+body.light-ui.desktop .lui-rchip-all.on{border-color:#98A1AD;background:#F7F9FB}
 /* ---- BOARD: grid de 4 colunas iguais (v4); colunas = cartões brancos ---- */
 /* paleta v4 por posição (amendment: v4 vence a cor real do eixo APENAS na apresentação clara;
    --kc real permanece como fallback e no legado) */
@@ -3232,7 +3243,7 @@ body.light-ui.desktop .kbv2-ccount{margin-left:auto;min-width:26px;height:22px;p
 body.light-ui.desktop .kbv2-column-body{display:flex;flex-direction:column;gap:12px;padding:2px 2px 4px;background:transparent;flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden}
 body.light-ui.desktop .kbv2-column-add{margin-top:12px;height:38px;flex:none;border:1px solid var(--lui-hair);border-radius:10px;background:var(--lui-surface);color:var(--kc2,var(--kc));font-size:12.5px;font-weight:750;gap:6px;box-shadow:none}
 body.light-ui.desktop .kbv2-column-add:hover{background:#FBFCFD}
-body.light-ui.desktop .kbv2-empty{border:0;background:transparent}
+body.light-ui.desktop .kbv2-empty2{border:0;background:transparent;color:#98A1AD}
 /* ---- CARD v4 (anatomia congelada): título → categoria → Cliente → Prazo →
         barra+% → avatares com anel + microstats · funções reais preservadas ---- */
 body.light-ui.desktop .kbv2-card{position:relative;display:flex;flex-direction:column;background:var(--lui-surface);border:1px solid #EEF1F4;border-radius:12px;box-shadow:0 1px 2px rgba(16,24,40,.05);padding:13px 13px 11px;margin:0}
@@ -3353,7 +3364,7 @@ body.light-ui.desktop .lui-legend .lui-kpi-tx span{white-space:normal;font-size:
 @media (min-width:1760px){
   body.light-ui.desktop:has(.modal-back[data-detmodal][data-detorigin="mine"]) .kbv2-board-surface{margin-right:408px}
   body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"]{background:transparent;backdrop-filter:none;padding:0}
-  body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-sheet{position:fixed;top:160px;right:26px;bottom:169px;left:auto;width:392px;height:auto;max-height:none;border-radius:14px;border:1px solid var(--lui-hair);box-shadow:0 4px 14px rgba(16,24,40,.08)}
+  body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-sheet{position:fixed;top:230px;right:26px;bottom:169px;left:auto;width:392px;height:auto;max-height:none;border-radius:14px;border:1px solid var(--lui-hair);box-shadow:0 4px 14px rgba(16,24,40,.08)}
   body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-title{font-size:19.5px;font-weight:800;letter-spacing:-.2px;line-height:1.25}
 }
 </style>
@@ -3730,7 +3741,7 @@ async function logout(){
   try{window.desktopAPI&&window.desktopAPI.diagLog&&window.desktopAPI.diagLog('logout.begin')}catch(_){}
   try{if(window.desktopAPI&&window.desktopAPI.authLogout){await window.desktopAPI.authLogout();}}catch(_){}
   try{window.desktopAPI&&window.desktopAPI.diagLog&&window.desktopAPI.diagLog('logout.afterAuthLogout')}catch(_){}
-  try{window.desktopAPI&&window.desktopAPI.sessionLogout()}catch(_){} for(const k in unsub){if(unsub[k])unsub[k]();unsub[k]=null;}clearSession();state.user=null;state.flowView=null;state.designerBoard=null;state.socialBoard=null;state.personBoard=null;state.roleBoards=false;state.boardSector=null;boardQuery='';try{notifAttrToastSeen={};}catch(_){}document.body.classList.remove('authed');if(typeof closeCardMenus==='function')closeCardMenus();var _ca=document.getElementById('cornerAvatar');if(_ca)_ca.remove();var _sm=document.getElementById('sla-monitor');if(_sm)_sm.remove();var _bl=document.getElementById('slaib-bell');if(_bl)_bl.remove();var _bo=document.getElementById('slaib-ov');if(_bo)_bo.remove();document.getElementById('app').style.display='none';document.getElementById('login').classList.remove('hidden');loginMode='login';try{slaibRefresh();}catch(_){}try{authPhase='AUTH_UNAUTHENTICATED_CONFIRMED';}catch(_){}try{if(typeof _hideAuthSplash==='function')_hideAuthSplash();}catch(_){}try{if(typeof _authObs==='function')_authObs('auth.startup.explicit_logout',{});}catch(_){}renderLogin();}
+  try{window.desktopAPI&&window.desktopAPI.sessionLogout()}catch(_){} for(const k in unsub){if(unsub[k])unsub[k]();unsub[k]=null;}clearSession();state.user=null;state.flowView=null;state.designerBoard=null;state.socialBoard=null;state.personBoard=null;state.roleBoards=false;state.boardSector=null;boardQuery='';boardRespFilter='';try{notifAttrToastSeen={};}catch(_){}document.body.classList.remove('authed');if(typeof closeCardMenus==='function')closeCardMenus();var _ca=document.getElementById('cornerAvatar');if(_ca)_ca.remove();var _sm=document.getElementById('sla-monitor');if(_sm)_sm.remove();var _bl=document.getElementById('slaib-bell');if(_bl)_bl.remove();var _bo=document.getElementById('slaib-ov');if(_bo)_bo.remove();document.getElementById('app').style.display='none';document.getElementById('login').classList.remove('hidden');loginMode='login';try{slaibRefresh();}catch(_){}try{authPhase='AUTH_UNAUTHENTICATED_CONFIRMED';}catch(_){}try{if(typeof _hideAuthSplash==='function')_hideAuthSplash();}catch(_){}try{if(typeof _authObs==='function')_authObs('auth.startup.explicit_logout',{});}catch(_){}renderLogin();}
 function subscribeData(){
   /* F3.3.56-G2 — roster via usersPublic (projeção allowlist {id,name,role,admin,
      status,photo,color} mantida pelo trigger syncUsersPublic). O renderer deixa
@@ -6882,13 +6893,19 @@ function renderPersonBoard(){
   const pid=state.personBoard;const p=state.users.find(x=>x.id===pid)||{id:pid,name:(state.user&&state.user.id===pid?state.user.name:'Responsável')};
   const isMe=state.user&&state.user.id===pid;
   let list=state.tasks.filter(t=>t.assigneeId===pid||t.by===pid);
-  if(boardQuery)list=list.filter(t=>((t.title||'')+(t.client||'')).toLowerCase().includes(boardQuery.toLowerCase()));
-  /* LIGHT UI (I3A.3 v4 port): KPIs read-only derivados dos MESMOS dados/helpers reais
-     (taskDeadline/isTaskCompleted/respOf). Gated por body.light-ui: sem a classe, nada
-     disto entra no HTML (legado byte-idêntico). Leitura pura; zero escrita. O filtro por
-     responsável do v4 NÃO foi portado: V4-FUNCTIONAL-CONFLICT-01 (inexiste no código
-     real — aguarda decisão do owner; não inventar controle). */
+  /* LIGHT UI I3A.4 — V4-FUNCTIONAL-CONFLICT-01 RESOLVIDO PELO OWNER (2026-08-20):
+     IMPLEMENT RESPONSIBLE FILTER. Função nova AUTORIZADA: filtro por responsável do
+     Meu Quadro, client-side/in-memory sobre as tasks já carregadas; semântica =
+     respOf() (o MESMO responsável primário do produto); chips derivados das próprias
+     tasks do board (respeita a visibilidade real — não vaza equipe); busca E filtro
+     COMPÕEM; counts/KPIs refletem a visão filtrada; zero escrita (Firestore/Functions/
+     Worker/API). Gated por body.light-ui: sem a classe, nada entra no HTML (legado
+     byte-idêntico). */
   const _lui=document.body.classList.contains('light-ui');
+  const _people=_lui?[...new Map(list.map(t=>{const a=respOf(t);return (a&&a.id)?[a.id,a]:null;}).filter(Boolean)).values()]:[];
+  if(_lui&&boardRespFilter&&!_people.some(a=>a.id===boardRespFilter))boardRespFilter='';
+  if(boardQuery)list=list.filter(t=>((t.title||'')+(t.client||'')).toLowerCase().includes(boardQuery.toLowerCase()));
+  if(_lui&&boardRespFilter)list=list.filter(t=>{const a=respOf(t);return a&&a.id===boardRespFilter;});
   // F3.3.17-R5.1 — board do DESIGNER (dono é o designer em TODAS as suas tarefas de cronograma): usa o
   // EIXO do designer (DESIGNER_COLS4, que tem a coluna "Entregue") para a ENTREGA não ficar presa em
   // "Em andamento". Boards de Social/Admin seguem o eixo social (personBoardCol) — intacto.
@@ -6905,6 +6922,11 @@ function renderPersonBoard(){
     avatar(p,44)+
     '<div style="flex:1;min-width:0"><div class="d-bh-title">'+(isMe?'Meu quadro':'Quadro de '+esc((p.name||'').split(' ')[0]||'Responsável'))+'</div><div class="d-bh-sub">'+esc(p.role||'Fluxo individual')+'</div></div></div></div>'+
     '<div class="scr" style="padding-top:0">'+boardToolbar()+
+    (_lui?(function(){
+      return '<div class="lui-frow"><span class="lui-frow-k">Filtrar por responsável:</span>'+
+        _people.map(a=>'<button type="button" class="lui-rchip'+(boardRespFilter===a.id?' on':'')+'" data-bresp="'+a.id+'" aria-pressed="'+(boardRespFilter===a.id)+'" style="--kresp:'+userColor(a.id)+'">'+avatar(a,24)+'<span>'+esc((a.name||'').split(' ')[0])+'</span></button>').join('')+
+        '<button type="button" class="lui-rchip lui-rchip-all'+(boardRespFilter?'':' on')+'" data-bresp="" aria-pressed="'+(!boardRespFilter)+'">'+svg('grid')+'<span>Todos</span></button></div>';
+    })():'')+
     // role-aware: no "Meu quadro" de um DESIGNER, a tarefa atribuída a ele aparece na
     // perspectiva do designer; tarefas onde ele NÃO é o designer seguem operacional.
     kbv2BoardHtml(COLS.map((st,i)=>({label:st.label,color:st.color,key:st.key,tasks:byStatus[i]})),
@@ -6912,7 +6934,7 @@ function renderPersonBoard(){
     (_lui?(function(){
       const _tot=list.length;const _dn=list.filter(t=>isTaskCompleted(t)||t.status==='concluido').length;
       const _pct=_tot?Math.round(_dn*100/_tot):0;const _lt=list.filter(t=>{const d0=taskDeadline(t);return d0&&d0.late;}).length;
-      const _rs=[...new Map(list.map(t=>{const a=respOf(t);return (a&&a.id)?[a.id,a]:null;}).filter(Boolean)).values()];
+      const _rs=_people;   /* legenda = responsáveis do BOARD (chips), estável sob filtro */
       return '<div class="lui-kpis">'+
         '<div class="lui-kpi"><span class="lui-kpi-ic lui-ic-blue">'+svg('flag')+'</span><div class="lui-kpi-tx"><b>'+(_tot-_dn)+'</b><span>Tarefas ativas</span></div></div>'+
         '<div class="lui-kpi"><span class="lui-kpi-ic lui-ic-green">'+svg('check')+'</span><div class="lui-kpi-tx"><b>'+_pct+'%</b><span>Conclusão geral</span></div></div>'+
@@ -7799,6 +7821,7 @@ function renderSocialBoard(){
 
 /* ---- KANBAN ---- */
 let boardCol=0,boardMine=false,boardQuery='';
+let boardRespFilter='';   /* LIGHT UI I3A.4 — filtro por responsável do Meu Quadro (função AUTORIZADA pelo owner; conflito-01 resolvido). Vive só no estado da surface; zero persistência. */
 function renderBoard(){
   const s=secOf(state.boardSector);const u=state.user;
   let list=visibleTasks(u,state.tasks).filter(t=>secOf(t.sector).key===s.key);
@@ -13069,15 +13092,16 @@ document.addEventListener('click',async e=>{
   }
   if(el=g('[data-tab]')){state.form=null;state.boardSector=null;state.personBoard=null;state.roleBoards=false;state.flowView=null;state.designerBoard=null;state.socialBoard=null;state.tab=el.dataset.tab;closeModal();render();return;}
   if(el=g('[data-fab]')){state.tab='tarefas';openNewTaskWizard();return;}   // F3.3.75A — sempre ETAPA 1 (Setor), sem reaproveitar estado
-  if(el=g('[data-sector]')){if(isRetiredSectorKey(el.dataset.sector)){retiredModuleNotice('',SECTOR_ALIAS[el.dataset.sector]||el.dataset.sector);return;}state.boardSector=el.dataset.sector;state.personBoard=null;state.roleBoards=false;state.flowView=null;state.designerBoard=null;state.socialBoard=null;boardCol=0;boardMine=false;boardQuery='';render();return;}   /* F3.5.5E — quadro retirado nunca abre */
-  if(el=g('[data-myboard]')){state.personBoard=state.user&&state.user.id;state.roleBoards=false;state.flowView=null;state.designerBoard=null;state.socialBoard=null;state.boardSector=null;boardQuery='';render();return;}
-  if(el=g('[data-roleboards]')){state.roleBoards=true;state.personBoard=null;state.flowView=null;state.designerBoard=null;state.socialBoard=null;state.boardSector=null;boardQuery='';render();return;}
-  if(el=g('[data-personboard]')){state.personBoard=el.dataset.personboard;state.roleBoards=false;state.flowView=null;state.designerBoard=null;state.socialBoard=null;state.boardSector=null;boardQuery='';render();return;}
-  if(el=g('[data-flowclient]')){state.flowView='client';state.designerBoard=null;state.socialBoard=null;state.personBoard=null;state.roleBoards=false;state.boardSector=null;boardQuery='';render();return;}
-  if(el=g('[data-flowdesigners]')){state.flowView='designers';state.designerBoard=f354DesignerAutoPick();state.socialBoard=null;state.personBoard=null;state.roleBoards=false;state.boardSector=null;boardQuery='';render();return;}
-  if(el=g('[data-designerboard]')){state.flowView='designers';state.designerBoard=el.dataset.designerboard;f354DesignerSelSave(state.user&&state.user.id,state.designerBoard);state.socialBoard=null;boardQuery='';render();return;}
-  if(el=g('[data-flowsocials]')){state.flowView='socials';state.socialBoard=f354SocialAutoPick();state.designerBoard=null;state.personBoard=null;state.roleBoards=false;state.boardSector=null;boardQuery='';render();return;}
-  if(el=g('[data-socialboard]')){state.flowView='socials';state.socialBoard=el.dataset.socialboard;f354SocialSelSave(state.user&&state.user.id,state.socialBoard);state.designerBoard=null;boardQuery='';render();return;}
+  if(el=g('[data-bresp]')){boardRespFilter=el.dataset.bresp||'';render();return;}   /* LIGHT UI I3A.4: filtro por responsável (DOM só sob body.light-ui) */
+  if(el=g('[data-sector]')){if(isRetiredSectorKey(el.dataset.sector)){retiredModuleNotice('',SECTOR_ALIAS[el.dataset.sector]||el.dataset.sector);return;}state.boardSector=el.dataset.sector;state.personBoard=null;state.roleBoards=false;state.flowView=null;state.designerBoard=null;state.socialBoard=null;boardCol=0;boardMine=false;boardQuery='';boardRespFilter='';render();return;}   /* F3.5.5E — quadro retirado nunca abre */
+  if(el=g('[data-myboard]')){state.personBoard=state.user&&state.user.id;state.roleBoards=false;state.flowView=null;state.designerBoard=null;state.socialBoard=null;state.boardSector=null;boardQuery='';boardRespFilter='';render();return;}
+  if(el=g('[data-roleboards]')){state.roleBoards=true;state.personBoard=null;state.flowView=null;state.designerBoard=null;state.socialBoard=null;state.boardSector=null;boardQuery='';boardRespFilter='';render();return;}
+  if(el=g('[data-personboard]')){state.personBoard=el.dataset.personboard;state.roleBoards=false;state.flowView=null;state.designerBoard=null;state.socialBoard=null;state.boardSector=null;boardQuery='';boardRespFilter='';render();return;}
+  if(el=g('[data-flowclient]')){state.flowView='client';state.designerBoard=null;state.socialBoard=null;state.personBoard=null;state.roleBoards=false;state.boardSector=null;boardQuery='';boardRespFilter='';render();return;}
+  if(el=g('[data-flowdesigners]')){state.flowView='designers';state.designerBoard=f354DesignerAutoPick();state.socialBoard=null;state.personBoard=null;state.roleBoards=false;state.boardSector=null;boardQuery='';boardRespFilter='';render();return;}
+  if(el=g('[data-designerboard]')){state.flowView='designers';state.designerBoard=el.dataset.designerboard;f354DesignerSelSave(state.user&&state.user.id,state.designerBoard);state.socialBoard=null;boardQuery='';boardRespFilter='';render();return;}
+  if(el=g('[data-flowsocials]')){state.flowView='socials';state.socialBoard=f354SocialAutoPick();state.designerBoard=null;state.personBoard=null;state.roleBoards=false;state.boardSector=null;boardQuery='';boardRespFilter='';render();return;}
+  if(el=g('[data-socialboard]')){state.flowView='socials';state.socialBoard=el.dataset.socialboard;f354SocialSelSave(state.user&&state.user.id,state.socialBoard);state.designerBoard=null;boardQuery='';boardRespFilter='';render();return;}
   if(el=g('[data-board]')){const a=el.dataset.board;
     if(a==='back')state.boardSector=null;
     else if(a==='hub'){state.boardSector=null;state.personBoard=null;state.roleBoards=false;state.flowView=null;state.designerBoard=null;state.socialBoard=null;}
