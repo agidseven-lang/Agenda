@@ -181,6 +181,38 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > temas/notas → drawer; colunas com barra na cor real (--kc) + add colorido. Altura média
 > 264px; 2 cards completos/coluna; smoke OK; drawer intacto; legado 0px.
 > Relatório: `LIGHT-UI-I3A-2-GOLDEN-CARDS-REPORT.md`. **Gate de saída: GO do owner.**
+
+### F1 · PROTÓTIPO v4 — ✔ **APROVADO PELO OWNER** (REFERÊNCIA VISUAL INTEGRAL DO F1)
+> **Registro formal (2026-08-20, correção de direção do owner).** O protótipo
+> `design-prototypes/light-ui/proposta-e-f1-card-golden-restoration.html` na revisão
+> **`0600303c`** (v4, medido pixel a pixel da referência canônica) foi **APROVADO PELO OWNER
+> como referência visual integral da tela F1 — Meu Quadro**. O owner confirmou que o problema
+> das iterações anteriores **não era o layout**, e sim os cards densos/legados; o v4 corrigiu.
+>
+> **Escopo integral da aprovação (manter, não reinterpretar):** sidebar teal/petróleo ·
+> header · enquadramento · toolbar · filtro por responsável · grid (4 colunas kanban + painel
+> lateral de detalhes NA MESMA LINHA) · alinhamento vertical · botões "Adicionar tarefa" ·
+> KPIs do rodapé · legenda de responsáveis · spacing · proporções · cores · tipografia ·
+> cards compactos · densidade dos cards.
+>
+> **Proibições vigentes:** NÃO alterar o layout do v4 · NÃO voltar ao shell/layout anterior ·
+> NÃO remover KPIs · NÃO remover o painel lateral · NÃO trocar a sidebar · NÃO reinterpretar
+> a composição · NÃO gerar nova proposta visual (sem v5, sem redesign).
+>
+> **Regra de autoridade atualizada (F1):** código real = funções, dados, permissões e
+> workflow; **protótipo v4 aprovado = apresentação visual e layout**. Conflito funcional →
+> preservar a função real e adaptar visualmente **sem descaracterizar o v4**.
+>
+> **Supersede:** a seção "REFERENCE ALIGNMENT v2" do branch
+> `impl/light-ui-f1-golden-cards-1.0.246` (sidebar clara etc. — leitura errada, reprovada) e,
+> onde conflitar, decisões visuais anteriores de shell/canvas para o F1. Nota de coerência:
+> o v4 RESTAURA a direção da I2 aprovada (sidebar gradiente petróleo), agora com cores e
+> medidas exatas da referência (`#0A4552→#03303B`, 266px, canvas `#FDFEFE`).
+>
+> **Próxima fase: I3A.3 · F1 V4 PORT** — portar o v4 INTEIRO para o app real
+> (`desktop/src/renderer/index.html`, bloco light-ui, namespace `body.light-ui`), medindo do
+> HTML aprovado; plano de porte apresentado ao owner em 2026-08-20. **Gate de entrada da
+> implementação: GO do owner sobre o plano.**
 > **Status:** branch `impl/light-ui-core-shell-1.0.246` criado EXATAMENTE de `0dc87ccb` (I1
 > aprovada). Commit `6a4ea142`: 1 arquivo, **+80/−0, 1 hunk**, seção SHELL comentada dentro do
 > MESMO bloco `<style id="light-ui-foundation">`. Escopo cumprido = SÓ camada compartilhada
