@@ -823,6 +823,31 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > I3M = ENTREGUE — AGUARDA OWNER · F13 = NÃO CONGELADA até GO explícito ·
 > CHECKPOINT CANDIDATO = `899862a2` · etapa posterior = NÃO INICIADA.**
 
+## I4 · GLOBAL INTEGRATION & RELEASE READINESS ▶ AUDITORIA ENTREGUE
+> **Contexto declarado pelo owner na I4: "F1 a F13 concluídos; checkpoint atual `899862a2`"**
+> (registro literal). Natureza: auditoria + harness + docs — **ZERO mudança de código**
+> (md5 do renderer idêntico a `899862a2` antes/depois; branch de auditoria descartado sem
+> commits). Relatório `LIGHT-UI-I4-INTEGRATION-AUDIT-REPORT.md`. **Resultados:** foundation
+> consolidado 1466 linhas · 15 seções · **905/905 seletores gated** (863 .desktop + 42
+> shell I1/I2) · 43 tokens · balanço 0; **gate de segurança verificado: ZERO
+> `classList.add('light-ui')` no produto** (só 3 leituras condicionais — ativação por
+> padrão impossível); **integração end-to-end 11/11** (2 voltas × 8 tabs, modais cruzados
+> F6/F13, deep-link real F9→F6, bloqueio H16 integrado, filtros preservados, badge=storage,
+> consistência exec-kpi F10≡F11, zero writes/storage, nested sweep global=0, zero
+> pageerrors próprios); **PROVA DE INÉRCIA inédita: foundation REMOVIDO×PRESENTE sem
+> body.light-ui = 0px em 9/9 cenários legados** (7 superfícies dark + HC + legacy-light);
+> **smokes das 8 fases re-executados no MESMO commit: 265/265 PASS** (+ chooser 1/1/1).
+> **Achados: 0 críticos · 0 altos · M1 Firebase SDK via CDN no boot (pré-existente,
+> decisão RC: vendorizar?) · M2 mecanismo de ativação inexistente por design (trabalho da
+> RC, com guard rail .desktop — B1) · B2 dívidas herdadas formalizadas (F13 sem validação
+> de arte/progress/disabled; F11 críticas com não-crít herdado F10; recovery stub F12;
+> Escape não fecha F13) · B3 flake do sino (A–E).** **Veredito: APROVADA COM RESSALVAS ·
+> GO CONDICIONADO para RC** — condições são trabalho DA RC (mecanismo de ativação
+> controlada + decisões do owner sobre M1/B2); Light UI permanece INATIVA; nenhum
+> build/installer/deploy/tag/bump gerado.
+> **Estado: I3M = ENTREGUE (contexto I4 do owner: "F1–F13 concluídos") · I4 = AUDITORIA
+> ENTREGUE — AGUARDA DECISÃO DE RC DO OWNER · RC = NÃO INICIADA.**
+
 > — GO do owner (2026-08-20) com 4 correções
 > obrigatórias (amendment registrado; filtro parado como conflito-01; KPIs auditados acima;
 > sidebar 266px como calibração compartilhada do Light Shell sob `body.light-ui`, validada
