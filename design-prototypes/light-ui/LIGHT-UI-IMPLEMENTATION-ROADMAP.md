@@ -450,6 +450,42 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > **Produção NÃO alterada** — HEAD segue `c4c114e9` (worktree limpa; F1–F6 congelados;
 > 1.0.246; Light UI inativa). Adendo: `LIGHT-UI-I3G1-F7-FUNCTIONAL-HARDENING-REPORT.md`.
 > **I3G.1 = PASS · F7 = READY FOR OWNER FREEZE · CODE CHECKPOINT = `c4c114e9`.**
+> **I3G = ✔ GO DO OWNER (registrado). F7 WIZARD = GOLDEN / CONGELADO @ `c4c114e9`.**
+
+## I3H · F8 — AGENDA ▶ ENTREGUE (aguarda owner)
+> **GO do owner recebido (F8 somente; F9+ NÃO autorizadas).** **Branch:**
+> `impl/light-ui-f8-agenda-1.0.246` de `c4c114e9` (HEAD confirmado; worktree limpa) ·
+> **checkpoint único `1cf13637`** ("feat(light-ui): port F8 agenda golden") · relatório
+> `LIGHT-UI-I3H-F8-AGENDA-REPORT.md`. Reauditoria literal (26 itens): entry real
+> `[data-tab="agenda"]` → `renderAgenda` (agView month|list, agCursor/agSel/agFilter/
+> agQuery/agShowCancelled); eventos = coleção própria `events` via onSnapshot (SEM task
+> linkage — vínculo real é ownerId/by); `TYPES` reais = as cores do Golden; status real
+> `evStatus/evStatusMeta` (Agendado/Em andamento/Finalizado/Cancelado); `calendarGrid` 42
+> células domingo-first com dots ≤4 por tipo e sel que oculta dots; buckets reais da
+> lista; cards `evc2-*` completos (rail userColor/late, data, horário, status, cliente,
+> local, owner, tipo) já com role=button/tabindex/aria-label/Enter reais; detalhe
+> `evd-*` com dialog/aria-modal/trap/Esc em camadas/retorno de foco REAIS e ações gated
+> (Iniciar/Finalizar/Cancelar/Editar/⋯ Excluir só admin + EXCLUIR); form `ev-sheet` com
+> saveEvent (add/update). Matriz: A massivo; B = 2 colunas via wrappers ADITIVOS neutros
+> (.ag-tools/.ag-body/.ag-day, pixel-inertes — legado 0px nos 3 temas), toolbar por CSS
+> order, células min-height 92 número ao topo, gradiente do amendment em hoje/sel/CTAs
+> (!important só contra styles inline reais — 9, registrados); C = count do dia
+> `dayEvs.length` real gated pela classe; D = topbar de página do Golden (shell);
+> **E = nenhum conflito; nenhum evento/campo fabricado; lógica de datas intocada**.
+> Guardas estritas: `#content:has([data-ag="vmonth"])` + `.sheet.ev-sheet` +
+> `.modal-back[data-evdmodal]` — 39 seletores 100% escopados, 0 global, balanço 0.
+> Gates: smoke **32/32** (entry real; prev/next/Hoje; dots reais; múltiplos no dia;
+> ordenação por horário; count real; empty; cancelados toggle real; filtro/busca;
+> buckets; detalhe por clique E teclado com foco no X, Esc e RETORNO ao card; RBAC
+> admin×não-admin no Excluir; **zero mutation por navegar**; writes stubados: Iniciar =
+> 1 update {startedAt,startedBy}, criação = 1 add com payload real completo) ·
+> responsivo 1920 (grid 1140+416)/1366/**win125 1093×614** sem overflow · regressão
+> congelada **F1–F7 = 0px** (12/13 puro; F5 painel só na região exata do flake — A–E
+> cumprida, 0px fora) · legado **0px em 7/7 pares** (Agenda 3 temas com wrappers;
+> Central 3 temas; board dark) · fidelidade ZERO ISSUE com medidas. Provas
+> F8-AGENDA-{1920, LIST-1920, EVENT-DETAIL-1920, 1366, win125, A11Y-FOCUS}.png +
+> F8-COMPARE-GOLDEN-vs-APP.png no chat. **Gate de saída: avaliação do owner (F8 NÃO é
+> marcado congelado — quem congela é o owner).** **F9+ = NÃO INICIADA.**
 
 > — GO do owner (2026-08-20) com 4 correções
 > obrigatórias (amendment registrado; filtro parado como conflito-01; KPIs auditados acima;
