@@ -300,7 +300,27 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > docada ≥1760, 240..1027). Gates: smoke 11/11 · **F1 REGRESSION 0px** · **F2 REGRESSION
 > 0px** (board+painel) · legado 0px nas 3 superfícies · 1920/1366/win125 sem overflow ·
 > zero escrita · matriz ZERO ISSUE. Provas F3-DESIGNERS-{1920,1920-PANEL,1920-BOAZ,1366,
-> win125}.png no chat. **Gate de saída: avaliação do owner.** **I3D/F4 = NÃO INICIADA.** — GO do owner (2026-08-20) com 4 correções
+> win125}.png no chat. **I3C = ✔ GO DO OWNER (registrado). F3 = IMPLEMENTADO / GOLDEN /
+> CONGELADO.**
+
+## I3D · F4 — SOCIAL MEDIAS ▶ ENTREGUE (aguarda owner)
+> **GO do owner recebido (F4 somente; F5+ NÃO autorizadas).** **Branch:**
+> `impl/light-ui-f4-social-medias-1.0.246` de `05910f33` (HEAD confirmado, worktree
+> limpa) · **checkpoint único `6d4796ff`** ("feat(light-ui): implement F4 social medias
+> golden") · relatório `LIGHT-UI-I3D-F4-SOCIAL-MEDIAS-REPORT.md`. Fonte visual = Frame 4
+> aprovado; shell/cards = F1 v4 + padrões F2/F3. Reauditoria real: SOCIAL_COLS4
+> confirmado (A Fazer/Em andamento/Revisão/Finalizado — eixo OPERACIONAL; aprovação
+> parcial do cliente NUNCA vira Concluído, regra real); strip real `f354SocialStrip` +
+> autoload real `f354SocialAutoPick` com ORDEM PRÓPRIA (seleção salva → o próprio →
+> 1º A-Z — diferente do designers; preservada); `socialOf` real; sinais reais no card
+> (Visualizado/Não visualizado/Ajuste/Designer entregou — `designerSla.finishedAt`).
+> Painel = MESMA Central real (drawer <1760 / docada ≥1760, 240..1027; X/Esc/foco
+> provados). Gates: smoke **18/18** · **F1/F2/F3 REGRESSION 0px** (board+painel; F3 com
+> strip) · legado 0px nas QUATRO superfícies (F3-dark 0px fora de zona-flake ambiental
+> 40×40 no cluster, comprovada base×base) · 1920/1366/win125 sem overflow · zero write ·
+> matriz ZERO ISSUE. Provas F4-SOCIAL-MEDIAS-{1920, 1920-PANEL, 1920-OUTRO-USUARIO,
+> 1366, win125}.png + comparação no chat. **Gate de saída: avaliação do owner.**
+> **I3E/F5 Setores = NÃO INICIADA.** — GO do owner (2026-08-20) com 4 correções
 > obrigatórias (amendment registrado; filtro parado como conflito-01; KPIs auditados acima;
 > sidebar 266px como calibração compartilhada do Light Shell sob `body.light-ui`, validada
 > em 1920/1366/win125). Painel lateral: MESMA Central de Detalhes real DOCADA como 5ª
