@@ -3587,6 +3587,80 @@ body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="socials"] .det-
   body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="socials"] .det-sheet{position:fixed;top:240px;right:26px;bottom:53px;left:auto;width:392px;height:auto;max-height:none;border-radius:14px;border:1px solid var(--lui-hair);box-shadow:0 4px 14px rgba(16,24,40,.08)}
   body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="socials"] .det-title{font-size:19.5px;font-weight:800;letter-spacing:-.2px;line-height:1.25}
 }
+/* ============================================================================
+   LIGHT UI — I3E · F5 SETORES (Golden Frame 5 sobre as FUNÇÕES REAIS)
+   Escopo estrito: .scr-sector (hook aditivo do renderBoard desktop) e
+   [data-detorigin="sectors"]. Shell/toolbar/board/cards = F1 v4 + família
+   F2–F4. Colunas = STATUS real (A Fazer/Em andamento/Revisão/Concluído);
+   critério task→setor real (secOf + visibleTasks); "Minhas tarefas" = chip
+   real boardMine; strip = navegação real [data-sector] reapresentada
+   (setores descontinuados nunca aparecem). Zero seletor F6+.
+   ========================================================================== */
+/* ---- STRIP DE SETORES (navegação real re-skin Golden; ícone do setor real) ---- */
+body.light-ui.desktop .scr-sector .lui-sstrip{display:flex;align-items:center;gap:9px;flex-wrap:wrap;min-height:56px;padding:12px 2px}
+body.light-ui.desktop .scr-sector .lui-sstrip::before{content:'Quadros de setor:';font-size:12px;font-weight:600;color:#667085;margin-right:4px;flex:0 0 auto}
+body.light-ui.desktop .scr-sector .lui-schip{display:inline-flex;align-items:center;gap:8px;height:42px;padding:0 12px 0 8px;border-radius:12px;border:1.5px solid var(--lui-hair-2);background:var(--lui-surface);color:#1D2939;font-size:12.5px;font-weight:750;box-shadow:0 1px 2px rgba(16,24,40,.04);cursor:pointer}
+body.light-ui.desktop .scr-sector .lui-schip .ic{width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--sc,#98A1AD) 14%,#FFFFFF);color:var(--sc,#475467)}
+body.light-ui.desktop .scr-sector .lui-schip .ic svg{width:15px;height:15px}
+body.light-ui.desktop .scr-sector .lui-schip i{font-style:normal;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:8px;background:#F2F4F7;color:#475467}
+body.light-ui.desktop .scr-sector .lui-schip:hover{border-color:#D8E4F9;color:#2E5FD0}
+body.light-ui.desktop .scr-sector .lui-schip:focus-visible{outline:0;box-shadow:0 0 0 2.5px rgba(47,107,255,.55)}
+body.light-ui.desktop .scr-sector .lui-schip.on{border-color:#2E5FD0;background:#E9F0FC;color:#2E5FD0}
+body.light-ui.desktop .scr-sector .lui-schip.on i{background:#D8E4F9;color:#2E5FD0}
+/* ---- "Minhas tarefas" (chip REAL boardMine) no estilo v4 ---- */
+body.light-ui.desktop .scr-sector .tchips .chip[data-bmine]{height:44px !important;border-radius:12px !important;padding:0 16px !important;background:var(--lui-surface);border:1px solid var(--lui-hair-2);font-size:12.5px;font-weight:750;color:#45505F;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+body.light-ui.desktop .scr-sector .tchips .chip[data-bmine]:hover{border-color:#D8E4F9;color:#2E5FD0}
+/* ---- COLUNAS: cores REAIS do STATUS (desfaz a paleta F1 por posição) ---- */
+body.light-ui.desktop .scr-sector .kbv2-column:nth-child(1),
+body.light-ui.desktop .scr-sector .kbv2-column:nth-child(2),
+body.light-ui.desktop .scr-sector .kbv2-column:nth-child(3),
+body.light-ui.desktop .scr-sector .kbv2-column:nth-child(4){--kc2:var(--kc)}
+/* ---- CARD (família v4/F4 sob dados reais do setor) ---- */
+body.light-ui.desktop .scr-sector .kbv2-card-main{padding-right:8px}
+body.light-ui.desktop .scr-sector .kbv2-title{order:2;font-size:14px;margin-top:3px;padding-right:22px}
+body.light-ui.desktop .scr-sector .kbv2-tier{order:1;font-size:12px;font-weight:750;color:#1D2939;padding-right:118px}
+body.light-ui.desktop .scr-sector .kbv2-tier::before{display:none}
+body.light-ui.desktop .scr-sector .kbv2-status{display:inline-flex;align-items:center;gap:5px;position:absolute;top:12px;right:36px;max-width:44%;font-size:9px;font-weight:800;letter-spacing:.2px;padding:4px 9px;border-radius:8px;border-width:0 !important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;z-index:1}
+body.light-ui.desktop .scr-sector .kbv2-status-dot{width:6px;height:6px;flex:none}
+body.light-ui.desktop .scr-sector .kbv2-card-chips{display:none}
+body.light-ui.desktop .scr-sector .kbv2-card-top{display:none}
+body.light-ui.desktop .scr-sector .kbv2-card-top:has(.kbv2-sla){display:flex;order:5;margin:-22px 0 0;padding:0;min-height:0;justify-content:flex-end;align-items:center}
+body.light-ui.desktop .scr-sector .kbv2-sla{margin:0;font-size:9px}
+body.light-ui.desktop .scr-sector .kbv2-card:has(.kbv2-sla) .kbv2-card-date{padding-right:96px}
+body.light-ui.desktop .scr-sector .kbv2-due{display:none}
+body.light-ui.desktop .scr-sector .kbv2-pct{order:5}
+body.light-ui.desktop .scr-sector .kbv2-cliview{display:flex !important;align-items:center;gap:6px;order:6;margin-top:9px;font-size:11.5px;color:#344054;min-width:0}
+body.light-ui.desktop .scr-sector .kbv2-cliview:empty{display:none !important}
+body.light-ui.desktop .scr-sector .kbv2-cliview svg{width:13px;height:13px;color:#12A38B;flex:none}
+body.light-ui.desktop .scr-sector .kbv2-cliview b{font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.light-ui.desktop .scr-sector .kbv2-cliview em{font-style:normal;color:#98A1AD;font-weight:600;margin-left:auto;flex:none}
+body.light-ui.desktop .scr-sector .kbv2-stage2{display:block;order:7;margin:8px 0 0;padding:0;background:transparent;border:0}
+body.light-ui.desktop .scr-sector .kbv2-st2-row{display:none}
+body.light-ui.desktop .scr-sector .kbv2-st2-row:has(.kbv2-st2-ic-next){display:flex;align-items:center;gap:7px}
+body.light-ui.desktop .scr-sector .kbv2-st2-ic{width:16px;height:16px;border-radius:0;background:transparent !important;color:#98A1AD !important;flex:none;display:flex;align-items:center;justify-content:center}
+body.light-ui.desktop .scr-sector .kbv2-st2-ic svg{width:13px;height:13px}
+body.light-ui.desktop .scr-sector .kbv2-st2-tx{display:flex;min-width:0;flex:1}
+body.light-ui.desktop .scr-sector .kbv2-st2-k{display:none}
+body.light-ui.desktop .scr-sector .kbv2-st2-next{font-size:11.5px;color:#667085;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.light-ui.desktop .scr-sector .kbv2-column:last-child .kbv2-card{padding-right:13px}
+/* ordem determinística do rodapé (desempate do flex order) */
+body.light-ui.desktop .scr-sector .kbv2-card-profile{order:8}
+body.light-ui.desktop .scr-sector .kbv2-card-summary{order:9}
+body.light-ui.desktop .scr-sector .kbv2-card-chk{order:10}
+/* busca REAL deste board (markup próprio, sem wrapper/⌘K): mesmo visual v4 */
+body.light-ui.desktop .scr-sector .d-board-tools .inp.bsearch{flex:0 0 574px;width:574px !important}
+/* ---- PAINEL: MESMA Central real p/ origem sectors (drawer <1760 · docada ≥1760) ---- */
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="sectors"]{background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none;align-items:stretch;justify-content:flex-end}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="sectors"] .det-sheet{width:416px;max-width:94vw;height:100%;max-height:none;border-radius:0;box-shadow:var(--lui-sh-drawer)}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="sectors"] .det-head{padding-bottom:16px;box-shadow:0 1px 0 var(--lui-hair)}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="sectors"] .det-actions{border-top:0;box-shadow:0 -1px 0 var(--lui-hair)}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="sectors"] .det-title{font-size:23px;font-weight:700;letter-spacing:-.02em;line-height:1.28}
+@media (min-width:1760px){
+  body.light-ui.desktop:has(.modal-back[data-detmodal][data-detorigin="sectors"]) .kbv2-board-surface{margin-right:408px}
+  body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="sectors"]{padding:0}
+  body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="sectors"] .det-sheet{position:fixed;top:240px;right:26px;bottom:53px;left:auto;width:392px;height:auto;max-height:none;border-radius:14px;border:1px solid var(--lui-hair);box-shadow:0 4px 14px rgba(16,24,40,.08)}
+  body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="sectors"] .det-title{font-size:19.5px;font-weight:800;letter-spacing:-.2px;line-height:1.25}
+}
 </style>
 </head>
 <body>
@@ -8058,7 +8132,19 @@ function renderBoard(){
       '<div style="flex:1;min-width:0"><div class="d-bh-title">Quadro de '+esc(s.label)+'</div><div class="d-bh-sub">'+esc(s.desc)+'</div></div>'+
       (isDesktop()?'':'<button class="btn" data-board="new" style="width:auto;height:auto;padding:10px 18px;border-radius:12px;font-size:13.5px">+ Nova tarefa</button>')+
     '</div></div>'+
-    '<div class="scr" style="padding-top:0"><div class="d-board-tools tbar">'+
+    '<div class="scr scr-sector" style="padding-top:0">'+
+    /* LIGHT UI I3E (F5): strip de setores — REAPRESENTAÇÃO gated da navegação REAL do hub
+       (mesmo handler [data-sector]; mesma lista SECTORS !descontinuado; mesmos counts de
+       visibleTasks por setor — fórmula idêntica ao renderHub). Nenhuma função nova; sem a
+       classe light-ui nada entra no HTML (legado byte-idêntico). */
+    ((document.body.classList.contains('light-ui'))?(function(){
+      const _vis=visibleTasks(u,state.tasks);
+      return '<div class="lui-sstrip">'+SECTORS.filter(x=>!x.descontinuado).map(x=>{
+        const n=_vis.filter(t=>secOf(t.sector).key===x.key).length;
+        return '<button type="button" class="lui-schip'+(x.key===s.key?' on':'')+'" data-sector="'+x.key+'" aria-pressed="'+(x.key===s.key)+'" style="--sc:'+x.color+'"><span class="ic">'+svg(x.icon)+'</span><span>'+esc(x.label)+'</span><i>'+n+'</i></button>';
+      }).join('')+'</div>';
+    })():'')+
+    '<div class="d-board-tools tbar">'+
       '<input class="inp bsearch" id="bSearch" placeholder="Buscar tarefa…" value="'+esc(boardQuery)+'">'+
       '<div class="tchips">'+
         (u?'<button class="chip" data-bmine="1" style="'+(boardMine?'background:var(--accent);border-color:transparent;color:#fff':'')+'">Minhas tarefas</button>':'')+
@@ -9402,7 +9488,7 @@ function openDetails(taskId){
   /* I3A.1 (Light UI) — hook de CONTEXTO aditivo: marca a abertura feita a partir do MEU QUADRO
      (estado real via activeTab()) p/ o tema claro apresentar a MESMA Central como drawer lateral
      (CSS-only). Atributo inerte no tema dark (nenhuma regra o consome); zero mudança de lógica. */
-  const _detOrigin=(typeof activeTab==='function'&&state.tab==='tarefas')?(activeTab()==='mine'?' data-detorigin="mine"':(activeTab()==='client'?' data-detorigin="client"':(activeTab()==='designers'?' data-detorigin="designers"':(activeTab()==='socials'?' data-detorigin="socials"':'')))):'';
+  const _detOrigin=(typeof activeTab==='function'&&state.tab==='tarefas')?(activeTab()==='mine'?' data-detorigin="mine"':(activeTab()==='client'?' data-detorigin="client"':(activeTab()==='designers'?' data-detorigin="designers"':(activeTab()==='socials'?' data-detorigin="socials"':((activeTab()==='hub'&&state.boardSector)?' data-detorigin="sectors"':''))))):'';
   let h='<div class="modal-back" data-modalbg="1" data-detmodal="1"'+_detOrigin+' data-detsector="'+esc(t.sector||'')+'" data-dettaskid="'+esc(t.id||'')+'"><div class="sheet det-sheet" role="dialog" aria-modal="true" aria-label="Central de Detalhes da tarefa">'+
     '<div class="det-head"><div class="det-badge" style="background:'+withAlpha(s.color,.16)+';color:'+s.color+'">'+svg(s.icon)+'<span>'+esc(s.label)+'</span></div>'+
       '<button class="iconbtn det-x" data-modalclose="1">'+svg('close')+'</button></div>'+
