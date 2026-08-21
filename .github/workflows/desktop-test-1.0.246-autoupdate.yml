@@ -197,11 +197,13 @@ jobs:
           if (!closed) { try { const x = await st(); out.installState = x.status; closed = (x.status === 'installing'); } catch (_) { closed = true; } }
           out.appClosedByUpdater = closed;
           g.c1_installTriggered = closed === true;               // updater assumiu (app encerrou/instalando)
-          try { await app.close(); } catch (_) {}
-          console.log(JSON.stringify(out, null, 1));
           const failsA = Object.entries(g).filter(([k, v]) => !v).map(([k]) => k);
-          fs.writeFileSync(process.env.RUNNER_TEMP + '/au-sessionA.json', JSON.stringify(out));
-          if (failsA.length) { console.error('FAILS A:', failsA); process.exit(1); }
+          out.fails = failsA;
+          fs.writeFileSync(process.env.RUNNER_TEMP + '/au-sessionA.json', JSON.stringify(out));   // ANTES de qualquer close
+          console.log(JSON.stringify(out, null, 1));
+          try { await Promise.race([app.close(), sleep(4000)]); } catch (_) {}   // close de app morto pode pendurar
+          if (failsA.length) { console.error('FAILS A:', failsA); }
+          process.exit(failsA.length ? 1 : 0);                   // exit explícito: derruba handles CDP zumbis
           EOF
           node au-test.mjs
 
@@ -282,11 +284,13 @@ jobs:
           out.down = s.status;
           g.e2_noDowngrade = s.status !== 'update_available';
           await pg.screenshot({ path: process.env.RUNNER_TEMP + '/AU-AFTER-1.0.247.png' });
-          try { await app.close(); } catch (_) {}
-          console.log(JSON.stringify(out, null, 1));
           const fails = Object.entries(g).filter(([k, v]) => !v).map(([k]) => k);
+          out.fails = fails;
           fs.writeFileSync(process.env.RUNNER_TEMP + '/au-sessionB.json', JSON.stringify(out));
-          if (fails.length) { console.error('FAILS B:', fails); process.exit(1); }
+          console.log(JSON.stringify(out, null, 1));
+          try { await Promise.race([app.close(), sleep(4000)]); } catch (_) {}
+          if (fails.length) { console.error('FAILS B:', fails); }
+          process.exit(fails.length ? 1 : 0);
           EOF
           node au-after.mjs
           echo "AUTO-UPDATE ACCEPTANCE: PASS" >> "$GITHUB_STEP_SUMMARY"
