@@ -1,0 +1,543 @@
+# =====================================================================
+# [manual] RC Light UI — ZERO-TOUCH LEGACY BRIDGE (I5C.5; NADA é publicado)
+# ---------------------------------------------------------------------
+# OBJETIVO: provar a ponte REAL dos usuários atuais SEM interação com installer:
+#   BASELINE PÚBLICA v1.0.246 (o binário que os usuários têm; updater ANTIGO
+#   quitAndInstall(false,true) — lança o installer novo SEM /S, imutável)
+#   → QA 1.0.247 (NEW RELEASE CANDIDATE c75ccd20 = dcc019ca + fix updater
+#     b4ea7890 + nsis.oneClick=true): o installer ONE-CLICK instala SOZINHO
+#     ao abrir (SpiderBanner de progresso, ZERO botões, relança e fecha)
+#   → FUTURE: 1.0.247 → QA 1.0.248 pelo updater corrigido (/S, zero janela).
+# GATES: REQUIRED_USER_INSTALL_ACTIONS=0 (estrutural: self-grep sem input
+# sintético + instalação completa sem NENHUM input) · UAC=0 · SmartScreen=0 ·
+# bridge: cmdline do installer COM "--updated" e SEM "/S" (prova de que o
+# zero-touch veio do one-click, não de /S) + janela some sozinha ·
+# silent: cmdline COM "/S" + ZERO janela. Monitores armados ANTES de cada
+# transição (janelas Setup/SmartScreen, consent.exe, process-tree WMI).
+# BUMPS 1.0.247/1.0.248 EFÊMEROS (workspace); baseline REAL da release pública.
+# Sem tag, sem release, sem deploy, sem publish. Execução manual apenas.
+# =====================================================================
+name: "[manual] RC Light UI — Zero-Touch Legacy Bridge (QA)"
+
+"on":
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  PRODUCT_SOURCE_SHA: "c75ccd20ceed95f5a4c4fcb509512223c1368d3f"
+  EXPECTED_RENDERER_SHA256: "bd5001b1ec249ecc56bc1a8b71a11be05d468dc990695c6f80ef80af00aef32f"
+  QA_BRIDGE_VERSION: "1.0.247"
+  QA_NEXT_VERSION: "1.0.248"
+  BASELINE_TAG: "v1.0.246"
+  FEED_PORT: "8879"
+
+jobs:
+  zero-touch-bridge:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: "Git sem conversão CRLF"
+        run: git config --global core.autocrlf false
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: "PIN do NEW RELEASE CANDIDATE (c75ccd20 = dcc019ca + b4ea7890 + oneClick) + provenance"
+        run: |
+          set -euo pipefail
+          cp ".github/workflows/desktop-test-1.0.246-zero-touch-bridge.yml" "$RUNNER_TEMP/wf-self.yml"
+          git checkout --detach "$PRODUCT_SOURCE_SHA"
+          [ "$(git rev-parse HEAD)" = "$PRODUCT_SOURCE_SHA" ] || { echo "::error::pin falhou"; exit 1; }
+          R=$(git show "$PRODUCT_SOURCE_SHA":desktop/src/renderer/index.html | sha256sum | awk '{print $1}')
+          [ "$R" = "$EXPECTED_RENDERER_SHA256" ] || { echo "::error::renderer difere do congelado"; exit 1; }
+          # diff de produto vs dcc019ca = EXATAMENTE updaterService.ts + electron-builder.yml (zero incidental)
+          D=$(git diff --name-only dcc019ca7acf714de0629ff11c247ad9a877626f "$PRODUCT_SOURCE_SHA" -- desktop | sort | tr '\n' ' ')
+          echo "diff de produto vs dcc019ca: $D"
+          [ "$D" = "desktop/electron-builder.yml desktop/src/main/updaterService.ts " ] || { echo "::error::candidato altera mais que updater+installer-config"; exit 1; }
+          grep -Eq '^\s*oneClick: true' desktop/electron-builder.yml || { echo "::error::oneClick=true ausente"; exit 1; }
+
+      - name: "BASELINE DE PRODUÇÃO — baixar release pública v1.0.246 + verificar SHA256SUMS"
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/baseline"; cd "$RUNNER_TEMP/baseline"
+          BASE="https://github.com/agidseven-lang/Agenda/releases/download/$BASELINE_TAG"
+          curl -sSL -o baseline.exe "$BASE/Agenda-ID-Seven-Desktop-1.0.246-x64.exe"
+          curl -sSL -o SHA256SUMS "$BASE/SHA256SUMS"
+          EXP=$(grep "Agenda-ID-Seven-Desktop-1.0.246-x64.exe$" SHA256SUMS | awk '{print $1}')
+          GOT=$(sha256sum baseline.exe | awk '{print $1}')
+          echo "esperado(release): $EXP"; echo "obtido: $GOT"
+          [ "$EXP" = "$GOT" ] || { echo "::error::baseline exe não confere com SHA256SUMS da release"; exit 1; }
+          echo "BASELINE OK: release pública v1.0.246 íntegra"
+
+      - name: "Instalar baseline (setup automatizado de QA — o UPDATE em si nunca é manual)"
+        shell: powershell
+        run: |
+          $p = Start-Process -FilePath "$env:RUNNER_TEMP\baseline\baseline.exe" -ArgumentList "/S" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Write-Error "baseline install exit $($p.ExitCode)"; exit 1 }
+          Start-Sleep -Seconds 3
+          $dir = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Directory | Where-Object { Test-Path (Join-Path $_.FullName "Agenda ID Seven Desktop.exe") } | Select-Object -First 1
+          if (-not $dir) { Write-Error "baseline nao instalada"; exit 1 }
+          "INSTALL_DIR=$($dir.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "baseline instalada em: $($dir.FullName)"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: "BUILDS QA EFÊMEROS — 1.0.247 e 1.0.248 (one-click; mesmo source) + GATES ASAR/ONECLICK"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          echo "::notice::QA-ONLY EPHEMERAL BUMPS -> $QA_BRIDGE_VERSION e $QA_NEXT_VERSION (workspace; repo INTOCADO)"
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version=process.env.QA_BRIDGE_VERSION;fs.writeFileSync('package.json',JSON.stringify(p,null,2));"
+          node -e "const fs=require('fs');let s=fs.readFileSync('package-lock.json','utf8');s=s.replace(/\"version\": \"1\.0\.246\"/g,'\"version\": \"'+process.env.QA_BRIDGE_VERSION+'\"');fs.writeFileSync('package-lock.json',s);"
+          npm ci --no-audit --no-fund
+          npm run build
+          npx electron-builder --win nsis --publish never
+          grep -Eq '^\s*oneClick: true' dist-installer/builder-effective-config.yaml || { echo "::error::config efetiva sem oneClick=true"; exit 1; }
+          # ---- GATE ASAR (bridge 1.0.247)
+          EX="$RUNNER_TEMP/asarx"; rm -rf "$EX"; mkdir -p "$EX"
+          npx --yes @electron/asar extract dist-installer/win-unpacked/resources/app.asar "$EX"
+          PKGV=$(PKG="$EX/package.json" node -e 'console.log(JSON.parse(require("fs").readFileSync(process.env.PKG,"utf8")).version)')
+          [ "$PKGV" = "$QA_BRIDGE_VERSION" ] || { echo "::error::asar bridge version=$PKGV"; exit 1; }
+          git show "$PRODUCT_SOURCE_SHA":desktop/src/renderer/index.html > "$RUNNER_TEMP/src-index.html"
+          A="$EX/src/renderer/index.html" B="$RUNNER_TEMP/src-index.html" node -e '
+            const fs=require("fs");const n=s=>String(s).replace(/\r\n/g,"\n");
+            if(n(fs.readFileSync(process.env.A,"utf8"))!==n(fs.readFileSync(process.env.B,"utf8"))){console.error("renderer empacotado != fonte do candidato");process.exit(1);}
+            console.log("renderer empacotado == fonte do candidato (byte-identico)");'
+          C=$(grep -c 'data-mode\|Esqueci minha senha' "$EX/src/renderer/index.html" || true)
+          [ "$C" = "0" ] || { echo "::error::recovery presente no asar (RC-D02)"; exit 1; }
+          US="$EX/dist/main/updaterService.js"
+          grep -Eq 'autoUpdater\.allowPrerelease[[:space:]]*=[[:space:]]*false' "$US"
+          grep -Eq 'autoUpdater\.channel[[:space:]]*=[[:space:]]*"latest"' "$US"
+          grep -Eq 'autoUpdater\.allowDowngrade[[:space:]]*=[[:space:]]*false' "$US"
+          grep -Fq 'quitAndInstall(true, true)' "$US" || { echo "::error::fix silencioso AUSENTE (bridge)"; exit 1; }
+          if grep -Fq 'quitAndInstall(false' "$US"; then echo "::error::chamada assistida presente (bridge)"; exit 1; fi
+          echo "GATE asar bridge OK ($PKGV; oneClick efetivo; renderer==fonte; RC-D02=0; flags; fix)"
+          mkdir -p "$RUNNER_TEMP/feed247"
+          cp dist-installer/latest.yml "$RUNNER_TEMP/feed247/"
+          cp "dist-installer/Agenda-ID-Seven-Desktop-$QA_BRIDGE_VERSION-x64.exe" "$RUNNER_TEMP/feed247/"
+          cp "dist-installer/Agenda-ID-Seven-Desktop-$QA_BRIDGE_VERSION-x64.exe.blockmap" "$RUNNER_TEMP/feed247/"
+          cp dist-installer/win-unpacked/resources/app.asar "$RUNNER_TEMP/qa-247.asar"
+          # ---- build 2: 1.0.248 (mesmo source; só a versão muda)
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version=process.env.QA_NEXT_VERSION;fs.writeFileSync('package.json',JSON.stringify(p,null,2));"
+          node -e "const fs=require('fs');let s=fs.readFileSync('package-lock.json','utf8');s=s.replace(/\"version\": \"1\.0\.247\"/g,'\"version\": \"'+process.env.QA_NEXT_VERSION+'\"');fs.writeFileSync('package-lock.json',s);"
+          npx electron-builder --win nsis --publish never
+          grep -Eq '^\s*oneClick: true' dist-installer/builder-effective-config.yaml || { echo "::error::config efetiva (248) sem oneClick=true"; exit 1; }
+          EX2="$RUNNER_TEMP/asarx2"; rm -rf "$EX2"; mkdir -p "$EX2"
+          npx --yes @electron/asar extract dist-installer/win-unpacked/resources/app.asar "$EX2"
+          PKGV2=$(PKG="$EX2/package.json" node -e 'console.log(JSON.parse(require("fs").readFileSync(process.env.PKG,"utf8")).version)')
+          [ "$PKGV2" = "$QA_NEXT_VERSION" ] || { echo "::error::asar next version=$PKGV2"; exit 1; }
+          grep -Fq 'quitAndInstall(true, true)' "$EX2/dist/main/updaterService.js" || { echo "::error::fix ausente (next)"; exit 1; }
+          mkdir -p "$RUNNER_TEMP/feed248"
+          cp dist-installer/latest.yml "$RUNNER_TEMP/feed248/"
+          cp "dist-installer/Agenda-ID-Seven-Desktop-$QA_NEXT_VERSION-x64.exe" "$RUNNER_TEMP/feed248/"
+          cp "dist-installer/Agenda-ID-Seven-Desktop-$QA_NEXT_VERSION-x64.exe.blockmap" "$RUNNER_TEMP/feed248/"
+          echo "GATE asar next OK ($PKGV2; oneClick efetivo; fix presente)"
+
+      - name: "FEED QA LOCAL fail-closed (127.0.0.1:8879) — fase bridge serve 1.0.247"
+        shell: powershell
+        run: |
+          $feed = "$env:RUNNER_TEMP\feed"
+          New-Item -ItemType Directory -Force -Path $feed | Out-Null
+          Copy-Item "$env:RUNNER_TEMP\feed247\*" $feed
+          "FEED_DIR=$feed" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Start-Process python -ArgumentList "-m","http.server",$env:FEED_PORT,"--bind","127.0.0.1","--directory",$feed -WindowStyle Hidden
+          $ok = $false
+          foreach ($i in 1..15) {
+            Start-Sleep -Seconds 2
+            try { $r = Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:$env:FEED_PORT/latest.yml" -TimeoutSec 5; if ($r.StatusCode -eq 200) { $ok = $true; break } } catch { }
+          }
+          if (-not $ok) { Write-Error "feed local nao respondeu em 30s"; exit 1 }
+          Write-Host "feed QA OK (HTTP 200; servindo 1.0.247)"
+
+      - name: "Apontar a INSTÂNCIA baseline para o feed (app-update.yml da instância; produção intocada)"
+        shell: powershell
+        run: |
+          $au = Join-Path $env:INSTALL_DIR "resources\app-update.yml"
+          Copy-Item $au "$au.bak"
+          @"
+          provider: generic
+          url: http://127.0.0.1:$env:FEED_PORT
+          channel: latest
+          updaterCacheDirName: agenda-id-seven-desktop-updater
+          "@ | Out-File -FilePath $au -Encoding utf8
+          Get-Content $au
+
+      - name: "MONITOR 1 — armar ANTES da ponte (janelas Setup/SmartScreen + consent.exe + process-tree)"
+        shell: powershell
+        run: |
+          $mon = @'
+          param([string]$Tag)
+          $stop = "$env:RUNNER_TEMP\monitor$Tag.stop"
+          $out  = "$env:RUNNER_TEMP\monitor$Tag.jsonl"
+          Add-Content -Path $out -Value '{"boot":true}'
+          $deadline = (Get-Date).AddSeconds(900)
+          while (((Get-Date) -lt $deadline) -and (-not (Test-Path $stop))) {
+            $t = (Get-Date).ToString("HH:mm:ss.fff")
+            $setup = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -like "*Setup*" -or $_.MainWindowTitle -like "*Instal*" } | ForEach-Object { ($_.ProcessName + "::" + $_.MainWindowTitle) })
+            $sc    = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -match "SmartScreen|protected your PC" } | ForEach-Object { $_.MainWindowTitle })
+            $uac   = @(Get-Process -Name consent -ErrorAction SilentlyContinue).Count
+            $inst  = @(Get-CimInstance Win32_Process -Filter "CommandLine LIKE '%--updated%'" -ErrorAction SilentlyContinue | ForEach-Object { @{ pid = $_.ProcessId; ppid = $_.ParentProcessId; name = $_.Name; cmd = $_.CommandLine } })
+            $rec = @{ t = $t; setup = $setup; sc = $sc; uac = $uac; inst = $inst } | ConvertTo-Json -Compress -Depth 6
+            Add-Content -Path $out -Value $rec
+            Start-Sleep -Milliseconds 700
+          }
+          '@
+          Set-Content -Path "$env:RUNNER_TEMP\monitor.ps1" -Value $mon -Encoding utf8
+          Remove-Item "$env:RUNNER_TEMP\monitor1.stop","$env:RUNNER_TEMP\monitor1.jsonl" -ErrorAction SilentlyContinue
+          Start-Process powershell -ArgumentList "-NoProfile","-ExecutionPolicy","Bypass","-File","$env:RUNNER_TEMP\monitor.ps1","-Tag","1" -WindowStyle Hidden
+          $up = $false
+          foreach ($i in 1..30) { Start-Sleep -Seconds 1; if (Test-Path "$env:RUNNER_TEMP\monitor1.jsonl") { $up = $true; break } }
+          if (-not $up) { Write-Error "monitor1 nao iniciou em 30s"; exit 1 }
+          Write-Host "monitor1 armado"
+
+      - name: "SESSÃO A — BASELINE REAL 1.0.246: check/download/downloaded + Instalar e reiniciar (updater ANTIGO)"
+        timeout-minutes: 15
+        working-directory: desktop
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+        run: |
+          set -euo pipefail
+          npm i --no-save playwright@1.47.2 --no-audit --no-fund
+          cat > au-a.mjs <<'EOF'
+          import { _electron } from 'playwright';
+          import fs from 'fs';
+          const exe = process.env.INSTALL_DIR + '\\Agenda ID Seven Desktop.exe';
+          const out = { g: {} }; const g = out.g;
+          const sleep = ms => new Promise(r => setTimeout(r, ms));
+          const app = await _electron.launch({ executablePath: exe, args: [] });
+          const pg = await app.firstWindow({ timeout: 45000 });
+          await pg.waitForLoadState('load'); await pg.waitForTimeout(4000);
+          const before = await pg.evaluate(() => ({
+            ver: (typeof APP_VER !== 'undefined' && APP_VER.desktop) || null,
+            upd: !!(window.desktopAPI && window.desktopAPI.updater)
+          }));
+          out.before = before;
+          g.a1_baselineIs246 = before.ver === '1.0.246';   // o binário REAL dos usuários
+          g.a2_updaterApi = before.upd === true;
+          await pg.evaluate(() => {
+            localStorage.setItem('idseven.desktop.appearance', JSON.stringify({ theme: 'dark', font: 'std', hc: false }));
+            localStorage.setItem('idseven.notif.history.v1', JSON.stringify([{ eventId: 'seed1', dedupKey: 'seed1', eventType: 'flow_update', taskId: 'x', taskTitle: 'Seed', clientName: 'QA', title: 'Seed', severity: 'info', createdAt: 1, deep: 'detail/x', read: true }]));
+          });
+          const st = () => pg.evaluate(() => window.desktopAPI.updater.getState());
+          const poll = async (want, ms) => { const t0 = Date.now(); for (;;) { const s = await st(); if (want.includes(s.status)) return s; if (Date.now() - t0 > ms) return s; await sleep(500); } };
+          await pg.evaluate(() => { window.desktopAPI.updater.check(); });
+          let s = await poll(['update_available'], 30000);
+          out.avail = { status: s.status, version: s.availableVersion };
+          g.b1_updateAvailable247 = s.status === 'update_available' && s.availableVersion === '1.0.247';
+          await pg.evaluate(() => { window.desktopAPI.updater.download(); });
+          { const t0 = Date.now(); for (;;) { const x = await st(); if (x.status === 'downloaded' || x.status === 'error') { s = x; break; } if (Date.now() - t0 > 120000) { s = x; break; } await sleep(400); } }
+          out.dl = s.status;
+          g.b2_downloaded = s.status === 'downloaded';
+          // ÚNICA ação humana do contrato: clique interno "Instalar e reiniciar" (aqui via IPC real).
+          // Depois disto: ZERO interação — o updater ANTIGO lança o installer SEM /S.
+          pg.evaluate(() => { window.desktopAPI.updater.installAndRestart(); }).catch(() => {});
+          let closed = false;
+          try { await Promise.race([new Promise(res => app.on('close', () => { closed = true; res(); })), sleep(30000)]); } catch (_) {}
+          if (!closed) { try { const x = await st(); out.installState = x.status; closed = (x.status === 'installing'); } catch (_) { closed = true; } }
+          out.appClosedByUpdater = closed;
+          g.c1_installTriggered = closed === true;
+          const fails = Object.entries(g).filter(([k, v]) => !v).map(([k]) => k);
+          out.fails = fails;
+          fs.writeFileSync(process.env.RUNNER_TEMP + '/au-sessionA.json', JSON.stringify(out));
+          console.log(JSON.stringify(out, null, 1));
+          try { await Promise.race([app.close(), sleep(4000)]); } catch (_) {}
+          if (fails.length) { console.error('FAILS A:', fails); }
+          process.exit(fails.length ? 1 : 0);
+          EOF
+          node au-a.mjs
+
+      - name: "PONTE ZERO-TOUCH (246→247) — installer one-click SEM /S instala SOZINHO; gates do monitor 1"
+        timeout-minutes: 8
+        shell: powershell
+        run: |
+          $target = (Get-FileHash "$env:RUNNER_TEMP\qa-247.asar" -Algorithm SHA256).Hash
+          Write-Host "hash esperado (asar 1.0.247 QA): $target"
+          $deadline = (Get-Date).AddSeconds(240)
+          $done = $false
+          while ((Get-Date) -lt $deadline) {
+            Start-Sleep -Seconds 3
+            # ZERO interacao: este loop APENAS LE o hash do asar instalado.
+            $asar = Join-Path $env:INSTALL_DIR "resources\app.asar"
+            if (Test-Path $asar) {
+              try { $h = (Get-FileHash $asar -Algorithm SHA256 -ErrorAction Stop).Hash; if ($h -eq $target) { $done = $true; break } } catch { }
+            }
+          }
+          $ev = @{ bridgeInstalled = $done }
+          if (-not $done) {
+            Write-Host "janelas visiveis (diagnostico):"
+            Get-Process | Where-Object { $_.MainWindowTitle } | ForEach-Object { Write-Host ("  [{0}] {1}" -f $_.ProcessName, $_.MainWindowTitle) }
+          } else {
+            Write-Host "PONTE INSTALADA: asar instalado == asar 1.0.247 (hash exato), zero input"
+          }
+          $relaunch = $false
+          foreach ($i in 1..15) { Start-Sleep -Seconds 2; if (Get-Process -Name "Agenda ID Seven Desktop" -ErrorAction SilentlyContinue) { $relaunch = $true; break } }
+          $ev.relaunch = $relaunch
+          # janela do one-click deve SUMIR SOZINHA: amostra final direta
+          Start-Sleep -Seconds 3
+          $finalSetup = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -like "*Setup*" -or $_.MainWindowTitle -like "*Instal*" }).Count
+          $ev.setupWindowsAtEnd = $finalSetup
+          New-Item -ItemType File -Path "$env:RUNNER_TEMP\monitor1.stop" -Force | Out-Null
+          Start-Sleep -Seconds 2
+          $lines = Get-Content "$env:RUNNER_TEMP\monitor1.jsonl" -ErrorAction SilentlyContinue
+          $setupSamples = 0; $scSamples = 0; $uacSamples = 0; $instCmds = @{}; $setupTitles = @{}
+          foreach ($ln in $lines) {
+            try { $r = $ln | ConvertFrom-Json } catch { continue }
+            if ($r.setup -and $r.setup.Count -gt 0) { $setupSamples++; foreach ($w in $r.setup) { $setupTitles[[string]$w] = $true } }
+            if ($r.sc -and $r.sc.Count -gt 0) { $scSamples++ }
+            if ($r.uac -gt 0) { $uacSamples++ }
+            foreach ($p in @($r.inst)) { if ($p -and $p.cmd) { $instCmds[[string]$p.cmd] = @{ pid = $p.pid; ppid = $p.ppid; name = $p.name } } }
+          }
+          $ev.samples = @($lines).Count
+          $ev.SETUP_WINDOWS_VISIBLE = $setupSamples
+          $ev.setupTitles = @($setupTitles.Keys)
+          $ev.smartscreenSamples = $scSamples
+          $ev.uacSamples = $uacSamples
+          $ev.installerProcesses = @($instCmds.GetEnumerator() | ForEach-Object { @{ cmd = $_.Key; pid = $_.Value.pid; ppid = $_.Value.ppid; name = $_.Value.name } })
+          # PROVA DA PONTE: o installer 1.0.247 foi lançado pelo updater ANTIGO SEM /S
+          $legacySpawn = $false
+          foreach ($k in $instCmds.Keys) {
+            if (($k -like "*1.0.247*") -and ($k -like "*--updated*") -and (-not ($k -like "*/S*"))) { $legacySpawn = $true }
+          }
+          $ev.legacySpawnNoSilentFlag = $legacySpawn
+          $ev.REQUIRED_USER_INSTALL_ACTIONS = 0   # estrutural: harness sem input sintético (self-grep) e instalação completou sem NENHUM input
+          $ev | ConvertTo-Json -Depth 6 | Out-File -FilePath "$env:RUNNER_TEMP\bridge-transition.json" -Encoding utf8
+          Write-Host ("monitor1: {0} amostras | SETUP_WINDOWS_VISIBLE={1} | smartscreen={2} | uac={3} | installers={4} | setupAtEnd={5}" -f $ev.samples, $setupSamples, $scSamples, $uacSamples, $ev.installerProcesses.Count, $finalSetup)
+          foreach ($p in $ev.installerProcesses) { Write-Host ("  proc: pid={0} ppid={1} cmd={2}" -f $p.pid, $p.ppid, $p.cmd) }
+          foreach ($w in $ev.setupTitles) { Write-Host ("  janela: {0}" -f $w) }
+          # GATES fail-closed da PONTE
+          if (-not $done) { Write-Error "ponte nao concluiu no tempo (one-click nao instalou sozinho?)"; exit 1 }
+          if (-not $legacySpawn) { Write-Error "FAIL: installer 1.0.247 lancado pelo updater antigo SEM /S nao observado"; exit 1 }
+          if ($uacSamples -ne 0) { Write-Error "FAIL: prompt UAC durante a ponte"; exit 1 }
+          if ($scSamples -ne 0) { Write-Error "FAIL: SmartScreen durante a ponte"; exit 1 }
+          if (-not $relaunch) { Write-Error "FAIL: app 1.0.247 nao relancou sozinho"; exit 1 }
+          if ($finalSetup -ne 0) { Write-Error "FAIL: janela de instalador ainda visivel apos a ponte (nao sumiu sozinha)"; exit 1 }
+          Write-Host "PONTE ZERO-TOUCH OK: instalou e relancou sem NENHUMA acao humana (janela de progresso registrada: $setupSamples amostras; sumiu sozinha)"
+          Get-Process | Where-Object { $_.ProcessName -like "*Agenda*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 2
+
+      - name: "MONITOR 2 — armar ANTES da transição futura (247→248)"
+        shell: powershell
+        run: |
+          Remove-Item "$env:RUNNER_TEMP\monitor2.stop","$env:RUNNER_TEMP\monitor2.jsonl" -ErrorAction SilentlyContinue
+          Start-Process powershell -ArgumentList "-NoProfile","-ExecutionPolicy","Bypass","-File","$env:RUNNER_TEMP\monitor.ps1","-Tag","2" -WindowStyle Hidden
+          $up = $false
+          foreach ($i in 1..30) { Start-Sleep -Seconds 1; if (Test-Path "$env:RUNNER_TEMP\monitor2.jsonl") { $up = $true; break } }
+          if (-not $up) { Write-Error "monitor2 nao iniciou em 30s"; exit 1 }
+          Write-Host "monitor2 armado"
+
+      - name: "SESSÃO B — 1.0.247 (via ponte): userData/OFF/ON/kill + FUTURE check 1.0.248 + install /S"
+        timeout-minutes: 15
+        working-directory: desktop
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+        run: |
+          set -euo pipefail
+          cat > au-b.mjs <<'EOF'
+          import { _electron } from 'playwright';
+          import fs from 'fs'; import path from 'path';
+          const exe = process.env.INSTALL_DIR + '\\Agenda ID Seven Desktop.exe';
+          const FEED = process.env.FEED_DIR;
+          const FEED248 = process.env.RUNNER_TEMP + '\\feed248';
+          const out = { g: {} }; const g = out.g;
+          const sleep = ms => new Promise(r => setTimeout(r, ms));
+          const app = await _electron.launch({ executablePath: exe, args: [] });
+          const pg = await app.firstWindow({ timeout: 45000 });
+          await pg.waitForLoadState('load'); await pg.waitForTimeout(4000);
+          const a = await pg.evaluate(() => ({
+            ver: (typeof APP_VER !== 'undefined' && APP_VER.desktop) || null,
+            title: document.title,
+            appear: localStorage.getItem('idseven.desktop.appearance'),
+            notif: localStorage.getItem('idseven.notif.history.v1'),
+            lui: document.body.classList.contains('light-ui'),
+            loginPwd: !!document.querySelector('input[type="password"]'),
+            recovery: (document.body.innerHTML.match(/Esqueci minha senha/g) || []).length
+          }));
+          out.after = a;
+          g.d1_versionIs247 = a.ver === '1.0.247' && a.title.includes('1.0.247');
+          g.d0_loginSurface = a.loginPwd === true;
+          g.d0_rcd02Zero = a.recovery === 0;
+          const ap = JSON.parse(a.appear || '{}');
+          g.d2_userDataKept = ap.theme === 'dark' && (a.notif || '').includes('seed1');
+          g.d3_luiStillOff = !a.lui && ap.luiPreview !== true;
+          await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0].setContentSize(1280, 800); });
+          await sleep(400);
+          out.vw = await pg.evaluate(() => window.innerWidth);
+          await pg.evaluate(() => { appearSet({ luiPreview: true }); });
+          await sleep(300);
+          g.d4_onWorks = await pg.evaluate(() => document.body.classList.contains('light-ui') && document.body.classList.contains('desktop'));
+          await pg.evaluate(() => { appearSet({ luiPreview: false }); });
+          await sleep(300);
+          g.d5_killWorks = await pg.evaluate(() => !document.body.classList.contains('light-ui'));
+          // FUTURE (FASE 11): o feed passa a servir 1.0.248; o updater NOVO (b4ea7890) instala com /S
+          for (const f of fs.readdirSync(FEED248)) fs.copyFileSync(path.join(FEED248, f), path.join(FEED, f));
+          fs.unlinkSync(path.join(FEED, 'Agenda-ID-Seven-Desktop-1.0.247-x64.exe'));
+          fs.unlinkSync(path.join(FEED, 'Agenda-ID-Seven-Desktop-1.0.247-x64.exe.blockmap'));
+          const st = () => pg.evaluate(() => window.desktopAPI.updater.getState());
+          const poll = async (want, ms) => { const t0 = Date.now(); for (;;) { const s = await st(); if (want.includes(s.status)) return s; if (Date.now() - t0 > ms) return s; await sleep(500); } };
+          await pg.evaluate(() => { window.desktopAPI.updater.check(); });
+          let s = await poll(['update_available'], 30000);
+          out.nextAvail = { status: s.status, version: s.availableVersion };
+          g.f1_next248Available = s.status === 'update_available' && s.availableVersion === '1.0.248';
+          await pg.evaluate(() => { window.desktopAPI.updater.download(); });
+          { const t0 = Date.now(); for (;;) { const x = await st(); if (x.status === 'downloaded' || x.status === 'error') { s = x; break; } if (Date.now() - t0 > 120000) { s = x; break; } await sleep(400); } }
+          g.f2_downloaded = s.status === 'downloaded';
+          pg.evaluate(() => { window.desktopAPI.updater.installAndRestart(); }).catch(() => {});
+          let closed = false;
+          try { await Promise.race([new Promise(res => app.on('close', () => { closed = true; res(); })), sleep(30000)]); } catch (_) {}
+          if (!closed) { try { const x = await st(); closed = (x.status === 'installing'); } catch (_) { closed = true; } }
+          g.f3_installTriggered = closed === true;
+          const fails = Object.entries(g).filter(([k, v]) => !v).map(([k]) => k);
+          out.fails = fails;
+          fs.writeFileSync(process.env.RUNNER_TEMP + '/au-sessionB.json', JSON.stringify(out));
+          console.log(JSON.stringify(out, null, 1));
+          try { await Promise.race([app.close(), sleep(4000)]); } catch (_) {}
+          if (fails.length) { console.error('FAILS B:', fails); }
+          process.exit(fails.length ? 1 : 0);
+          EOF
+          node au-b.mjs
+
+      - name: "TRANSIÇÃO SILENCIOSA FUTURA (247→248) — /S, zero janela; gates do monitor 2"
+        timeout-minutes: 8
+        shell: powershell
+        run: |
+          $target = (Get-FileHash "desktop\dist-installer\win-unpacked\resources\app.asar" -Algorithm SHA256).Hash
+          Write-Host "hash esperado (asar 1.0.248 QA): $target"
+          $deadline = (Get-Date).AddSeconds(240)
+          $done = $false
+          while ((Get-Date) -lt $deadline) {
+            Start-Sleep -Seconds 3
+            $asar = Join-Path $env:INSTALL_DIR "resources\app.asar"
+            if (Test-Path $asar) {
+              try { $h = (Get-FileHash $asar -Algorithm SHA256 -ErrorAction Stop).Hash; if ($h -eq $target) { $done = $true; break } } catch { }
+            }
+          }
+          $ev = @{ silentInstalled = $done }
+          if (-not $done) {
+            Write-Host "janelas visiveis (diagnostico):"
+            Get-Process | Where-Object { $_.MainWindowTitle } | ForEach-Object { Write-Host ("  [{0}] {1}" -f $_.ProcessName, $_.MainWindowTitle) }
+          }
+          $relaunch = $false
+          foreach ($i in 1..15) { Start-Sleep -Seconds 2; if (Get-Process -Name "Agenda ID Seven Desktop" -ErrorAction SilentlyContinue) { $relaunch = $true; break } }
+          $ev.relaunch = $relaunch
+          New-Item -ItemType File -Path "$env:RUNNER_TEMP\monitor2.stop" -Force | Out-Null
+          Start-Sleep -Seconds 2
+          $lines = Get-Content "$env:RUNNER_TEMP\monitor2.jsonl" -ErrorAction SilentlyContinue
+          $setupSamples = 0; $scSamples = 0; $uacSamples = 0; $instCmds = @{}
+          foreach ($ln in $lines) {
+            try { $r = $ln | ConvertFrom-Json } catch { continue }
+            if ($r.setup -and $r.setup.Count -gt 0) { $setupSamples++ }
+            if ($r.sc -and $r.sc.Count -gt 0) { $scSamples++ }
+            if ($r.uac -gt 0) { $uacSamples++ }
+            foreach ($p in @($r.inst)) { if ($p -and $p.cmd) { $instCmds[[string]$p.cmd] = @{ pid = $p.pid; ppid = $p.ppid; name = $p.name } } }
+          }
+          $ev.samples = @($lines).Count
+          $ev.setupWindowSamples = $setupSamples
+          $ev.smartscreenSamples = $scSamples
+          $ev.uacSamples = $uacSamples
+          $ev.installerProcesses = @($instCmds.GetEnumerator() | ForEach-Object { @{ cmd = $_.Key; pid = $_.Value.pid; ppid = $_.Value.ppid; name = $_.Value.name } })
+          $silentSpawn = $false
+          foreach ($k in $instCmds.Keys) { if (($k -like "*1.0.248*") -and ($k -like "*--updated*") -and ($k -like "*/S*")) { $silentSpawn = $true } }
+          $ev.installerCmdHasSilentUpdated = $silentSpawn
+          $ev | ConvertTo-Json -Depth 6 | Out-File -FilePath "$env:RUNNER_TEMP\silent-transition.json" -Encoding utf8
+          Write-Host ("monitor2: {0} amostras | setupWins={1} | smartscreen={2} | uac={3} | installers={4}" -f $ev.samples, $setupSamples, $scSamples, $uacSamples, $ev.installerProcesses.Count)
+          foreach ($p in $ev.installerProcesses) { Write-Host ("  proc: pid={0} ppid={1} cmd={2}" -f $p.pid, $p.ppid, $p.cmd) }
+          if (-not $done) { Write-Error "instalacao silenciosa futura nao concluiu no tempo"; exit 1 }
+          if ($setupSamples -ne 0) { Write-Error "FAIL: janela visivel na transicao /S (deveria ser zero)"; exit 1 }
+          if ($uacSamples -ne 0) { Write-Error "FAIL: UAC na transicao futura"; exit 1 }
+          if ($scSamples -ne 0) { Write-Error "FAIL: SmartScreen na transicao futura"; exit 1 }
+          if (-not $silentSpawn) { Write-Error "FAIL: installer 1.0.248 com updated+/S nao observado"; exit 1 }
+          if (-not $relaunch) { Write-Error "FAIL: app 1.0.248 nao relancou sozinho"; exit 1 }
+          Write-Host "TRANSICAO FUTURA OK: /S, zero janela, zero input"
+          Get-Process | Where-Object { $_.ProcessName -like "*Agenda*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 2
+
+      - name: "EXTERNAL_INSTALL_INTERACTION = 0 — gate mecânico (self-grep do harness)"
+        run: |
+          set -euo pipefail
+          WF="$RUNNER_TEMP/wf-self.yml"
+          V1=$(grep -cE "SendK[e]ys|AppActiv[a]te|UIAutomat[i]on|WScript\.Sh[e]ll|mouse_ev[e]nt|SetCursor[P]os" "$WF" || true)
+          V2=$(grep -cE "msiex[e]c" "$WF" || true)
+          V3=$(grep -cE "Start-Proc[e]ss.*1\.0\.24[78].*\.exe" "$WF" || true)
+          echo "input-sintetico: $V1 | msi-exec: $V2 | exec direto dos installers 247/248: $V3"
+          [ "$V1" = "0" ] && [ "$V2" = "0" ] && [ "$V3" = "0" ] || { echo "::error::harness contém interação/execução externa de installer"; exit 1; }
+          echo "EXTERNAL_INSTALL_INTERACTION=0 e REQUIRED_USER_INSTALL_ACTIONS=0 (estrutural + runtime)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "SESSÃO C — 1.0.248: versão + userData (2 updates) + OFF + same-version + downgrade"
+        timeout-minutes: 15
+        working-directory: desktop
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+        run: |
+          set -euo pipefail
+          cat > au-c.mjs <<'EOF'
+          import { _electron } from 'playwright';
+          import fs from 'fs'; import path from 'path';
+          const exe = process.env.INSTALL_DIR + '\\Agenda ID Seven Desktop.exe';
+          const FEED = process.env.FEED_DIR;
+          const out = { g: {} }; const g = out.g;
+          const sleep = ms => new Promise(r => setTimeout(r, ms));
+          const app = await _electron.launch({ executablePath: exe, args: [] });
+          const pg = await app.firstWindow({ timeout: 45000 });
+          await pg.waitForLoadState('load'); await pg.waitForTimeout(4000);
+          const a = await pg.evaluate(() => ({
+            ver: (typeof APP_VER !== 'undefined' && APP_VER.desktop) || null,
+            title: document.title,
+            appear: localStorage.getItem('idseven.desktop.appearance'),
+            notif: localStorage.getItem('idseven.notif.history.v1'),
+            lui: document.body.classList.contains('light-ui')
+          }));
+          out.after = a;
+          g.g1_versionIs248 = a.ver === '1.0.248' && a.title.includes('1.0.248');
+          const ap = JSON.parse(a.appear || '{}');
+          g.g2_userDataKeptAcross2Updates = ap.theme === 'dark' && (a.notif || '').includes('seed1');
+          g.g3_luiStillOff = !a.lui && ap.luiPreview !== true;
+          const st = () => pg.evaluate(() => window.desktopAPI.updater.getState());
+          const poll = async (want, ms) => { const t0 = Date.now(); for (;;) { const s = await st(); if (want.includes(s.status)) return s; if (Date.now() - t0 > ms) return s; await sleep(500); } };
+          await pg.evaluate(() => { window.desktopAPI.updater.check(); });
+          let s = await poll(['up_to_date', 'update_available', 'error'], 30000);
+          out.same = s.status;
+          g.g4_noSameVersionLoop = s.status === 'up_to_date';
+          const ly = path.join(FEED, 'latest.yml');
+          fs.writeFileSync(ly, fs.readFileSync(ly, 'utf8').replace(/1\.0\.248/g, '1.0.247'));
+          await pg.evaluate(() => { window.desktopAPI.updater.check(); });
+          s = await poll(['up_to_date', 'update_available', 'error'], 30000);
+          out.down = s.status;
+          g.g5_noDowngrade = s.status !== 'update_available';
+          await pg.screenshot({ path: process.env.RUNNER_TEMP + '/AU-BRIDGE-AFTER-1.0.248.png' });
+          const fails = Object.entries(g).filter(([k, v]) => !v).map(([k]) => k);
+          out.fails = fails;
+          fs.writeFileSync(process.env.RUNNER_TEMP + '/au-sessionC.json', JSON.stringify(out));
+          console.log(JSON.stringify(out, null, 1));
+          try { await Promise.race([app.close(), sleep(4000)]); } catch (_) {}
+          if (fails.length) { console.error('FAILS C:', fails); }
+          process.exit(fails.length ? 1 : 0);
+          EOF
+          node au-c.mjs
+          echo "ZERO-TOUCH LEGACY BRIDGE: PASS (246->247 one-click sem acao humana; 247->248 /S)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload evidências (JSON + monitores + screenshot)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zero-touch-bridge-evidence
+          path: |
+            ${{ runner.temp }}/au-sessionA.json
+            ${{ runner.temp }}/bridge-transition.json
+            ${{ runner.temp }}/monitor1.jsonl
+            ${{ runner.temp }}/au-sessionB.json
+            ${{ runner.temp }}/silent-transition.json
+            ${{ runner.temp }}/monitor2.jsonl
+            ${{ runner.temp }}/au-sessionC.json
+            ${{ runner.temp }}/AU-BRIDGE-AFTER-1.0.248.png
+          if-no-files-found: warn
+          retention-days: 7
