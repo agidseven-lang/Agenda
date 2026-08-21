@@ -82,7 +82,7 @@ jobs:
           if ($p.ExitCode -ne 0) { Write-Error "baseline install exit $($p.ExitCode)"; exit 1 }
           Start-Sleep -Seconds 3
           $dir = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Directory | Where-Object { Test-Path (Join-Path $_.FullName "Agenda ID Seven Desktop.exe") } | Select-Object -First 1
-          if (-not $dir) { Write-Error "baseline não instalada"; exit 1 }
+          if (-not $dir) { Write-Error "baseline nao instalada"; exit 1 }
           "INSTALL_DIR=$($dir.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           Write-Host "baseline instalada em: $($dir.FullName)"
 
@@ -181,7 +181,7 @@ jobs:
             Start-Sleep -Seconds 1
             if (Test-Path "$env:RUNNER_TEMP\monitor.jsonl") { $up = $true; break }
           }
-          if (-not $up) { Write-Error "monitor não iniciou em 30s"; exit 1 }
+          if (-not $up) { Write-Error "monitor nao iniciou em 30s"; exit 1 }
           Write-Host "monitor armado (amostragem ~700ms; Setup/SmartScreen/consent.exe/process --updated)"
 
       - name: "SESSÃO A IN-APP — negativos + check/download/downloaded + quitAndInstall SILENCIOSO"
@@ -291,7 +291,7 @@ jobs:
           }
           $ev = @{ silentInstalled = $done }
           if (-not $done) {
-            Write-Host "janelas visíveis (diagnóstico):"
+            Write-Host "janelas visiveis (diagnostico):"
             Get-Process | Where-Object { $_.MainWindowTitle } | ForEach-Object { Write-Host ("  [{0}] {1}" -f $_.ProcessName, $_.MainWindowTitle) }
           } else {
             Write-Host "UPDATE SILENCIOSO INSTALADO: asar instalado == asar 1.0.247 (hash exato), zero input"
@@ -324,16 +324,16 @@ jobs:
           foreach ($k in $instCmds.Keys) { if (($k -like "*--updated*") -and ($k -like "*/S*") -and ($k -like "*1.0.247*")) { $updaterSpawn = $true } }
           $ev.installerCmdHasSilentUpdated = $updaterSpawn
           $ev | ConvertTo-Json -Depth 6 | Out-File -FilePath "$env:RUNNER_TEMP\silent-transition.json" -Encoding utf8
-          Write-Host ("monitor: {0} amostras · setupWins={1} · smartscreen={2} · uac={3} · installers={4}" -f $ev.samples, $setupSamples, $scSamples, $uacSamples, $ev.installerProcesses.Count)
+          Write-Host ("monitor: {0} amostras | setupWins={1} | smartscreen={2} | uac={3} | installers={4}" -f $ev.samples, $setupSamples, $scSamples, $uacSamples, $ev.installerProcesses.Count)
           foreach ($p in $ev.installerProcesses) { Write-Host ("  installer: pid={0} ppid={1} cmd={2}" -f $p.pid, $p.ppid, $p.cmd) }
           # GATES fail-closed
-          if (-not $done) { Write-Error "instalação silenciosa não concluiu no tempo"; exit 1 }
-          if ($setupSamples -ne 0) { Write-Error "FAIL: janela de Setup visível durante a transição ($setupSamples amostras) — update NÃO é unattended"; exit 1 }
-          if ($uacSamples -ne 0) { Write-Error "FAIL: prompt UAC (consent.exe) durante a transição"; exit 1 }
+          if (-not $done) { Write-Error "instalacao silenciosa nao concluiu no tempo"; exit 1 }
+          if ($setupSamples -ne 0) { Write-Error "FAIL: janela de Setup visivel durante a transicao ($setupSamples amostras) - update NAO e unattended"; exit 1 }
+          if ($uacSamples -ne 0) { Write-Error "FAIL: prompt UAC (consent.exe) durante a transicao"; exit 1 }
           if ($scSamples -ne 0) { Write-Error "FAIL: SmartScreen durante a transição"; exit 1 }
-          if (-not $updaterSpawn) { Write-Error "FAIL: processo do installer com '--updated /S' não observado (evidência de spawn pelo updater ausente)"; exit 1 }
-          if (-not $relaunch) { Write-Error "FAIL: app não relançou sozinho (--force-run)"; exit 1 }
-          Write-Host "TRANSIÇÃO SILENCIOSA OK: instalado + relançado sem NENHUMA janela/prompt/input"
+          if (-not $updaterSpawn) { Write-Error "FAIL: processo do installer com updated/S nao observado (evidencia de spawn pelo updater ausente)"; exit 1 }
+          if (-not $relaunch) { Write-Error "FAIL: app nao relancou sozinho (force-run)"; exit 1 }
+          Write-Host "TRANSICAO SILENCIOSA OK: instalado + relancado sem NENHUMA janela/prompt/input"
           # encerra instâncias p/ a sessão B controlada (cleanup pós-prova; não é interação de instalação)
           Get-Process | Where-Object { $_.ProcessName -like "*Agenda*" } | Stop-Process -Force -ErrorAction SilentlyContinue
           Start-Sleep -Seconds 2
