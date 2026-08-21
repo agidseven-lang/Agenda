@@ -1,0 +1,300 @@
+# =====================================================================
+# [manual] RC Light UI — AUTO-UPDATE ACCEPTANCE TEST (QA; NADA é publicado)
+# ---------------------------------------------------------------------
+# I5C.3 — prova do fluxo REAL de atualização IN-APP:
+#   baseline 1.0.246 (release pública REAL, instalada automaticamente p/ QA)
+#   → feed QA LOCAL (127.0.0.1; fail-closed; produção intocada)
+#   → updater INTERNO do app (rota real desktopAPI.updater.* / electron-updater)
+#   → negativos (feed fora; artefato corrompido ⇒ sha512 barra) → retry
+#   → download → downloaded → quitAndInstall REAL (instalador visível por
+#     contrato F3.4.1A; wizard avançado por SendKeys da máquina QA)
+#   → nova versão abre → userData preservado → Light UI OFF → ON/kill
+#   → same-version ⇒ up_to_date → downgrade ⇒ up_to_date.
+# BUMP EFÊMERO DE QA: o pacote de teste é buildado do source dcc019ca com a
+# versão 1.0.247 aplicada SOMENTE no workspace do runner (nunca comitada,
+# nunca publicada) — necessário porque same-version não atualiza (RC-U01).
+# A ÚNICA entidade que inicia o novo installer é o UPDATER DO APLICATIVO.
+# Sem tag, sem release, sem deploy, sem publish. Execução manual apenas.
+# =====================================================================
+name: "[manual] RC Light UI — Auto-Update Acceptance (QA)"
+
+"on":
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  PRODUCT_SOURCE_SHA: "dcc019ca7acf714de0629ff11c247ad9a877626f"
+  QA_EPHEMERAL_VERSION: "1.0.247"
+  BASELINE_TAG: "v1.0.246"
+  FEED_PORT: "8879"
+
+jobs:
+  autoupdate:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: "Git sem conversão CRLF"
+        run: git config --global core.autocrlf false
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: "PIN do PRODUCT SOURCE (dcc019ca) + provenance"
+        run: |
+          set -euo pipefail
+          git checkout --detach "$PRODUCT_SOURCE_SHA"
+          [ "$(git rev-parse HEAD)" = "$PRODUCT_SOURCE_SHA" ] || { echo "::error::pin falhou"; exit 1; }
+
+      - name: "BASELINE DE PRODUÇÃO — baixar release pública v1.0.246 + verificar SHA256SUMS"
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/baseline"; cd "$RUNNER_TEMP/baseline"
+          BASE="https://github.com/agidseven-lang/Agenda/releases/download/$BASELINE_TAG"
+          curl -sSL -o baseline.exe "$BASE/Agenda-ID-Seven-Desktop-1.0.246-x64.exe"
+          curl -sSL -o SHA256SUMS "$BASE/SHA256SUMS"
+          EXP=$(grep "Agenda-ID-Seven-Desktop-1.0.246-x64.exe$" SHA256SUMS | awk '{print $1}')
+          GOT=$(sha256sum baseline.exe | awk '{print $1}')
+          echo "esperado(release): $EXP"; echo "obtido: $GOT"
+          [ "$EXP" = "$GOT" ] || { echo "::error::baseline exe não confere com SHA256SUMS da release"; exit 1; }
+          echo "BASELINE OK: release pública v1.0.246 íntegra"
+
+      - name: "Instalar baseline (setup automatizado de QA — permitido; update NUNCA será manual)"
+        shell: powershell
+        run: |
+          $p = Start-Process -FilePath "$env:RUNNER_TEMP\baseline\baseline.exe" -ArgumentList "/S" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Write-Error "baseline install exit $($p.ExitCode)"; exit 1 }
+          Start-Sleep -Seconds 3
+          $dir = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Directory | Where-Object { Test-Path (Join-Path $_.FullName "Agenda ID Seven Desktop.exe") } | Select-Object -First 1
+          if (-not $dir) { Write-Error "baseline não instalada"; exit 1 }
+          "INSTALL_DIR=$($dir.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "baseline instalada em: $($dir.FullName)"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: "RC QA 1.0.247 EFÊMERO — bump SÓ no workspace do runner (nunca comitado/publicado) + build NSIS"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          echo "::notice::QA-ONLY EPHEMERAL BUMP -> $QA_EPHEMERAL_VERSION (workspace do runner; source do repo INTOCADO)"
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version=process.env.QA_EPHEMERAL_VERSION;fs.writeFileSync('package.json',JSON.stringify(p,null,2));"
+          node -e "const fs=require('fs');let s=fs.readFileSync('package-lock.json','utf8');s=s.replace(/\"version\": \"1\.0\.246\"/g,'\"version\": \"'+process.env.QA_EPHEMERAL_VERSION+'\"');fs.writeFileSync('package-lock.json',s);"
+          npm ci --no-audit --no-fund
+          npm run build
+          npx electron-builder --win nsis --publish never
+          ls -la dist-installer/ | head -8
+          grep -E "^version:" dist-installer/latest.yml
+
+      - name: "FEED QA LOCAL fail-closed (127.0.0.1:8879 — produção não enxerga)"
+        shell: powershell
+        run: |
+          $feed = "$env:RUNNER_TEMP\feed"
+          New-Item -ItemType Directory -Force -Path $feed | Out-Null
+          Copy-Item "desktop\dist-installer\latest.yml" $feed
+          Copy-Item "desktop\dist-installer\Agenda-ID-Seven-Desktop-1.0.247-x64.exe" $feed
+          Copy-Item "desktop\dist-installer\Agenda-ID-Seven-Desktop-1.0.247-x64.exe.blockmap" $feed
+          "FEED_DIR=$feed" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Start-Process python -ArgumentList "-m","http.server",$env:FEED_PORT,"--bind","127.0.0.1","--directory",$feed -WindowStyle Hidden
+          Start-Sleep -Seconds 3
+          (Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:$env:FEED_PORT/latest.yml").StatusCode
+
+      - name: "Apontar a INSTÂNCIA QA para o feed (app-update.yml da instância; produção intocada)"
+        shell: powershell
+        run: |
+          $au = Join-Path $env:INSTALL_DIR "resources\app-update.yml"
+          Copy-Item $au "$au.bak"
+          @"
+          provider: generic
+          url: http://127.0.0.1:$env:FEED_PORT
+          channel: latest
+          updaterCacheDirName: agenda-id-seven-desktop-updater
+          "@ | Out-File -FilePath $au -Encoding utf8
+          Get-Content $au
+
+      - name: "TESTE IN-APP — negativos (feed fora + artefato corrompido) e fluxo real até DOWNLOADED + INSTALL"
+        working-directory: desktop
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+        run: |
+          set -euo pipefail
+          npm i --no-save playwright@1.47.2 --no-audit --no-fund
+          cat > au-test.mjs <<'EOF'
+          import { _electron } from 'playwright';
+          import fs from 'fs'; import path from 'path';
+          const exe = process.env.INSTALL_DIR + '\\Agenda ID Seven Desktop.exe';
+          const FEED = process.env.FEED_DIR;
+          const out = { g: {}, log: [] }; const g = out.g;
+          const sleep = ms => new Promise(r => setTimeout(r, ms));
+          const launch = () => _electron.launch({ executablePath: exe, args: [] });
+
+          // ---------- SESSÃO A: baseline + semear userData + negativos + fluxo até installing
+          let app = await launch();
+          let pg = await app.firstWindow({ timeout: 45000 });
+          await pg.waitForLoadState('load'); await pg.waitForTimeout(4000);
+          const before = await pg.evaluate(() => ({
+            ver: (typeof APP_VER !== 'undefined' && APP_VER.desktop) || null,
+            upd: !!(window.desktopAPI && window.desktopAPI.updater)
+          }));
+          out.before = before;
+          g.a1_baselineVersion = before.ver === '1.0.246';
+          g.a2_updaterApi = before.upd === true;
+          // semear userData p/ prova de preservação (aparência legacy + histórico)
+          await pg.evaluate(() => {
+            localStorage.setItem('idseven.desktop.appearance', JSON.stringify({ theme: 'dark', font: 'std', hc: false }));
+            localStorage.setItem('idseven.notif.history.v1', JSON.stringify([{ eventId: 'seed1', dedupKey: 'seed1', eventType: 'flow_update', taskId: 'x', taskTitle: 'Seed', clientName: 'QA', title: 'Seed', severity: 'info', createdAt: 1, deep: 'detail/x', read: true }]));
+          });
+          const st = () => pg.evaluate(() => window.desktopAPI.updater.getState());
+          const check = () => pg.evaluate(() => window.desktopAPI.updater.check());
+          const poll = async (want, ms) => { const t0 = Date.now(); for (;;) { const s = await st(); if (want.includes(s.status)) return s; if (Date.now() - t0 > ms) return s; await sleep(500); } };
+
+          // NEG 1 — feed indisponível: renomeia latest.yml → check → erro honesto; app segue vivo
+          fs.renameSync(path.join(FEED, 'latest.yml'), path.join(FEED, 'latest.hold'));
+          await check(); let s = await poll(['error', 'up_to_date', 'update_available'], 20000);
+          out.neg1 = s.status;
+          g.n1_feedDownHonest = s.status === 'error';
+          g.n1_appAlive = await pg.evaluate(() => !!document.body);
+          fs.renameSync(path.join(FEED, 'latest.hold'), path.join(FEED, 'latest.yml'));
+
+          // CHECK real — update disponível 1.0.247
+          await check(); s = await poll(['update_available'], 30000);
+          out.avail = { status: s.status, version: s.availableVersion, size: s.sizeBytes };
+          g.b1_updateAvailable = s.status === 'update_available' && s.availableVersion === '1.0.247';
+
+          // NEG 2 — artefato CORROMPIDO: troca o exe do feed por lixo → download → sha512 barra
+          const exeName = 'Agenda-ID-Seven-Desktop-1.0.247-x64.exe';
+          fs.copyFileSync(path.join(FEED, exeName), path.join(FEED, exeName + '.good'));
+          fs.writeFileSync(path.join(FEED, exeName), Buffer.from('CORRUPT-QA-ARTIFACT'));
+          await pg.evaluate(() => window.desktopAPI.updater.download());
+          s = await poll(['error', 'downloaded'], 60000);
+          out.neg2 = { status: s.status, err: s.error };
+          g.n2_corruptRejected = s.status === 'error';           // sha512/size mismatch — NÃO instala
+          fs.copyFileSync(path.join(FEED, exeName + '.good'), path.join(FEED, exeName));
+
+          // RETRY íntegro — check de novo (estado error → novo ciclo) → download com progress → downloaded
+          await check(); s = await poll(['update_available'], 30000);
+          g.b2_retryAvailable = s.status === 'update_available';
+          await pg.evaluate(() => window.desktopAPI.updater.download());
+          let sawProgress = false;
+          { const t0 = Date.now(); for (;;) { const x = await st(); if (x.status === 'downloading' && x.progress && x.progress.percent > 0) sawProgress = true; if (x.status === 'downloaded') { s = x; break; } if (x.status === 'error') { s = x; break; } if (Date.now() - t0 > 120000) { s = x; break; } await sleep(400); } }
+          out.dl = { status: s.status, progressSeen: sawProgress };
+          g.b3_downloaded = s.status === 'downloaded';
+          g.b4_progress = sawProgress === true;
+
+          // INSTALL — ÚNICO iniciador: o updater do app (quitAndInstall real; wizard visível por contrato)
+          const r = await pg.evaluate(() => window.desktopAPI.updater.installAndRestart());
+          out.installCall = r;
+          g.c1_installAccepted = r && r.ok === true;
+          await sleep(4000);
+          try { await app.close(); } catch (_) {}                // o app já deve ter fechado sozinho
+          console.log(JSON.stringify(out, null, 1));
+          const failsA = Object.entries(g).filter(([k, v]) => !v).map(([k]) => k);
+          fs.writeFileSync(process.env.RUNNER_TEMP + '/au-sessionA.json', JSON.stringify(out));
+          if (failsA.length) { console.error('FAILS A:', failsA); process.exit(1); }
+          EOF
+          node au-test.mjs
+
+      - name: "WIZARD do NSIS (contrato: instalador VISÍVEL) — avançar via SendKeys + aguardar instalação"
+        shell: powershell
+        run: |
+          $deadline = (Get-Date).AddSeconds(150)
+          $wsh = New-Object -ComObject WScript.Shell
+          $done = $false
+          while ((Get-Date) -lt $deadline) {
+            Start-Sleep -Seconds 3
+            # tenta focar o instalador e avançar (Install -> Finish com run-after)
+            $null = $wsh.AppActivate("Agenda ID Seven Desktop")
+            $wsh.SendKeys("{ENTER}")
+            # instalado quando o package.json interno do asar reportar 1.0.247
+            $asar = Join-Path $env:INSTALL_DIR "resources\app.asar"
+            if (Test-Path $asar) {
+              $bytes = [System.IO.File]::ReadAllBytes($asar)[0..40000]
+              $txt = [System.Text.Encoding]::UTF8.GetString($bytes)
+              if ($txt -match '"version"\s*:\s*"1\.0\.247"') { $done = $true; break }
+            }
+          }
+          if (-not $done) { Write-Error "instalação via updater não concluiu no tempo (wizard)"; exit 1 }
+          Write-Host "UPDATE INSTALADO: asar reporta 1.0.247"
+          # o updater relança o app (isForceRunAfter=true) — encerra instâncias p/ a sessão B controlada
+          Start-Sleep -Seconds 8
+          Get-Process | Where-Object { $_.ProcessName -like "*Agenda*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 2
+
+      - name: "SESSÃO B — versão nova + userData + Light OFF→ON→kill + same-version + downgrade"
+        working-directory: desktop
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+        run: |
+          set -euo pipefail
+          cat > au-after.mjs <<'EOF'
+          import { _electron } from 'playwright';
+          import fs from 'fs'; import path from 'path';
+          const exe = process.env.INSTALL_DIR + '\\Agenda ID Seven Desktop.exe';
+          const FEED = process.env.FEED_DIR;
+          const out = { g: {} }; const g = out.g;
+          const sleep = ms => new Promise(r => setTimeout(r, ms));
+          const app = await _electron.launch({ executablePath: exe, args: [] });
+          const pg = await app.firstWindow({ timeout: 45000 });
+          await pg.waitForLoadState('load'); await pg.waitForTimeout(4000);
+          const a = await pg.evaluate(() => ({
+            ver: (typeof APP_VER !== 'undefined' && APP_VER.desktop) || null,
+            title: document.title,
+            appear: localStorage.getItem('idseven.desktop.appearance'),
+            notif: localStorage.getItem('idseven.notif.history.v1'),
+            lui: document.body.classList.contains('light-ui')
+          }));
+          out.after = a;
+          g.d1_versionAfter = a.ver === '1.0.247' && a.title.includes('1.0.247');
+          const ap = JSON.parse(a.appear || '{}');
+          g.d2_userDataKept = ap.theme === 'dark' && (a.notif || '').includes('seed1');
+          g.d3_luiStillOff = !a.lui && ap.luiPreview !== true;       // update NÃO liga o preview
+          // ON pelo mecanismo real + kill
+          await pg.evaluate(() => { appearSet({ luiPreview: true }); });
+          await sleep(300);
+          g.d4_onWorks = await pg.evaluate(() => document.body.classList.contains('light-ui') && document.body.classList.contains('desktop'));
+          await pg.evaluate(() => { appearSet({ luiPreview: false }); });
+          await sleep(300);
+          g.d5_killWorks = await pg.evaluate(() => !document.body.classList.contains('light-ui'));
+          // SAME-VERSION LOOP GATE — feed segue 1.0.247; app é 1.0.247 → up_to_date
+          const st = () => pg.evaluate(() => window.desktopAPI.updater.getState());
+          const poll = async (want, ms) => { const t0 = Date.now(); for (;;) { const s = await st(); if (want.includes(s.status)) return s; if (Date.now() - t0 > ms) return s; await sleep(500); } };
+          await pg.evaluate(() => window.desktopAPI.updater.check());
+          let s = await poll(['up_to_date', 'update_available', 'error'], 30000);
+          out.same = s.status;
+          g.e1_noSameVersionLoop = s.status === 'up_to_date';
+          // OLDER VERSION GATE — latest.yml aponta 1.0.246 → allowDowngrade=false → up_to_date
+          const ly = path.join(FEED, 'latest.yml');
+          fs.writeFileSync(ly, fs.readFileSync(ly, 'utf8').replace(/1\.0\.247/g, '1.0.246'));
+          await pg.evaluate(() => window.desktopAPI.updater.check());
+          s = await poll(['up_to_date', 'update_available', 'error'], 30000);
+          out.down = s.status;
+          g.e2_noDowngrade = s.status !== 'update_available';
+          await pg.screenshot({ path: process.env.RUNNER_TEMP + '/AU-AFTER-1.0.247.png' });
+          try { await app.close(); } catch (_) {}
+          console.log(JSON.stringify(out, null, 1));
+          const fails = Object.entries(g).filter(([k, v]) => !v).map(([k]) => k);
+          fs.writeFileSync(process.env.RUNNER_TEMP + '/au-sessionB.json', JSON.stringify(out));
+          if (fails.length) { console.error('FAILS B:', fails); process.exit(1); }
+          EOF
+          node au-after.mjs
+          echo "AUTO-UPDATE ACCEPTANCE: PASS" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload evidências (JSON + screenshot)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: autoupdate-acceptance-evidence
+          path: |
+            ${{ runner.temp }}/au-sessionA.json
+            ${{ runner.temp }}/au-sessionB.json
+            ${{ runner.temp }}/AU-AFTER-1.0.247.png
+          if-no-files-found: warn
+          retention-days: 7
