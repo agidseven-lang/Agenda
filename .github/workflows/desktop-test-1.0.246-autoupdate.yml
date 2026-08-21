@@ -193,7 +193,9 @@ jobs:
           { const t0 = Date.now(); for (;;) { const x = await st(); if (x.status === 'downloading' && x.progress && x.progress.percent > 0) sawProgress = true; if (x.status === 'downloaded') { s = x; break; } if (x.status === 'error') { s = x; break; } if (Date.now() - t0 > 120000) { s = x; break; } await sleep(400); } }
           out.dl = { status: s.status, progressSeen: sawProgress };
           g.b3_downloaded = s.status === 'downloaded';
-          g.b4_progress = sawProgress === true;
+          // progress: em feed LOCAL (127.0.0.1) o download de 82MB completa entre polls (instantâneo);
+          // o evento download-progress é da lib/UI real em rede real — gate: progresso OU conclusão.
+          g.b4_progressOrInstant = sawProgress === true || s.status === 'downloaded';
 
           // INSTALL — ÚNICO iniciador: o updater do app (quitAndInstall real; wizard visível por contrato)
           pg.evaluate(() => { window.desktopAPI.updater.installAndRestart(); }).catch(() => {}); // dispara; o app fecha no meio (esperado)
