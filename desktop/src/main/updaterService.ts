@@ -276,9 +276,12 @@ export function createUpdaterService(deps: UpdaterDeps) {
       deps.onLog("updater.install.teardown.error", { message: redact((e && e.message) || e) });
     }
     try {
-      // isSilent=false → instalador assistido VISÍVEL (nunca silencioso sem confirmação);
-      // isForceRunAfter=true → reabre o app após instalar.
-      autoUpdater.quitAndInstall(false, true);
+      // isSilent=true → NSIS roda com /S (sem wizard): a CONFIRMAÇÃO exigida pelo contrato
+      // é o clique "Instalar e reiniciar" + guard de trabalho não salvo acima (I5C.4 —
+      // update não assistido; o usuário nunca interage com o instalador).
+      // isForceRunAfter=true → --force-run reabre o app (com isSilent, o parâmetro é usado
+      // literalmente; no modo assistido a lib o ignorava e usava autoRunAppAfterInstall).
+      autoUpdater.quitAndInstall(true, true);
       return { ok: true };
     } catch (e: any) {
       set({ status: "error", error: { message: redact((e && e.message) || e), code: codeOf(e) } });
