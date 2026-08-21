@@ -1,0 +1,326 @@
+# =====================================================================
+# [manual] RC 1.0.246 LIGHT UI — Desktop Build (CANDIDATO; NADA é publicado)
+# ---------------------------------------------------------------------
+# I5C.2 — par de BUILD da linhagem RC (padrão dos 25 pares históricos do repo).
+# PRODUCT SOURCE pinado: dcc019ca (fix(rc): close login recovery and win125 gates).
+# O commit que carrega ESTE arquivo é INFRA de CI — o produto compilado vem do
+# checkout EXPLÍCITO do PRODUCT_SOURCE_SHA (gate fail-closed abaixo).
+# Gates: provenance (SHA-256 do renderer e do lockfile CONGELADOS na I5B/I5C) ·
+# npm ci/build/dist reais · NSIS+MSI · hash manifest · asar==fonte byte-idêntico ·
+# RC-D02=0 no pacote · CDN NORMAL (host EXATO do produto) · install/uninstall/
+# reinstall NSIS reais · MSI install/uninstall reais (msiexec) · consistência
+# NSIS×MSI · sanity Electron no APP INSTALADO com SDK CDN REAL (default OFF →
+# ON pelo mecanismo real → kill) · CDN BLOCKED via hosts (restaurado).
+# `--publish never`; artifacts PRIVADOS do run; SEM tag; SEM release; SEM deploy.
+# Execução SOMENTE manual (workflow_dispatch).
+# =====================================================================
+name: "[manual] RC 1.0.246 Light UI — Desktop Build (candidate)"
+
+"on":
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  PRODUCT_SOURCE_SHA: "dcc019ca7acf714de0629ff11c247ad9a877626f"
+  EXPECTED_RENDERER_SHA256: "bd5001b1ec249ecc56bc1a8b71a11be05d468dc990695c6f80ef80af00aef32f"
+  EXPECTED_LOCKFILE_SHA256: "901d8fe0917e679d5d9a0c81f801624cff6a8322432b135ca080b0aff40322f1"
+  APP_DIR: "desktop"
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout (history completa p/ pin do PRODUCT SOURCE)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: "HARD GATE — checkout EXPLÍCITO do PRODUCT SOURCE (dcc019ca; nunca HEAD implícito)"
+        run: |
+          set -euo pipefail
+          git checkout --detach "$PRODUCT_SOURCE_SHA"
+          ACTUAL=$(git rev-parse HEAD)
+          echo "PRODUCT_SOURCE_SHA=$PRODUCT_SOURCE_SHA"
+          echo "checked-out HEAD  =$ACTUAL"
+          [ "$ACTUAL" = "$PRODUCT_SOURCE_SHA" ] || { echo "::error::checkout != PRODUCT_SOURCE_SHA"; exit 1; }
+          echo "## RC 1.0.246 — Provenance" >> "$GITHUB_STEP_SUMMARY"
+          echo "PRODUCT SOURCE: \`$ACTUAL\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "PROVENANCE GATE — renderer + lockfile byte-idênticos aos congelados (antes do npm ci)"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          R=$(sha256sum src/renderer/index.html | awk '{print $1}')
+          L=$(sha256sum package-lock.json | awk '{print $1}')
+          echo "renderer: $R"; echo "lockfile: $L"
+          [ "$R" = "$EXPECTED_RENDERER_SHA256" ] || { echo "::error::renderer SHA divergente do congelado"; exit 1; }
+          [ "$L" = "$EXPECTED_LOCKFILE_SHA256" ] || { echo "::error::lockfile SHA divergente do congelado"; exit 1; }
+          V=$(node -p "require('./package.json').version")
+          [ "$V" = "1.0.246" ] || { echo "::error::versao $V != 1.0.246"; exit 1; }
+          { echo "renderer SHA-256: \`$R\`"; echo "lockfile SHA-256: \`$L\`"; echo "version: $V"; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: npm ci (lockfile real; sem update/audit-fix)
+        working-directory: desktop
+        run: npm ci --no-audit --no-fund
+
+      - name: Build (scripts reais do repo)
+        working-directory: desktop
+        run: npm run build
+
+      - name: "electron-builder — NSIS + MSI (--publish never; unsigned por design)"
+        working-directory: desktop
+        run: npx electron-builder --win nsis msi --publish never
+
+      - name: "SOURCE IMMUTABILITY pós-build (nenhum arquivo versionado mutado)"
+        run: |
+          set -euo pipefail
+          git status --porcelain | grep -v '^??' && { echo "::error::build mutou source versionado"; exit 1; } || echo "worktree versionada intacta"
+          R=$(sha256sum desktop/src/renderer/index.html | awk '{print $1}')
+          [ "$R" = "$EXPECTED_RENDERER_SHA256" ] || { echo "::error::renderer mudou pós-build"; exit 1; }
+
+      - name: "HASH MANIFEST do RC (exe/msi/blockmap/latest.yml/asar)"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          cd dist-installer
+          EXE=$(ls Agenda-ID-Seven-Desktop-1.0.246-x64.exe)
+          MSI=$(ls Agenda-ID-Seven-Desktop-1.0.246-x64.msi)
+          BM=$(ls Agenda-ID-Seven-Desktop-1.0.246-x64.exe.blockmap)
+          {
+            echo "PRODUCT_SOURCE=$PRODUCT_SOURCE_SHA"
+            echo "VERSION=1.0.246"
+            echo "SIGNING=unsigned (por design do projeto nesta fase)"
+            for f in "$EXE" "$MSI" "$BM" latest.yml win-unpacked/resources/app.asar; do
+              echo "FILE=$f SIZE=$(wc -c <"$f" | tr -d ' ') SHA256=$(sha256sum "$f" | awk '{print $1}')"
+            done
+          } | tee RC-MANIFEST.txt
+          cat RC-MANIFEST.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "GATE ASAR — versão empacotada + renderer==fonte(dcc019ca) + RC-D02=0 + flags updater"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          EX="$RUNNER_TEMP/asarx"; rm -rf "$EX"; mkdir -p "$EX"
+          npx --yes @electron/asar extract dist-installer/win-unpacked/resources/app.asar "$EX"
+          PKGV=$(PKG="$EX/package.json" node -e 'console.log(JSON.parse(require("fs").readFileSync(process.env.PKG,"utf8")).version)')
+          [ "$PKGV" = "1.0.246" ] || { echo "::error::asar version=$PKGV"; exit 1; }
+          git show "$PRODUCT_SOURCE_SHA":desktop/src/renderer/index.html > "$RUNNER_TEMP/src-index.html"
+          A="$EX/src/renderer/index.html" B="$RUNNER_TEMP/src-index.html" node -e '
+            const fs=require("fs");const n=s=>String(s).replace(/\r\n/g,"\n");
+            if(n(fs.readFileSync(process.env.A,"utf8"))!==n(fs.readFileSync(process.env.B,"utf8"))){console.error("renderer empacotado != fonte dcc019ca");process.exit(1);}
+            console.log("renderer empacotado == fonte dcc019ca (byte-identico)");'
+          C=$(grep -c 'data-mode\|Esqueci minha senha' "$EX/src/renderer/index.html" || true)
+          [ "$C" = "0" ] || { echo "::error::recovery presente no asar"; exit 1; }
+          US="$EX/dist/main/updaterService.js"
+          grep -Eq 'autoUpdater\.allowPrerelease[[:space:]]*=[[:space:]]*false' "$US"
+          grep -Eq 'autoUpdater\.channel[[:space:]]*=[[:space:]]*"latest"' "$US"
+          grep -Eq 'autoUpdater\.allowDowngrade[[:space:]]*=[[:space:]]*false' "$US"
+          echo "GATE asar OK (versao, renderer, RC-D02=0, flags updater)"
+
+      - name: "CDN NORMAL (transporte) — host EXATO do produto no runner"
+        run: |
+          set -euo pipefail
+          URL="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"
+          CODE=$(curl -sS -o "$RUNNER_TEMP/fb.js" -w "%{http_code}" "$URL")
+          SIZE=$(wc -c < "$RUNNER_TEMP/fb.js" | tr -d ' ')
+          echo "GET $URL -> HTTP $CODE ($SIZE bytes)"
+          [ "$CODE" = "200" ] && [ "$SIZE" -gt 10000 ] || { echo "::error::CDN normal falhou (HTTP $CODE)"; exit 1; }
+          URL2="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"
+          CODE2=$(curl -sS -o "$RUNNER_TEMP/fs.js" -w "%{http_code}" "$URL2")
+          echo "GET $URL2 -> HTTP $CODE2"
+          [ "$CODE2" = "200" ] || { echo "::error::CDN firestore falhou"; exit 1; }
+          echo "CDN NORMAL (transporte): PASS — HTTP 200 nos 2 scripts EXATOS do produto" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "NSIS INSTALL real (silencioso /S) + verificação do payload instalado"
+        shell: powershell
+        run: |
+          $exe = Get-ChildItem desktop\dist-installer\Agenda-ID-Seven-Desktop-1.0.246-x64.exe
+          $p = Start-Process -FilePath $exe.FullName -ArgumentList "/S" -Wait -PassThru
+          Write-Host "NSIS install exit: $($p.ExitCode)"
+          if ($p.ExitCode -ne 0) { exit 1 }
+          Start-Sleep -Seconds 3
+          $dir = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Directory | Where-Object { Test-Path (Join-Path $_.FullName "Agenda ID Seven Desktop.exe") } | Select-Object -First 1
+          if (-not $dir) { Write-Error "app instalado nao encontrado"; exit 1 }
+          Write-Host "instalado em: $($dir.FullName)"
+          "INSTALL_DIR=$($dir.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          if (-not (Test-Path (Join-Path $dir.FullName "resources\app.asar"))) { Write-Error "app.asar ausente"; exit 1 }
+          $un = Get-ChildItem $dir.FullName -Filter "Uninstall*.exe"
+          if (-not $un) { Write-Error "uninstaller ausente"; exit 1 }
+          $h = (Get-FileHash (Join-Path $dir.FullName "resources\app.asar") -Algorithm SHA256).Hash.ToLower()
+          $b = (Get-FileHash "desktop\dist-installer\win-unpacked\resources\app.asar" -Algorithm SHA256).Hash.ToLower()
+          Write-Host "asar instalado: $h"
+          if ($h -ne $b) { Write-Error "asar instalado != asar do build"; exit 1 }
+          Write-Host "NSIS INSTALL: PASS (payload byte-identico ao build)"
+
+      - name: "SANITY no APP INSTALADO — SDK CDN REAL + default OFF -> ON (mecanismo real) -> kill + RC-D02"
+        working-directory: desktop
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+        run: |
+          set -euo pipefail
+          npm i --no-save playwright@1.47.2 --no-audit --no-fund
+          cat > "$RUNNER_TEMP/rc-sanity.mjs" <<'EOF'
+          import { _electron } from 'playwright';
+          const exe = process.env.INSTALL_DIR + '\\Agenda ID Seven Desktop.exe';
+          const out = { g: {}, err: [] }; const g = out.g;
+          const app = await _electron.launch({ executablePath: exe, args: [] });
+          try {
+            const pg = await app.firstWindow({ timeout: 45000 });
+            pg.on('pageerror', e => out.err.push(String(e.message).slice(0, 120)));
+            await pg.waitForLoadState('load');
+            await pg.waitForTimeout(6000);                       // boot real: CDN + authSelf reais
+            const s = await pg.evaluate(() => ({
+              title: document.title,
+              sdk: typeof firebase !== 'undefined' && !!firebase.initializeApp,   // SDK CDN REAL carregado
+              splashMsg: (document.getElementById('authSplashMsg') || {}).textContent || '',
+              waiting: /Aguardando conex/.test((document.getElementById('authSplashMsg') || {}).textContent || ''),
+              login: !document.getElementById('login').classList.contains('hidden'),
+              lui: document.body.classList.contains('light-ui'),
+              desktop: document.body.classList.contains('desktop'),
+              raw: localStorage.getItem('idseven.desktop.appearance')
+            }));
+            out.s = s;
+            g.t1_title246 = s.title.includes('1.0.246');
+            g.t2_sdkRealLoaded = s.sdk === true;                 // RC-A02: SDK do CDN carregou DE VERDADE
+            g.t3_noFalseOffline = !s.waiting;                    // sem "Aguardando conexão…" falso
+            g.t4_defaultOff = !s.lui && (s.raw === null || JSON.parse(s.raw || '{}').luiPreview !== true);
+            g.t5_bootState = s.login || s.splashMsg.length > 0;  // login real OU splash legitimo
+            if (s.login) {
+              const rc = await pg.evaluate(() => ({
+                rec: !document.querySelector('#login [data-mode]') && !/Esqueci/.test(document.getElementById('login').textContent),
+                foc: [...document.querySelectorAll('#loginForm input,#loginForm button')].map(e => e.id || e.className)
+              }));
+              g.t6_noRecovery = rc.rec;
+              g.t7_tabOrder = rc.foc[0] === 'liId' && rc.foc[3] === 'btnLogin' && rc.foc.length === 4;
+            }
+            // ON pelo MECANISMO REAL + reload persiste
+            await pg.evaluate(() => localStorage.setItem('idseven.desktop.appearance', JSON.stringify({ theme: 'dark', font: 'std', hc: false, luiPreview: true })));
+            await pg.reload({ waitUntil: 'load' }).catch(() => {});
+            await pg.waitForTimeout(4000);
+            const on = await pg.evaluate(() => ({ lui: document.body.classList.contains('light-ui'), desktop: document.body.classList.contains('desktop') }));
+            g.t8_onPair = on.lui && on.desktop;
+            await pg.screenshot({ path: process.env.RUNNER_TEMP + '/I5C2-INSTALLED-LIGHT-ON.png' });
+            // KILL pelo mecanismo real
+            await pg.evaluate(() => appearSet({ luiPreview: false }));
+            await pg.waitForTimeout(300);
+            const kill = await pg.evaluate(() => ({ lui: document.body.classList.contains('light-ui'), flag: JSON.parse(localStorage.getItem('idseven.desktop.appearance') || '{}').luiPreview === false }));
+            g.t9_kill = !kill.lui && kill.flag;
+            await pg.screenshot({ path: process.env.RUNNER_TEMP + '/I5C2-INSTALLED-LEGACY-OFF.png' });
+          } catch (e) { out.fatal = e.message; }
+          try { await app.close(); } catch (_) {}
+          out.fails = Object.entries(g).filter(([k, v]) => !v).map(([k]) => k);
+          console.log(JSON.stringify(out, null, 1));
+          if (out.fatal || out.fails.length) process.exit(1);
+          EOF
+          node "$RUNNER_TEMP/rc-sanity.mjs"
+          echo "SANITY app INSTALADO + CDN REAL: PASS (SDK carregado; OFF->ON->kill)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "CDN BLOCKED (controle) — hosts temporário + fallback honesto + RESTAURA"
+        shell: powershell
+        run: |
+          $hosts = "$env:SystemRoot\System32\drivers\etc\hosts"
+          Copy-Item $hosts "$env:RUNNER_TEMP\hosts.bak"
+          Add-Content -Path $hosts -Value "127.0.0.1 www.gstatic.com"
+          ipconfig /flushdns | Out-Null
+          try {
+            $env:PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1"
+            Set-Location desktop
+            node -e "
+              const { _electron } = require('playwright');
+              (async () => {
+                const app = await _electron.launch({ executablePath: process.env.INSTALL_DIR + '\\\\Agenda ID Seven Desktop.exe' });
+                const pg = await app.firstWindow({ timeout: 45000 });
+                await pg.waitForLoadState('load');
+                await pg.waitForTimeout(5000);
+                const s = await pg.evaluate(() => ({ msg: (document.getElementById('authSplashMsg')||{}).textContent||'', login: !document.getElementById('login').classList.contains('hidden') }));
+                console.log(JSON.stringify(s));
+                await app.close().catch(()=>{});
+                if (!/Aguardando conex/.test(s.msg) || s.login) { console.error('fallback bloqueado invalido'); process.exit(1); }
+                console.log('CDN BLOCKED: fallback honesto OK');
+              })().catch(e => { console.error(e.message); process.exit(1); });
+            "
+          } finally {
+            Copy-Item "$env:RUNNER_TEMP\hosts.bak" $hosts -Force
+            ipconfig /flushdns | Out-Null
+            Write-Host "hosts RESTAURADO"
+          }
+
+      - name: "NSIS UNINSTALL real + userData preservado (deleteAppDataOnUninstall:false) + REINSTALL"
+        shell: powershell
+        run: |
+          $un = Get-ChildItem $env:INSTALL_DIR -Filter "Uninstall*.exe" | Select-Object -First 1
+          $p = Start-Process -FilePath $un.FullName -ArgumentList "/S" -Wait -PassThru
+          Write-Host "NSIS uninstall exit: $($p.ExitCode)"
+          Start-Sleep -Seconds 4
+          if (Test-Path (Join-Path $env:INSTALL_DIR "Agenda ID Seven Desktop.exe")) { Write-Error "exe ainda presente pos-uninstall"; exit 1 }
+          $ud = Get-ChildItem "$env:APPDATA" -Directory | Where-Object { $_.Name -like "*agenda*" -or $_.Name -like "*Agenda*" }
+          if ($ud) { Write-Host "userData PRESERVADO (deleteAppDataOnUninstall:false): $($ud.FullName)" } else { Write-Host "userData: nenhum encontrado em APPDATA (registrado)" }
+          # REINSTALL do MESMO RC
+          $exe = Get-ChildItem desktop\dist-installer\Agenda-ID-Seven-Desktop-1.0.246-x64.exe
+          $p2 = Start-Process -FilePath $exe.FullName -ArgumentList "/S" -Wait -PassThru
+          Write-Host "NSIS reinstall exit: $($p2.ExitCode)"
+          if ($p2.ExitCode -ne 0) { exit 1 }
+          Start-Sleep -Seconds 3
+          if (-not (Test-Path (Join-Path $env:INSTALL_DIR "resources\app.asar"))) { Write-Error "reinstall sem asar"; exit 1 }
+          # uninstall final para deixar o ambiente limpo p/ MSI
+          $un2 = Get-ChildItem $env:INSTALL_DIR -Filter "Uninstall*.exe" | Select-Object -First 1
+          Start-Process -FilePath $un2.FullName -ArgumentList "/S" -Wait | Out-Null
+          Start-Sleep -Seconds 4
+          Write-Host "NSIS install/uninstall/reinstall: PASS"
+
+      - name: "MSI INSTALL real (msiexec /qn) + verificação + UNINSTALL real"
+        shell: powershell
+        run: |
+          $msi = Get-ChildItem desktop\dist-installer\Agenda-ID-Seven-Desktop-1.0.246-x64.msi
+          $p = Start-Process msiexec -ArgumentList "/i", "`"$($msi.FullName)`"", "/qn", "/norestart" -Wait -PassThru
+          Write-Host "msiexec install exit: $($p.ExitCode)"
+          if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010) { exit 1 }
+          Start-Sleep -Seconds 4
+          $dir = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Directory -ErrorAction SilentlyContinue | Where-Object { Test-Path (Join-Path $_.FullName "Agenda ID Seven Desktop.exe") } | Select-Object -First 1
+          if (-not $dir) { Write-Error "MSI: app nao encontrado"; exit 1 }
+          Write-Host "MSI instalado em: $($dir.FullName)"
+          $h = (Get-FileHash (Join-Path $dir.FullName "resources\app.asar") -Algorithm SHA256).Hash.ToLower()
+          $b = (Get-FileHash "desktop\dist-installer\win-unpacked\resources\app.asar" -Algorithm SHA256).Hash.ToLower()
+          Write-Host "asar MSI: $h"
+          if ($h -ne $b) { Write-Error "CONSISTENCY FAIL: asar do MSI != asar do build (NSIS)"; exit 1 }
+          Write-Host "ARTIFACT CONSISTENCY: NSIS == MSI == build (asar byte-identico)"
+          $p2 = Start-Process msiexec -ArgumentList "/x", "`"$($msi.FullName)`"", "/qn", "/norestart" -Wait -PassThru
+          Write-Host "msiexec uninstall exit: $($p2.ExitCode)"
+          if ($p2.ExitCode -ne 0 -and $p2.ExitCode -ne 3010) { exit 1 }
+          Start-Sleep -Seconds 4
+          if (Test-Path (Join-Path $dir.FullName "Agenda ID Seven Desktop.exe")) { Write-Error "MSI: exe ainda presente pos-uninstall"; exit 1 }
+          Write-Host "MSI install/uninstall: PASS"
+
+      - name: Upload artifacts do RC (PRIVADOS do run; NAO e publicacao)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-1.0.246-RC-bundle
+          path: |
+            desktop/dist-installer/Agenda-ID-Seven-Desktop-1.0.246-x64.exe
+            desktop/dist-installer/Agenda-ID-Seven-Desktop-1.0.246-x64.msi
+            desktop/dist-installer/Agenda-ID-Seven-Desktop-1.0.246-x64.exe.blockmap
+            desktop/dist-installer/latest.yml
+            desktop/dist-installer/RC-MANIFEST.txt
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload screenshots do sanity (app instalado)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-1.0.246-RC-sanity-screens
+          path: ${{ runner.temp }}/I5C2-*.png
+          if-no-files-found: warn
+          retention-days: 7
