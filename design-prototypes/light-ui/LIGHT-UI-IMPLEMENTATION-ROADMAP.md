@@ -983,10 +983,28 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > (OWNER-WINDOWS-CHECKS: 1. instalador NSIS com interface visível ~2min; 2. display
 > scaling 125% nativo ~3min) · "RC aprovado para RELEASE FINAL?" = NÃO (aguarda os 2
 > checks + GO do owner).**
-> **Estado: I5C.2 = ENTREGUE — AGUARDA OWNER · RC SOURCE = `dcc019ca` (imutável) ·
-> ARTEFATO CANÔNICO = run `32431962343` (bundle privado, expira 2026-08-28) · M1 =
-> ACCEPTED · TAG = NÃO · GITHUB RELEASE = NÃO · DEPLOY = NÃO · BUMP = NÃO · RELEASE
-> WORKFLOW = INERTE/NÃO EXECUTADO · RELEASE FINAL = NÃO INICIADA.**
+> **Estado: I5C.2 = ✔ GO · RC-A02 = RESOLVED · RC-A03 = RESOLVED.**
+
+### I5C.3 · OWNER WINDOWS INTERACTIVE ACCEPTANCE ▶ ENTREGUE — **EXECUÇÃO INTERATIVA PENDENTE DO OWNER**
+> **Mandato do owner (GO explícito). ZERO mudanças** (source `dcc019ca` e workflows
+> intocados; nenhum RC novo). Relatório
+> `LIGHT-UI-I5C3-WINDOWS-INTERACTIVE-ACCEPTANCE-REPORT.md`. **Declaração sem simulação:**
+> os Gates 1–7 são interativos (NSIS GUI visível; Display Scale 125% NATIVO; julgamento
+> visual; screenshots do desktop) e esta sessão é um container Linux — **nenhum gate
+> interativo foi executado nem maquiado; nenhuma screenshot I5C3-* fabricada.** Executado
+> daqui: identidade do artefato ancorada no RC-MANIFEST do próprio run verde
+> (`32431962343`; exe `ca94a337…` 82 549 920 B; download do bundle nesta sessão bloqueado
+> pelo proxy — 403 no blob, registrado) + **ROTEIRO OPERACIONAL BINÁRIO completo de ~15
+> min** (Passo 0 identidade com STOP; Gates 1–7 com critérios PASS/FAIL, mecanismo real
+> `appearSet`, nomes exatos das evidências; regra RC-A04 sem correção). Matriz PENDING
+> pronta para preenchimento.
+> **Veredito: I5C.3 = NO-GO (pendência exclusivamente operacional; zero falha de produto;
+> zero RC-A04) · RC-A01 = OPEN (aguarda roteiro) · "RC aprovado para RELEASE FINAL?" =
+> NÃO.**
+> **Estado: I5C.3 = ENTREGUE — AGUARDA EXECUÇÃO INTERATIVA DO OWNER · RC SOURCE =
+> `dcc019ca` (imutável) · ARTEFATO CANÔNICO = run `32431962343` (expira 2026-08-28) ·
+> M1 = ACCEPTED · TAG = NÃO · GITHUB RELEASE = NÃO · DEPLOY = NÃO · BUMP = NÃO ·
+> RELEASE WORKFLOW = INERTE/NÃO EXECUTADO · RELEASE FINAL = NÃO INICIADA.**
 
 > — GO do owner (2026-08-20) com 4 correções
 > obrigatórias (amendment registrado; filtro parado como conflito-01; KPIs auditados acima;
