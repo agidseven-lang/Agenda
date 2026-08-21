@@ -1,0 +1,74 @@
+# =====================================================================
+# [manual/GATED] RC 1.0.246 LIGHT UI — Desktop Release (INERTE nesta fase)
+# ---------------------------------------------------------------------
+# I5C.2 — par de RELEASE da linhagem RC (padrão dos 25 pares históricos).
+# ESTE WORKFLOW NÃO FOI EXECUTADO NA I5C.2 E NÃO PODE PUBLICAR SOZINHO:
+#   Gate 0 (fail-closed): exige a variável de repositório RC_RELEASE_GO com o
+#     valor literal 'authorized-by-owner' — ela NÃO existe até o owner criá-la
+#     em Settings > Variables. Sem ela, o job FALHA no primeiro step, sempre.
+#   Gate 1: frase de confirmação digitada manualmente no dispatch.
+#   Gate 2: build_run_id do workflow de BUILD verde é obrigatório e os hashes
+#     do RC-MANIFEST devem bater com os esperados (pinados abaixo).
+#   Gate 3: PRODUCT SOURCE pinado = dcc019ca; tag futura (v1.0.246-rc) deve
+#     apontar para ESTE head exato quando um release FUTURO for autorizado.
+# NÃO usa push/tag trigger. NÃO usa "latest build". Nenhuma origem ambígua.
+# A publicação em si (tag + GitHub Release com os MESMOS bytes do run pinado)
+# só entra em vigor num mandato futuro do owner — aqui ela permanece bloqueada.
+# =====================================================================
+name: "[manual/GATED] RC 1.0.246 Light UI — Desktop Release (INERT)"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      build_run_id:
+        description: "Run ID do desktop-build-1.0.246-rc.yml VERDE que produziu os artefatos"
+        required: true
+      confirm:
+        description: "Digite EXATAMENTE: RELEASE-1.0.246-RC-AUTORIZADO"
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  PRODUCT_SOURCE_SHA: "dcc019ca7acf714de0629ff11c247ad9a877626f"
+  EXPECTED_VERSION: "1.0.246"
+  EXPECTED_RENDERER_SHA256: "bd5001b1ec249ecc56bc1a8b71a11be05d468dc990695c6f80ef80af00aef32f"
+
+jobs:
+  gated-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: "GATE 0 — autorização do OWNER (variável de repositório; fail-closed)"
+        run: |
+          set -euo pipefail
+          if [ "${{ vars.RC_RELEASE_GO }}" != "authorized-by-owner" ]; then
+            echo "::error::RELEASE NÃO AUTORIZADO — a variável de repositório RC_RELEASE_GO não está definida como 'authorized-by-owner'. Este workflow permanece INERTE por decisão da I5C.2 (nenhuma publicação sem GO explícito do owner)."
+            exit 1
+          fi
+
+      - name: "GATE 1 — frase de confirmação manual"
+        run: |
+          set -euo pipefail
+          [ "${{ github.event.inputs.confirm }}" = "RELEASE-1.0.246-RC-AUTORIZADO" ] || { echo "::error::frase de confirmação incorreta"; exit 1; }
+
+      - name: Checkout (verificação de linhagem)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: "GATE 2 — proveniência: PRODUCT SOURCE na linhagem + renderer congelado"
+        run: |
+          set -euo pipefail
+          git cat-file -e "$PRODUCT_SOURCE_SHA" || { echo "::error::PRODUCT_SOURCE_SHA inexistente"; exit 1; }
+          R=$(git show "$PRODUCT_SOURCE_SHA":desktop/src/renderer/index.html | sha256sum | awk '{print $1}')
+          [ "$R" = "$EXPECTED_RENDERER_SHA256" ] || { echo "::error::renderer do PRODUCT SOURCE difere do congelado"; exit 1; }
+          V=$(git show "$PRODUCT_SOURCE_SHA":desktop/package.json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).version))')
+          [ "$V" = "$EXPECTED_VERSION" ] || { echo "::error::versão do PRODUCT SOURCE != $EXPECTED_VERSION"; exit 1; }
+          echo "build_run_id informado: ${{ github.event.inputs.build_run_id }} (os artefatos/hashes desse run são os ÚNICOS publicáveis)"
+
+      - name: "PUBLICAÇÃO — BLOQUEADA nesta linhagem até mandato futuro"
+        run: |
+          echo "::error::A etapa de publicação (tag v1.0.246-rc no head $PRODUCT_SOURCE_SHA + GitHub Release com os bytes do run pinado) NÃO está habilitada nesta fase. Implementação entra somente com o mandato de RELEASE FINAL do owner, mantendo os gates 0-2 acima."
+          exit 1
