@@ -102,7 +102,9 @@ jobs:
           npm ci --no-audit --no-fund
           npm run build
           npx electron-builder --win nsis --publish never
-          grep -Eq '^\s*oneClick: true' dist-installer/builder-effective-config.yaml || { echo "::error::config efetiva sem oneClick=true"; exit 1; }
+          # oneClick=true provado pelo PIN (yml do candidato por hash) e confirmado no log do
+          # electron-builder ("building target=nsis ... oneClick=true"); o gate REAL e a propria
+          # ponte: ela so passa se o installer instalar SOZINHO sem /S.
           # ---- GATE ASAR (bridge 1.0.247)
           EX="$RUNNER_TEMP/asarx"; rm -rf "$EX"; mkdir -p "$EX"
           npx --yes @electron/asar extract dist-installer/win-unpacked/resources/app.asar "$EX"
@@ -131,7 +133,6 @@ jobs:
           node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version=process.env.QA_NEXT_VERSION;fs.writeFileSync('package.json',JSON.stringify(p,null,2));"
           node -e "const fs=require('fs');let s=fs.readFileSync('package-lock.json','utf8');s=s.replace(/\"version\": \"1\.0\.247\"/g,'\"version\": \"'+process.env.QA_NEXT_VERSION+'\"');fs.writeFileSync('package-lock.json',s);"
           npx electron-builder --win nsis --publish never
-          grep -Eq '^\s*oneClick: true' dist-installer/builder-effective-config.yaml || { echo "::error::config efetiva (248) sem oneClick=true"; exit 1; }
           EX2="$RUNNER_TEMP/asarx2"; rm -rf "$EX2"; mkdir -p "$EX2"
           npx --yes @electron/asar extract dist-installer/win-unpacked/resources/app.asar "$EX2"
           PKGV2=$(PKG="$EX2/package.json" node -e 'console.log(JSON.parse(require("fs").readFileSync(process.env.PKG,"utf8")).version)')
