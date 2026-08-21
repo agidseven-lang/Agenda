@@ -12,8 +12,13 @@
 #   Gate 3: PRODUCT SOURCE pinado = dcc019ca; tag futura (v1.0.246-rc) deve
 #     apontar para ESTE head exato quando um release FUTURO for autorizado.
 # NÃO usa push/tag trigger. NÃO usa "latest build". Nenhuma origem ambígua.
-# A publicação em si (tag + GitHub Release com os MESMOS bytes do run pinado)
-# só entra em vigor num mandato futuro do owner — aqui ela permanece bloqueada.
+# I5C.4 (RC-U03 PREPARED): a etapa de publicação existe ABAIXO com a mecânica
+# completa (bundle do build pinado → verificação criptográfica → tag → Release
+# Latest com latest.yml + exe + blockmap + MSI + SHA256SUMS + VERSAO-DESKTOP.txt),
+# mas permanece INALCANÇÁVEL sem o GO do owner: Gate 0 (variável inexistente)
+# + Gate 1 (frase) + Gate 2 (proveniência) + Gate 3 (pins de hash em PENDING
+# até o mandato de RELEASE FINAL preenchê-los) + tag v<versão> não pode existir.
+# NUNCA executado nesta fase. Nenhuma publicação sem mandato explícito.
 # =====================================================================
 name: "[manual/GATED] RC 1.0.246 Light UI — Desktop Release (INERT)"
 
@@ -27,13 +32,23 @@ name: "[manual/GATED] RC 1.0.246 Light UI — Desktop Release (INERT)"
         description: "Digite EXATAMENTE: RELEASE-1.0.246-RC-AUTORIZADO"
         required: true
 
+# contents:write e actions:read são exigidos pela etapa de publicação PREPARADA;
+# permanecem inertes na prática: nenhum step roda além do Gate 0 sem a variável do owner.
 permissions:
-  contents: read
+  contents: write
+  actions: read
 
 env:
   PRODUCT_SOURCE_SHA: "dcc019ca7acf714de0629ff11c247ad9a877626f"
   EXPECTED_VERSION: "1.0.246"
   EXPECTED_RENDERER_SHA256: "bd5001b1ec249ecc56bc1a8b71a11be05d468dc990695c6f80ef80af00aef32f"
+  # ---- PINS DE PUBLICAÇÃO (RC-U03): preenchidos SOMENTE pelo mandato de RELEASE FINAL.
+  # Enquanto "PENDING…", o Gate 3 falha SEMPRE (fail-closed). O mandato final define:
+  # a versão/tag da linha publicada (ex.: 1.0.247 + candidato com fix do updater) e os
+  # SHA-256 do RC-MANIFEST do run de build canônico dessa linha.
+  EXPECTED_EXE_SHA256: "PENDING-RELEASE-FINAL-MANDATE"
+  EXPECTED_MSI_SHA256: "PENDING-RELEASE-FINAL-MANDATE"
+  BUNDLE_ARTIFACT_NAME: "agenda-id-seven-desktop-1.0.246-RC-bundle"
 
 jobs:
   gated-release:
@@ -68,7 +83,51 @@ jobs:
           [ "$V" = "$EXPECTED_VERSION" ] || { echo "::error::versão do PRODUCT SOURCE != $EXPECTED_VERSION"; exit 1; }
           echo "build_run_id informado: ${{ github.event.inputs.build_run_id }} (os artefatos/hashes desse run são os ÚNICOS publicáveis)"
 
-      - name: "PUBLICAÇÃO — BLOQUEADA nesta linhagem até mandato futuro"
+      - name: "GATE 3 — pins de publicação preenchidos pelo mandato de RELEASE FINAL (fail-closed)"
         run: |
-          echo "::error::A etapa de publicação (tag v1.0.246-rc no head $PRODUCT_SOURCE_SHA + GitHub Release com os bytes do run pinado) NÃO está habilitada nesta fase. Implementação entra somente com o mandato de RELEASE FINAL do owner, mantendo os gates 0-2 acima."
-          exit 1
+          set -euo pipefail
+          if [ "$EXPECTED_EXE_SHA256" = "PENDING-RELEASE-FINAL-MANDATE" ] || [ "$EXPECTED_MSI_SHA256" = "PENDING-RELEASE-FINAL-MANDATE" ]; then
+            echo "::error::RC-U03: os SHA-256 esperados dos artefatos NÃO foram pinados — a publicação só é liberada quando o mandato de RELEASE FINAL do owner fixar a versão, o candidato e os hashes do run de build canônico."
+            exit 1
+          fi
+
+      - name: "PUBLICAÇÃO (RC-U03 PREPARADA) — bundle pinado → verificação → tag → Release Latest"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="v$EXPECTED_VERSION"
+          # a tag NÃO pode existir (nunca sobrescrever release/tag)
+          if git ls-remote --tags origin "refs/tags/$TAG" | grep -q .; then
+            echo "::error::tag $TAG já existe — publicação abortada (nunca sobrescrever)"; exit 1
+          fi
+          # baixar o bundle EXATO do run de build pinado (nunca 'latest build')
+          RUN="${{ github.event.inputs.build_run_id }}"
+          AID=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN/artifacts" --jq ".artifacts[] | select(.name==\"$BUNDLE_ARTIFACT_NAME\") | .id")
+          [ -n "$AID" ] || { echo "::error::artifact $BUNDLE_ARTIFACT_NAME não encontrado no run $RUN (expirado? rode o build canônico de novo)"; exit 1; }
+          mkdir -p bundle && cd bundle
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$AID/zip" > bundle.zip
+          unzip -q bundle.zip && rm bundle.zip
+          EXE=$(find . -name "Agenda-ID-Seven-Desktop-$EXPECTED_VERSION-x64.exe" | head -1)
+          MSI=$(find . -name "Agenda-ID-Seven-Desktop-$EXPECTED_VERSION-x64.msi" | head -1)
+          BMAP=$(find . -name "Agenda-ID-Seven-Desktop-$EXPECTED_VERSION-x64.exe.blockmap" | head -1)
+          LYML=$(find . -name "latest.yml" | head -1)
+          for f in "$EXE" "$MSI" "$BMAP" "$LYML"; do [ -n "$f" ] && [ -f "$f" ] || { echo "::error::asset ausente no bundle"; exit 1; }; done
+          # verificação criptográfica contra os pins do mandato
+          [ "$(sha256sum "$EXE" | awk '{print $1}')" = "$EXPECTED_EXE_SHA256" ] || { echo "::error::exe difere do pinado"; exit 1; }
+          [ "$(sha256sum "$MSI" | awk '{print $1}')" = "$EXPECTED_MSI_SHA256" ] || { echo "::error::msi difere do pinado"; exit 1; }
+          # contrato do updater: latest.yml do MESMO build (versão + sha512 do exe batem)
+          grep -q "^version: $EXPECTED_VERSION$" "$LYML" || { echo "::error::latest.yml versão != $EXPECTED_VERSION"; exit 1; }
+          SHA512=$(openssl dgst -sha512 -binary "$EXE" | base64 -w0)
+          grep -q "$SHA512" "$LYML" || { echo "::error::sha512 do exe não bate com latest.yml (assets de builds diferentes!)"; exit 1; }
+          # padrão da casa: SHA256SUMS + VERSAO-DESKTOP.txt gerados sobre os bytes verificados
+          sha256sum "$(basename "$EXE")" "$(basename "$MSI")" "$(basename "$BMAP")" "$(basename "$LYML")" > SHA256SUMS 2>/dev/null || \
+            (cd "$(dirname "$EXE")" && sha256sum "$(basename "$EXE")" "$(basename "$MSI")" "$(basename "$BMAP")" "$(basename "$LYML")" > "$OLDPWD/SHA256SUMS")
+          echo "$EXPECTED_VERSION" > VERSAO-DESKTOP.txt
+          # tag no PRODUCT SOURCE exato + Release marcada Latest (feed real do updater)
+          gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$TAG" -f sha="$PRODUCT_SOURCE_SHA"
+          gh release create "$TAG" "$EXE" "$MSI" "$BMAP" "$LYML" SHA256SUMS VERSAO-DESKTOP.txt \
+            --title "Agenda ID Seven Desktop $EXPECTED_VERSION" \
+            --notes "Release gated (mandato do owner). Fonte: $PRODUCT_SOURCE_SHA · build run: $RUN." \
+            --latest
+          echo "RELEASE PUBLICADA: $TAG (Latest) com latest.yml+exe+blockmap+msi+SHA256SUMS+VERSAO-DESKTOP.txt do run $RUN" >> "$GITHUB_STEP_SUMMARY"
