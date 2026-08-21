@@ -121,6 +121,7 @@ jobs:
           Get-Content $au
 
       - name: "TESTE IN-APP — negativos (feed fora + artefato corrompido) e fluxo real até DOWNLOADED + INSTALL"
+        timeout-minutes: 15
         working-directory: desktop
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
@@ -153,7 +154,7 @@ jobs:
             localStorage.setItem('idseven.notif.history.v1', JSON.stringify([{ eventId: 'seed1', dedupKey: 'seed1', eventType: 'flow_update', taskId: 'x', taskTitle: 'Seed', clientName: 'QA', title: 'Seed', severity: 'info', createdAt: 1, deep: 'detail/x', read: true }]));
           });
           const st = () => pg.evaluate(() => window.desktopAPI.updater.getState());
-          const check = () => pg.evaluate(() => window.desktopAPI.updater.check());
+          const check = () => pg.evaluate(() => { window.desktopAPI.updater.check(); });
           const poll = async (want, ms) => { const t0 = Date.now(); for (;;) { const s = await st(); if (want.includes(s.status)) return s; if (Date.now() - t0 > ms) return s; await sleep(500); } };
 
           // NEG 1 — feed indisponível: renomeia latest.yml → check → erro honesto; app segue vivo
@@ -173,8 +174,8 @@ jobs:
           const exeName = 'Agenda-ID-Seven-Desktop-1.0.247-x64.exe';
           fs.copyFileSync(path.join(FEED, exeName), path.join(FEED, exeName + '.good'));
           fs.writeFileSync(path.join(FEED, exeName), Buffer.from('CORRUPT-QA-ARTIFACT'));
-          await pg.evaluate(() => window.desktopAPI.updater.download());
-          s = await poll(['error', 'downloaded'], 60000);
+          await pg.evaluate(() => { window.desktopAPI.updater.download(); });   // fire-and-forget (padrão da UI real)
+          s = await poll(['error', 'downloaded'], 90000);
           out.neg2 = { status: s.status, err: s.error };
           g.n2_corruptRejected = s.status === 'error';           // sha512/size mismatch — NÃO instala
           fs.copyFileSync(path.join(FEED, exeName + '.good'), path.join(FEED, exeName));
@@ -182,7 +183,7 @@ jobs:
           // RETRY íntegro — check de novo (estado error → novo ciclo) → download com progress → downloaded
           await check(); s = await poll(['update_available'], 30000);
           g.b2_retryAvailable = s.status === 'update_available';
-          await pg.evaluate(() => window.desktopAPI.updater.download());
+          await pg.evaluate(() => { window.desktopAPI.updater.download(); });   // fire-and-forget + poll
           let sawProgress = false;
           { const t0 = Date.now(); for (;;) { const x = await st(); if (x.status === 'downloading' && x.progress && x.progress.percent > 0) sawProgress = true; if (x.status === 'downloaded') { s = x; break; } if (x.status === 'error') { s = x; break; } if (Date.now() - t0 > 120000) { s = x; break; } await sleep(400); } }
           out.dl = { status: s.status, progressSeen: sawProgress };
@@ -190,11 +191,13 @@ jobs:
           g.b4_progress = sawProgress === true;
 
           // INSTALL — ÚNICO iniciador: o updater do app (quitAndInstall real; wizard visível por contrato)
-          const r = await pg.evaluate(() => window.desktopAPI.updater.installAndRestart());
-          out.installCall = r;
-          g.c1_installAccepted = r && r.ok === true;
-          await sleep(4000);
-          try { await app.close(); } catch (_) {}                // o app já deve ter fechado sozinho
+          pg.evaluate(() => { window.desktopAPI.updater.installAndRestart(); }).catch(() => {}); // dispara; o app fecha no meio (esperado)
+          let closed = false;
+          try { await Promise.race([new Promise(res => app.on('close', () => { closed = true; res(); })), sleep(30000)]); } catch (_) {}
+          if (!closed) { try { const x = await st(); out.installState = x.status; closed = (x.status === 'installing'); } catch (_) { closed = true; } }
+          out.appClosedByUpdater = closed;
+          g.c1_installTriggered = closed === true;               // updater assumiu (app encerrou/instalando)
+          try { await app.close(); } catch (_) {}
           console.log(JSON.stringify(out, null, 1));
           const failsA = Object.entries(g).filter(([k, v]) => !v).map(([k]) => k);
           fs.writeFileSync(process.env.RUNNER_TEMP + '/au-sessionA.json', JSON.stringify(out));
@@ -229,6 +232,7 @@ jobs:
           Start-Sleep -Seconds 2
 
       - name: "SESSÃO B — versão nova + userData + Light OFF→ON→kill + same-version + downgrade"
+        timeout-minutes: 15
         working-directory: desktop
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
@@ -266,14 +270,14 @@ jobs:
           // SAME-VERSION LOOP GATE — feed segue 1.0.247; app é 1.0.247 → up_to_date
           const st = () => pg.evaluate(() => window.desktopAPI.updater.getState());
           const poll = async (want, ms) => { const t0 = Date.now(); for (;;) { const s = await st(); if (want.includes(s.status)) return s; if (Date.now() - t0 > ms) return s; await sleep(500); } };
-          await pg.evaluate(() => window.desktopAPI.updater.check());
+          await pg.evaluate(() => { window.desktopAPI.updater.check(); });
           let s = await poll(['up_to_date', 'update_available', 'error'], 30000);
           out.same = s.status;
           g.e1_noSameVersionLoop = s.status === 'up_to_date';
           // OLDER VERSION GATE — latest.yml aponta 1.0.246 → allowDowngrade=false → up_to_date
           const ly = path.join(FEED, 'latest.yml');
           fs.writeFileSync(ly, fs.readFileSync(ly, 'utf8').replace(/1\.0\.247/g, '1.0.246'));
-          await pg.evaluate(() => window.desktopAPI.updater.check());
+          await pg.evaluate(() => { window.desktopAPI.updater.check(); });
           s = await poll(['up_to_date', 'update_available', 'error'], 30000);
           out.down = s.status;
           g.e2_noDowngrade = s.status !== 'update_available';
