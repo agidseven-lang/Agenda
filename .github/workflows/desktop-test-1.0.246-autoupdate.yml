@@ -277,7 +277,11 @@ jobs:
           const ap = JSON.parse(a.appear || '{}');
           g.d2_userDataKept = ap.theme === 'dark' && (a.notif || '').includes('seed1');
           g.d3_luiStillOff = !a.lui && ap.luiPreview !== true;       // update NÃO liga o preview
-          // ON pelo mecanismo real + kill
+          // ON pelo mecanismo real + kill (janela dimensionada como desktop real ≥1024 CSS;
+          // o run 6 provou o GUARD negando a classe em janela <1024 — comportamento correto)
+          await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0].setContentSize(1280, 800); });
+          await sleep(400);
+          out.vw = await pg.evaluate(() => window.innerWidth);
           await pg.evaluate(() => { appearSet({ luiPreview: true }); });
           await sleep(300);
           g.d4_onWorks = await pg.evaluate(() => document.body.classList.contains('light-ui') && document.body.classList.contains('desktop'));
