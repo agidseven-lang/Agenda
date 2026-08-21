@@ -29,7 +29,11 @@ win:
   icon: build/icon.ico
   artifactName: "Agenda-ID-Seven-Desktop-${version}-${arch}.${ext}"
 nsis:
-  oneClick: false
+  # I5C.5 ZERO-TOUCH LEGACY BRIDGE: one-click — o instalador instala sozinho AO ABRIR
+  # (SpiderBanner de progresso, zero botoes, relanca o app e fecha), inclusive quando o
+  # UPDATER ANTIGO da base 1.0.246 o lanca SEM /S (quitAndInstall(false,...) legado).
+  # Com /S (updater >= 1.0.247, b4ea7890) segue 100% silencioso. Per-user: sem UAC.
+  oneClick: true
   perMachine: false
   allowToChangeInstallationDirectory: false
   createDesktopShortcut: true
