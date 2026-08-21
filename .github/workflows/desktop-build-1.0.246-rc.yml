@@ -177,7 +177,7 @@ jobs:
         run: |
           set -euo pipefail
           npm i --no-save playwright@1.47.2 --no-audit --no-fund
-          cat > "$RUNNER_TEMP/rc-sanity.mjs" <<'EOF'
+          cat > rc-sanity.mjs <<'EOF'
           import { _electron } from 'playwright';
           const exe = process.env.INSTALL_DIR + '\\Agenda ID Seven Desktop.exe';
           const out = { g: {}, err: [] }; const g = out.g;
@@ -230,7 +230,7 @@ jobs:
           console.log(JSON.stringify(out, null, 1));
           if (out.fatal || out.fails.length) process.exit(1);
           EOF
-          node "$RUNNER_TEMP/rc-sanity.mjs"
+          node rc-sanity.mjs && rm -f rc-sanity.mjs
           echo "SANITY app INSTALADO + CDN REAL: PASS (SDK carregado; OFF->ON->kill)" >> "$GITHUB_STEP_SUMMARY"
 
       - name: "CDN BLOCKED (controle) — hosts temporário + fallback honesto + RESTAURA"
