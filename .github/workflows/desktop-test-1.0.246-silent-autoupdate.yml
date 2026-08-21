@@ -61,6 +61,8 @@ jobs:
       - name: "PIN do PRODUCT SOURCE CANDIDATO (b4ea7890 = dcc019ca + fix updater) + provenance"
         run: |
           set -euo pipefail
+          # guarda o PRÓPRIO workflow para o self-grep (o pin a seguir volta a uma árvore onde ele não existe)
+          cp ".github/workflows/desktop-test-1.0.246-silent-autoupdate.yml" "$RUNNER_TEMP/wf-self.yml"
           git checkout --detach "$PRODUCT_SOURCE_SHA"
           [ "$(git rev-parse HEAD)" = "$PRODUCT_SOURCE_SHA" ] || { echo "::error::pin falhou"; exit 1; }
           # renderer congelado NÃO muda com o fix (só MAIN): prova por bytes do objeto git
@@ -349,7 +351,7 @@ jobs:
       - name: "EXTERNAL_INSTALL_INTERACTION = 0 — gate mecânico (self-grep do harness)"
         run: |
           set -euo pipefail
-          WF=".github/workflows/desktop-test-1.0.246-silent-autoupdate.yml"
+          WF="$RUNNER_TEMP/wf-self.yml"
           # padrões com classes de caracteres para não casarem consigo mesmos
           V1=$(grep -cE "SendK[e]ys|AppActiv[a]te|UIAutomat[i]on|WScript\.Sh[e]ll" "$WF" || true)
           V2=$(grep -cE "msiex[e]c" "$WF" || true)
