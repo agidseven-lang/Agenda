@@ -36,6 +36,9 @@ jobs:
       run:
         shell: bash
     steps:
+      - name: "Git sem conversão CRLF (checkout byte-fiel no Windows)"
+        run: git config --global core.autocrlf false
+
       - name: Checkout (history completa p/ pin do PRODUCT SOURCE)
         uses: actions/checkout@v4
         with:
@@ -52,16 +55,18 @@ jobs:
           echo "## RC 1.0.246 — Provenance" >> "$GITHUB_STEP_SUMMARY"
           echo "PRODUCT SOURCE: \`$ACTUAL\`" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: "PROVENANCE GATE — renderer + lockfile byte-idênticos aos congelados (antes do npm ci)"
-        working-directory: desktop
+      - name: "PROVENANCE GATE — renderer + lockfile byte-idênticos aos congelados (bytes do OBJETO git; imune a CRLF)"
         run: |
           set -euo pipefail
-          R=$(sha256sum src/renderer/index.html | awk '{print $1}')
-          L=$(sha256sum package-lock.json | awk '{print $1}')
-          echo "renderer: $R"; echo "lockfile: $L"
+          R=$(git show "$PRODUCT_SOURCE_SHA":desktop/src/renderer/index.html | sha256sum | awk '{print $1}')
+          L=$(git show "$PRODUCT_SOURCE_SHA":desktop/package-lock.json | sha256sum | awk '{print $1}')
+          echo "renderer(objeto git): $R"; echo "lockfile(objeto git): $L"
           [ "$R" = "$EXPECTED_RENDERER_SHA256" ] || { echo "::error::renderer SHA divergente do congelado"; exit 1; }
           [ "$L" = "$EXPECTED_LOCKFILE_SHA256" ] || { echo "::error::lockfile SHA divergente do congelado"; exit 1; }
-          V=$(node -p "require('./package.json').version")
+          RW=$(sha256sum desktop/src/renderer/index.html | awk '{print $1}')
+          echo "renderer(working tree): $RW"
+          [ "$RW" = "$EXPECTED_RENDERER_SHA256" ] || { echo "::error::working tree difere dos bytes do objeto (conversão de linha ativa?)"; exit 1; }
+          V=$(node -p "require('./desktop/package.json').version")
           [ "$V" = "1.0.246" ] || { echo "::error::versao $V != 1.0.246"; exit 1; }
           { echo "renderer SHA-256: \`$R\`"; echo "lockfile SHA-256: \`$L\`"; echo "version: $V"; } >> "$GITHUB_STEP_SUMMARY"
 
@@ -88,6 +93,8 @@ jobs:
           git status --porcelain | grep -v '^??' && { echo "::error::build mutou source versionado"; exit 1; } || echo "worktree versionada intacta"
           R=$(sha256sum desktop/src/renderer/index.html | awk '{print $1}')
           [ "$R" = "$EXPECTED_RENDERER_SHA256" ] || { echo "::error::renderer mudou pós-build"; exit 1; }
+          L=$(sha256sum desktop/package-lock.json | awk '{print $1}')
+          [ "$L" = "$EXPECTED_LOCKFILE_SHA256" ] || { echo "::error::lockfile mudou pós-build"; exit 1; }
 
       - name: "HASH MANIFEST do RC (exe/msi/blockmap/latest.yml/asar)"
         working-directory: desktop
