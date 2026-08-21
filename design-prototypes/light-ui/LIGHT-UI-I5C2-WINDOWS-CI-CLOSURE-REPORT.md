@@ -45,6 +45,9 @@ Logs/summaries/manifest/YAMLs varridos: **zero segredo** (sem tokens impressos, 
 ## SOURCE IMMUTABILITY (fase 22)
 **APPLICATION SOURCE = `dcc019ca`** (gate de checkout + provenance no run; renderer do artefato byte-idêntico à fonte). **CI INFRA COMMITs** (main): `994ad386`→`995366ea`→`3f4c53b8`; (branch rc): `e2b41928`→`f940e4e0`→`d3b2fcd4` — nenhum toca produto (`git diff` = só `.github/workflows/`).
 
+## REGISTRO DE CONTEXTO — tag `v1.0.246` pré-existente
+O repo JÁ CONTÉM a tag `v1.0.246` (criada em **2026-08-11**, dez dias antes desta trilha, pelo release gated da linhagem f356bh2 → commit `0fa34335`, o Desktop 1.0.246 de produção SEM Light UI). **Nenhuma tag foi criada nesta fase.** Implicação para o RELEASE FINAL do RC (decisão do owner): a publicação do RC Light UI precisará de identidade própria — `v1.0.246-rc` (como o release workflow inerte já referencia) ou um bump de versão para a linha seguinte (fora deste mandato).
+
 ## RECOMENDAÇÃO
 Pipeline oficial da linhagem RC existe, roda verde em Windows real e está pronto para o release gated futuro; CDN normal e bloqueado provados no app instalado; NSIS e MSI reais instalam/desinstalam/reinstalam com consistência criptográfica. Restam **5 minutos de verificação visual do owner** (2 itens acima) para o fechamento formal do RC-A01 — e o GO de RELEASE FINAL continua exclusivamente com o owner (workflow de release inerte até `RC_RELEASE_GO`).
 
