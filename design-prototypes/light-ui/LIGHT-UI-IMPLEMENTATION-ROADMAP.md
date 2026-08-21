@@ -1006,6 +1006,37 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > M1 = ACCEPTED · TAG = NÃO · GITHUB RELEASE = NÃO · DEPLOY = NÃO · BUMP = NÃO ·
 > RELEASE WORKFLOW = INERTE/NÃO EXECUTADO · RELEASE FINAL = NÃO INICIADA.**
 
+### I5C.3 · IN-APP AUTO-UPDATE ACCEPTANCE ▶ ✔ **GO** — instalação manual CANCELADA pelo owner
+> **Mandato do owner (GO explícito): o usuário NUNCA baixa/abre instalador — a única
+> entidade que inicia o installer é o UPDATER de dentro do app.** ZERO código de produto
+> (só `.github/workflows/` + docs, como autorizado — mesmo regime da I5C.2). Relatório
+> `LIGHT-UI-I5C3-AUTOUPDATE-ACCEPTANCE-REPORT.md`. **Run oficial verde `32480199947`**
+> (workflow novo `desktop-test-1.0.246-autoupdate.yml`, windows-latest, produto `dcc019ca`):
+> baseline REAL v1.0.246 instalada da release pública (SHA256SUMS conferido) → bump QA
+> **efêmero** 1.0.247 (só no runner) + build NSIS → feed local fail-closed (127.0.0.1,
+> `app-update.yml` SÓ da instância; produção github/latest INTOCADA) → **sessão A 10/10**
+> (feed fora = `error` honesto; `update_available` 1.0.247; corrupto REJEITADO
+> `ERR_CHECKSUM_MISMATCH` sha512; retry → `downloaded`; `installAndRestart` → app fechado
+> pelo updater) → **wizard NSIS visível concluído** (critério: asar instalado ==
+> asar QA por SHA-256 exato `c09e653a…`) → **sessão B 7/7** (título 1.0.247; userData
+> preservado; **Light OFF pós-update**; ON pelo `appearSet` real (janela 1280×800 — run 6
+> registrou o guard desktop-only NEGANDO em <1024px, comportamento correto); kill;
+> same-version → `up_to_date`; downgrade → `up_to_date`). Auditoria literal do
+> `updaterService.ts` (325 linhas, intocado): flags `allowPrerelease=false / channel=latest /
+> allowDowngrade=false / autoDownload=false / autoInstallOnAppQuit=false`,
+> `quitAndInstall(false,true)` = wizard VISÍVEL (contrato F3.4.1A), logs redigidos, 6h de
+> intervalo mínimo de check automático.
+> **Veredito: I5C.3 AUTO-UPDATE = GO · RC-U01 = RESOLVED por recomendação (FINAL VERSION
+> = 1.0.247; bump NÃO criado — `desktop/package.json` + 2 ocorrências no lockfile; marcador
+> de description = decisão editorial do owner) · RC-U02 = N/A (produto unsigned por design;
+> integridade = sha512 do latest.yml, provada) · RC-U03 = OPEN registrado (etapa de
+> publicação dos assets `latest.yml`+exe+blockmap [MESMO build] no release workflow —
+> mandato de RELEASE FINAL).**
+> **Estado: pergunta do mandato — "pronto para atualizar automaticamente os usuários
+> atuais para a Light UI, sem instalação manual?" = SIM, publicando 1.0.247 (aguarda GO
+> do owner) · TAG = NÃO · RELEASE = NÃO · PUBLICAÇÃO = NÃO · DEPLOY = NÃO · BUMP = NÃO ·
+> RELEASE WORKFLOW = INERTE/NÃO EXECUTADO.**
+
 > — GO do owner (2026-08-20) com 4 correções
 > obrigatórias (amendment registrado; filtro parado como conflito-01; KPIs auditados acima;
 > sidebar 266px como calibração compartilhada do Light Shell sob `body.light-ui`, validada
