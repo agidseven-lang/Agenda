@@ -1075,6 +1075,42 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > **Estado: NEW CANDIDATE = `b4ea7890` (não congelado — aguarda GO) · bump definitivo
 > NÃO · TAG = NÃO · RELEASE = NÃO · PUBLICAÇÃO = NÃO · DEPLOY = NÃO · RELEASE WORKFLOW
 > = INERTE (etapa preparada fail-closed) · Light UI default OFF provado pós-update.**
+> **[pós-fase] Owner declarou I5C.4 = NO-GO/HOLD ("uma última vez" assistida é
+> INACEITÁVEL; RC-U04 reaberto). Fechamento na I5C.5 abaixo.**
+
+### I5C.5 · ZERO-TOUCH LEGACY BRIDGE ▶ ✔ **GO** — ENTREGUE, AGUARDA OWNER
+> **Mandato do owner (GO explícito): resolver 1.0.246→1.0.247 SEM interação com
+> installer.** Fix cirúrgico AUTORIZADO: **`nsis.oneClick: true`** →
+> **NEW RELEASE CANDIDATE = `c75ccd20`** (`fix(updater): bridge legacy updates
+> without installer interaction`; diff vs `dcc019ca` = EXATAMENTE
+> `updaterService.ts` (b4ea7890) + `electron-builder.yml` — zero incidental, gate no
+> CI). Auditoria literal dos templates NSIS instalados: one-click sem `/S` = página
+> única INSTFILES + SpiderBanner de progresso SEM botões, instala ao abrir, relança
+> (`runAfterFinish` default + `--force-run` do updater velho) e fecha via
+> `quitSuccess`; auto-elevação é código exclusivo do assisted; per-user sem UAC;
+> `customInit` da casa preserva `IfSilent`. Relatório
+> `LIGHT-UI-I5C5-ZERO-TOUCH-LEGACY-BRIDGE-REPORT.md`.
+> **Run oficial verde `32487165389` (22/22)** — cadeia REAL única:
+> **release pública v1.0.246** (SHA256SUMS) → sessão A 5/5 (check/download/
+> "Instalar e reiniciar") → **PONTE: updater ANTIGO lança installer SEM `/S`
+> (`--updated --force-run`) e o one-click instala SOZINHO** (asar==QA por SHA-256 em
+> ~6s; `SETUP_WINDOWS_VISIBLE=11` amostras SÓ de progresso informativo, `setupAtEnd=0`
+> — sumiu sozinha; `UAC=0`; `SmartScreen=0`; **`REQUIRED_USER_INSTALL_ACTIONS=0`**;
+> app 1.0.247 relança sozinho) → sessão B 10/10 (login/RC-D02=0/userData/OFF/ON/kill
+> + FUTURE: `update_available` 1.0.248 → `downloaded` → install) → **transição /S:
+> `setupWins=0`, cmdline `--updated /S --force-run`, zero janela** → sessão C 5/5
+> (1.0.248; userData através de 2 updates; OFF; same-version e downgrade
+> `up_to_date`). Self-grep: input-sintético 0 / msiexec 0 / exec direto 0.
+> **FASE 12 documentada:** com one-click, o exe baixado MANUALMENTE instala ao abrir
+> (sem diretório/confirmação/Finish; SmartScreen do download manual permanece igual a
+> hoje — MotW/unsigned). **Veredito: I5C.5 = GO · RC-U04 = RESOLVED · RC-U06 =
+> RESOLVED (ponte neutraliza a herança assistida) · RC-U05 = NONE · RC-U03 =
+> PREPARED.** Pergunta literal "usuário na 1.0.246 chega à 1.0.247 sem interagir com
+> qualquer instalador?" = **SIM** (único ato: clique interno "Instalar e reiniciar").
+> **Estado: NEW RELEASE CANDIDATE = `c75ccd20` (não congelado — aguarda GO) · FINAL
+> VERSION recomendada = 1.0.247 · bump definitivo NÃO · TAG = NÃO · RELEASE = NÃO ·
+> PUBLICAÇÃO = NÃO · DEPLOY = NÃO · RELEASE WORKFLOW = INERTE · Light UI default OFF
+> provado através de 2 updates zero-touch.**
 
 > — GO do owner (2026-08-20) com 4 correções
 > obrigatórias (amendment registrado; filtro parado como conflito-01; KPIs auditados acima;
