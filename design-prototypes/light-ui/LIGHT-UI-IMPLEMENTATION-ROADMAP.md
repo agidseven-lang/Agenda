@@ -1006,7 +1006,7 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > M1 = ACCEPTED · TAG = NÃO · GITHUB RELEASE = NÃO · DEPLOY = NÃO · BUMP = NÃO ·
 > RELEASE WORKFLOW = INERTE/NÃO EXECUTADO · RELEASE FINAL = NÃO INICIADA.**
 
-### I5C.3 · IN-APP AUTO-UPDATE ACCEPTANCE ▶ ✔ **GO** — instalação manual CANCELADA pelo owner
+### I5C.3 · IN-APP AUTO-UPDATE ACCEPTANCE ▶ **HOLD (owner)** — assisted installer discovered (RC-U04) → fechado na I5C.4
 > **Mandato do owner (GO explícito): o usuário NUNCA baixa/abre instalador — a única
 > entidade que inicia o installer é o UPDATER de dentro do app.** ZERO código de produto
 > (só `.github/workflows/` + docs, como autorizado — mesmo regime da I5C.2). Relatório
@@ -1036,6 +1036,45 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > atuais para a Light UI, sem instalação manual?" = SIM, publicando 1.0.247 (aguarda GO
 > do owner) · TAG = NÃO · RELEASE = NÃO · PUBLICAÇÃO = NÃO · DEPLOY = NÃO · BUMP = NÃO ·
 > RELEASE WORKFLOW = INERTE/NÃO EXECUTADO.**
+> **[pós-fase] Owner declarou I5C.3 = NO-GO/HOLD (RC-U04: o teste avançou o wizard NSIS
+> com teclas sintéticas fazendo o papel do usuário — instalador assistido descoberto).
+> Fechamento na I5C.4 abaixo.**
+
+### I5C.4 · SILENT IN-APP UPDATE CLOSURE ▶ ✔ **GO** — ENTREGUE, AGUARDA OWNER
+> **Mandato do owner (GO explícito): update 100% não assistido — zero wizard, zero
+> teclas sintéticas, zero automação de UI.** Fix cirúrgico AUTORIZADO e aplicado:
+> **`fix(updater): make in-app update unattended` = `b4ea7890`** (BASE `dcc019ca`;
+> 1 arquivo `desktop/src/main/updaterService.ts`, +6/−3: `quitAndInstall(false,true)` →
+> **`quitAndInstall(true,true)`** — NSIS roda com `/S`; a CONFIRMAÇÃO permanece sendo o
+> clique "Instalar e reiniciar" + guard de trabalho não salvo; renderer byte-idêntico
+> `bd5001b1…`). Auditoria literal da 6.8.9 instalada: com `isSilent=true` a lib empurra
+> `/S` e usa `isForceRunAfter` literalmente; `installer.nsh` da casa já preserva `/S`
+> (IfSilent + killRunningApp). Relatório
+> `LIGHT-UI-I5C4-SILENT-AUTOUPDATE-CLOSURE-REPORT.md`.
+> **DESCOBERTA RC-U06 (constatação, run `32482938306`):** o MODO de instalação é
+> decidido pelo APP JÁ INSTALADO — a baseline 1.0.246 de produção (código antigo)
+> spawna o installer SEM `/S` (cmdline `--updated --force-run`; 372 amostras de janela
+> Setup; zero input do harness) ⇒ **a transição 1.0.246→1.0.247 será a ÚLTIMA
+> assistida** (igual à produção vigente); irredutível sem tocar a máquina do usuário.
+> Rota opcional (decisão do owner, NÃO implementada): `nsis.oneClick:true` na 1.0.247.
+> **Run oficial verde `32484494788` (18/18, Prova B):** QA 1.0.247 (candidato)
+> instalado → feed local → sessão A 10/10 (negativos sha512/feed-fora + downloaded +
+> quitAndInstall) → **TRANSIÇÃO SILENCIOSA: setupWins=0 · UAC=0 · SmartScreen=0 ·
+> installer spawnado SÓ pelo updater com `--updated /S --force-run` · uninstall interno
+> `/S /KEEP_APP_DATA /currentuser` · app relança sozinho · asar==QA-248 por SHA-256** →
+> gate mecânico EXTERNAL_INSTALL_INTERACTION=0 → sessão B 9/9 (1.0.248; login real;
+> RC-D02=0; userData preservado; **Light OFF**; ON/kill reais; same-version e downgrade
+> `up_to_date`). RC-U03: etapa de publicação PREPARADA no release workflow
+> (bundle pinado → sha256/sha512 → tag → Release Latest com latest.yml+exe+blockmap+
+> msi+SHA256SUMS+VERSAO-DESKTOP.txt), INALCANÇÁVEL (gates 0–3 + pins PENDING + tag).
+> **Veredito: I5C.4 = GO · RC-U04 = RESOLVED (no candidato) · RC-U05 = NONE ·
+> RC-U03 = PREPARED · RC-U06 = OPEN (aceitação do owner OU mandato oneClick).**
+> **Pergunta literal "1.0.246→1.0.247 sem qualquer interação externa com o instalador?"
+> = NÃO (herança assistida imutável da baseline — uma última vez); a partir da 1.0.247
+> = SIM para sempre (provado 247→248).**
+> **Estado: NEW CANDIDATE = `b4ea7890` (não congelado — aguarda GO) · bump definitivo
+> NÃO · TAG = NÃO · RELEASE = NÃO · PUBLICAÇÃO = NÃO · DEPLOY = NÃO · RELEASE WORKFLOW
+> = INERTE (etapa preparada fail-closed) · Light UI default OFF provado pós-update.**
 
 > — GO do owner (2026-08-20) com 4 correções
 > obrigatórias (amendment registrado; filtro parado como conflito-01; KPIs auditados acima;
