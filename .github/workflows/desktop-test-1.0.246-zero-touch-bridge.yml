@@ -326,9 +326,19 @@ jobs:
           Get-Process | Where-Object { $_.ProcessName -like "*Agenda*" } | Stop-Process -Force -ErrorAction SilentlyContinue
           Start-Sleep -Seconds 2
 
-      - name: "MONITOR 2 — armar ANTES da transição futura (247→248)"
+      - name: "MONITOR 2 — re-apontar feed (o installer da ponte recria app-update.yml p/ github) + armar"
         shell: powershell
         run: |
+          # a instalacao da ponte substituiu resources\app-update.yml pelo do pacote (provider github);
+          # o check da sessao B iria para a PRODUCAO real (up_to_date, 246<247). Re-aponta ao feed QA.
+          $au = Join-Path $env:INSTALL_DIR "resources\app-update.yml"
+          @"
+          provider: generic
+          url: http://127.0.0.1:$env:FEED_PORT
+          channel: latest
+          updaterCacheDirName: agenda-id-seven-desktop-updater
+          "@ | Out-File -FilePath $au -Encoding utf8
+          Get-Content $au
           Remove-Item "$env:RUNNER_TEMP\monitor2.stop","$env:RUNNER_TEMP\monitor2.jsonl" -ErrorAction SilentlyContinue
           Start-Process powershell -ArgumentList "-NoProfile","-ExecutionPolicy","Bypass","-File","$env:RUNNER_TEMP\monitor.ps1","-Tag","2" -WindowStyle Hidden
           $up = $false
@@ -461,6 +471,14 @@ jobs:
           Write-Host "TRANSICAO FUTURA OK: /S, zero janela, zero input"
           Get-Process | Where-Object { $_.ProcessName -like "*Agenda*" } | Stop-Process -Force -ErrorAction SilentlyContinue
           Start-Sleep -Seconds 2
+          # o installer 1.0.248 recriou o app-update.yml (github) — re-aponta ao feed p/ a sessao C
+          $au = Join-Path $env:INSTALL_DIR "resources\app-update.yml"
+          @"
+          provider: generic
+          url: http://127.0.0.1:$env:FEED_PORT
+          channel: latest
+          updaterCacheDirName: agenda-id-seven-desktop-updater
+          "@ | Out-File -FilePath $au -Encoding utf8
 
       - name: "EXTERNAL_INSTALL_INTERACTION = 0 — gate mecânico (self-grep do harness)"
         run: |
