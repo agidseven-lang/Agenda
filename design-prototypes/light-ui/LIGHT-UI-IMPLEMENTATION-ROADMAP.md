@@ -961,9 +961,32 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > **Veredito: I5C.1 = NO-GO · RC-A01 OPEN · RC-A02 OPEN · RC-A03 OPEN · "RC aprovado para
 > RELEASE FINAL?" = NÃO** (produto sem defeito conhecido; pendências 100% de ambiente/
 > processo).
-> **Estado: I5C.1 = ENTREGUE — AGUARDA OWNER · RC SOURCE = `dcc019ca` (imutável) ·
-> NSIS I5B = artefato de referência (hash `82576b18…`) · M1 = ACCEPTED · TAG = NÃO ·
-> GITHUB RELEASE = NÃO · DEPLOY = NÃO · BUMP = NÃO · RELEASE FINAL = NÃO INICIADA.**
+> **Estado: I5C.1 = NO-GO / ENVIRONMENTAL HOLD (superseded pela I5C.2).**
+
+### I5C.2 · WINDOWS CI & ENVIRONMENTAL CLOSURE ▶ ENTREGUE — **GO (A02/A03 RESOLVED; A01 residual de 2 checks)**
+> **Mandato do owner (GO explícito; autorização cirúrgica p/ workflows CI).** Relatório
+> `LIGHT-UI-I5C2-WINDOWS-CI-CLOSURE-REPORT.md`. **Par de workflows da linhagem RC criado**
+> (padrão dos 25 pares; registro no main = precedente literal da casa):
+> `desktop-build-1.0.246-rc.yml` (dispatch-only, windows-latest, checkout EXPLÍCITO e
+> verificado de `dcc019ca`, provenance por SHA-256 dos objetos git, NSIS+MSI, gates de
+> asar/RC-D02/updater, CDN normal fail-closed, installs reais, sanity no app INSTALADO,
+> CDN blocked restaurado, artifacts privados) e `desktop-release-1.0.246-rc.yml` (INERTE:
+> var de repositório `RC_RELEASE_GO` + frase + publicação bloqueada; NUNCA executado).
+> **Run oficial VERDE `32431962343` (20/20 steps, 5min24s):** NSIS 82 549 920 B
+> `ca94a337…` · **MSI 92 561 408 B `91517b1c…` (RC-B01 FECHADO)** · asar `e1e2be5a…`
+> byte-idêntico à fonte · **install/uninstall/reinstall NSIS exit 0 + userData preservado**
+> · **MSI install/uninstall exit 0 + consistency NSIS==MSI==build** · **CDN NORMAL HTTP
+> 200 nos hosts exatos + SDK REAL carregado no app instalado + default OFF + ON mecanismo
+> real + kill (sanity fail-closed)** · CDN blocked honesto + hosts restaurado · zero
+> segredo. CI INFRA COMMITs ≠ PRODUCT SOURCE (`dcc019ca` imutável; zero produto tocado).
+> **Veredito: I5C.2 = GO · RC-A02 = RESOLVED · RC-A03 = RESOLVED · RC-A01 = OPEN residual
+> (OWNER-WINDOWS-CHECKS: 1. instalador NSIS com interface visível ~2min; 2. display
+> scaling 125% nativo ~3min) · "RC aprovado para RELEASE FINAL?" = NÃO (aguarda os 2
+> checks + GO do owner).**
+> **Estado: I5C.2 = ENTREGUE — AGUARDA OWNER · RC SOURCE = `dcc019ca` (imutável) ·
+> ARTEFATO CANÔNICO = run `32431962343` (bundle privado, expira 2026-08-28) · M1 =
+> ACCEPTED · TAG = NÃO · GITHUB RELEASE = NÃO · DEPLOY = NÃO · BUMP = NÃO · RELEASE
+> WORKFLOW = INERTE/NÃO EXECUTADO · RELEASE FINAL = NÃO INICIADA.**
 
 > — GO do owner (2026-08-20) com 4 correções
 > obrigatórias (amendment registrado; filtro parado como conflito-01; KPIs auditados acima;
