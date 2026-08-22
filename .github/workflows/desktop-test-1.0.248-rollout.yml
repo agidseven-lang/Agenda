@@ -1,0 +1,430 @@
+# =====================================================================
+# [manual] Light UI — PUBLIC ROLLOUT QA 1.0.247→1.0.248 (I6A; NADA é publicado)
+# ---------------------------------------------------------------------
+# OBJETIVO: provar o rollout REAL da Light UI pública no caminho dos usuários:
+#   BASELINE = release PÚBLICA v1.0.247 (o binário Latest que os usuários têm;
+#   Light UI OFF por default; updater com fix /S) instalada em QA
+#   → QA 1.0.248 EFÊMERO (ROLLOUT SOURCE CANDIDATE eefa0259 = cd92ec1f +
+#     SOMENTE o novo contrato de ativação no renderer): update in-app real
+#     check→download→downloaded→"Instalar e reiniciar"→instalação /S
+#   → app relança em 1.0.248 e abre AUTOMATICAMENTE com a Light UI
+#     (LIGHT_UI_DEFAULT_ON=true) SEM DevTools/localStorage/flag/reinstalação.
+# GATES: REQUIRED_USER_INSTALL_ACTIONS=0 · UAC=0 · SmartScreen=0 · janela de
+# setup=0 (updater 1.0.247 passa /S) · cmdline COM "--updated" e "/S" ·
+# asar instalado == asar QA (SHA-256) · userData PRESERVADO · luiPreview
+# stale (false) NÃO vira opt-out · emergency luiPublicOff off→on reversível ·
+# RC-D02=0 · login presente · reload mantém ON · same-version up_to_date.
+# BUMP 1.0.248 EFÊMERO (workspace); baseline REAL da release pública (pins).
+# Sem tag, sem release, sem deploy, sem publish. Execução manual apenas.
+# =====================================================================
+name: "[manual] Light UI — Public Rollout QA 1.0.247→1.0.248 (I6A)"
+
+"on":
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  ROLLOUT_CANDIDATE_SHA: "eefa0259493e2342b05fbaa54fd2ba1a8d3bb8a4"
+  PRODUCTION_BASE_SHA: "cd92ec1fb723146ead1bd3031898be77a577b135"
+  EXPECTED_RENDERER_SHA256: "ed7a4ad2c267d73d7a5957e2cb0ded9316f43260e0ebe325f34201eb1b301350"
+  BASELINE_TAG: "v1.0.247"
+  PUBLIC_EXE_SHA256: "9ed5eee9042f04d4e1533a1558ad48c49ed4be33933d9f7d10d69ffa6bf09a50"
+  QA_VERSION: "1.0.248"
+  FEED_PORT: "8879"
+
+jobs:
+  rollout-qa:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: "Git sem conversão CRLF"
+        run: git config --global core.autocrlf false
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: "PIN do ROLLOUT SOURCE CANDIDATE (eefa0259 = cd92ec1f + contrato I6A) + provenance"
+        run: |
+          set -euo pipefail
+          cp ".github/workflows/desktop-test-1.0.248-rollout.yml" "$RUNNER_TEMP/wf-self.yml"
+          git checkout --detach "$ROLLOUT_CANDIDATE_SHA"
+          [ "$(git rev-parse HEAD)" = "$ROLLOUT_CANDIDATE_SHA" ] || { echo "::error::pin falhou"; exit 1; }
+          git merge-base --is-ancestor "$PRODUCTION_BASE_SHA" "$ROLLOUT_CANDIDATE_SHA" || { echo "::error::candidato nao descende da PRODUCTION BASE cd92ec1f"; exit 1; }
+          R=$(sha256sum desktop/src/renderer/index.html | awk '{print $1}')
+          [ "$R" = "$EXPECTED_RENDERER_SHA256" ] || { echo "::error::renderer difere do candidato congelado"; exit 1; }
+          # diff de PRODUTO vs PRODUCTION BASE = EXATAMENTE o renderer (zero incidental)
+          D=$(git diff --name-only "$PRODUCTION_BASE_SHA" "$ROLLOUT_CANDIDATE_SHA" -- desktop | sort | tr '\n' ' ')
+          echo "diff de produto vs cd92ec1f: $D"
+          [ "$D" = "desktop/src/renderer/index.html " ] || { echo "::error::candidato altera mais que o renderer"; exit 1; }
+          # contrato I6A literal presente; contrato antigo (preview governa) AUSENTE
+          grep -Fq "luiPublicOff!==true&&document.body.classList.contains('desktop')" desktop/src/renderer/index.html || { echo "::error::novo contrato de ativacao ausente"; exit 1; }
+          grep -Fq "luiPublicOff:a.luiPublicOff===true" desktop/src/renderer/index.html || { echo "::error::persistencia luiPublicOff ausente"; exit 1; }
+          if grep -Fq "luiPreview===true&&document.body.classList.contains('desktop')" desktop/src/renderer/index.html; then echo "::error::contrato antigo (luiPreview governa) ainda presente"; exit 1; fi
+          # base do updater/installer preservada (fix /S + one-click herdados de cd92ec1f)
+          V=$(node -e 'console.log(JSON.parse(require("fs").readFileSync("desktop/package.json","utf8")).version)')
+          [ "$V" = "1.0.247" ] || { echo "::error::versao do candidato=$V (esperado 1.0.247 pre-bump)"; exit 1; }
+          grep -Fq 'quitAndInstall(true, true)' desktop/src/main/updaterService.ts || { echo "::error::fix silencioso ausente no candidato"; exit 1; }
+          grep -Eq '^\s*oneClick: true' desktop/electron-builder.yml || { echo "::error::oneClick=true ausente no candidato"; exit 1; }
+          echo "PIN OK: candidato integro; diff de produto = so o contrato de ativacao"
+
+      - name: "BASELINE DE PRODUÇÃO — baixar release pública v1.0.247 + verificar pins + SHA256SUMS"
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/baseline"; cd "$RUNNER_TEMP/baseline"
+          BASE="https://github.com/agidseven-lang/Agenda/releases/download/$BASELINE_TAG"
+          curl -sSL -o baseline.exe "$BASE/Agenda-ID-Seven-Desktop-1.0.247-x64.exe"
+          curl -sSL -o SHA256SUMS "$BASE/SHA256SUMS"
+          EXP=$(grep "Agenda-ID-Seven-Desktop-1.0.247-x64.exe$" SHA256SUMS | awk '{print $1}')
+          GOT=$(sha256sum baseline.exe | awk '{print $1}')
+          echo "esperado(release): $EXP"; echo "esperado(pin):     $PUBLIC_EXE_SHA256"; echo "obtido:            $GOT"
+          [ "$EXP" = "$GOT" ] || { echo "::error::baseline exe nao confere com SHA256SUMS da release"; exit 1; }
+          [ "$GOT" = "$PUBLIC_EXE_SHA256" ] || { echo "::error::baseline exe difere do pin canonico da 1.0.247"; exit 1; }
+          echo "BASELINE OK: release publica v1.0.247 integra (SHA256SUMS + pin canonico)"
+
+      - name: "Instalar baseline (setup automatizado de QA — o UPDATE em si nunca é manual)"
+        shell: powershell
+        run: |
+          $p = Start-Process -FilePath "$env:RUNNER_TEMP\baseline\baseline.exe" -ArgumentList "/S" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Write-Error "baseline install exit $($p.ExitCode)"; exit 1 }
+          Start-Sleep -Seconds 3
+          $dir = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Directory | Where-Object { Test-Path (Join-Path $_.FullName "Agenda ID Seven Desktop.exe") } | Select-Object -First 1
+          if (-not $dir) { Write-Error "baseline nao instalada"; exit 1 }
+          "INSTALL_DIR=$($dir.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "baseline instalada em: $($dir.FullName)"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: "BUILD QA EFÊMERO — 1.0.248 do candidato (bump só no workspace) + GATE ASAR I6A"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          echo "::notice::QA-ONLY EPHEMERAL BUMP -> $QA_VERSION (workspace; repo INTOCADO)"
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version=process.env.QA_VERSION;fs.writeFileSync('package.json',JSON.stringify(p,null,2));"
+          node -e "const fs=require('fs');let s=fs.readFileSync('package-lock.json','utf8');s=s.replace(/\"version\": \"1\.0\.247\"/g,'\"version\": \"'+process.env.QA_VERSION+'\"');fs.writeFileSync('package-lock.json',s);"
+          npm ci --no-audit --no-fund
+          npm run build
+          npx electron-builder --win nsis --publish never
+          # ---- GATE ASAR (QA 1.0.248 = candidato + versao, nada mais)
+          EX="$RUNNER_TEMP/asarx"; rm -rf "$EX"; mkdir -p "$EX"
+          npx --yes @electron/asar extract dist-installer/win-unpacked/resources/app.asar "$EX"
+          PKGV=$(PKG="$EX/package.json" node -e 'console.log(JSON.parse(require("fs").readFileSync(process.env.PKG,"utf8")).version)')
+          [ "$PKGV" = "$QA_VERSION" ] || { echo "::error::asar QA version=$PKGV"; exit 1; }
+          git show "$ROLLOUT_CANDIDATE_SHA":desktop/src/renderer/index.html > "$RUNNER_TEMP/src-index.html"
+          A="$EX/src/renderer/index.html" B="$RUNNER_TEMP/src-index.html" node -e '
+            const fs=require("fs");const n=s=>String(s).replace(/\r\n/g,"\n");
+            if(n(fs.readFileSync(process.env.A,"utf8"))!==n(fs.readFileSync(process.env.B,"utf8"))){console.error("renderer empacotado != fonte do candidato");process.exit(1);}
+            console.log("renderer empacotado == fonte do candidato (byte-identico)");'
+          grep -Fq "luiPublicOff!==true&&document.body.classList.contains('desktop')" "$EX/src/renderer/index.html" || { echo "::error::contrato I6A ausente no asar"; exit 1; }
+          grep -Fq "try{applyAppearance();}catch(_){}" "$EX/src/renderer/index.html" || { echo "::error::first-paint inline ausente no asar"; exit 1; }
+          C=$(grep -c 'data-mode\|Esqueci minha senha' "$EX/src/renderer/index.html" || true)
+          [ "$C" = "0" ] || { echo "::error::recovery presente no asar (RC-D02)"; exit 1; }
+          US="$EX/dist/main/updaterService.js"
+          grep -Eq 'autoUpdater\.allowPrerelease[[:space:]]*=[[:space:]]*false' "$US"
+          grep -Eq 'autoUpdater\.channel[[:space:]]*=[[:space:]]*"latest"' "$US"
+          grep -Eq 'autoUpdater\.allowDowngrade[[:space:]]*=[[:space:]]*false' "$US"
+          grep -Fq 'quitAndInstall(true, true)' "$US" || { echo "::error::fix silencioso ausente no asar QA"; exit 1; }
+          if grep -Fq 'quitAndInstall(false' "$US"; then echo "::error::chamada assistida presente no asar QA"; exit 1; fi
+          echo "GATE asar QA OK ($PKGV; renderer==candidato; contrato I6A; first-paint; RC-D02=0; flags; fix)"
+          mkdir -p "$RUNNER_TEMP/feed248"
+          cp dist-installer/latest.yml "$RUNNER_TEMP/feed248/"
+          cp "dist-installer/Agenda-ID-Seven-Desktop-$QA_VERSION-x64.exe" "$RUNNER_TEMP/feed248/"
+          cp "dist-installer/Agenda-ID-Seven-Desktop-$QA_VERSION-x64.exe.blockmap" "$RUNNER_TEMP/feed248/"
+          cp dist-installer/win-unpacked/resources/app.asar "$RUNNER_TEMP/qa-248.asar"
+
+      - name: "FEED QA LOCAL fail-closed (127.0.0.1:8879) — serve 1.0.248"
+        shell: powershell
+        run: |
+          $feed = "$env:RUNNER_TEMP\feed"
+          New-Item -ItemType Directory -Force -Path $feed | Out-Null
+          Copy-Item "$env:RUNNER_TEMP\feed248\*" $feed
+          "FEED_DIR=$feed" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Start-Process python -ArgumentList "-m","http.server",$env:FEED_PORT,"--bind","127.0.0.1","--directory",$feed -WindowStyle Hidden
+          $ok = $false
+          foreach ($i in 1..15) {
+            Start-Sleep -Seconds 2
+            try { $r = Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:$env:FEED_PORT/latest.yml" -TimeoutSec 5; if ($r.StatusCode -eq 200) { $ok = $true; break } } catch { }
+          }
+          if (-not $ok) { Write-Error "feed local nao respondeu em 30s"; exit 1 }
+          Write-Host "feed QA OK (HTTP 200; servindo 1.0.248)"
+
+      - name: "Apontar a INSTÂNCIA baseline para o feed (app-update.yml da instância; produção intocada)"
+        shell: powershell
+        run: |
+          $au = Join-Path $env:INSTALL_DIR "resources\app-update.yml"
+          Copy-Item $au "$au.bak"
+          @"
+          provider: generic
+          url: http://127.0.0.1:$env:FEED_PORT
+          channel: latest
+          updaterCacheDirName: agenda-id-seven-desktop-updater
+          "@ | Out-File -FilePath $au -Encoding utf8
+          Get-Content $au
+
+      - name: "MONITOR 1 — armar ANTES da transição (janelas Setup/SmartScreen + consent.exe + process-tree)"
+        shell: powershell
+        run: |
+          $mon = @'
+          param([string]$Tag)
+          $stop = "$env:RUNNER_TEMP\monitor$Tag.stop"
+          $out  = "$env:RUNNER_TEMP\monitor$Tag.jsonl"
+          Add-Content -Path $out -Value '{"boot":true}'
+          $deadline = (Get-Date).AddSeconds(900)
+          while (((Get-Date) -lt $deadline) -and (-not (Test-Path $stop))) {
+            $t = (Get-Date).ToString("HH:mm:ss.fff")
+            $setup = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -like "*Setup*" -or $_.MainWindowTitle -like "*Instal*" } | ForEach-Object { ($_.ProcessName + "::" + $_.MainWindowTitle) })
+            $sc    = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -match "SmartScreen|protected your PC" } | ForEach-Object { $_.MainWindowTitle })
+            $uac   = @(Get-Process -Name consent -ErrorAction SilentlyContinue).Count
+            $inst  = @(Get-CimInstance Win32_Process -Filter "CommandLine LIKE '%--updated%'" -ErrorAction SilentlyContinue | ForEach-Object { @{ pid = $_.ProcessId; ppid = $_.ParentProcessId; name = $_.Name; cmd = $_.CommandLine } })
+            $rec = @{ t = $t; setup = $setup; sc = $sc; uac = $uac; inst = $inst } | ConvertTo-Json -Compress -Depth 6
+            Add-Content -Path $out -Value $rec
+            Start-Sleep -Milliseconds 700
+          }
+          '@
+          Set-Content -Path "$env:RUNNER_TEMP\monitor.ps1" -Value $mon -Encoding utf8
+          Remove-Item "$env:RUNNER_TEMP\monitor1.stop","$env:RUNNER_TEMP\monitor1.jsonl" -ErrorAction SilentlyContinue
+          Start-Process powershell -ArgumentList "-NoProfile","-ExecutionPolicy","Bypass","-File","$env:RUNNER_TEMP\monitor.ps1","-Tag","1" -WindowStyle Hidden
+          $up = $false
+          foreach ($i in 1..30) { Start-Sleep -Seconds 1; if (Test-Path "$env:RUNNER_TEMP\monitor1.jsonl") { $up = $true; break } }
+          if (-not $up) { Write-Error "monitor1 nao iniciou em 30s"; exit 1 }
+          Write-Host "monitor1 armado"
+
+      - name: "SESSÃO A — PUBLIC 1.0.247 real: Light OFF antes + seed userData (luiPreview stale) + update flow"
+        timeout-minutes: 15
+        working-directory: desktop
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+        run: |
+          set -euo pipefail
+          npm i --no-save playwright@1.47.2 --no-audit --no-fund
+          cat > rollout-a.mjs <<'EOF'
+          import { _electron } from 'playwright';
+          import fs from 'fs';
+          const exe = process.env.INSTALL_DIR + '\\Agenda ID Seven Desktop.exe';
+          const out = { g: {} }; const g = out.g;
+          const sleep = ms => new Promise(r => setTimeout(r, ms));
+          const app = await _electron.launch({ executablePath: exe, args: [] });
+          const pg = await app.firstWindow({ timeout: 45000 });
+          await pg.waitForLoadState('load'); await pg.waitForTimeout(4000);
+          await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0].setContentSize(1280, 800); });
+          await sleep(500);
+          const before = await pg.evaluate(() => ({
+            ver: (typeof APP_VER !== 'undefined' && APP_VER.desktop) || null,
+            title: document.title,
+            upd: !!(window.desktopAPI && window.desktopAPI.updater),
+            desktop: document.body.classList.contains('desktop'),
+            lui: document.body.classList.contains('light-ui'),
+            vw: window.innerWidth
+          }));
+          out.before = before;
+          g.a1_baselineIs247 = before.ver === '1.0.247' && before.title.includes('1.0.247');   // o binario Latest REAL dos usuarios
+          g.a2_updaterApi = before.upd === true;
+          g.a3_desktopEligible = before.desktop === true;
+          g.a4_luiOffBefore = before.lui === false;   // 1.0.247 publica: Light UI OFF por default (a mudanca visivel vem DO update)
+          // seed userData do usuario real: tema/notificacoes + flag de preview STALE=false
+          // (perfil adversarial C da migracao: NAO pode virar opt-out na 1.0.248)
+          await pg.evaluate(() => {
+            localStorage.setItem('idseven.desktop.appearance', JSON.stringify({ theme: 'dark', font: 'std', hc: false, luiPreview: false }));
+            localStorage.setItem('idseven.notif.history.v1', JSON.stringify([{ eventId: 'seed1', dedupKey: 'seed1', eventType: 'flow_update', taskId: 'x', taskTitle: 'Seed', clientName: 'QA', title: 'Seed', severity: 'info', createdAt: 1, deep: 'detail/x', read: true }]));
+          });
+          const st = () => pg.evaluate(() => window.desktopAPI.updater.getState());
+          const poll = async (want, ms) => { const t0 = Date.now(); for (;;) { const s = await st(); if (want.includes(s.status)) return s; if (Date.now() - t0 > ms) return s; await sleep(500); } };
+          await pg.evaluate(() => { window.desktopAPI.updater.check(); });
+          let s = await poll(['update_available'], 30000);
+          out.avail = { status: s.status, version: s.availableVersion };
+          g.b1_updateAvailable248 = s.status === 'update_available' && s.availableVersion === '1.0.248';
+          await pg.evaluate(() => { window.desktopAPI.updater.download(); });
+          { const t0 = Date.now(); for (;;) { const x = await st(); if (x.status === 'downloaded' || x.status === 'error') { s = x; break; } if (Date.now() - t0 > 120000) { s = x; break; } await sleep(400); } }
+          out.dl = s.status;
+          g.b2_downloaded = s.status === 'downloaded';
+          // UNICA acao humana do contrato: clique interno "Instalar e reiniciar" (aqui via IPC real).
+          // Depois disto: ZERO interacao — o updater da 1.0.247 (fix) instala com /S.
+          pg.evaluate(() => { window.desktopAPI.updater.installAndRestart(); }).catch(() => {});
+          let closed = false;
+          try { await Promise.race([new Promise(res => app.on('close', () => { closed = true; res(); })), sleep(30000)]); } catch (_) {}
+          if (!closed) { try { const x = await st(); out.installState = x.status; closed = (x.status === 'installing'); } catch (_) { closed = true; } }
+          out.appClosedByUpdater = closed;
+          g.c1_installTriggered = closed === true;
+          const fails = Object.entries(g).filter(([k, v]) => !v).map(([k]) => k);
+          out.fails = fails;
+          fs.writeFileSync(process.env.RUNNER_TEMP + '/rollout-sessionA.json', JSON.stringify(out));
+          console.log(JSON.stringify(out, null, 1));
+          try { await Promise.race([app.close(), sleep(4000)]); } catch (_) {}
+          if (fails.length) { console.error('FAILS A:', fails); }
+          process.exit(fails.length ? 1 : 0);
+          EOF
+          node rollout-a.mjs
+
+      - name: "TRANSIÇÃO SILENCIOSA (247→248) — /S, zero janela; gates do monitor 1"
+        timeout-minutes: 8
+        shell: powershell
+        run: |
+          $target = (Get-FileHash "$env:RUNNER_TEMP\qa-248.asar" -Algorithm SHA256).Hash
+          Write-Host "hash esperado (asar 1.0.248 QA): $target"
+          $deadline = (Get-Date).AddSeconds(240)
+          $done = $false
+          while ((Get-Date) -lt $deadline) {
+            Start-Sleep -Seconds 3
+            # ZERO interacao: este loop APENAS LE o hash do asar instalado.
+            $asar = Join-Path $env:INSTALL_DIR "resources\app.asar"
+            if (Test-Path $asar) {
+              try { $h = (Get-FileHash $asar -Algorithm SHA256 -ErrorAction Stop).Hash; if ($h -eq $target) { $done = $true; break } } catch { }
+            }
+          }
+          $ev = @{ silentInstalled = $done }
+          if (-not $done) {
+            Write-Host "janelas visiveis (diagnostico):"
+            Get-Process | Where-Object { $_.MainWindowTitle } | ForEach-Object { Write-Host ("  [{0}] {1}" -f $_.ProcessName, $_.MainWindowTitle) }
+          }
+          $relaunch = $false
+          foreach ($i in 1..15) { Start-Sleep -Seconds 2; if (Get-Process -Name "Agenda ID Seven Desktop" -ErrorAction SilentlyContinue) { $relaunch = $true; break } }
+          $ev.relaunch = $relaunch
+          New-Item -ItemType File -Path "$env:RUNNER_TEMP\monitor1.stop" -Force | Out-Null
+          Start-Sleep -Seconds 2
+          $lines = Get-Content "$env:RUNNER_TEMP\monitor1.jsonl" -ErrorAction SilentlyContinue
+          $setupSamples = 0; $scSamples = 0; $uacSamples = 0; $instCmds = @{}
+          foreach ($ln in $lines) {
+            try { $r = $ln | ConvertFrom-Json } catch { continue }
+            if ($r.setup -and $r.setup.Count -gt 0) { $setupSamples++ }
+            if ($r.sc -and $r.sc.Count -gt 0) { $scSamples++ }
+            if ($r.uac -gt 0) { $uacSamples++ }
+            foreach ($p in @($r.inst)) { if ($p -and $p.cmd) { $instCmds[[string]$p.cmd] = @{ pid = $p.pid; ppid = $p.ppid; name = $p.name } } }
+          }
+          $ev.samples = @($lines).Count
+          $ev.setupWindowSamples = $setupSamples
+          $ev.smartscreenSamples = $scSamples
+          $ev.uacSamples = $uacSamples
+          $ev.installerProcesses = @($instCmds.GetEnumerator() | ForEach-Object { @{ cmd = $_.Key; pid = $_.Value.pid; ppid = $_.Value.ppid; name = $_.Value.name } })
+          $silentSpawn = $false
+          foreach ($k in $instCmds.Keys) { if (($k -like "*1.0.248*") -and ($k -like "*--updated*") -and ($k -like "*/S*")) { $silentSpawn = $true } }
+          $ev.installerCmdHasSilentUpdated = $silentSpawn
+          $ev.REQUIRED_USER_INSTALL_ACTIONS = 0   # estrutural: harness sem input sintetico (self-grep) e instalacao completou sem NENHUM input
+          $ev | ConvertTo-Json -Depth 6 | Out-File -FilePath "$env:RUNNER_TEMP\rollout-transition.json" -Encoding utf8
+          Write-Host ("monitor1: {0} amostras | setupWins={1} | smartscreen={2} | uac={3} | installers={4}" -f $ev.samples, $setupSamples, $scSamples, $uacSamples, $ev.installerProcesses.Count)
+          foreach ($p in $ev.installerProcesses) { Write-Host ("  proc: pid={0} ppid={1} cmd={2}" -f $p.pid, $p.ppid, $p.cmd) }
+          if (-not $done) { Write-Error "instalacao silenciosa nao concluiu no tempo"; exit 1 }
+          if ($setupSamples -ne 0) { Write-Error "FAIL: janela visivel na transicao /S (deveria ser zero)"; exit 1 }
+          if ($uacSamples -ne 0) { Write-Error "FAIL: prompt UAC na transicao"; exit 1 }
+          if ($scSamples -ne 0) { Write-Error "FAIL: SmartScreen na transicao"; exit 1 }
+          if (-not $silentSpawn) { Write-Error "FAIL: installer 1.0.248 com updated+/S nao observado"; exit 1 }
+          if (-not $relaunch) { Write-Error "FAIL: app 1.0.248 nao relancou sozinho"; exit 1 }
+          Write-Host "TRANSICAO OK: /S, zero janela, zero input"
+          Get-Process | Where-Object { $_.ProcessName -like "*Agenda*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 2
+          # o installer 1.0.248 recriou o app-update.yml (github) — re-aponta ao feed p/ a sessao B
+          $au = Join-Path $env:INSTALL_DIR "resources\app-update.yml"
+          @"
+          provider: generic
+          url: http://127.0.0.1:$env:FEED_PORT
+          channel: latest
+          updaterCacheDirName: agenda-id-seven-desktop-updater
+          "@ | Out-File -FilePath $au -Encoding utf8
+
+      - name: "EXTERNAL_INSTALL_INTERACTION = 0 — gate mecânico (self-grep do harness)"
+        run: |
+          set -euo pipefail
+          WF="$RUNNER_TEMP/wf-self.yml"
+          V1=$(grep -cE "SendK[e]ys|AppActiv[a]te|UIAutomat[i]on|WScript\.Sh[e]ll|mouse_ev[e]nt|SetCursor[P]os" "$WF" || true)
+          V2=$(grep -cE "msiex[e]c" "$WF" || true)
+          V3=$(grep -cE "Start-Proc[e]ss.*1\.0\.248.*\.exe" "$WF" || true)
+          echo "input-sintetico: $V1 | msi-exec: $V2 | exec direto do installer 248: $V3"
+          [ "$V1" = "0" ] && [ "$V2" = "0" ] && [ "$V3" = "0" ] || { echo "::error::harness contem interacao/execucao externa de installer"; exit 1; }
+          echo "EXTERNAL_INSTALL_INTERACTION=0 e REQUIRED_USER_INSTALL_ACTIONS=0 (estrutural + runtime)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "SESSÃO B — 1.0.248: LIGHT UI ON AUTOMÁTICA + userData + migração stale + emergency + reload + same-version"
+        timeout-minutes: 15
+        working-directory: desktop
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+        run: |
+          set -euo pipefail
+          cat > rollout-b.mjs <<'EOF'
+          import { _electron } from 'playwright';
+          import fs from 'fs';
+          const exe = process.env.INSTALL_DIR + '\\Agenda ID Seven Desktop.exe';
+          const out = { g: {} }; const g = out.g;
+          const sleep = ms => new Promise(r => setTimeout(r, ms));
+          const app = await _electron.launch({ executablePath: exe, args: [] });
+          const pg = await app.firstWindow({ timeout: 45000 });
+          await pg.waitForLoadState('load'); await pg.waitForTimeout(4000);
+          out.bootRaw = await pg.evaluate(() => ({ vw: window.innerWidth, desktop: document.body.classList.contains('desktop'), lui: document.body.classList.contains('light-ui') }));
+          await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0].setContentSize(1280, 800); });
+          await sleep(500);
+          const a = await pg.evaluate(() => ({
+            ver: (typeof APP_VER !== 'undefined' && APP_VER.desktop) || null,
+            title: document.title,
+            appear: localStorage.getItem('idseven.desktop.appearance'),
+            notif: localStorage.getItem('idseven.notif.history.v1'),
+            desktop: document.body.classList.contains('desktop'),
+            lui: document.body.classList.contains('light-ui'),
+            loginPwd: !!document.querySelector('input[type="password"]'),
+            recovery: (document.body.innerHTML.match(/Esqueci minha senha/g) || []).length,
+            vw: window.innerWidth
+          }));
+          out.after = a;
+          g.d1_versionIs248 = a.ver === '1.0.248' && a.title.includes('1.0.248');
+          const ap = JSON.parse(a.appear || '{}');
+          g.d2_userDataKept = ap.theme === 'dark' && (a.notif || '').includes('seed1');
+          // HARD GATE PRINCIPAL DO I6A: Light UI ON AUTOMATICA no desktop elegivel,
+          // SEM DevTools/localStorage/flag/reinstalacao — direto do update.
+          g.d3_LIGHT_UI_DEFAULT_ON = a.desktop === true && a.lui === true;
+          // migracao: luiPreview stale (false, semeado na 1.0.247) NAO virou opt-out; flag segue no storage como legado inerte
+          g.d4_stalePreviewNotOptOut = ap.luiPreview === false && a.lui === true;
+          // emergency kill switch NOVO: default AUSENTE no perfil migrado; liga/desliga tecnico reversivel
+          g.d5_emergencyDefaultAbsent = !('luiPublicOff' in ap) || ap.luiPublicOff === false;
+          g.d0_loginSurface = a.loginPwd === true;
+          g.d0_rcd02Zero = a.recovery === 0;
+          await pg.evaluate(() => { appearSet({ luiPublicOff: true }); });
+          await sleep(300);
+          g.e1_emergencyOff = await pg.evaluate(() => !document.body.classList.contains('light-ui'));
+          await pg.evaluate(() => { appearSet({ luiPublicOff: false }); });
+          await sleep(300);
+          g.e2_emergencyRestoreOn = await pg.evaluate(() => document.body.classList.contains('light-ui'));
+          // luiPreview segue INERTE na 1.0.248 (nao desliga nada)
+          await pg.evaluate(() => { appearSet({ luiPreview: false }); });
+          await sleep(300);
+          g.e3_previewInert = await pg.evaluate(() => document.body.classList.contains('light-ui'));
+          // reload = novo first paint: ON sem nenhuma acao
+          await pg.reload({ waitUntil: 'load' }); await pg.waitForTimeout(2500);
+          g.f1_reloadStillOn = await pg.evaluate(() => document.body.classList.contains('light-ui') && document.body.classList.contains('desktop'));
+          // same-version: 1.0.248 nao e oferecida de novo (sem loop)
+          const st = () => pg.evaluate(() => window.desktopAPI.updater.getState());
+          const poll = async (want, ms) => { const t0 = Date.now(); for (;;) { const s = await st(); if (want.includes(s.status)) return s; if (Date.now() - t0 > ms) return s; await sleep(500); } };
+          await pg.evaluate(() => { window.desktopAPI.updater.check(); });
+          const s = await poll(['up_to_date', 'update_available', 'error'], 30000);
+          out.same = s.status;
+          g.f2_noSameVersionLoop = s.status === 'up_to_date';
+          await pg.screenshot({ path: process.env.RUNNER_TEMP + '/I6A-ROLLOUT-AFTER-1.0.248.png' });
+          const fails = Object.entries(g).filter(([k, v]) => !v).map(([k]) => k);
+          out.fails = fails;
+          fs.writeFileSync(process.env.RUNNER_TEMP + '/rollout-sessionB.json', JSON.stringify(out));
+          console.log(JSON.stringify(out, null, 1));
+          try { await Promise.race([app.close(), sleep(4000)]); } catch (_) {}
+          if (fails.length) { console.error('FAILS B:', fails); }
+          process.exit(fails.length ? 1 : 0);
+          EOF
+          node rollout-b.mjs
+          echo "PUBLIC ROLLOUT QA: PASS (public 1.0.247 -> QA 1.0.248 /S; LIGHT_UI_DEFAULT_ON=true; zero acao manual)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload evidências (JSON + monitor + screenshot)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rollout-1.0.248-evidence
+          path: |
+            ${{ runner.temp }}/rollout-sessionA.json
+            ${{ runner.temp }}/rollout-transition.json
+            ${{ runner.temp }}/monitor1.jsonl
+            ${{ runner.temp }}/rollout-sessionB.json
+            ${{ runner.temp }}/I6A-ROLLOUT-AFTER-1.0.248.png
+          if-no-files-found: warn
+          retention-days: 7
