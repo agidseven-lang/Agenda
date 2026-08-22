@@ -1,0 +1,324 @@
+# =====================================================================
+# [manual] VERIFY 1.0.247 — Pós-publicação + Canary de PRODUÇÃO
+# ---------------------------------------------------------------------
+# FASES 6-11 do mandato FINAL RELEASE: baixa os assets DA RELEASE PÚBLICA
+# v1.0.247 e recalcula SHA-256 contra os pins canônicos; valida o contrato
+# do latest.yml público (version/url/sha512/size/releaseDate); e roda o
+# CANARY DE PRODUÇÃO: instala a PUBLIC v1.0.246, NÃO toca app-update.yml
+# (provider GitHub REAL), check → update_available 1.0.247 → download real
+# → ponte one-click sem interação (REQUIRED_USER_INSTALL_ACTIONS=0) →
+# pós-update (versão/asar==canônico/userData/OFF/ON/kill/RC-D02) →
+# same-version ⇒ up_to_date. Nada é publicado por este workflow.
+# =====================================================================
+name: "[manual] VERIFY 1.0.247 — Release Integrity + Production Canary"
+
+"on":
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  RELEASE_TAG: "v1.0.247"
+  EXPECTED_EXE_SHA256: "9ed5eee9042f04d4e1533a1558ad48c49ed4be33933d9f7d10d69ffa6bf09a50"
+  EXPECTED_MSI_SHA256: "ebae01888be4433fd649f4c2f68e1853ff5cdde3d267312834875ef1e8566909"
+  EXPECTED_BLOCKMAP_SHA256: "3bea99feff7276b13e045c5b240ef0a2fec9abcc8ee7b7e0bef296b7382cd994"
+  EXPECTED_LATESTYML_SHA256: "701911b3a7b608bf4835a8d4988a8f3d7f2000ad79f0050d3d4a03a1a4350987"
+  EXPECTED_SHA256SUMS_SHA256: "55815fe26ce6069a8f1095ae20f384b42e48a1e61c303ee5c1a06ffc5ad7b4dd"
+  EXPECTED_VERSAOTXT_SHA256: "404ac013f1e59ec07098b5a35b7e2f9c695fb70c8e784d0585a9c8fca3a2bd4f"
+  EXPECTED_FINAL_ASAR_SHA256: "1d21ad948c784337c4ce325c53d550fba861582da09b7b0bcc15d96c07c0ba4c"
+  BASELINE_TAG: "v1.0.246"
+
+jobs:
+  verify-release:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout (somente para o self-grep do harness)
+        uses: actions/checkout@v4
+
+      - name: "FASE 6 — baixar assets DA RELEASE PUBLICADA e recalcular SHA-256 (pins canônicos)"
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/pub"; cd "$RUNNER_TEMP/pub"
+          BASE="https://github.com/agidseven-lang/Agenda/releases/download/$RELEASE_TAG"
+          for f in "Agenda-ID-Seven-Desktop-1.0.247-x64.exe" "Agenda-ID-Seven-Desktop-1.0.247-x64.msi" "Agenda-ID-Seven-Desktop-1.0.247-x64.exe.blockmap" "latest.yml" "SHA256SUMS" "VERSAO-DESKTOP.txt"; do
+            curl -sSL -o "$f" "$BASE/$f"
+          done
+          check() { GOT=$(sha256sum "$1" | awk '{print $1}'); [ "$GOT" = "$2" ] || { echo "::error::RELEASE INTEGRITY FAIL: $1 = $GOT (esperado $2)"; exit 1; }; echo "OK $1 = $GOT"; }
+          check "Agenda-ID-Seven-Desktop-1.0.247-x64.exe" "$EXPECTED_EXE_SHA256"
+          check "Agenda-ID-Seven-Desktop-1.0.247-x64.msi" "$EXPECTED_MSI_SHA256"
+          check "Agenda-ID-Seven-Desktop-1.0.247-x64.exe.blockmap" "$EXPECTED_BLOCKMAP_SHA256"
+          check "latest.yml" "$EXPECTED_LATESTYML_SHA256"
+          check "SHA256SUMS" "$EXPECTED_SHA256SUMS_SHA256"
+          check "VERSAO-DESKTOP.txt" "$EXPECTED_VERSAOTXT_SHA256"
+          sha256sum -c SHA256SUMS
+          echo "FASE 6 OK: 6/6 assets publicos byte-identicos aos pins" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "FASE 7 — contrato do latest.yml PÚBLICO (fonte real do updater)"
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/pub"
+          EXE="Agenda-ID-Seven-Desktop-1.0.247-x64.exe"
+          grep -q "^version: 1.0.247$" latest.yml || { echo "::error::latest.yml version"; exit 1; }
+          grep -q "url: $EXE" latest.yml || { echo "::error::latest.yml url"; exit 1; }
+          SHA512=$(openssl dgst -sha512 -binary "$EXE" | base64 -w0)
+          grep -q "$SHA512" latest.yml || { echo "::error::sha512 divergente"; exit 1; }
+          SIZE=$(stat -c%s "$EXE")
+          grep -q "size: $SIZE" latest.yml || { echo "::error::size divergente"; exit 1; }
+          grep -Eq "releaseDate: '?[0-9]{4}-[0-9]{2}-[0-9]{2}T" latest.yml || { echo "::error::releaseDate ausente/invalida"; exit 1; }
+          echo "FASE 7 OK: latest.yml publico resolve para os bytes publicados (version/url/sha512/size/releaseDate)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "Instalar baseline PUBLIC v1.0.246 (setup de QA; app-update.yml NÃO é tocado — provider GitHub REAL)"
+        shell: powershell
+        run: |
+          Invoke-WebRequest -UseBasicParsing "https://github.com/agidseven-lang/Agenda/releases/download/$env:BASELINE_TAG/Agenda-ID-Seven-Desktop-1.0.246-x64.exe" -OutFile "$env:RUNNER_TEMP\baseline.exe"
+          Invoke-WebRequest -UseBasicParsing "https://github.com/agidseven-lang/Agenda/releases/download/$env:BASELINE_TAG/SHA256SUMS" -OutFile "$env:RUNNER_TEMP\SHA246"
+          $exp = (Select-String -Path "$env:RUNNER_TEMP\SHA246" -Pattern "Agenda-ID-Seven-Desktop-1.0.246-x64.exe").Line.Split(' ')[0]
+          $got = (Get-FileHash "$env:RUNNER_TEMP\baseline.exe" -Algorithm SHA256).Hash.ToLower()
+          if ($got -ne $exp) { Write-Error "baseline nao confere"; exit 1 }
+          $p = Start-Process -FilePath "$env:RUNNER_TEMP\baseline.exe" -ArgumentList "/S" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Write-Error "baseline install exit $($p.ExitCode)"; exit 1 }
+          Start-Sleep -Seconds 3
+          $dir = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Directory | Where-Object { Test-Path (Join-Path $_.FullName "Agenda ID Seven Desktop.exe") } | Select-Object -First 1
+          if (-not $dir) { Write-Error "baseline nao instalada"; exit 1 }
+          "INSTALL_DIR=$($dir.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $au = Get-Content (Join-Path $dir.FullName "resources\app-update.yml") -Raw
+          if ($au -notmatch "provider: github") { Write-Error "app-update.yml nao esta no provider github de producao"; exit 1 }
+          Write-Host "baseline instalada; provider de PRODUCAO confirmado (github)"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: "MONITOR — armar ANTES do canary"
+        shell: powershell
+        run: |
+          $mon = @'
+          $stop = "$env:RUNNER_TEMP\monitor1.stop"
+          $out  = "$env:RUNNER_TEMP\monitor1.jsonl"
+          Add-Content -Path $out -Value '{"boot":true}'
+          $deadline = (Get-Date).AddSeconds(1200)
+          while (((Get-Date) -lt $deadline) -and (-not (Test-Path $stop))) {
+            $t = (Get-Date).ToString("HH:mm:ss.fff")
+            $setup = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -like "*Setup*" -or $_.MainWindowTitle -like "*Instal*" } | ForEach-Object { ($_.ProcessName + "::" + $_.MainWindowTitle) })
+            $sc    = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -match "SmartScreen|protected your PC" } | ForEach-Object { $_.MainWindowTitle })
+            $uac   = @(Get-Process -Name consent -ErrorAction SilentlyContinue).Count
+            $inst  = @(Get-CimInstance Win32_Process -Filter "CommandLine LIKE '%--updated%'" -ErrorAction SilentlyContinue | ForEach-Object { @{ pid = $_.ProcessId; ppid = $_.ParentProcessId; name = $_.Name; cmd = $_.CommandLine } })
+            $rec = @{ t = $t; setup = $setup; sc = $sc; uac = $uac; inst = $inst } | ConvertTo-Json -Compress -Depth 6
+            Add-Content -Path $out -Value $rec
+            Start-Sleep -Milliseconds 700
+          }
+          '@
+          Set-Content -Path "$env:RUNNER_TEMP\monitor.ps1" -Value $mon -Encoding utf8
+          Remove-Item "$env:RUNNER_TEMP\monitor1.stop","$env:RUNNER_TEMP\monitor1.jsonl" -ErrorAction SilentlyContinue
+          Start-Process powershell -ArgumentList "-NoProfile","-ExecutionPolicy","Bypass","-File","$env:RUNNER_TEMP\monitor.ps1" -WindowStyle Hidden
+          $up = $false
+          foreach ($i in 1..30) { Start-Sleep -Seconds 1; if (Test-Path "$env:RUNNER_TEMP\monitor1.jsonl") { $up = $true; break } }
+          if (-not $up) { Write-Error "monitor nao iniciou em 30s"; exit 1 }
+          Write-Host "monitor armado"
+
+      - name: "FASE 8/9 — CANARY DE PRODUÇÃO: discovery + download REAIS + Instalar e reiniciar"
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/harness" && cd "$RUNNER_TEMP/harness"
+          npm i --no-save playwright@1.47.2 --no-audit --no-fund >/dev/null 2>&1
+          cat > canary.mjs <<'EOF'
+          import { _electron } from 'playwright';
+          import fs from 'fs';
+          const exe = process.env.INSTALL_DIR + '\\Agenda ID Seven Desktop.exe';
+          const out = { g: {} }; const g = out.g;
+          const sleep = ms => new Promise(r => setTimeout(r, ms));
+          const app = await _electron.launch({ executablePath: exe, args: [] });
+          const pg = await app.firstWindow({ timeout: 45000 });
+          await pg.waitForLoadState('load'); await pg.waitForTimeout(4000);
+          const before = await pg.evaluate(() => ({
+            ver: (typeof APP_VER !== 'undefined' && APP_VER.desktop) || null,
+            upd: !!(window.desktopAPI && window.desktopAPI.updater)
+          }));
+          out.before = before;
+          g.a1_versionBefore246 = before.ver === '1.0.246';
+          g.a2_updaterApi = before.upd === true;
+          await pg.evaluate(() => {
+            localStorage.setItem('idseven.desktop.appearance', JSON.stringify({ theme: 'dark', font: 'std', hc: false }));
+            localStorage.setItem('idseven.notif.history.v1', JSON.stringify([{ eventId: 'seed1', dedupKey: 'seed1', eventType: 'flow_update', taskId: 'x', taskTitle: 'Seed', clientName: 'QA', title: 'Seed', severity: 'info', createdAt: 1, deep: 'detail/x', read: true }]));
+          });
+          const st = () => pg.evaluate(() => window.desktopAPI.updater.getState());
+          const poll = async (want, ms) => { const t0 = Date.now(); for (;;) { const s = await st(); if (want.includes(s.status)) return s; if (Date.now() - t0 > ms) return s; await sleep(500); } };
+          // FASE 8 — PRODUCTION UPDATE DISCOVERY (provider GitHub REAL; app-update.yml intocado)
+          await pg.evaluate(() => { window.desktopAPI.updater.check(); });
+          let s = await poll(['update_available', 'up_to_date', 'error'], 45000);
+          out.discovery = { status: s.status, version: s.availableVersion, size: s.sizeBytes };
+          g.f8_productionDiscovery247 = s.status === 'update_available' && s.availableVersion === '1.0.247';
+          // FASE 9 — download REAL do provider de produção (sha512 do latest.yml público validado pela lib)
+          await pg.evaluate(() => { window.desktopAPI.updater.download(); });
+          { const t0 = Date.now(); for (;;) { const x = await st(); if (x.status === 'downloaded' || x.status === 'error') { s = x; break; } if (Date.now() - t0 > 300000) { s = x; break; } await sleep(500); } }
+          out.dl = { status: s.status, err: s.error || null };
+          g.f9_downloadedFromProduction = s.status === 'downloaded';
+          // ação interna do contrato; depois: ZERO interação
+          pg.evaluate(() => { window.desktopAPI.updater.installAndRestart(); }).catch(() => {});
+          let closed = false;
+          try { await Promise.race([new Promise(res => app.on('close', () => { closed = true; res(); })), sleep(30000)]); } catch (_) {}
+          if (!closed) { try { const x = await st(); closed = (x.status === 'installing'); } catch (_) { closed = true; } }
+          g.f9_installTriggered = closed === true;
+          const fails = Object.entries(g).filter(([k, v]) => !v).map(([k]) => k);
+          out.fails = fails;
+          fs.writeFileSync(process.env.RUNNER_TEMP + '/canary-sessionA.json', JSON.stringify(out));
+          console.log(JSON.stringify(out, null, 1));
+          try { await Promise.race([app.close(), sleep(4000)]); } catch (_) {}
+          if (fails.length) { console.error('FAILS A:', fails); }
+          process.exit(fails.length ? 1 : 0);
+          EOF
+          node canary.mjs
+
+      - name: "PONTE DE PRODUÇÃO — one-click instala SOZINHO; gates do monitor"
+        timeout-minutes: 8
+        shell: powershell
+        run: |
+          $target = $env:EXPECTED_FINAL_ASAR_SHA256.ToUpper()
+          Write-Host "hash esperado (asar canonico publicado): $target"
+          $deadline = (Get-Date).AddSeconds(240)
+          $done = $false
+          while ((Get-Date) -lt $deadline) {
+            Start-Sleep -Seconds 3
+            # ZERO interacao: este loop APENAS LE o hash do asar instalado.
+            $asar = Join-Path $env:INSTALL_DIR "resources\app.asar"
+            if (Test-Path $asar) {
+              try { $h = (Get-FileHash $asar -Algorithm SHA256 -ErrorAction Stop).Hash; if ($h -eq $target) { $done = $true; break } } catch { }
+            }
+          }
+          $ev = @{ productionBridgeInstalled = $done }
+          if (-not $done) {
+            Write-Host "janelas visiveis (diagnostico):"
+            Get-Process | Where-Object { $_.MainWindowTitle } | ForEach-Object { Write-Host ("  [{0}] {1}" -f $_.ProcessName, $_.MainWindowTitle) }
+          } else {
+            Write-Host "CANARY INSTALADO: asar instalado == asar canonico publicado (hash exato), zero input"
+          }
+          $relaunch = $false
+          foreach ($i in 1..15) { Start-Sleep -Seconds 2; if (Get-Process -Name "Agenda ID Seven Desktop" -ErrorAction SilentlyContinue) { $relaunch = $true; break } }
+          $ev.relaunch = $relaunch
+          Start-Sleep -Seconds 3
+          $finalSetup = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -like "*Setup*" -or $_.MainWindowTitle -like "*Instal*" }).Count
+          $ev.setupWindowsAtEnd = $finalSetup
+          New-Item -ItemType File -Path "$env:RUNNER_TEMP\monitor1.stop" -Force | Out-Null
+          Start-Sleep -Seconds 2
+          $lines = Get-Content "$env:RUNNER_TEMP\monitor1.jsonl" -ErrorAction SilentlyContinue
+          $setupSamples = 0; $scSamples = 0; $uacSamples = 0; $instCmds = @{}; $setupTitles = @{}
+          foreach ($ln in $lines) {
+            try { $r = $ln | ConvertFrom-Json } catch { continue }
+            if ($r.setup -and $r.setup.Count -gt 0) { $setupSamples++; foreach ($w in $r.setup) { $setupTitles[[string]$w] = $true } }
+            if ($r.sc -and $r.sc.Count -gt 0) { $scSamples++ }
+            if ($r.uac -gt 0) { $uacSamples++ }
+            foreach ($p in @($r.inst)) { if ($p -and $p.cmd) { $instCmds[[string]$p.cmd] = @{ pid = $p.pid; ppid = $p.ppid; name = $p.name } } }
+          }
+          $ev.samples = @($lines).Count
+          $ev.SETUP_WINDOW_SAMPLES = $setupSamples
+          $ev.setupTitles = @($setupTitles.Keys)
+          $ev.SMARTSCREEN_SAMPLES = $scSamples
+          $ev.UAC_SAMPLES = $uacSamples
+          $ev.installerProcesses = @($instCmds.GetEnumerator() | ForEach-Object { @{ cmd = $_.Key; pid = $_.Value.pid; ppid = $_.Value.ppid; name = $_.Value.name } })
+          $legacySpawn = $false
+          foreach ($k in $instCmds.Keys) {
+            if (($k -like "*1.0.247*") -and ($k -like "*--updated*") -and (-not ($k -like "*/S*"))) { $legacySpawn = $true }
+          }
+          $ev.legacySpawnNoSilentFlag = $legacySpawn
+          $ev.REQUIRED_USER_INSTALL_ACTIONS = 0
+          $ev | ConvertTo-Json -Depth 6 | Out-File -FilePath "$env:RUNNER_TEMP\canary-bridge.json" -Encoding utf8
+          Write-Host ("monitor: {0} amostras | SETUP_WINDOW_SAMPLES={1} | SMARTSCREEN={2} | UAC={3} | installers={4} | setupAtEnd={5}" -f $ev.samples, $setupSamples, $scSamples, $uacSamples, $ev.installerProcesses.Count, $finalSetup)
+          foreach ($p in $ev.installerProcesses) { Write-Host ("  proc: pid={0} ppid={1} cmd={2}" -f $p.pid, $p.ppid, $p.cmd) }
+          foreach ($w in $ev.setupTitles) { Write-Host ("  janela: {0}" -f $w) }
+          if (-not $done) { Write-Error "canary nao concluiu no tempo"; exit 1 }
+          if (-not $legacySpawn) { Write-Error "FAIL: installer publicado lancado pelo updater antigo SEM /S nao observado"; exit 1 }
+          if ($uacSamples -ne 0) { Write-Error "FAIL: UAC durante o canary"; exit 1 }
+          if ($scSamples -ne 0) { Write-Error "FAIL: SmartScreen durante o canary"; exit 1 }
+          if (-not $relaunch) { Write-Error "FAIL: app nao relancou sozinho"; exit 1 }
+          if ($finalSetup -ne 0) { Write-Error "FAIL: janela de instalador nao sumiu sozinha"; exit 1 }
+          Write-Host "CANARY DE PRODUCAO OK: REQUIRED_USER_INSTALL_ACTIONS=0"
+          Get-Process | Where-Object { $_.ProcessName -like "*Agenda*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 2
+
+      - name: "EXTERNAL_INSTALL_INTERACTION = 0 — self-grep fail-closed"
+        run: |
+          set -euo pipefail
+          WF=".github/workflows/desktop-verify-1.0.247-release.yml"
+          V1=$(grep -cE "SendK[e]ys|AppActiv[a]te|UIAutomat[i]on|WScript\.Sh[e]ll|mouse_ev[e]nt|SetCursor[P]os" "$WF" || true)
+          V2=$(grep -cE "msiex[e]c" "$WF" || true)
+          V3=$(grep -cE "Start-Proc[e]ss.*1\.0\.247.*\.exe" "$WF" || true)
+          echo "input-sintetico: $V1 | msi-exec: $V2 | exec direto do installer publicado: $V3"
+          [ "$V1" = "0" ] && [ "$V2" = "0" ] && [ "$V3" = "0" ] || { echo "::error::harness contém interação/execução externa"; exit 1; }
+
+      - name: "FASE 10/11 — PÓS-UPDATE + SAME-VERSION (provider real)"
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/harness"
+          cat > after.mjs <<'EOF'
+          import { _electron } from 'playwright';
+          import fs from 'fs';
+          const exe = process.env.INSTALL_DIR + '\\Agenda ID Seven Desktop.exe';
+          const out = { g: {} }; const g = out.g;
+          const sleep = ms => new Promise(r => setTimeout(r, ms));
+          const app = await _electron.launch({ executablePath: exe, args: [] });
+          const pg = await app.firstWindow({ timeout: 45000 });
+          await pg.waitForLoadState('load'); await pg.waitForTimeout(4000);
+          const a = await pg.evaluate(() => ({
+            ver: (typeof APP_VER !== 'undefined' && APP_VER.desktop) || null,
+            title: document.title,
+            appear: localStorage.getItem('idseven.desktop.appearance'),
+            notif: localStorage.getItem('idseven.notif.history.v1'),
+            lui: document.body.classList.contains('light-ui'),
+            loginPwd: !!document.querySelector('input[type="password"]'),
+            recovery: (document.body.innerHTML.match(/Esqueci minha senha/g) || []).length
+          }));
+          out.after = a;
+          g.p1_versionAfter247 = a.ver === '1.0.247' && a.title.includes('1.0.247');
+          g.p2_loginSurface = a.loginPwd === true;
+          g.p3_rcd02Zero = a.recovery === 0;
+          const ap = JSON.parse(a.appear || '{}');
+          g.p4_userDataKept = ap.theme === 'dark' && (a.notif || '').includes('seed1');
+          g.p5_luiDefaultOff = !a.lui && ap.luiPreview !== true;
+          await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0].setContentSize(1280, 800); });
+          await sleep(400);
+          await pg.evaluate(() => { appearSet({ luiPreview: true }); });
+          await sleep(300);
+          g.p6_controlledOn = await pg.evaluate(() => document.body.classList.contains('light-ui') && document.body.classList.contains('desktop'));
+          await pg.evaluate(() => { appearSet({ luiPreview: false }); });
+          await sleep(300);
+          g.p7_killSwitch = await pg.evaluate(() => !document.body.classList.contains('light-ui'));
+          // FASE 11 — SAME VERSION contra o provider de PRODUÇÃO real
+          const st = () => pg.evaluate(() => window.desktopAPI.updater.getState());
+          const poll = async (want, ms) => { const t0 = Date.now(); for (;;) { const s = await st(); if (want.includes(s.status)) return s; if (Date.now() - t0 > ms) return s; await sleep(500); } };
+          await pg.evaluate(() => { window.desktopAPI.updater.check(); });
+          const s = await poll(['up_to_date', 'update_available', 'error'], 45000);
+          out.same = s.status;
+          g.p8_sameVersionUpToDate = s.status === 'up_to_date';
+          await pg.screenshot({ path: process.env.RUNNER_TEMP + '/CANARY-247-PRODUCTION.png' });
+          const fails = Object.entries(g).filter(([k, v]) => !v).map(([k]) => k);
+          out.fails = fails;
+          fs.writeFileSync(process.env.RUNNER_TEMP + '/canary-after.json', JSON.stringify(out));
+          console.log(JSON.stringify(out, null, 1));
+          try { await Promise.race([app.close(), sleep(4000)]); } catch (_) {}
+          if (fails.length) { console.error('FAILS AFTER:', fails); }
+          process.exit(fails.length ? 1 : 0);
+          EOF
+          node after.mjs
+          echo "PRODUCTION CANARY: PASS (246->247 pelo provider real; same-version up_to_date)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload evidências
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-1.0.247-release-evidence
+          path: |
+            ${{ runner.temp }}/canary-sessionA.json
+            ${{ runner.temp }}/canary-bridge.json
+            ${{ runner.temp }}/monitor1.jsonl
+            ${{ runner.temp }}/canary-after.json
+            ${{ runner.temp }}/CANARY-247-PRODUCTION.png
+          if-no-files-found: warn
+          retention-days: 30
