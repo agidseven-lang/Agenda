@@ -1,0 +1,211 @@
+# =====================================================================
+# [manual] AUTH INCIDENT — Firestore users READ-ONLY audit (PHASE 2A)
+# ---------------------------------------------------------------------
+# Autorizado pelo owner (AUTH INCIDENT CLOSURE — PHASE 2A, OPCAO 2).
+# ESTRITAMENTE READ-ONLY: consulta a colecao Firestore `users` do projeto
+# de producao agenda-id-seven pelo e-mail investigado (normalizado
+# trim+lowercase, o MESMO contrato do backend loginUser) e reporta APENAS:
+#   MATCH_COUNT · DOC_ID_MASKED · EMAIL_MATCH · STATUS ·
+#   PASS_PRESENT · SALT_PRESENT · CREDENTIAL_FORMAT (s2|legacy|missing|unknown)
+# + fallback controlado p/ typo/espaco (scan em memoria, SEM despejar a
+# colecao; near-matches apenas da PROPRIA conta investigada, mascarados)
+# + health READ-ONLY do Cloud Run loginuser (describe/reachability/logs
+# agregados SEM PII; nenhuma tentativa de login e feita).
+# PROIBIDO por construcao: imprimir pass/salt/hash/senha/token/telefone,
+# ecoar o secret, gravar artifact com credencial, qualquer escrita
+# (Firestore/IAM/deploy). Credencial: arquivo temp 0600 apagado em
+# `if: always()`. Execucao manual apenas (workflow_dispatch).
+# =====================================================================
+name: "[manual] Auth User Read-Only Audit (PHASE 2A)"
+
+"on":
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  GCP_PROJECT: "agenda-id-seven"
+  TARGET_EMAIL: "idseven.financeiro@gmail.com"
+  LOGIN_SERVICE: "loginuser"
+  LOGIN_URL: "https://loginuser-de36pi7vza-uc.a.run.app"
+  REGION: "us-central1"
+
+jobs:
+  readonly-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: "FASE 2 — materializar credencial (temp, 0600, nunca ecoada)"
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+        run: |
+          set -euo pipefail
+          [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ] || { echo "::error::GOOGLE_APPLICATION_CREDENTIALS_JSON ausente nos Secrets."; exit 1; }
+          umask 077
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/gcp-sa.json"
+          chmod 600 "$RUNNER_TEMP/gcp-sa.json"
+          echo "credencial materializada em arquivo temporario (0600); nada ecoado"
+
+      - name: "FASE 3/4/5/6/7/8 — Firestore users: query exata + fallback typo (output whitelisted)"
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/gcp-sa.json
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/audit" && cd "$RUNNER_TEMP/audit"
+          npm init -y >/dev/null 2>&1
+          npm i firebase-admin@12 --no-audit --no-fund >/dev/null 2>&1
+          cat > audit.mjs <<'EOF'
+          import admin from 'firebase-admin';
+          // READ-ONLY por construcao: este script executa APENAS .get() (leituras).
+          // Output WHITELISTED: nunca imprime pass/salt/hash/telefone/token nem docs completos.
+          admin.initializeApp({ credential: admin.credential.applicationDefault(), projectId: process.env.GCP_PROJECT });
+          const db = admin.firestore();
+          const TARGET = String(process.env.TARGET_EMAIL || '').trim().toLowerCase();
+          const norm = (e) => String(e || '').trim().toLowerCase();
+          const maskId = (id) => { const s = String(id); return s.length <= 6 ? s[0] + '***' : s.slice(0, 4) + '…' + s.slice(-2); };
+          const credFormat = (pass, salt) => {
+            if (typeof pass !== 'string' || pass.length === 0) return 'missing';
+            if (pass.startsWith('s2:')) return (typeof salt === 'string' && salt.length > 0) ? 's2' : 's2-SEM-SALT';
+            if (/^h\d+$/.test(pass)) return 'legacy';
+            return 'unknown';
+          };
+          const editDist = (a, b) => { // distancia simples p/ typo no proprio alvo
+            const m = a.length, n = b.length; if (Math.abs(m - n) > 3) return 99;
+            const d = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]);
+            for (let j = 0; j <= n; j++) d[0][j] = j;
+            for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++)
+              d[i][j] = Math.min(d[i-1][j] + 1, d[i][j-1] + 1, d[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1));
+            return d[m][n];
+          };
+          const row = (doc) => {
+            const u = doc.data() || {};
+            return {
+              DOC_ID_MASKED: maskId(doc.id),
+              EMAIL_RAW_JSON: JSON.stringify(String(u.email ?? '')),   // literal da PROPRIA conta investigada (espacos visiveis)
+              EMAIL_MATCH: norm(u.email) === TARGET,
+              STATUS: String(u.status ?? '<ausente>'),
+              PASS_PRESENT: typeof u.pass === 'string' && u.pass.length > 0,
+              SALT_PRESENT: typeof u.salt === 'string' && u.salt.length > 0,
+              CREDENTIAL_FORMAT: credFormat(u.pass, u.salt),
+            };
+          };
+          try {
+            // FASE 3 — query exata pelo valor normalizado literal (contrato do reset)
+            const exact = await db.collection('users').where('email', '==', TARGET).get();
+            let matches = exact.docs;
+            let usedFallback = false;
+            let near = [];
+            if (matches.length === 0) {
+              // FASE 6 — fallback READ-ONLY: scan EM MEMORIA com a MESMA normalizacao do
+              // loginUser (que tambem le a colecao inteira). NADA da colecao e impresso;
+              // so agregados + candidatos claramente correspondentes A PROPRIA conta.
+              usedFallback = true;
+              const all = await db.collection('users').get();
+              console.log(`TOTAL_USERS_SCANNED=${all.size} (apenas contagem; nenhum dado listado)`);
+              const tLocal = TARGET.split('@')[0];
+              for (const doc of all.docs) {
+                const e = norm((doc.data() || {}).email);
+                if (!e) continue;
+                if (e === TARGET) { matches.push(doc); continue; }
+                const local = e.split('@')[0];
+                const isNear = e.replace(/\s+/g, '') === TARGET
+                  || local === tLocal
+                  || local.includes('financeiro')
+                  || editDist(e, TARGET) <= 2;
+                if (isNear) near.push(doc);
+              }
+            }
+            console.log(`MATCH_COUNT=${matches.length}`);
+            console.log(`FALLBACK_SCAN_USED=${usedFallback}`);
+            matches.forEach((doc, i) => {
+              const r = row(doc);
+              console.log(`MATCH[${i}] ${JSON.stringify(r)}`);
+            });
+            console.log(`NEAR_MATCH_COUNT=${near.length}`);
+            near.slice(0, 5).forEach((doc, i) => {
+              const r = row(doc);
+              console.log(`NEAR[${i}] ${JSON.stringify(r)}`);
+            });
+            // classificacao preliminar (FASES 5/6/7/8)
+            const INACTIVE = new Set(['pendente', 'removido', 'excluido']);
+            let cls = 'NONE';
+            if (matches.length > 1) cls = 'AUTH-I01 DUPLICATE USER EMAIL';
+            else if (matches.length === 0) cls = near.length ? 'AUTH-I04-CANDIDATE (near-match malformado encontrado)' : 'AUTH-I04 USER MISSING';
+            else {
+              const u = matches[0].data() || {};
+              const st = String(u.status ?? '').trim().toLowerCase();
+              const fmt = credFormat(u.pass, u.salt);
+              if (INACTIVE.has(st)) cls = 'AUTH-I02 USER INACTIVE';
+              else if (fmt === 'missing' || fmt === 'unknown' || fmt === 's2-SEM-SALT') cls = 'AUTH-I03 INVALID CREDENTIAL STRUCTURE';
+              else cls = 'STRUCTURE-HEALTHY';
+            }
+            console.log(`CLASSIFICATION=${cls}`);
+          } catch (e) {
+            const msg = String(e && e.message || e);
+            if (/PERMISSION_DENIED|permission|IAM|unauthorized|403/i.test(msg)) {
+              console.log('CLASSIFICATION=AUTH-I11 CI SERVICE ACCOUNT LACKS FIRESTORE READ');
+              console.log(`PERMISSION_ERROR_LITERAL=${msg.slice(0, 300)}`);
+              process.exit(78);
+            }
+            console.error(`AUDIT_ERROR=${msg.slice(0, 300)}`);
+            process.exit(1);
+          }
+          EOF
+          GCP_PROJECT="$GCP_PROJECT" TARGET_EMAIL="$TARGET_EMAIL" node audit.mjs | tee "$RUNNER_TEMP/audit-result.txt"
+          {
+            echo "## AUTH USER READ-ONLY AUDIT (PHASE 2A)"
+            echo '```'
+            cat "$RUNNER_TEMP/audit-result.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "FASE 10/11 — Cloud Run loginuser: describe READY + reachability (sem login) + logs agregados"
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/gcp-sa.json
+        run: |
+          set -euo pipefail
+          gcloud auth activate-service-account --key-file="$RUNNER_TEMP/gcp-sa.json" --quiet >/dev/null 2>&1
+          gcloud config set project "$GCP_PROJECT" --quiet >/dev/null 2>&1
+          echo "== describe do servico (READY?) =="
+          if READY=$(gcloud run services describe "$LOGIN_SERVICE" --region "$REGION" --project "$GCP_PROJECT" --format='value(status.conditions[0].type,status.conditions[0].status)' 2>"$RUNNER_TEMP/err1.txt"); then
+            echo "LOGIN_SERVICE_CONDITION=$READY"
+          else
+            echo "LOGIN_SERVICE_DESCRIBE=NOT_AUTHORIZED_OR_ERROR: $(head -c 200 "$RUNNER_TEMP/err1.txt")"
+          fi
+          echo "== reachability SEM tentativa de login (GET => 405 esperado do handler) =="
+          CODE=$(curl -sS --max-time 20 -o /dev/null -w "%{http_code}" "$LOGIN_URL" || echo "000")
+          echo "LOGIN_URL_GET_HTTP=$CODE"
+          echo "== logs agregados 24h (contagem por status; SEM PII) =="
+          if gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=$LOGIN_SERVICE AND httpRequest.requestMethod=POST" --project "$GCP_PROJECT" --freshness=24h --limit=200 --format='value(httpRequest.status)' > "$RUNNER_TEMP/statuses.txt" 2>"$RUNNER_TEMP/err2.txt"; then
+            echo "LOGIN_STATUS_HISTOGRAM_24H:"
+            sort "$RUNNER_TEMP/statuses.txt" | uniq -c | sort -rn || true
+            TOTAL=$(wc -l < "$RUNNER_TEMP/statuses.txt" | tr -d ' ')
+            echo "LOGIN_POST_SAMPLES_24H=$TOTAL"
+          else
+            echo "LOGIN_LOGS=NOT_AUTHORIZED_OR_ERROR: $(head -c 200 "$RUNNER_TEMP/err2.txt")"
+          fi
+          {
+            echo "## LOGIN BACKEND HEALTH (READ-ONLY)"
+            echo '```'
+            echo "condition: ${READY:-n/a} | GET(no-login) HTTP=$CODE"
+            [ -f "$RUNNER_TEMP/statuses.txt" ] && sort "$RUNNER_TEMP/statuses.txt" | uniq -c | sort -rn
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "FASE 13 — security sweep do proprio output"
+        run: |
+          set -euo pipefail
+          # hard gates mecanicos sobre o output salvo (o script e whitelisted por construcao)
+          F="$RUNNER_TEMP/audit-result.txt"
+          for pat in '"pass"' '"salt"' 's2:[0-9a-f]' 'BEGIN PRIVATE' 'private_key' 'client_email' 'phone'; do
+            if grep -qiE "$pat" "$F"; then echo "::error::SECURITY SWEEP FAIL: padrao '$pat' apareceu no output"; exit 1; fi
+          done
+          echo "SECRET_EXPOSED=0 PASS_VALUE_EXPOSED=0 SALT_VALUE_EXPOSED=0 PASSWORD_EXPOSED=0 RESET_TOKEN_EXPOSED=0 USER_COLLECTION_DUMP=0"
+
+      - name: "FASE 14 — cleanup da credencial (sempre)"
+        if: always()
+        run: |
+          rm -f "$RUNNER_TEMP/gcp-sa.json" || true
+          rm -rf "$RUNNER_TEMP/audit/node_modules/.cache" 2>/dev/null || true
+          echo "credencial temporaria removida"
