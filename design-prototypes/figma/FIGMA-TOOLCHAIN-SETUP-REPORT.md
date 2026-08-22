@@ -150,3 +150,69 @@ owner clica "aprovar" no prompt, e do conector Figma **ligado naquele chat**. Tu
 1. Ligar o conector **Figma neste chat** (claude.ai → Conectores → habilitar no chat) — free.
 2. Para o write-path, rodar numa **sessão interativa** e aprovar o prompt das tools — free.
 Sem nenhum desses passos, o redesign **prossegue mesmo assim** (READ + P1 Golden/spec locais).
+
+## I7.5.3 — ZERO-COST INTERACTIVE ACTIVATION (RESULTADO — pipeline OPERACIONAL)
+Data: 2026-08-22. Owner ligou o conector Figma neste chat e definiu permissões como
+**"Sempre permitir"**. Revalidado: `ListConnectors` → `connected=true`, **`enabledInChat=true`**;
+tools `mcp__Figma__*` carregadas. **Nenhum OAuth repetido. Nenhum plano pago. Custo = R$0.**
+
+### Tool list REAL desta sessão (literal, não histórica)
+whoami · get_metadata · get_design_context · get_screenshot · get_variable_defs ·
+get_code_connect_map / get_code_connect_suggestions / get_context_for_code_connect ·
+create_new_file · use_figma · upload_assets · download_assets · generate_diagram ·
+get_libraries · search_design_system · get_figjam · get_figma_skill · read_skill_uri ·
+get_motion_context · shader/weave tools.
+**Nota:** `generate_figma_design` **NÃO existe** nesta sessão — o write-to-canvas real é
+**`use_figma`** (Plugin API JS). `get_code` isolado também não existe — o design→code é via
+`get_design_context`.
+
+### Round-trip provado (arquivo de teste em Drafts — gratuito)
+Arquivo: **`Agenda ID Seven — Figma Zero Cost Test`** · fileKey `Eb0VCGqDPoZEFTQ1QNf7VU` ·
+URL https://www.figma.com/design/Eb0VCGqDPoZEFTQ1QNf7VU
+Artefato `I7-ZERO-COST-FIGMA-TEST` (frame+surface+heading+button+task card, marcado
+*NOT A DESIGN PROPOSAL*). CREATED=true → READ_BACK=true (get_metadata + get_screenshot 440×282)
+→ EDIT (texto "…— Edited") → RE-READ confirmou a edição.
+
+### CAPABILITY MATRIX (com evidência — tudo ZERO custo)
+| Capacidade | Status | Evidência |
+|---|---|---|
+| FIGMA AUTH | **PASS** | whoami: ID Seven, tier starter, seat View, planKey team::1673067149303361523 |
+| MCP READ | **PASS** | get_metadata leu arquivo + subárvore |
+| METADATA | **PASS** | XML completo dos 10 nós |
+| DESIGN CONTEXT / GET CODE | **PASS** | get_design_context(1:7) → React+Tailwind do botão |
+| SCREENSHOT | **BITMAP** | get_screenshot → PNG real 440×282 (base64 verificado) |
+| DRAFT CREATE | **PASS** | create_new_file → Eb0VCGqDPoZEFTQ1QNf7VU (seat View NÃO bloqueou) |
+| CODE TO CANVAS (=generate) | **PASS** | use_figma criou 10 nós (rootId 1:2) |
+| RE-READ GENERATED | **PASS** | get_metadata + get_screenshot pós-escrita |
+| NODE EDIT | **PASS** | texto 1:10 "Cronograma Sunset Wear" → "…— Edited" |
+| VARIABLE WRITE | **PASS** | createVariableCollection + createVariable + setValueForMode |
+| VARIABLE READ | **PASS** | get_variable_defs(3:4) → {"surface/app":"#e7eef4"} |
+| COMPONENT CREATE | **PASS** | createComponent → 3:4 "ZC Test Component" |
+| COMPONENT READ | **PASS** | get_metadata → `<symbol id=3:4>` |
+| CODE CONNECT | tool disponível; **sem mapping** neste teste (N/A p/ zero-cost) | get_code_connect_map presente |
+| STRUCTURED WRITE TO CANVAS | **PASS** (NÃO é UNAVAILABLE) | use_figma escreveu nós, variáveis e componente |
+
+### Capacidades PAGAS exigidas
+**NENHUMA.** Nenhuma operação do pipeline exigiu upgrade/seat pago/billing. `PAID_FEATURE = false`.
+O registro anterior `STRUCTURED_WRITE_TO_CANVAS = UNAVAILABLE UNDER ZERO-COST POLICY` fica
+**REVOGADO** — a escrita estruturada funciona no free tier / seat View.
+
+### Limitações reais (não de custo)
+- Proxy da sessão bloqueia `www.figma.com` (403) → não dá para baixar o PNG por curl;
+  usar `enableBase64Response` (inline) ou o owner abre a `file_url`. Não afeta o pipeline.
+- `use_figma` é atômico e por passos (≤10 ops/call) — construções grandes são incrementais.
+
+### PIPELINE
+**FIGMA ZERO-COST DESIGN PIPELINE = OPERATIONAL.** Fluxo: Claude gera composição via
+`use_figma` (ou captura por generate quando aplicável) → Draft gratuito → owner abre no
+Starter → Claude relê via MCP (`get_metadata`/`get_screenshot`/`get_design_context`) →
+crítica/iteração → aprovação → implementação. Figma = OFFICIAL VISUAL APPROVAL SURFACE.
+
+### TOOLCHAIN (reverificado)
+Figma Starter Free ✓ · plugin `figma` habilitado ✓ · plugin `design` habilitado ✓ ·
+UI/UX Pro Max (disco) ✓ · agenda-premium-product-design (skill custom) ✓ · Skill Creator ✓ ·
+**Modern Web Guidance = NÃO habilitado** (ausente de ListPlugins; princípios replicados na skill).
+
+### POSTO DE CONTROLE
+1.0.248 congelada · renderer/PWA/backend/updater intocados · 1.0.249 não criada ·
+I7.6 P1 pilot SUSPENSO (artefatos preservados) · nada publicado · custo R$0 · nenhuma contratação paga.
