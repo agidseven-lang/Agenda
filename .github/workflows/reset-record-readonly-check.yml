@@ -1,0 +1,103 @@
+# =====================================================================
+# [manual] AUTH INCIDENT — passwordResetCodes READ-ONLY check (DELIVERY TEST)
+# ---------------------------------------------------------------------
+# Fases 0 e 4 do mandato PASSWORD RESET DELIVERY TEST (GO do owner).
+# ESTRITAMENTE READ-ONLY: (a) re-confirma na colecao `users` MATCH_COUNT e
+# STATUS do e-mail investigado; (b) le em `passwordResetCodes` os registros
+# do MESMO e-mail e imprime SOMENTE campos seguros: id mascarado,
+# createdAt/expiresAt ISO, idade em segundos, status, attempts,
+# usedAt nulo?, source. NUNCA imprime codeHash/code/token/pass/salt.
+# Serve como: preflight anti-rate-limit (ha reset nos ultimos 60s?) e
+# pos-verificacao (RESET_RECORD_CREATED apos o teste real).
+# Nenhuma escrita. Credencial temp 0600 apagada em if:always().
+# =====================================================================
+name: "[manual] Reset Record Read-Only Check"
+
+"on":
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  GCP_PROJECT: "agenda-id-seven"
+  TARGET_EMAIL: "idseven.financeiro@gmail.com"
+
+jobs:
+  readonly-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: "Materializar credencial (temp, 0600, nunca ecoada)"
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+        run: |
+          set -euo pipefail
+          [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ] || { echo "::error::secret ausente"; exit 1; }
+          umask 077
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/gcp-sa.json"
+          chmod 600 "$RUNNER_TEMP/gcp-sa.json"
+
+      - name: "READ-ONLY: users (match/status) + passwordResetCodes (campos seguros)"
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/gcp-sa.json
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/chk" && cd "$RUNNER_TEMP/chk"
+          npm init -y >/dev/null 2>&1
+          npm i firebase-admin@12 --no-audit --no-fund >/dev/null 2>&1
+          cat > check.mjs <<'EOF'
+          import admin from 'firebase-admin';
+          // READ-ONLY por construcao (.get() apenas). Output whitelisted: sem codeHash/code/token/pass/salt.
+          admin.initializeApp({ credential: admin.credential.applicationDefault(), projectId: process.env.GCP_PROJECT });
+          const db = admin.firestore();
+          const TARGET = String(process.env.TARGET_EMAIL || '').trim().toLowerCase();
+          const maskId = (id) => { const s = String(id); return s.length <= 6 ? s[0] + '***' : s.slice(0, 4) + '…' + s.slice(-2); };
+          const iso = (ms) => (typeof ms === 'number' && ms > 0) ? new Date(ms).toISOString() : '<n/a>';
+          const now = Date.now();
+          // (FASE 0) users: re-confirmacao minima
+          const us = await db.collection('users').where('email', '==', TARGET).get();
+          console.log(`USERS_MATCH_COUNT=${us.size}`);
+          us.docs.slice(0, 2).forEach((d, i) => {
+            const u = d.data() || {};
+            console.log(`USER[${i}] {"DOC_ID_MASKED":"${maskId(d.id)}","STATUS":"${String(u.status ?? '<ausente>')}"}`);
+          });
+          // (FASE 0/4) passwordResetCodes do MESMO e-mail (sem orderBy p/ nao exigir indice composto)
+          const rs = await db.collection('passwordResetCodes').where('email', '==', TARGET).get();
+          const rows = rs.docs.map(d => { const x = d.data() || {}; return {
+            id: maskId(d.id),
+            createdAt: typeof x.createdAt === 'number' ? x.createdAt : 0,
+            expiresAt: typeof x.expiresAt === 'number' ? x.expiresAt : 0,
+            status: String(x.status ?? '<ausente>'),
+            attempts: typeof x.attempts === 'number' ? x.attempts : -1,
+            usedAtNull: x.usedAt === null || typeof x.usedAt === 'undefined',
+            source: String(x.source ?? '<ausente>'),
+          };}).sort((a, b) => b.createdAt - a.createdAt);
+          console.log(`RESET_RECORDS_FOR_EMAIL=${rows.length}`);
+          rows.slice(0, 3).forEach((r, i) => {
+            const age = r.createdAt ? Math.round((now - r.createdAt) / 1000) : -1;
+            console.log(`RESET[${i}] {"ID_MASKED":"${r.id}","CREATED_AT":"${iso(r.createdAt)}","AGE_SECONDS":${age},"EXPIRES_AT":"${iso(r.expiresAt)}","STATUS":"${r.status}","ATTEMPTS":${r.attempts},"USED_AT_NULL":${r.usedAtNull},"SOURCE":"${r.source}"}`);
+          });
+          const newest = rows[0];
+          console.log(`RATE_WINDOW_60S_BLOCKED=${newest ? (now - newest.createdAt < 60000) : false}`);
+          EOF
+          GCP_PROJECT="$GCP_PROJECT" TARGET_EMAIL="$TARGET_EMAIL" node check.mjs | tee "$RUNNER_TEMP/check-result.txt"
+          {
+            echo "## RESET RECORD READ-ONLY CHECK"
+            echo '```'
+            cat "$RUNNER_TEMP/check-result.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "Security sweep do output"
+        run: |
+          set -euo pipefail
+          F="$RUNNER_TEMP/check-result.txt"
+          for pat in 'codeHash' '"code"' 'token' '"pass"' '"salt"' 'private_key' 'BEGIN PRIVATE' 'client_email' 'phone'; do
+            if grep -qiE "$pat" "$F"; then echo "::error::SECURITY SWEEP FAIL: '$pat' no output"; exit 1; fi
+          done
+          echo "RESET_CODE_EXPOSED=0 RESET_TOKEN_EXPOSED=0 PASS_HASH_EXPOSED=0 SALT_EXPOSED=0"
+
+      - name: "Cleanup credencial (sempre)"
+        if: always()
+        run: rm -f "$RUNNER_TEMP/gcp-sa.json" || true
