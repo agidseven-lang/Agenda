@@ -1,0 +1,105 @@
+# =====================================================================
+# [manual] AUTH INCIDENT — Resend delivery event audit (READ-ONLY)
+# ---------------------------------------------------------------------
+# Autorizado pelo owner (RESEND DELIVERY EVENT AUDIT). Localiza na API do
+# Resend o evento do UNICO e-mail de reset ja enviado (run 32573927491,
+# ~2026-08-22T12:47:18Z) para o destinatario investigado e reporta APENAS:
+#   EMAIL_ID_MASKED · CREATED_AT · LAST_EVENT (delivered/bounced/...) ·
+#   TO_MATCH · FROM_DOMAIN
+# NUNCA imprime: codigo de reset, token, corpo/subject do e-mail, API key,
+# headers sensiveis, e-mails de terceiros. NAO envia nada (somente GET).
+# Se a API nao suportar listagem, reporta o HTTP literal e encerra como
+# NAO VERIFICAVEL. Execucao manual apenas.
+# =====================================================================
+name: "[manual] Resend Delivery Event Audit"
+
+"on":
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  TARGET_EMAIL: "idseven.financeiro@gmail.com"
+  WINDOW_PREFIX_A: "2026-08-22T12:4"
+  WINDOW_PREFIX_B: "2026-08-22T12:5"
+
+jobs:
+  event-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: "Lookup READ-ONLY na API do Resend (GET apenas; key nunca impressa)"
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+        run: |
+          set -euo pipefail
+          [ -n "$RESEND_API_KEY" ] || { echo "::error::RESEND_API_KEY ausente nos Secrets."; exit 1; }
+          # 1) listagem (se o plano/API suportar)
+          HTTP=$(curl -sS --max-time 30 -o /tmp/list.json -w '%{http_code}' \
+            -H "Authorization: Bearer $RESEND_API_KEY" \
+            "https://api.resend.com/emails?limit=100" || echo "000")
+          echo "LIST_HTTP=$HTTP"
+          if [ "$HTTP" != "200" ]; then
+            echo "LIST_BODY_SAFE=$(head -c 200 /tmp/list.json | tr -d '\n')"
+            echo "PROVIDER_STATUS=unknown (listagem indisponivel por API)"
+            {
+              echo "## RESEND DELIVERY EVENT AUDIT"
+              echo "LIST_HTTP=$HTTP — listagem indisponivel; PROVIDER_STATUS=unknown"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          # 2) filtrar client-side por destinatario + janela; output whitelisted
+          python3 - <<'PYEOF' | tee /tmp/audit-out.txt
+          import json, os, urllib.request
+          target = os.environ['TARGET_EMAIL'].strip().lower()
+          wa, wb = os.environ['WINDOW_PREFIX_A'], os.environ['WINDOW_PREFIX_B']
+          key = os.environ['RESEND_API_KEY']
+          data = json.load(open('/tmp/list.json'))
+          items = data.get('data') or data.get('emails') or []
+          print(f"LIST_ITEMS={len(items)}")
+          def tolist(v):
+              if isinstance(v, list): return [str(x).strip().lower() for x in v]
+              return [str(v).strip().lower()] if v else []
+          matches = []
+          for it in items:
+              tos = tolist(it.get('to'))
+              created = str(it.get('created_at') or '')
+              if target in tos and (created.startswith(wa) or created.startswith(wb)):
+                  matches.append(it)
+          print(f"TARGET_WINDOW_MATCHES={len(matches)}")
+          for i, it in enumerate(matches[:3]):
+              eid = str(it.get('id') or '')
+              last = str(it.get('last_event') or '')
+              created = str(it.get('created_at') or '')
+              frm = str(it.get('from') or '')
+              dom = frm.split('@')[-1].rstrip('>') if '@' in frm else '<n/a>'
+              if not last and eid:
+                  try:
+                      req = urllib.request.Request(f"https://api.resend.com/emails/{eid}",
+                          headers={"Authorization": f"Bearer {key}"})
+                      d2 = json.load(urllib.request.urlopen(req, timeout=30))
+                      last = str(d2.get('last_event') or '')
+                  except Exception as e:
+                      last = f"<detail-error {str(e)[:60]}>"
+              print(f'EVENT[{i}] {{"EMAIL_ID_MASKED":"{eid[:8]}…","CREATED_AT":"{created}","LAST_EVENT":"{last}","TO_MATCH":true,"FROM_DOMAIN":"{dom}"}}')
+          if not matches:
+              recent = [str(it.get('created_at') or '') for it in items[:5]]
+              print(f"NOTE=nenhum item na janela p/ o destinatario; created_at mais recentes da lista: {recent}")
+          PYEOF
+          {
+            echo "## RESEND DELIVERY EVENT AUDIT"
+            echo '```'
+            cat /tmp/audit-out.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "Security sweep do output"
+        run: |
+          set -euo pipefail
+          F=/tmp/audit-out.txt
+          [ -f "$F" ] || { echo "sem output para varrer (listagem indisponivel)"; exit 0; }
+          for pat in 're_[A-Za-z0-9]' 'Bearer' 'Authorization' 'codigo' 'Codigo:' '"code"' 'token' 'subject' 'html' '"text"'; do
+            if grep -qiE "$pat" "$F"; then echo "::error::SECURITY SWEEP FAIL: '$pat' no output"; exit 1; fi
+          done
+          echo "RESET_CODE_EXPOSED=0 TOKEN_EXPOSED=0 RESEND_API_KEY_EXPOSED=0"
