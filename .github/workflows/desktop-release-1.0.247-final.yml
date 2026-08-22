@@ -113,6 +113,9 @@ jobs:
           owner: ${{ github.repository_owner }}
           repositories: Agenda
           permission-contents: write
+          # exigido para criar a ref da tag (a história de cd92ec1f contém commits
+          # de .github/workflows) — mesmo par de permissões do padrão f42f da casa
+          permission-workflows: write
 
       - name: "Release Bot ATIVO + escopo SÓ Agenda (padrão f42f)"
         env:
