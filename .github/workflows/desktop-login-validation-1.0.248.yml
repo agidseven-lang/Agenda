@@ -1,0 +1,194 @@
+# =====================================================================
+# [manual] AUTH INCIDENT — Final Login Validation (Desktop 1.0.248 PÚBLICO)
+# ---------------------------------------------------------------------
+# Mandato FINAL LOGIN VALIDATION (GO do owner; usuária ja redefiniu a
+# senha pelo fluxo oficial). Instala a release PUBLICA v1.0.248 (pin
+# SHA-256) e executa UM UNICO login legitimo pelo mecanismo normal do app
+# (campo de senha preenchido pelo harness a partir do secret
+# ARY_LOGIN_PASSWORD_TEMP — a senha NUNCA aparece em log/echo/linha de
+# comando/artifact; o valor nao e impresso em nenhum output).
+# Gates: VERSION=1.0.248 · Light UI default ON · LOGIN_RESULT ·
+# usuario correto via authSelf (prefixo/sufixo do doc id ja mascarado) ·
+# sessao (saiu do login; reload preserva) · logout volta ao login.
+# NADA e modificado (nenhuma escrita em Firestore/backend); sem
+# screenshot autenticada (privacidade). Uma tentativa apenas.
+# =====================================================================
+name: "[manual] Desktop Login Validation 1.0.248"
+
+"on":
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  RELEASE_TAG: "v1.0.248"
+  EXPECTED_EXE_SHA256: "be5f9b0cfeb7c6a1e3ad818309138a1b4dfc0c817676e523807975cf58a7a8b2"
+  TARGET_EMAIL: "idseven.financeiro@gmail.com"
+  USER_DOC_PREFIX: "fkRs"
+  USER_DOC_SUFFIX: "Jl"
+
+jobs:
+  login-validation:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: "GATE 0 — credencial temporária presente (nunca impressa)"
+        env:
+          ARY_PW: ${{ secrets.ARY_LOGIN_PASSWORD_TEMP }}
+        run: |
+          set -euo pipefail
+          if [ -z "$ARY_PW" ]; then
+            echo "::error::Secret ARY_LOGIN_PASSWORD_TEMP ausente. O owner deve criar em Settings > Secrets and variables > Actions com a senha NOVA definida pela usuaria (o valor nunca sera impresso) e re-disparar este workflow. Nada foi executado."
+            exit 1
+          fi
+          echo "credencial presente (valor jamais impresso)"
+
+      - name: "FASE 3a — baixar release PUBLICA v1.0.248 + pin"
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/pub"; cd "$RUNNER_TEMP/pub"
+          BASE="https://github.com/agidseven-lang/Agenda/releases/download/$RELEASE_TAG"
+          curl -sSL -o app.exe "$BASE/Agenda-ID-Seven-Desktop-1.0.248-x64.exe"
+          GOT=$(sha256sum app.exe | awk '{print $1}')
+          [ "$GOT" = "$EXPECTED_EXE_SHA256" ] || { echo "::error::exe publico difere do pin"; exit 1; }
+          echo "release publica integra ($GOT)"
+
+      - name: "FASE 3b — instalar (setup de QA /S)"
+        shell: powershell
+        run: |
+          $p = Start-Process -FilePath "$env:RUNNER_TEMP\pub\app.exe" -ArgumentList "/S" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Write-Error "install exit $($p.ExitCode)"; exit 1 }
+          Start-Sleep -Seconds 3
+          $dir = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Directory | Where-Object { Test-Path (Join-Path $_.FullName "Agenda ID Seven Desktop.exe") } | Select-Object -First 1
+          if (-not $dir) { Write-Error "app nao instalado"; exit 1 }
+          "INSTALL_DIR=$($dir.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: "FASES 3c/4/5/6/7 — UM login real + sessão + reload + logout (senha só via env->fill)"
+        timeout-minutes: 15
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+          ARY_PW: ${{ secrets.ARY_LOGIN_PASSWORD_TEMP }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/harness" && cd "$RUNNER_TEMP/harness"
+          npm i --no-save playwright@1.47.2 --no-audit --no-fund >/dev/null 2>&1
+          cat > login.mjs <<'EOF'
+          import { _electron } from 'playwright';
+          import fs from 'fs';
+          // SEGURANCA: a senha vive SOMENTE em process.env.ARY_PW e vai direto ao
+          // campo via fill(); jamais e logada, serializada ou incluida no JSON.
+          const exe = process.env.INSTALL_DIR + '\\Agenda ID Seven Desktop.exe';
+          const EMAIL = process.env.TARGET_EMAIL;
+          const PFX = process.env.USER_DOC_PREFIX, SFX = process.env.USER_DOC_SUFFIX;
+          const out = { g: {} }; const g = out.g;
+          const sleep = ms => new Promise(r => setTimeout(r, ms));
+          const app = await _electron.launch({ executablePath: exe, args: [] });
+          const pg = await app.firstWindow({ timeout: 45000 });
+          await pg.waitForLoadState('load'); await pg.waitForTimeout(4000);
+          await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0].setContentSize(1280, 800); });
+          await sleep(500);
+          const boot = await pg.evaluate(() => ({
+            ver: (typeof APP_VER !== 'undefined' && APP_VER.desktop) || null,
+            title: document.title,
+            desktop: document.body.classList.contains('desktop'),
+            lui: document.body.classList.contains('light-ui'),
+            pwd: !!document.querySelector('#liPw, input[type="password"]')
+          }));
+          out.boot = boot;
+          g.v1_versionIs248 = boot.ver === '1.0.248' && boot.title.includes('1.0.248');
+          g.v2_lightUiDefaultOn = boot.desktop === true && boot.lui === true;
+          g.v3_loginSurface = boot.pwd === true;
+          // FASE 4 — UM login legitimo (unica tentativa)
+          await pg.fill('#liId', EMAIL);
+          await pg.fill('#liPw', process.env.ARY_PW);
+          await pg.click('#btnLogin');
+          let authed = false, banner = '';
+          { const t0 = Date.now(); for (;;) {
+              const s = await pg.evaluate(() => ({
+                authed: document.body.classList.contains('authed'),
+                banner: (document.querySelector('#loginBanner .banner') || {}).textContent || ''
+              }));
+              if (s.authed) { authed = true; break; }
+              if ((s.banner || '').trim()) { banner = s.banner.trim(); break; }
+              if (Date.now() - t0 > 30000) { banner = '<timeout-30s>'; break; }
+              await sleep(500);
+          } }
+          out.LOGIN_REQUEST = 'executed';
+          out.LOGIN_RESULT = authed ? 'SUCCESS' : 'FAIL';
+          out.SAFE_ERROR = authed ? null : banner.slice(0, 120);
+          g.l1_loginSuccess = authed === true;
+          if (authed) {
+            // FASE 5 — contrato de sucesso
+            const st = await pg.evaluate(async () => {
+              const r = await window.desktopAPI.authSelf().catch(() => null);
+              const u = (r && (r.self || r.user)) || {};
+              return {
+                selfOk: !!(r && r.ok),
+                idPrefix: String(u.id || '').slice(0, 4),
+                idSuffix: String(u.id || '').slice(-2),
+                loginGone: !document.querySelector('#liPw'),
+                lui: document.body.classList.contains('light-ui')
+              };
+            });
+            out.session = st;
+            g.l2_sessionSelfOk = st.selfOk === true;
+            g.l3_correctUser = st.idPrefix === PFX && st.idSuffix === SFX;
+            g.l4_leftLoginScreen = st.loginGone === true;
+            g.l5_lightUiOnInShell = st.lui === true;
+            // FASE 6 — reload preserva sessao (restore server-side; sem novo login)
+            await pg.reload({ waitUntil: 'load' }); await pg.waitForTimeout(4000);
+            g.l6_reloadKeepsSession = await pg.evaluate(() => document.body.classList.contains('authed'));
+            // FASE 7 — logout normal -> volta ao login (e PARA; sem novo login)
+            const didLogout = await pg.evaluate(() => { const b = document.querySelector('[data-logout]'); if (b) { b.click(); return true; } return false; });
+            await sleep(2500);
+            const post = await pg.evaluate(() => ({ authed: document.body.classList.contains('authed'), pwd: !!document.querySelector('#liPw, input[type="password"]') }));
+            out.logout = { didLogout, ...post };
+            g.l7_logoutBackToLogin = didLogout === true && post.authed === false && post.pwd === true;
+          }
+          const fails = Object.entries(g).filter(([k, v]) => !v).map(([k]) => k);
+          out.fails = fails;
+          fs.writeFileSync(process.env.RUNNER_TEMP + '/login-validation.json', JSON.stringify(out));
+          console.log(JSON.stringify(out, null, 1));
+          try { await Promise.race([app.close(), sleep(4000)]); } catch (_) {}
+          if (fails.length) { console.error('FAILS:', fails); }
+          process.exit(fails.length ? 1 : 0);
+          EOF
+          node login.mjs
+          {
+            echo "## DESKTOP LOGIN VALIDATION 1.0.248"
+            echo '```'
+            cat "$RUNNER_TEMP/login-validation.json"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "FASE 9 — security sweep do output (senha jamais presente)"
+        if: always()
+        env:
+          ARY_PW: ${{ secrets.ARY_LOGIN_PASSWORD_TEMP }}
+        run: |
+          set -euo pipefail
+          F="$RUNNER_TEMP/login-validation.json"
+          [ -f "$F" ] || { echo "sem output para varrer"; exit 0; }
+          if [ -n "$ARY_PW" ] && grep -qF "$ARY_PW" "$F"; then echo "::error::SECURITY SWEEP FAIL: credencial apareceu no output"; exit 1; fi
+          for pat in 'ARY_PW' 'password"' '"token"' 'session.token' '"pass"' '"salt"' 'liPw"' 'value=' ; do
+            if grep -qiE "$pat" "$F"; then echo "::error::SECURITY SWEEP FAIL: padrao '$pat' no output"; exit 1; fi
+          done
+          echo "PASSWORD_EXPOSED=0 PASS_HASH_EXPOSED=0 SALT_EXPOSED=0 RESET_CODE_EXPOSED=0 SESSION_TOKEN_EXPOSED=0 GCP_SECRET_EXPOSED=0"
+
+      - name: "Upload evidencia (JSON de gates, sem dados sensiveis)"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: login-validation-1.0.248
+          path: ${{ runner.temp }}/login-validation.json
+          if-no-files-found: warn
+          retention-days: 7
