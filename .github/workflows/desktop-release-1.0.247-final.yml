@@ -31,10 +31,12 @@ name: "[manual/GATED] FINAL 1.0.247 — Desktop Release (INERT)"
         description: "GO do owner (mandato FINAL RELEASE 2026-08-22): authorized-by-owner"
         required: true
 
-# contents:write e actions:read são exigidos pela etapa de publicação;
-# permanecem inertes na prática: nenhum step roda além do Gate 0 sem a variável do owner.
+# ESCRITAS (tag + release + assets + Latest) via TOKEN TEMPORÁRIO do GitHub App
+# "Agenda ID Seven Release Bot" (padrão da casa desde f42f; expira sozinho) —
+# o GITHUB_TOKEN fica READ-ONLY (a org trava escrita de integração: 403 provado
+# no run 32543385076, com TODOS os gates de integridade verdes).
 permissions:
-  contents: write
+  contents: read
   actions: read
 
 env:
@@ -102,9 +104,32 @@ jobs:
           done
           [ "${{ github.event.inputs.build_run_id }}" = "$EXPECTED_BUILD_RUN_ID" ] || { echo "::error::build_run_id difere do RUN FINAL CANÔNICO pinado ($EXPECTED_BUILD_RUN_ID)"; exit 1; }
 
-      - name: "PUBLICAÇÃO — bundle do run pinado → verificação total → tag v1.0.247 → Release Latest"
+      - name: "Token temporário do Release Bot (GitHub App da casa; expira sozinho)"
+        id: release_bot
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: Agenda
+          permission-contents: write
+
+      - name: "Release Bot ATIVO + escopo SÓ Agenda (padrão f42f)"
         env:
-          GH_TOKEN: ${{ github.token }}
+          BOT_TOKEN: ${{ steps.release_bot.outputs.token }}
+        run: |
+          set -euo pipefail
+          [ -n "$BOT_TOKEN" ] || { echo "::error::token do Release Bot vazio — NADA publicado."; exit 1; }
+          FN="$(GH_TOKEN="$BOT_TOKEN" gh api "repos/$GITHUB_REPOSITORY" --jq '.full_name' 2>/dev/null || true)"
+          [ "$FN" = "$GITHUB_REPOSITORY" ] || { echo "::error::Release Bot sem acesso a $GITHUB_REPOSITORY."; exit 1; }
+          J="$(GH_TOKEN="$BOT_TOKEN" gh api /installation/repositories)"
+          N="$(echo "$J" | jq -r '.total_count')"; R="$(echo "$J" | jq -r '.repositories[0].full_name')"
+          { [ "$N" = "1" ] && [ "$R" = "$GITHUB_REPOSITORY" ]; } || { echo "::error::escopo do Release Bot != {1 repo} ($N,$R)."; exit 1; }
+          echo "OK: Release Bot ativo, escopo restrito"
+
+      - name: "PUBLICAÇÃO — bundle do run pinado → verificação total → tag v1.0.247 → Release Latest (via Release Bot)"
+        env:
+          GH_TOKEN: ${{ steps.release_bot.outputs.token }}
         run: |
           set -euo pipefail
           TAG="v$EXPECTED_VERSION"
@@ -113,10 +138,10 @@ jobs:
             echo "::error::tag $TAG já existe — publicação abortada (nunca sobrescrever)"; exit 1
           fi
           RUN="$EXPECTED_BUILD_RUN_ID"
-          AID=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN/artifacts" --jq ".artifacts[] | select(.name==\"$BUNDLE_ARTIFACT_NAME\") | .id")
+          AID=$(GH_TOKEN="${{ github.token }}" gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN/artifacts" --jq ".artifacts[] | select(.name==\"$BUNDLE_ARTIFACT_NAME\") | .id")
           [ -n "$AID" ] || { echo "::error::bundle $BUNDLE_ARTIFACT_NAME não encontrado no run $RUN (expirado? re-rode o build final e re-pine)"; exit 1; }
           mkdir -p bundle && cd bundle
-          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$AID/zip" > bundle.zip
+          GH_TOKEN="${{ github.token }}" gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$AID/zip" > bundle.zip
           unzip -q bundle.zip && rm bundle.zip
           EXE=$(find . -name "Agenda-ID-Seven-Desktop-$EXPECTED_VERSION-x64.exe" | head -1)
           MSI=$(find . -name "Agenda-ID-Seven-Desktop-$EXPECTED_VERSION-x64.msi" | head -1)
@@ -147,3 +172,23 @@ jobs:
             --notes "Release gated (GO do owner). Fonte: $PRODUCT_SOURCE_SHA · build run canônico: $RUN. Update in-app não assistido (ponte one-click 1.0.246→1.0.247; updates futuros silenciosos /S)." \
             --latest
           echo "RELEASE PUBLICADA: $TAG (Latest) com exe+blockmap+latest.yml+msi+SHA256SUMS+VERSAO-DESKTOP.txt do run $RUN" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "PÓS-VERIFICAÇÃO — flags/assets/tag-sha/Latest + releases históricas preservadas"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="v$EXPECTED_VERSION"
+          FLAGS="$(gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json isPrerelease,isDraft --jq '(.isPrerelease|tostring)+"|"+(.isDraft|tostring)')"
+          [ "$FLAGS" = "false|false" ] || { echo "::error::flags incorretas: $FLAGS"; exit 1; }
+          N="$(gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json assets --jq '.assets|length')"
+          [ "$N" = "6" ] || { echo "::error::esperado 6 assets, encontrados $N"; exit 1; }
+          if gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -qx "app-update.yml"; then echo "::error::app-update.yml nao pode ser asset"; exit 1; fi
+          TAGSHA="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq '.object.sha')"
+          [ "$TAGSHA" = "$PRODUCT_SOURCE_SHA" ] || { echo "::error::CRITICAL: tag $TAG aponta para $TAGSHA != FINAL SOURCE"; exit 1; }
+          LATEST_TAG="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.tag_name')"
+          [ "$LATEST_TAG" = "$TAG" ] || { echo "::error::Latest do repo != $TAG (got $LATEST_TAG)"; exit 1; }
+          for t in v1.0.246 v1.0.245 v1.0.244; do
+            gh release view "$t" -R "$GITHUB_REPOSITORY" --json tagName --jq '.tagName' | grep -qx "$t" || { echo "::error::release historica $t sumiu"; exit 1; }
+          done
+          echo "POS-VERIFICACAO OK: $TAG estavel/Latest no FINAL SOURCE; historicas preservadas" >> "$GITHUB_STEP_SUMMARY"
