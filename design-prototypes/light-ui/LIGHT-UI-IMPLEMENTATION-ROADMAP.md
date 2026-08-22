@@ -1152,9 +1152,38 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > **Light OFF**; ON; kill) → same-version `up_to_date`. **RE-LOCK aplicado** (Gate 0
 > só-variável; tag existente aborta publicação). Históricas v1.0.246/245/244
 > preservadas. Relatório `LIGHT-UI-1.0.247-FINAL-RELEASE-REPORT.md`.
-> **Estado: AGENDA ID SEVEN 1.0.247 = RELEASED · auto-update 246→247 ATIVO em
-> produção sem interação com installer · Light UI = OFF por default (rollout visual
-> = decisão futura do owner via luiPreview/mandato próprio).**
+> **Estado: AGENDA ID SEVEN 1.0.247 = RELEASED/FROZEN (tag imutável) · auto-update
+> 246→247 ATIVO em produção sem interação com installer · na 1.0.247 a Light UI é
+> OFF por default (o rollout público virou o mandato I6A abaixo).**
+
+### I6A · PUBLIC LIGHT UI ROLLOUT 1.0.248 (DEFAULT ON) ▶ ENTREGUE — AGUARDA OWNER
+> Mandato: Light UI **DEFAULT ON** em desktop elegível a partir da **1.0.248**, nascendo
+> de `cd92ec1f` (1.0.247 RELEASED), chegando por auto-update, **sem qualquer ativação
+> manual**. Mudança cirúrgica SÓ no bloco appearance do renderer: novo contrato
+> `light-ui = (luiPublicOff!==true) && body.desktop` — `luiPreview` (RC-0/I5A) vira
+> legado INERTE (nenhum perfil antigo vira opt-out; A–E todos chegam ON), emergency
+> kill switch tecnicamente separado no campo NOVO `luiPublicOff` (default ausente;
+> `appearSet({luiPublicOff:true})` reversível; OFF = legado integral, nunca híbrido).
+> **ROLLOUT SOURCE CANDIDATE `eefa0259`** (`feat(ui): enable Light UI by default`;
+> diff de produto vs cd92ec1f = SOMENTE o renderer) → **FINAL SOURCE 1.0.248
+> `3639144f`** (`release: prepare Agenda ID Seven 1.0.248`; marcador
+> `1.0.248-i6a-light-ui-default-on`). **Provas locais** (harness com boot real):
+> perfis A–E 5/5 ON · full **29/29** (first paint frame1/DCL; F1–F13 reais ON sem
+> overflow; F9-D01/F10/F11 7+exports/F12 recovery=0/F13 upload; leakage zero;
+> emergency; logout/login/reload/reopen) · resp-1366 e win125 PASS · 14 screenshots
+> I6A no chat. **QA CI do caminho real** run `32545309146` (windows-latest, 1ª
+> tentativa): release pública v1.0.247 (pins) instalada → update in-app → `/S` zero
+> janela/UAC/SmartScreen → **1.0.248 abre com LIGHT_UI_DEFAULT_ON=true**, userData
+> preservado, `luiPreview:false` stale NÃO vira opt-out, emergency off→on, reload ON,
+> same-version `up_to_date`, REQUIRED_USER_INSTALL_ACTIONS=0. **FASE 23**: build
+> final canônico `desktop-build-1.0.248-final.yml` run `32545607334` (NSIS+MSI+
+> SHA256SUMS+manifest+contrato latest.yml + prova do rollout com assets FINAIS;
+> artifacts privados 30d) + `desktop-release-1.0.248-final.yml` **INERTE**
+> (Gate 0 fail-closed; frase `RELEASE-1.0.248-FINAL-AUTORIZADO`; pins criptográficos
+> do run canônico; Release Bot). **NADA publicado: sem tag v1.0.248, sem release, sem
+> Latest.** Relatório `LIGHT-UI-I6A-PUBLIC-ROLLOUT-1.0.248-REPORT.md`.
+> **Estado: I6A = ENTREGUE — AGUARDA OWNER (GO de publicação da 1.0.248 é mandato
+> próprio; 1.0.247 permanece a release pública até lá).**
 
 > — GO do owner (2026-08-20) com 4 correções
 > obrigatórias (amendment registrado; filtro parado como conflito-01; KPIs auditados acima;
