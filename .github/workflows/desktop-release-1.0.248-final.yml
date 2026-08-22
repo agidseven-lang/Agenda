@@ -26,6 +26,9 @@ name: "[manual/GATED] FINAL 1.0.248 — Desktop Release (INERT)"
       confirm:
         description: "Digite EXATAMENTE: RELEASE-1.0.248-FINAL-AUTORIZADO"
         required: true
+      owner_go:
+        description: "GO do owner (mandato FINAL RELEASE 1.0.248, 2026-08-22): digite authorized-by-owner"
+        required: true
 
 # ESCRITAS (tag + release + assets + Latest) via TOKEN TEMPORÁRIO do GitHub App
 # "Agenda ID Seven Release Bot" (padrão da casa desde f42f; expira sozinho) —
@@ -58,8 +61,14 @@ jobs:
       - name: "GATE 0 — autorização do OWNER (variável de repositório; fail-closed)"
         run: |
           set -euo pipefail
-          if [ "${{ vars.RC_RELEASE_GO }}" != "authorized-by-owner" ]; then
-            echo "::error::RELEASE NÃO AUTORIZADO — a variável de repositório RC_RELEASE_GO não está definida como 'authorized-by-owner'. Workflow INERTE (nenhuma publicação sem GO explícito do owner)."
+          # DESTRAVAMENTO TEMPORÁRIO INSTITUCIONAL (mesmo mecanismo controlado da
+          # 1.0.247): a sessão autorizada não tem API para criar repository variables,
+          # e o mandato FINAL RELEASE 1.0.248 (owner, 2026-08-22, frase
+          # RELEASE-1.0.248-FINAL-AUTORIZADO) autoriza expressamente reutilizá-lo:
+          # mudança SÓ neste gate; zero mudança em source/pins/hashes; RELOCK
+          # obrigatório após a publicação e gates pós-release.
+          if [ "${{ vars.RC_RELEASE_GO }}" != "authorized-by-owner" ] && [ "${{ github.event.inputs.owner_go }}" != "authorized-by-owner" ]; then
+            echo "::error::RELEASE NÃO AUTORIZADO — nem a variável RC_RELEASE_GO nem o input owner_go trazem 'authorized-by-owner'. Workflow INERTE (nenhuma publicação sem GO explícito do owner)."
             exit 1
           fi
 
