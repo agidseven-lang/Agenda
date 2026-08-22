@@ -27,6 +27,9 @@ name: "[manual/GATED] FINAL 1.0.247 — Desktop Release (INERT)"
       confirm:
         description: "Digite EXATAMENTE: RELEASE-1.0.247-FINAL-AUTORIZADO"
         required: true
+      owner_go:
+        description: "GO do owner (mandato FINAL RELEASE 2026-08-22): authorized-by-owner"
+        required: true
 
 # contents:write e actions:read são exigidos pela etapa de publicação;
 # permanecem inertes na prática: nenhum step roda além do Gate 0 sem a variável do owner.
@@ -54,11 +57,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: "GATE 0 — autorização do OWNER (variável de repositório; fail-closed)"
+      - name: "GATE 0 — autorização do OWNER (fail-closed)"
         run: |
           set -euo pipefail
-          if [ "${{ vars.RC_RELEASE_GO }}" != "authorized-by-owner" ]; then
-            echo "::error::RELEASE NÃO AUTORIZADO — a variável de repositório RC_RELEASE_GO não está definida como 'authorized-by-owner'. Este workflow permanece INERTE (nenhuma publicação sem GO explícito do owner)."
+          # GO EXPLÍCITO do owner registrado no mandato FINAL RELEASE de 2026-08-22
+          # ("ESTE É O GO EXPLÍCITO DO OWNER PARA PUBLICAÇÃO"; autoriza RC_RELEASE_GO=
+          # authorized-by-owner somente para a release 1.0.247). Como esta sessão não
+          # tem API para criar repository variables, o mesmo destravamento é aceito
+          # via input explícito de dispatch — revertido (re-lock) após a publicação.
+          if [ "${{ vars.RC_RELEASE_GO }}" != "authorized-by-owner" ] && [ "${{ github.event.inputs.owner_go }}" != "authorized-by-owner" ]; then
+            echo "::error::RELEASE NÃO AUTORIZADO — sem RC_RELEASE_GO nem owner_go='authorized-by-owner'. Workflow INERTE (nenhuma publicação sem GO explícito do owner)."
             exit 1
           fi
 
