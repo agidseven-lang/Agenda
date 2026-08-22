@@ -4136,6 +4136,48 @@ body.light-ui.desktop .pr-sheet .btn:focus-visible,
 body.light-ui.desktop .pr-sheet .sp-x:focus-visible,
 body.light-ui.desktop .pr-sheet .pr-thumb-x:focus-visible{outline:2px solid #4353D8;outline-offset:2px}
 </style>
+<style id="p1-skin">
+/* ══════════ I7.6 — P1 GOLDEN SKIN (piloto F1 / Meu quadro) ══════════
+   Escopo estrito: body.light-ui.desktop.p1f1 (marcador só no personBoard).
+   F2–F13 e legado INTACTOS. Autoridade visual: P1 Golden (owner-approved).
+   Increment 1: sidebar petroleum + superfícies/well + colunas + cards
+   border-left colorido. (cockpit rail direito, Inter e estados = próximos.) */
+body.light-ui.desktop.p1f1{
+  --p1-work:#EEF3F8; --p1-board:#E2E9F1; --p1-col:#EDF1F6; --p1-card:#fff;
+  --p1-ink:#16233B; --p1-ink2:#42506B; --p1-ink3:#7B879D; --p1-line:#DCE3EC;
+  --p1-teal:#0D9488; --p1-tealbg:#E9F7F5;
+}
+/* ---- sidebar petroleum ---- */
+body.light-ui.desktop.p1f1 .nav{background:linear-gradient(180deg,#0E343B,#0C2C35);border-right:1px solid rgba(0,0,0,.10)}
+body.light-ui.desktop.p1f1 .nav .sb-brand .nm,
+body.light-ui.desktop.p1f1 .nav .sb-brand .nm *{color:#F2F7F7}
+body.light-ui.desktop.p1f1 .nav .sb-brand .sy{color:#7FB9AF}
+body.light-ui.desktop.p1f1 .nav .new-task-btn{background:linear-gradient(135deg,#14B8A6,#0D9488);box-shadow:0 5px 14px rgba(13,148,136,.30);color:#fff}
+body.light-ui.desktop.p1f1 .nav .sb-sect{color:#5E98A0}
+body.light-ui.desktop.p1f1 .nav .sb-item{color:#AFCDD2}
+body.light-ui.desktop.p1f1 .nav .sb-item svg{color:#79A8AE}
+body.light-ui.desktop.p1f1 .nav .sb-item.on{background:rgba(255,255,255,.10);color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
+body.light-ui.desktop.p1f1 .nav .sb-item.on svg{color:#2DD4BF}
+body.light-ui.desktop.p1f1 .nav .sb-user{background:rgba(255,255,255,.06)}
+body.light-ui.desktop.p1f1 .nav .sb-user .su-n{color:#F2F7F7}
+body.light-ui.desktop.p1f1 .nav .sb-user .su-r{color:#8FB6BB}
+body.light-ui.desktop.p1f1 .nav .sb-footer,
+body.light-ui.desktop.p1f1 .nav .sb-footer .ver{color:#6E9AA1;border-top-color:rgba(255,255,255,.08)}
+/* ---- workspace + board well ---- */
+body.light-ui.desktop.p1f1 #content{background:var(--p1-work)}
+body.light-ui.desktop.p1f1 .kbv2-board-surface{background:var(--p1-board);border:1px solid #D6DEE9;border-radius:16px;padding:14px;box-shadow:inset 0 1px 3px rgba(15,42,60,.04)}
+body.light-ui.desktop.p1f1 .kbv2-board{gap:11px}
+/* ---- colunas ---- */
+body.light-ui.desktop.p1f1 .kbv2-column{background:var(--p1-col);border:1px solid #E0E6EF;border-radius:13px}
+body.light-ui.desktop.p1f1 .kbv2-column-header .kbv2-ctitle{color:var(--p1-ink2);font-weight:800}
+body.light-ui.desktop.p1f1 .kbv2-column-header .kbv2-ccount{color:var(--p1-ink3);background:#fff;border:1px solid var(--p1-line);border-radius:8px;padding:1px 7px;font-weight:800}
+/* ---- cards: branco + border-left na cor do estágio (--kc) ---- */
+body.light-ui.desktop.p1f1 .kbv2-column .tc.tcv4{background:var(--p1-card);border:1px solid #E7EBF2;border-left:3px solid var(--kc,#5B6CFF);border-radius:11px;box-shadow:0 1px 2px rgba(15,42,60,.05),0 4px 14px rgba(15,42,60,.08)}
+body.light-ui.desktop.p1f1 .kbv2-tier{color:var(--p1-ink3)}
+/* ---- header título ---- */
+body.light-ui.desktop.p1f1 .scr-head .d-bh-title{color:var(--p1-ink);font-weight:800;letter-spacing:-.01em}
+body.light-ui.desktop.p1f1 .scr-head .d-bh-sub{color:var(--p1-ink3)}
+</style>
 </head>
 <body>
 
@@ -6591,6 +6633,7 @@ function render(){
   }
   const c=document.getElementById('content');
   c.classList.remove('board-mode');
+  document.body.classList.remove('p1f1'); /* I7.6 P1 pilot: marcador de escopo (só F1/Meu quadro) */
   if(state.clientView){c.innerHTML=renderClientView();afterClientView();return;}
   if(state.form){c.innerHTML=renderForm();afterForm();return;}
   if(state.tab==='hoje')c.innerHTML=renderHoje();
@@ -6603,7 +6646,7 @@ function render(){
     if(state.flowView==='client'){body=renderClientFlowBoard();}
     else if(state.flowView==='designers'){body=state.designerBoard?renderDesignerBoard():renderDesignersHub();}
     else if(state.flowView==='socials'){body=state.socialBoard?renderSocialBoard():renderSocialsHub();}
-    else if(state.personBoard){body=renderPersonBoard();}
+    else if(state.personBoard){body=renderPersonBoard();document.body.classList.add('p1f1');/* I7.6 P1 pilot */}
     else if(state.roleBoards){body=renderRoleBoards();}
     else if(state.boardSector){body=renderBoard();}
     else body=renderHub();
