@@ -106,3 +106,47 @@ que eu já leio agora (get_metadata/get_design_context/get_screenshot) para prov
 ## POSTO DE CONTROLE
 1.0.248 = congelada · PWA/renderer/produção = intocados · 1.0.249 = não criada ·
 nenhum mockup HTML novo · ambiente MCP limpo (probe removido) · Figma READ-conectado, WRITE pendente (G1+G2).
+
+## ZERO-COST POLICY AUDIT (correção do owner — Figma exclusivamente gratuito)
+Política do owner: **NENHUM plano/assento pago** (não pedir Professional, Full/Dev seat,
+Organization, Enterprise, Weave pago, add-on). Usar só **Figma Starter/Iniciante = GRATUITO**.
+Hard cost gate = **R$0 / US$0**.
+
+### Estado verificado nesta sessão (2026-08-22)
+- **Plano/custo:** `whoami` anterior provou **tier starter, seat "View"**, plano
+  `team::1673067149303361523`. **FIGMA PLAN = STARTER/FREE**, **FIGMA COST = ZERO**. Nenhuma
+  ação paga executada; nenhuma será.
+- **Conector (ListConnectors):** `installState:"connected"`, `connected:true`,
+  **`enabledInChat:false`** → o conector segue **autenticado** na conta, porém **desligado
+  para este chat**. As tools `mcp__Figma__*` **não estão carregadas neste turno** (confirmado:
+  ToolSearch por figma retornou só `SearchMcpRegistry`).
+- **Consequência:** os testes de escrita/geração **não rodam neste turno** — não por custo,
+  mas por (a) conector *toggled off* neste chat e (b) sessão remota autônoma não aprova o
+  prompt das tools de escrita ao vivo (G1).
+
+### Resultado dos 7 campos (honesto)
+| Campo | Resultado | Motivo |
+|---|---|---|
+| FIGMA PLAN | **STARTER/FREE** | tier starter (whoami) |
+| FIGMA COST | **ZERO** | nenhuma ação paga; hard gate R$0 respeitado |
+| MCP READ | **PASS** (provado antes) | whoami retornou identidade/plano/seat = auth+read OK no free tier; hoje não re-executável (conector off no chat) |
+| DRAFT CREATE | **FAIL nesta sessão — NÃO por custo** | tools off no chat + G1 (aprovação de escrita não concedível em sessão autônoma) + G2 (seat View read-only) |
+| CODE TO CANVAS | **FAIL nesta sessão — NÃO por custo** | mesmos motivos; `generate_figma_design` é write-path |
+| FIGMA RE-READ | **N/A** | nenhum design criado para reler |
+| PAID FEATURE REQUIRED | **NÃO** | o redesign continua sem qualquer recurso pago do Figma |
+
+### Registro obrigatório
+`STRUCTURED_WRITE_TO_CANVAS = UNAVAILABLE UNDER ZERO-COST POLICY` — e, adicionalmente,
+indisponível nesta sessão remota por G1 (aprovação ao vivo). **Isto NÃO bloqueia o redesign.**
+
+### Onde o WRITE/GERAÇÃO gratuito é possível (sem custo)
+O bloqueio é de **tipo de sessão**, não de dinheiro. As tools de escrita/geração do Figma
+precisam de uma **sessão interativa** do Claude (app desktop / VS Code / claude.ai) onde o
+owner clica "aprovar" no prompt, e do conector Figma **ligado naquele chat**. Tudo isso é
+**gratuito** (Starter permite ao owner criar/editar seus próprios Drafts). A leitura
+(get_metadata/get_design_context/get_screenshot/get_variable_defs) já está provada no free.
+
+### Ação zero-custo para reabilitar os testes nesta linha (opcional)
+1. Ligar o conector **Figma neste chat** (claude.ai → Conectores → habilitar no chat) — free.
+2. Para o write-path, rodar numa **sessão interativa** e aprovar o prompt das tools — free.
+Sem nenhum desses passos, o redesign **prossegue mesmo assim** (READ + P1 Golden/spec locais).
