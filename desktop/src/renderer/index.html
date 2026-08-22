@@ -11910,15 +11910,17 @@ function cfgTrayRowHtml(){
    desligado. applyAppearance roda no boot (sobrevive a fechar/reabrir) e a cada mudança. */
 const APPEAR_KEY='idseven.desktop.appearance';
 const APPEAR_FONTS={std:'',lg:'1.1',xl:'1.25'};
-/* RC-0 (I5A) — FLAG DE PREVIEW DA LIGHT UI (interna, sem UI pública nesta build).
-   Campo namespaced `luiPreview` DENTRO da preferência de aparência existente (mesmo
-   padrão client-side: só localStorage, sem backend). Default FALSE; opt-in explícito
-   via appearSet({luiPreview:true}) e reversível via appearSet({luiPreview:false}).
-   A classe `light-ui` SÓ é aplicada quando a flag está ativa E body.desktop presente
-   (guard desktop-only; sem ativação parcial — reavaliado também na mudança da MQ). */
-function appearLoad(){try{const a=JSON.parse(localStorage.getItem(APPEAR_KEY)||'{}')||{};return{theme:a.theme==='light'?'light':'dark',font:(APPEAR_FONTS[a.font]!==undefined)?a.font:'std',hc:a.hc===true,luiPreview:a.luiPreview===true};}catch(_){return{theme:'dark',font:'std',hc:false,luiPreview:false};}}
-function appearSave(a){try{localStorage.setItem(APPEAR_KEY,JSON.stringify({theme:a.theme,font:a.font,hc:a.hc,luiPreview:a.luiPreview===true}));}catch(_){}}
-function applyAppearance(){try{const a=appearLoad();document.body.classList.toggle('light',a.theme==='light');document.body.classList.toggle('hc',a.hc===true);document.body.classList.toggle('light-ui',a.luiPreview===true&&document.body.classList.contains('desktop'));document.body.style.zoom=APPEAR_FONTS[a.font]||'';}catch(_){}}
+/* I6A (1.0.248) — LIGHT UI PÚBLICA: DEFAULT ON no desktop elegível (body.desktop).
+   O campo legado `luiPreview` (RC-0/I5A) NÃO governa mais a ativação pública: perfis
+   antigos com luiPreview true/false/ausente chegam TODOS à Light UI por padrão (sem
+   migração de dados — a flag permanece no storage apenas como legado inerte de preview).
+   EMERGENCY OFF (rollback técnico, separado do default público): campo NOVO
+   `luiPublicOff` — nenhum usuário antigo o possui gravado; acionável somente via
+   mecanismo técnico appearSet({luiPublicOff:true}) e reversível com false/remoção.
+   Guard desktop-only preservado; reavaliado também na mudança da MQ. */
+function appearLoad(){try{const a=JSON.parse(localStorage.getItem(APPEAR_KEY)||'{}')||{};return{theme:a.theme==='light'?'light':'dark',font:(APPEAR_FONTS[a.font]!==undefined)?a.font:'std',hc:a.hc===true,luiPreview:a.luiPreview===true,luiPublicOff:a.luiPublicOff===true};}catch(_){return{theme:'dark',font:'std',hc:false,luiPreview:false,luiPublicOff:false};}}
+function appearSave(a){try{localStorage.setItem(APPEAR_KEY,JSON.stringify({theme:a.theme,font:a.font,hc:a.hc,luiPreview:a.luiPreview===true,luiPublicOff:a.luiPublicOff===true}));}catch(_){}}
+function applyAppearance(){try{const a=appearLoad();document.body.classList.toggle('light',a.theme==='light');document.body.classList.toggle('hc',a.hc===true);document.body.classList.toggle('light-ui',a.luiPublicOff!==true&&document.body.classList.contains('desktop'));document.body.style.zoom=APPEAR_FONTS[a.font]||'';}catch(_){}}
 function appearSet(patch){const a=Object.assign(appearLoad(),patch||{});appearSave(a);applyAppearance();try{render();}catch(_){}}
 try{applyAppearance();}catch(_){}
 function renderConfig(){
