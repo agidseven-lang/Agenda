@@ -75,6 +75,34 @@ feita por você (ou por um plugin de escrita), e Claude passa a **ler/gerar** a 
 centric / B Balanced workspace / C Operational cockpit) — **só inicia após o Figma
 operacional e GO do owner**. Não iniciar automaticamente.
 
+## PÓS-AUTORIZAÇÃO (owner autorizou; tools Figma carregaram nesta sessão)
+- **Conexão comprovada (READ/auth):** `mcp__Figma__whoami` → handle "Id Seven",
+  email agidseven@gmail.com, plano `team::1673067149303361523`, **seat: "View"**, tier starter.
+- **Tools reais expostas:** whoami, get_design_context, get_screenshot, get_metadata,
+  get_variable_defs, get_code_connect_map, get_libraries, search_design_system,
+  create_new_file, use_figma, generate_figma_design, upload_assets, download_assets,
+  generate_diagram, get_figjam, get_figma_skill… (nomes literais do servidor).
+- **Teste de ESCRITA (create_new_file):** BLOQUEADO por DOIS gates reais:
+  - **G1 — aprovação de permissão da sessão:** retornou *"MCP tool call requires approval"*.
+    As tools de escrita exigem aprovação do owner nesta sessão (não autoaprovável em sessão autônoma).
+  - **G2 — assento "View":** provável recusa do Figma a criar/editar mesmo após G1 —
+    View não escreve. Requer assento **Editor** no time.
+- **READ de conteúdo:** tools presentes, porém ainda não demonstrado num nó real (não há
+  arquivo/URL para apontar — a criação está bloqueada por G1/G2). whoami já prova auth/READ.
+
+### CAPABILITIES (atualizado, honesto)
+CONNECTION/AUTH = SIM (provado) · READ_CONTENT = PROVÁVEL (tools presentes; sem arquivo p/ provar) ·
+WRITE/CREATE_DESIGN/EDIT = BLOQUEADO (G1 aprovação + G2 assento View) · SCREENSHOT/VARIABLES/
+COMPONENTS/CODE_CONNECT/DESIGN_TO_CODE = disponíveis como tools, pendentes de um arquivo-alvo.
+
+### AÇÃO HUMANA NECESSÁRIA (2 itens)
+1. **Aprovar** as tools de escrita do Figma (`create_new_file`, `use_figma`) nesta sessão
+   (ou rodar numa sessão interativa onde você aprova o prompt ao vivo).
+2. **Assento Editor:** elevar a conta agidseven@gmail.com de **View → Editor** no time Figma
+   (admin do time faz em figma.com → Members). Sem isso, o Figma recusa escrita.
+Alternativa para READ imediato: me enviar a **URL de um arquivo Figma** existente (design)
+que eu já leio agora (get_metadata/get_design_context/get_screenshot) para provar READ de conteúdo.
+
 ## POSTO DE CONTROLE
 1.0.248 = congelada · PWA/renderer/produção = intocados · 1.0.249 = não criada ·
-nenhum mockup HTML novo · ambiente MCP limpo (probe removido).
+nenhum mockup HTML novo · ambiente MCP limpo (probe removido) · Figma READ-conectado, WRITE pendente (G1+G2).
