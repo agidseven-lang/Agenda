@@ -1112,6 +1112,32 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > PUBLICAÇÃO = NÃO · DEPLOY = NÃO · RELEASE WORKFLOW = INERTE · Light UI default OFF
 > provado através de 2 updates zero-touch.**
 
+### FINAL RELEASE PREPARATION · 1.0.247 ▶ ✔ **GO** — AGUARDA APENAS O GO DE PUBLICAÇÃO
+> **Mandato do owner (GO explícito).** **FINAL SOURCE CANDIDATE = `cd92ec1f`**
+> (`release: prepare Agenda ID Seven 1.0.247`; parent funcional `c75ccd20`): bump
+> definitivo (package.json + lock x2) + marcador mecânico
+> `1.0.247-i5c5-unattended-update-bridge` (padrão da casa; 1.0.246 herdado). Diff gate:
+> nada além do bump. **RUN FINAL CANÔNICO = `32542723701`** (workflow novo
+> `desktop-build-1.0.247-final.yml`, 20/20 verde): checkout explícito + provenance
+> (renderer `bd5001b1…` inalterado; lockfile `39a329a9…`; version+marker; diffs exatos)
+> → build único NSIS+MSI+blockmap+latest.yml+SHA256SUMS+VERSAO-DESKTOP.txt (MESMO
+> build; contrato latest.yml sha512/size verificado; immutability pós-build) →
+> MANIFEST (exe `9ed5eee9…` 82 493 537 B · msi `ebae0188…` · blockmap `3bea99fe…` ·
+> latest.yml `701911b3…` · asar `1d21ad94…`) → **ponte com os ASSETS FINAIS:**
+> PUBLIC v1.0.246 real → 1.0.247 com `REQUIRED_USER_INSTALL_ACTIONS=0` (monitor
+> 36 amostras; progresso 9 amostras sumiu sozinha; UAC=0; SmartScreen=0; userData
+> preservado; Light OFF; ON/kill; RC-D02=0). Release workflow **sucedido** por
+> `desktop-release-1.0.247-final.yml`, TOTALMENTE PINADO no run canônico (run id +
+> SHA-256 dos 6 assets) e INERTE (Gate 0 `RC_RELEASE_GO` + frase
+> `RELEASE-1.0.247-FINAL-AUTORIZADO` + proveniência + tag v1.0.247 inexistente +
+> verificação criptográfica total; release será stable/Latest, não prerelease).
+> Bundle no artifact privado id 9467586681 (retention 30d — se o GO passar de
+> ~2026-09-21, re-rodar o build e re-pinar). Relatório
+> `LIGHT-UI-FINAL-RELEASE-PREP-1.0.247-REPORT.md`.
+> **Estado: FINAL SOURCE PREPARED = SIM · FINAL BUILD GENERATED = SIM · RELEASE
+> WORKFLOW PREPARED = SIM · TAG = NÃO · GITHUB RELEASE = NÃO · LATEST = NÃO ·
+> DEPLOY = NÃO · DISTRIBUIÇÃO = NÃO — aguarda somente o GO de publicação do owner.**
+
 > — GO do owner (2026-08-20) com 4 correções
 > obrigatórias (amendment registrado; filtro parado como conflito-01; KPIs auditados acima;
 > sidebar 266px como calibração compartilhada do Light Shell sob `body.light-ui`, validada
