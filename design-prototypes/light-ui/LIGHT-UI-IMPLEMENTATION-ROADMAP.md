@@ -1138,6 +1138,24 @@ criado (sem valor canônico). Docs da entrega: `65acd652`. Relatório:
 > WORKFLOW PREPARED = SIM · TAG = NÃO · GITHUB RELEASE = NÃO · LATEST = NÃO ·
 > DEPLOY = NÃO · DISTRIBUIÇÃO = NÃO — aguarda somente o GO de publicação do owner.**
 
+### 1.0.247 FINAL RELEASE ▶ ✔ **RELEASED** (GO explícito do owner, 2026-08-22)
+> **TAG `v1.0.247` → `cd92ec1f` (FINAL SOURCE exato) · LATEST = 1.0.247 (stable;
+> prerelease=false) · release workflow run `32543641929`** (gates 0–3 + Release Bot
+> da casa [contents+workflows write, padrão f42f] + verificação criptográfica total +
+> pós-verificação; iterações honestas: 2 runs 403 provaram GITHUB_TOKEN read-only e o
+> escopo workflows — pins NUNCA editados). **VERIFY `32543702368` 15/15:** 6/6 hashes
+> públicos == pins; latest.yml público resolve os bytes publicados (sha512/size);
+> **CANARY DE PRODUÇÃO** (app-update.yml intocado, provider github REAL): PUBLIC
+> 1.0.246 → `update_available` 1.0.247 → download real → ponte one-click
+> **REQUIRED_USER_INSTALL_ACTIONS=0** (UAC=0; SmartScreen=0; progresso sumiu sozinha)
+> → asar == canônico `1d21ad94…` → pós-update 7/7 (1.0.247; login; RC-D02=0; userData;
+> **Light OFF**; ON; kill) → same-version `up_to_date`. **RE-LOCK aplicado** (Gate 0
+> só-variável; tag existente aborta publicação). Históricas v1.0.246/245/244
+> preservadas. Relatório `LIGHT-UI-1.0.247-FINAL-RELEASE-REPORT.md`.
+> **Estado: AGENDA ID SEVEN 1.0.247 = RELEASED · auto-update 246→247 ATIVO em
+> produção sem interação com installer · Light UI = OFF por default (rollout visual
+> = decisão futura do owner via luiPreview/mandato próprio).**
+
 > — GO do owner (2026-08-20) com 4 correções
 > obrigatórias (amendment registrado; filtro parado como conflito-01; KPIs auditados acima;
 > sidebar 266px como calibração compartilhada do Light Shell sob `body.light-ui`, validada
