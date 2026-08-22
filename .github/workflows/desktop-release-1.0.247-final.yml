@@ -27,9 +27,6 @@ name: "[manual/GATED] FINAL 1.0.247 — Desktop Release (INERT)"
       confirm:
         description: "Digite EXATAMENTE: RELEASE-1.0.247-FINAL-AUTORIZADO"
         required: true
-      owner_go:
-        description: "GO do owner (mandato FINAL RELEASE 2026-08-22): authorized-by-owner"
-        required: true
 
 # ESCRITAS (tag + release + assets + Latest) via TOKEN TEMPORÁRIO do GitHub App
 # "Agenda ID Seven Release Bot" (padrão da casa desde f42f; expira sozinho) —
@@ -59,18 +56,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: "GATE 0 — autorização do OWNER (fail-closed)"
+      - name: "GATE 0 — autorização do OWNER (variável de repositório; fail-closed)"
         run: |
           set -euo pipefail
-          # GO EXPLÍCITO do owner registrado no mandato FINAL RELEASE de 2026-08-22
-          # ("ESTE É O GO EXPLÍCITO DO OWNER PARA PUBLICAÇÃO"; autoriza RC_RELEASE_GO=
-          # authorized-by-owner somente para a release 1.0.247). Como esta sessão não
-          # tem API para criar repository variables, o mesmo destravamento é aceito
-          # via input explícito de dispatch — revertido (re-lock) após a publicação.
-          if [ "${{ vars.RC_RELEASE_GO }}" != "authorized-by-owner" ] && [ "${{ github.event.inputs.owner_go }}" != "authorized-by-owner" ]; then
-            echo "::error::RELEASE NÃO AUTORIZADO — sem RC_RELEASE_GO nem owner_go='authorized-by-owner'. Workflow INERTE (nenhuma publicação sem GO explícito do owner)."
+          # RE-LOCK pós-publicação (FASE 12 do mandato FINAL RELEASE): a release
+          # v1.0.247 foi publicada no run 32543641929; o destravamento temporário por
+          # input foi REMOVIDO. Nova publicação exige de novo a variável do owner.
+          if [ "${{ vars.RC_RELEASE_GO }}" != "authorized-by-owner" ]; then
+            echo "::error::RELEASE NÃO AUTORIZADO — a variável de repositório RC_RELEASE_GO não está definida como 'authorized-by-owner'. Workflow INERTE (nenhuma publicação sem GO explícito do owner)."
             exit 1
           fi
+          # proteção extra pós-release: a tag v1.0.247 agora EXISTE — a etapa de
+          # publicação aborta por construção (nunca sobrescrever), tornando este
+          # workflow duplamente inerte mesmo com a variável presente.
 
       - name: "GATE 1 — frase de confirmação manual"
         run: |
