@@ -4,8 +4,10 @@
 // + Card B component (4:2). Does NOT recreate Foundations / tokens / cards / sidebar. Run once.
 //
 // Hardening (owner pre-run audit):
-//  - No invalid `counterAxisAlignItems = "STRETCH"` — equal-height columns via per-child
-//    `layoutAlign = "STRETCH"` + `minHeight` (valid Plugin API).
+//  - Equal-height columns via the official Fill shorthand: the board (well) uses
+//    counterAxisSizingMode="FIXED" (height 430); each column uses layoutSizingHorizontal="FILL"
+//    and layoutSizingVertical="FILL". No `counterAxisAlignItems="STRETCH"` (invalid), and no
+//    per-column minHeight / layoutAlign.
 //  - Transactional: every created node is tracked; on ANY error the run is rolled back so B is
 //    never left partial (ends either unchanged, or fully complete).
 //  - Completion marker via setPluginData("i76-composition-b-status","complete") set ONLY after all
@@ -160,14 +162,13 @@
       return e;
     }
     const well = F(); well.name = "board"; well.layoutMode = "HORIZONTAL"; well.itemSpacing = 12; well.paddingTop = 14; well.paddingBottom = 14; well.paddingLeft = 14; well.paddingRight = 14; well.cornerRadius = 16; well.fills = [{ type: "SOLID", color: S3 }];
-    B.appendChild(well); well.x = 268; well.y = 128; well.resize(1252, 430); well.primaryAxisSizingMode = "FIXED"; well.counterAxisSizingMode = "AUTO";
+    B.appendChild(well); well.x = 268; well.y = 128; well.resize(1252, 430); well.primaryAxisSizingMode = "FIXED"; well.counterAxisSizingMode = "FIXED";
     const stages = [{ n: "A Fazer", c: TODO, k: 1, t: "todo" }, { n: "Em andamento", c: DOING, k: 1, t: "doing" }, { n: "Revisão", c: REVIEW, k: 0, t: "empty" }, { n: "Finalizado", c: DONE, k: 0, t: "empty" }];
     for (const s of stages) {
       const col = AL("VERTICAL", { name: "col/" + s.n, itemSpacing: 9 }); col.paddingTop = 10; col.paddingBottom = 12; col.paddingLeft = 10; col.paddingRight = 10; col.cornerRadius = 14; col.fills = [{ type: "SOLID", color: S4 }];
       well.appendChild(col);
-      col.layoutSizingHorizontal = "FILL"; // even width split
-      col.minHeight = 430;                  // floor height
-      col.layoutAlign = "STRETCH";          // equal height on the well's counter axis (valid API; replaces invalid counterAxisAlignItems="STRETCH")
+      col.layoutSizingHorizontal = "FILL"; // even width split (well is FIXED 1252 wide)
+      col.layoutSizingVertical = "FILL";   // equal height: fill the board's fixed inner height (official Fill shorthand)
       const h = AL("HORIZONTAL", { name: "colhead" }); h.fills = []; h.counterAxisAlignItems = "CENTER"; h.primaryAxisAlignItems = "SPACE_BETWEEN"; h.paddingLeft = 4; h.paddingRight = 2; h.paddingTop = 2; h.paddingBottom = 2; col.appendChild(h); h.layoutSizingHorizontal = "FILL";
       const hl = AL("HORIZONTAL", { name: "hl", itemSpacing: 8 }); hl.fills = []; hl.counterAxisAlignItems = "CENTER"; h.appendChild(hl);
       const dot = E(); dot.resize(8, 8); dot.fills = [{ type: "SOLID", color: s.c }]; hl.appendChild(dot);

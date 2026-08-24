@@ -72,9 +72,10 @@ Localiza o frame **B — Balanced Workspace** (que já tem a sidebar pronta) e a
 - Convertido de `design-prototypes/figma/i76_compB.js`. A única API incompatível com o plugin
   clássico era o helper `figma.createAutoLayout(...)` (exclusivo do MCP `use_figma`); substituído
   pelo helper local `AL()` (`createFrame` + `layoutMode` + sizing). Todo o resto já é Plugin API padrão.
-- **Colunas de igual altura** via `col.layoutAlign = "STRETCH"` + `minHeight` (válido). O valor
-  inválido `counterAxisAlignItems = "STRETCH"` foi **removido** (essa propriedade só aceita
-  MIN/MAX/CENTER/BASELINE).
+- **Colunas de igual altura** via o **Fill shorthand oficial**: o board (`well`) usa
+  `counterAxisSizingMode="FIXED"` (altura 430) e cada coluna usa `layoutSizingHorizontal="FILL"` +
+  `layoutSizingVertical="FILL"`. **Sem** `minHeight`, **sem** `layoutAlign` e **sem** o valor
+  inválido `counterAxisAlignItems="STRETCH"` (essa propriedade só aceita MIN/MAX/CENTER/BASELINE).
 - **`VARIABLE_BINDING = PENDING`:** as cores usam **hex token-matched** (idênticos aos Agenda Tokens),
   mas **ainda não estão vinculadas por binding** às Variables reais. Isso é intencional para o
   primeiro preview visual; o binding às Variables é um passo posterior. **Não** foram criadas novas
