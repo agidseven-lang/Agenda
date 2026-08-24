@@ -1,0 +1,60 @@
+{
+  "runId": "i76-figma-meu-quadro",
+  "designDirection": "PREMIUM OPERATIONAL SAAS — 3 composições: A Kanban-centric, B Balanced Workspace, C Operational Cockpit. Nenhuma escolhida pelo owner ainda.",
+  "officialFile": { "name": "Agenda ID Seven — Product Design", "key": "aG7NXRdpCaiRDMeBiT8EKu", "url": "https://www.figma.com/design/aG7NXRdpCaiRDMeBiT8EKu" },
+  "testFile": { "key": "Eb0VCGqDPoZEFTQ1QNf7VU", "note": "I7.5.3 capability probe only — NOT a design foundation" },
+
+  "figmaPolicy": { "plan": "STARTER/FREE", "cost": "ZERO", "forbidden": ["Professional", "paid seat", "upgrade", "billing", "credits"] },
+  "constraints": { "starterMaxPages": 3, "pagesArePaid": true, "useSectionsFrames": true },
+
+  "FIGMA_STARTER_MCP_RATE_LIMIT": "OBSERVED",
+  "RESET_WINDOW": "UNKNOWN",
+  "rate_limit_note": "A rate limit on the Starter MCP was OBSERVED (calls returned a tool-call-limit message). The reset window size and per-window call budget are NOT proven — do not claim '1 call/hour', '1 call/window', or 'daily limit'.",
+  "REMOTE_SESSION_FIGMA_TOGGLE_UNSTABLE": true,
+  "REMOTE_FIGMA_OPERATIONS_SUSPENDED": true,
+  "NEXT_EXECUTION_ENVIRONMENT": "INTERACTIVE_CLAUDE_CODE",
+  "NEXT_PENDING_ITEM": "COMPOSITION_B_MEGA_CALL",
+  "connector_note": "In this remote session, ListConnectors repeatedly showed connected=true but enabledInChat=false after wakes/resumes, and Figma tools did not load. The per-conversation connector toggle did not persist. Resume in an INTERACTIVE Claude Code session with the Figma connector enabled for the conversation.",
+
+  "planKey": "team::1673067149303361523",
+  "collections": { "tokens": "VariableCollectionId:2:2", "tokensMode": "2:0", "scale": "VariableCollectionId:2:25" },
+  "vars": {
+    "s0": "VariableID:2:3", "s1": "VariableID:2:4", "s2": "VariableID:2:5", "s3": "VariableID:2:6", "s4": "VariableID:2:7", "s5": "VariableID:2:8", "s6": "VariableID:2:9",
+    "ink": "VariableID:2:10", "ink2": "VariableID:2:11", "ink3": "VariableID:2:12", "inv": "VariableID:2:13",
+    "line": "VariableID:2:14", "line2": "VariableID:2:15",
+    "teal": "VariableID:2:16", "tealS": "VariableID:2:17", "pet": "VariableID:2:18", "pet2": "VariableID:2:19",
+    "todo": "VariableID:2:20", "doing": "VariableID:2:21", "rev": "VariableID:2:22", "done": "VariableID:2:23", "dang": "VariableID:2:24"
+  },
+  "hex": {
+    "s0": "#E7EDF3", "s1": "#EEF3F8", "s2": "#EAF0F6", "s3": "#E2E9F1", "s4": "#EDF1F6", "s5": "#FFFFFF",
+    "ink": "#16233B", "ink2": "#42506B", "ink3": "#7B879D", "inv": "#EAF2F1", "line": "#DCE3EC", "line2": "#CBD5E3",
+    "teal": "#0D9488", "tealS": "#14B8A6", "pet": "#0E343B", "pet2": "#0C2C35",
+    "todo": "#5B6CFF", "doing": "#F59E0B", "rev": "#8B5CF6", "done": "#22C55E", "dang": "#C2410C"
+  },
+  "nodes": { "cardA": "3:2", "cardB": "4:2", "cardC": "5:2", "compB_frame": "6:2", "compB_sidebar": "6:3" },
+  "cardHeights": { "A": 93, "B": 136, "C": 132 },
+
+  "completed": [
+    "official file created",
+    "page renamed 'Design' (Starter 3-page cap; use sections/frames)",
+    "Foundations: Agenda Tokens (surface S0-S6, text ink/ink2/ink3/inverse, border line/line2, brand teal/teal-strong/petroleum/petroleum2, status todo/doing/review/done/danger) + Scale (radius/space) with scopes",
+    "Card A component (3:2, minimal)",
+    "Card B component (4:2, informational)",
+    "Card C component (5:2, operational)",
+    "Composition B — sidebar (6:3): petroleum, brand, Nova tarefa, primary+secondary nav with lucide icons, user footer"
+  ],
+  "pending": [
+    "COMPOSITION_B_MEGA_CALL: run design-prototypes/figma/i76_compB.js as ONE use_figma call — adds header, view controls, board well + 4 stages, 2 real tasks (Card B instance + inline A-fazer card), dashed empty states, operational context rail. Does NOT recreate sidebar/foundations/cards.",
+    "Composition A (Kanban-centric): prepare i76_compA.js then ONE use_figma call (uses Card A 3:2)",
+    "Composition C (Operational cockpit): prepare i76_compC.js then ONE use_figma call (uses Card C 5:2)",
+    "Owner Choice Board (A/B/C side by side: name/concept/3 strengths/2 tradeoffs/score)",
+    "Screenshots A/B/C via get_screenshot",
+    "Re-read metadata + variables + components + design_context",
+    "Premium Scorecard + recommendation + ENTREGA blocos 1-15"
+  ],
+  "preparedCode": {
+    "compB": "design-prototypes/figma/i76_compB.js — READ and run its contents as ONE use_figma call (fileKey aG7NXRdpCaiRDMeBiT8EKu, skillNames resource:figma-use,resource:figma-generate-design). Idempotency: before running, if get_metadata on 6:2 already shows a child named 'header', Composition B is DONE — skip to Composition A."
+  },
+
+  "productSafety": { "1.0.248": "FROZEN", "renderer": "UNTOUCHED", "PWA": "UNTOUCHED", "1.0.249": "NOT_CREATED", "published": false, "cost": "R$0" }
+}
