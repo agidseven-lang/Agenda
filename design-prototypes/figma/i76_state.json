@@ -53,7 +53,10 @@
     "Premium Scorecard + recommendation + ENTREGA blocos 1-15"
   ],
   "preparedCode": {
-    "compB": "design-prototypes/figma/i76_compB.js — READ and run its contents as ONE use_figma call (fileKey aG7NXRdpCaiRDMeBiT8EKu, skillNames resource:figma-use,resource:figma-generate-design). Idempotency: before running, if get_metadata on 6:2 already shows a child named 'header', Composition B is DONE — skip to Composition A."
+    "compB": "design-prototypes/figma/i76_compB.js — ONE use_figma call. FINISHES Composition B in the EXISTING frame 6:2 (sidebar 6:3 already built): adds header+view controls+board+rail. Idempotency: if get_metadata on 6:2 already shows a child named 'header', B is DONE.",
+    "compA": "design-prototypes/figma/i76_compA.js — ONE use_figma call. Builds a NEW standalone frame 'A — Kanban-centric' at x=2000 (own sidebar; board DOMINANT; NO right rail, context folded into a KPI strip; uses Card A 3:2). Idempotency: if a top-level frame named 'A — Kanban-centric' exists, skip.",
+    "compC": "design-prototypes/figma/i76_compC.js — ONE use_figma call. Builds a NEW standalone frame 'C — Operational Cockpit' at x=4000 (own sidebar; board narrower; STRONG 4-panel cockpit rail: Resumo operacional, SLA da visão, Equipe & carga, Próximas entregas; uses Card C 5:2). Idempotency: if a top-level frame named 'C — Operational Cockpit' exists, skip.",
+    "runOrder": "In an INTERACTIVE session with Figma enabledInChat=true: run compB, then compA, then compC (one use_figma each, skillNames resource:figma-use,resource:figma-generate-design, fileKey aG7NXRdpCaiRDMeBiT8EKu). All three are PREPARED OFFLINE but NOT YET EXECUTED — screenshot each after running and fix any clip/overlap surgically. Then: owner choice board, get_screenshot A/B/C, re-read (metadata/variables/components/design_context), scorecard, recommendation, HARD STOP."
   },
 
   "productSafety": { "1.0.248": "FROZEN", "renderer": "UNTOUCHED", "PWA": "UNTOUCHED", "1.0.249": "NOT_CREATED", "published": false, "cost": "R$0" }
