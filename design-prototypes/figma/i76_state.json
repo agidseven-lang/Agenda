@@ -12,6 +12,8 @@
   "rate_limit_note": "A rate limit on the Starter MCP was OBSERVED (calls returned a tool-call-limit message). The reset window size and per-window call budget are NOT proven — do not claim '1 call/hour', '1 call/window', or 'daily limit'.",
   "REMOTE_SESSION_FIGMA_TOGGLE_UNSTABLE": true,
   "REMOTE_FIGMA_OPERATIONS_SUSPENDED": true,
+  "last_attempt": { "when": "interactive-execution", "gate": "connected=true, enabledInChat=TRUE, use_figma AVAILABLE (gate PASSED)", "compB_run": "RATE_LIMITED — atomic, NOT CREATED", "note": "Connector is now correctly enabled; the ONLY remaining blocker is the Starter MCP call quota (OBSERVED, RESET_WINDOW UNKNOWN). When quota resets AND connector still enabled, re-run i76_compB.js (one use_figma), then A, then C." },
+  "COMPOSITION_B": "NOT CREATED (rate limit)",
   "NEXT_EXECUTION_ENVIRONMENT": "INTERACTIVE_CLAUDE_CODE",
   "NEXT_PENDING_ITEM": "COMPOSITION_B_MEGA_CALL",
   "connector_note": "In this remote session, ListConnectors repeatedly showed connected=true but enabledInChat=false after wakes/resumes, and Figma tools did not load. The per-conversation connector toggle did not persist. Resume in an INTERACTIVE Claude Code session with the Figma connector enabled for the conversation.",
