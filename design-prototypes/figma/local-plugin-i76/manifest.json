@@ -1,0 +1,8 @@
+{
+  "name": "I7.6 — Composition B Builder",
+  "id": "agenda-id-seven-i76-composition-b-builder",
+  "api": "1.0.0",
+  "main": "code.js",
+  "editorType": ["figma"],
+  "networkAccess": { "allowedDomains": ["none"] }
+}
