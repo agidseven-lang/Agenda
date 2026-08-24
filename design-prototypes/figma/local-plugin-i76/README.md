@@ -24,33 +24,50 @@ Localiza o frame **B — Balanced Workspace** (que já tem a sidebar pronta) e a
 1. Instale/abra o **Figma Desktop** (o app de computador — plugins de desenvolvimento não rodam no navegador).
 2. Abra o arquivo oficial **"Agenda ID Seven — Product Design"**
    (`https://www.figma.com/design/aG7NXRdpCaiRDMeBiT8EKu`) e vá para a página **"Design"**.
-3. No menu do topo: **Figma → Plugins → Development → Import plugin from manifest…**
-4. Selecione o arquivo: `design-prototypes/figma/local-plugin-i76/manifest.json` (deste repositório).
-5. Rode: **Figma → Plugins → Development → I7.6 — Composition B Builder**.
-6. Aguarde a confirmação: *"I7.6 — Composition B criada com sucesso."* O plugin seleciona e dá zoom no frame B.
-7. **NÃO execute novamente** se a B já tiver sido criada — o plugin é idempotente e vai avisar
-   *"COMPOSITION B ALREADY EXISTS"* sem duplicar nada, mas não há motivo para rodar 2×.
+3. No menu: **Figma → Plugins → Development → Import plugin from manifest…** → selecione
+   `design-prototypes/figma/local-plugin-i76/manifest.json`.
+4. Rode: **Figma → Plugins → Development → I7.6 — Composition B Builder**.
+5. Aguarde a confirmação: *"Composition B (Balanced Workspace) criada com sucesso."* — o plugin
+   seleciona e dá zoom no frame B.
+6. **Rode apenas uma vez.** É idempotente: se já estiver completa, avisa *ALREADY EXISTS* e não duplica.
+
+> **Se o Figma Desktop recusar o `id` do manifest na importação** (raro em dev local):
+> use o caminho garantido — **Plugins → Development → New plugin… → Figma design**, o Figma cria
+> uma pasta com `manifest.json` (com `id` gerado pelo Figma) + `code.js`. Substitua o `code.js`
+> gerado pelo **nosso** `code.js`, e no `manifest.json` gerado acrescente
+> `"documentAccess": "dynamic-page"` e `"networkAccess": { "allowedDomains": ["none"] }`. Não publique na Community.
 
 ---
 
-## Segurança (idempotência e abort)
-- Se o frame **B** já contém um `header`, o plugin **não duplica** — encerra com *ALREADY EXISTS*.
-- Se **não encontrar** o frame "B — Balanced Workspace" (id `6:2`), **aborta** com mensagem clara,
-  sem criar uma segunda B em outro lugar.
-- Se o componente **Card B** (`4:2`) não for encontrado, usa um card informacional equivalente
-  **inline** (mesma aparência), para nunca deixar a tela incompleta.
-- Carrega as fontes **Inter** (Regular/Medium/Semi Bold/Bold) antes de criar textos.
-- `networkAccess: none` — o plugin **não acessa a rede**.
+## Segurança (endurecida após auditoria pré-execução do owner)
+- **Idempotência por marker explícito:** conclusão é marcada com
+  `setPluginData("i76-composition-b-status","complete")` **somente depois** que TODAS as seções
+  existem. A checagem inicial olha o **marker**, não a mera presença de `header`.
+- **Transacional (rollback):** cada node criado nesta execução é rastreado; se ocorrer **qualquer
+  erro**, todos os nodes desta execução são removidos. A B termina **ou intacta ou completa —
+  nunca parcial**.
+- **Partial build de execução antiga** (seções presentes, sem marker): apenas as seções do builder
+  (`header`, `view-controls`, `board`, `context-rail`, por nome exato) são limpas e reconstruídas.
+  A **sidebar nunca é tocada**.
+- **Card B obrigatório:** se o componente oficial **Card B (`4:2`)** não for encontrado, o plugin
+  **ABORTA** com mensagem clara. Não cria cópia visual inline — Figma é a source of truth.
+- **Abort seguro:** se o frame **B (`6:2`)** não existir, aborta sem criar uma segunda B.
+- **Fontes** Inter (Regular/Medium/Semi Bold/Bold) carregadas antes de qualquer texto.
+- `documentAccess: "dynamic-page"` · `networkAccess: none` (sem rede).
 
 ---
 
 ## Notas técnicas
 - Convertido de `design-prototypes/figma/i76_compB.js`. A única API incompatível com o plugin
-  clássico era o helper `figma.createAutoLayout(...)` (exclusivo do MCP `use_figma`); foi
-  substituída pelo helper local `AL()` (`createFrame` + `layoutMode` + sizing). Todo o restante
-  já é Plugin API padrão.
-- Usa **cores token-matched** (hex idênticos aos Agenda Tokens). **Não cria** novas variáveis nem
-  coleção de tokens — as Agenda Tokens existentes ficam intactas.
+  clássico era o helper `figma.createAutoLayout(...)` (exclusivo do MCP `use_figma`); substituído
+  pelo helper local `AL()` (`createFrame` + `layoutMode` + sizing). Todo o resto já é Plugin API padrão.
+- **Colunas de igual altura** via `col.layoutAlign = "STRETCH"` + `minHeight` (válido). O valor
+  inválido `counterAxisAlignItems = "STRETCH"` foi **removido** (essa propriedade só aceita
+  MIN/MAX/CENTER/BASELINE).
+- **`VARIABLE_BINDING = PENDING`:** as cores usam **hex token-matched** (idênticos aos Agenda Tokens),
+  mas **ainda não estão vinculadas por binding** às Variables reais. Isso é intencional para o
+  primeiro preview visual; o binding às Variables é um passo posterior. **Não** foram criadas novas
+  variáveis nem coleção — as Agenda Tokens existentes ficam intactas.
 - Depois de aprovar a B, os builders de **A** (`i76_compA.js`) e **C** (`i76_compC.js`) podem ser
   convertidos do mesmo jeito (ainda **não** faça isso — o owner quer avaliar a B primeiro).
 
