@@ -21,6 +21,7 @@
   const SECTION_NAMES = ["header", "view-controls", "board", "context-rail"];
   const track = (n) => { created.push(n); return n; };
   const rollback = () => { for (let i = created.length - 1; i >= 0; i--) { const n = created[i]; try { if (n && !n.removed) n.remove(); } catch (e) {} } };
+  let B = null; // declared in outer scope so the catch block can clear the marker defensively
   try {
     // ---------- tracked node factories ----------
     function F() { return track(figma.createFrame()); }
@@ -43,7 +44,6 @@
     }
 
     // ---------- locate Composition B frame ----------
-    let B = null;
     try { B = await figma.getNodeByIdAsync("6:2"); } catch (e) { B = null; }
     if (!B || B.type !== "FRAME" || !/Balanced/i.test(B.name)) {
       try { const hit = figma.currentPage.findOne(n => n.type === "FRAME" && n.name === "B — Balanced Workspace"); if (hit) B = hit; } catch (e) {}
@@ -57,11 +57,17 @@
     let page = B; while (page && page.type !== "PAGE") page = page.parent;
     if (page && figma.currentPage !== page) { try { await figma.setCurrentPageAsync(page); } catch (e) {} }
 
-    // ---------- idempotency: rely on the explicit completion MARKER ----------
+    // ---------- idempotency: rely on the explicit completion MARKER (+ consistency) ----------
     if (B.getPluginData(MARK) === "complete") {
-      figma.currentPage.selection = [B];
-      figma.viewport.scrollAndZoomIntoView([B]);
-      figma.closePlugin("I7.6 COMPOSITION B ALREADY EXISTS (marker=complete) — nada a fazer.");
+      const missing = SECTION_NAMES.filter(nm => !B.children.some(c => c.name === nm));
+      if (missing.length === 0) {
+        figma.currentPage.selection = [B];
+        figma.viewport.scrollAndZoomIntoView([B]);
+        figma.closePlugin("I7.6 COMPOSITION B ALREADY EXISTS (marker=complete) — nada a fazer.");
+        return;
+      }
+      // marker says complete but sections are missing → do not touch anything.
+      figma.closePlugin("I7.6 ABORTADO: INCONSISTENT COMPLETE STATE — marker=complete mas faltam seções (" + missing.join(", ") + "). Nenhum elemento foi alterado.");
       return;
     }
 
@@ -76,11 +82,16 @@
       return;
     }
 
-    // ---------- partial build cleanup (prior failed run, no marker) ----------
-    // Only builder-owned section frames (exact names) are removed. The sidebar (name "sidebar")
-    // and any other legitimate content are never touched.
-    const stale = B.children.filter(n => SECTION_NAMES.indexOf(n.name) >= 0);
-    for (const n of stale) { try { if (!n.removed) n.remove(); } catch (e) {} }
+    // ---------- partial-build gate (prior failed run, no marker): NON-DESTRUCTIVE ----------
+    // We do NOT auto-delete pre-existing sections — they are not in `created`, so a later failure
+    // could not restore them, which would break the "intact OR complete, never partial" guarantee.
+    // Instead, if any builder section already exists without a complete marker, ABORT and change
+    // nothing. (First official run: B has only the sidebar, so this gate normally does not fire.)
+    const preexisting = B.children.filter(n => SECTION_NAMES.indexOf(n.name) >= 0).map(n => n.name);
+    if (preexisting.length > 0) {
+      figma.closePlugin("I7.6 ABORTADO: build parcial anterior da Composition B detectado (" + preexisting.join(", ") + "). Nenhum elemento foi alterado. Revise/limpe o estado parcial manualmente antes de executar novamente.");
+      return;
+    }
 
     // ---------- fonts ----------
     await figma.loadFontAsync({ family: "Inter", style: "Regular" });
@@ -192,13 +203,18 @@
     member("CE", TEAL, "Carlos Eduardo", "CEO · Operações", "2");
     member("MK", REVIEW, "Marina Klein", "Designer", "0");
 
-    // ---------- commit: mark complete ONLY after all sections exist ----------
-    B.setPluginData(MARK, "complete");
+    // ---------- finish: view FIRST, then mark complete LAST ----------
+    // Ordering matters: if selection/scrollAndZoomIntoView threw AFTER the marker was set, the
+    // catch would roll back the content but leave marker=complete (false ALREADY EXISTS next run).
+    // So the marker is the very last mutation before closePlugin.
     figma.currentPage.selection = [B];
     figma.viewport.scrollAndZoomIntoView([B]);
+    B.setPluginData(MARK, "complete");
     figma.closePlugin("I7.6 — Composition B (Balanced Workspace) criada com sucesso.");
   } catch (err) {
+    // On ANY error: guarantee marker !== "complete", then remove only THIS run's new nodes.
+    try { if (B) B.setPluginData(MARK, ""); } catch (_) {}
     try { rollback(); } catch (e) {}
-    figma.closePlugin("I7.6 ERRO (rollback executado — B não ficou parcial): " + (err && err.message ? err.message : String(err)));
+    figma.closePlugin("I7.6 ERRO (marker limpo + rollback dos nodes novos — B não ficou parcial): " + (err && err.message ? err.message : String(err)));
   }
 })();

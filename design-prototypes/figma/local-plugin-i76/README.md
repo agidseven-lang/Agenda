@@ -31,11 +31,17 @@ Localiza o frame **B — Balanced Workspace** (que já tem a sidebar pronta) e a
    seleciona e dá zoom no frame B.
 6. **Rode apenas uma vez.** É idempotente: se já estiver completa, avisa *ALREADY EXISTS* e não duplica.
 
-> **Se o Figma Desktop recusar o `id` do manifest na importação** (raro em dev local):
-> use o caminho garantido — **Plugins → Development → New plugin… → Figma design**, o Figma cria
-> uma pasta com `manifest.json` (com `id` gerado pelo Figma) + `code.js`. Substitua o `code.js`
-> gerado pelo **nosso** `code.js`, e no `manifest.json` gerado acrescente
-> `"documentAccess": "dynamic-page"` e `"networkAccess": { "allowedDomains": ["none"] }`. Não publique na Community.
+> **Sobre o `id` do manifest:** o Figma normalmente **atribui o plugin id** ao criar o plugin
+> (Create/New Plugin), então o `id` textual do nosso manifest **não é garantidamente aceito** na
+> importação direta. Caminho garantido:
+> 1. **Plugins → Development → New plugin…** → **Figma design**
+> 2. deixe o Figma **gerar** o `manifest.json` e o `id`
+> 3. substitua **somente** o `code.js` gerado pelo **nosso** builder
+> 4. **mantenha o `id` gerado pelo Figma**
+> 5. acrescente/confirme no manifest gerado: `"documentAccess": "dynamic-page"` e
+>    `"networkAccess": { "allowedDomains": ["none"] }`
+>
+> Não publique na Community.
 
 ---
 
@@ -46,9 +52,14 @@ Localiza o frame **B — Balanced Workspace** (que já tem a sidebar pronta) e a
 - **Transacional (rollback):** cada node criado nesta execução é rastreado; se ocorrer **qualquer
   erro**, todos os nodes desta execução são removidos. A B termina **ou intacta ou completa —
   nunca parcial**.
-- **Partial build de execução antiga** (seções presentes, sem marker): apenas as seções do builder
-  (`header`, `view-controls`, `board`, `context-rail`, por nome exato) são limpas e reconstruídas.
-  A **sidebar nunca é tocada**.
+- **Build parcial anterior (não-destrutivo):** se alguma seção do builder já existir **sem** o marker
+  de conclusão, o plugin **ABORTA e não altera nada** (não apaga automaticamente), para nunca deixar
+  o arquivo em estado parcial. Você revisa/limpa o parcial manualmente e roda de novo.
+- **Ordem do marker:** a conclusão é marcada **por último** (depois de seleção/zoom). Em qualquer erro,
+  o marker é **limpo** e os nodes **desta execução** são removidos → nunca há "marker complete" sobre
+  conteúdo revertido. O rollback cobre só os nodes criados nesta execução (não conteúdo preexistente).
+- **Estado complete inconsistente:** se o marker disser "complete" mas faltar alguma seção, o plugin
+  **ABORTA** (INCONSISTENT COMPLETE STATE) sem alterar nada.
 - **Card B obrigatório:** se o componente oficial **Card B (`4:2`)** não for encontrado, o plugin
   **ABORTA** com mensagem clara. Não cria cópia visual inline — Figma é a source of truth.
 - **Abort seguro:** se o frame **B (`6:2`)** não existir, aborta sem criar uma segunda B.
