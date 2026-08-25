@@ -4188,6 +4188,68 @@ body.light-ui.desktop .kbv2-empty2.lui-empty .s{display:none}
 
 /* A4) Micro-craft do card: título com peso/tracking A GOLDEN. */
 body.light-ui.desktop .kbv2-title{font-weight:700;letter-spacing:-.011em}
+
+/* ===== I7.7.1 — A GOLDEN PARITY (header / toolbar / KPIs / brand / cluster). Escopo light-ui. ===== */
+/* A5) Header A GOLDEN */
+body.light-ui.desktop .scr-head.lui-ph{display:flex;align-items:center;gap:18px;padding:14px 4px 14px;border-bottom:1px solid var(--lui-hair);margin:0 0 2px}
+body.light-ui.desktop .lui-ph-l{display:flex;flex-direction:column;gap:2px;min-width:0;flex:none}
+body.light-ui.desktop .lui-ph-t{font-size:16.5px;font-weight:700;letter-spacing:-.011em;color:var(--lui-tx-1);line-height:1.1}
+body.light-ui.desktop .lui-ph-s{font-size:11.5px;font-weight:500;color:var(--lui-tx-3)}
+body.light-ui.desktop .lui-ph-c{margin:0 auto;display:flex;padding:3px;border-radius:10px;background:var(--lui-sunk);border:1px solid var(--lui-hair);gap:2px;flex-wrap:nowrap}
+body.light-ui.desktop .lui-ph-c .tchip{border:0 !important;background:transparent !important;height:30px;padding:6px 13px !important;border-radius:8px;font-size:12.5px;color:var(--lui-tx-3) !important;box-shadow:none !important;white-space:nowrap}
+body.light-ui.desktop .lui-ph-c .tchip.on{background:#fff !important;color:var(--lui-tx-1) !important;box-shadow:0 1px 2px rgba(15,42,60,.10) !important;font-weight:600 !important}
+body.light-ui.desktop .lui-ph-c .tchip svg{width:15px;height:15px}
+body.light-ui.desktop .lui-ph-r{display:flex;align-items:center;gap:12px;flex:none;margin-left:auto}
+body.light-ui.desktop .lui-search{display:flex;align-items:center;gap:9px;width:230px;height:36px;padding:0 12px;border-radius:10px;background:#fff;border:1px solid var(--lui-control-border);color:var(--lui-tx-3);white-space:nowrap;overflow:hidden}
+body.light-ui.desktop .lui-search svg{width:16px;height:16px;flex:none;color:var(--lui-tx-3)}
+body.light-ui.desktop .lui-search input.inp{border:0 !important;background:transparent !important;padding:0 !important;height:auto !important;min-height:0 !important;font-size:12.5px;color:var(--lui-tx-1);width:100%;box-shadow:none !important}
+body.light-ui.desktop .lui-hicon{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:#fff;border:1px solid var(--lui-control-border);cursor:pointer;padding:0;flex:none}
+body.light-ui.desktop .lui-hicon svg{width:18px;height:18px;color:var(--lui-tx-2)}
+body.light-ui.desktop .lui-havatar{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:transparent;border:0;cursor:pointer;padding:0;flex:none;overflow:hidden}
+body.light-ui.desktop .lui-havatar .av,body.light-ui.desktop .lui-havatar img{width:34px !important;height:34px !important;border-radius:50% !important}
+
+/* A6) Toolbar A GOLDEN — filtros (esq) + KPIs compactos (dir) */
+body.light-ui.desktop .lui-tb2{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 4px 12px}
+body.light-ui.desktop .lui-tb2-l{display:flex;align-items:center;gap:9px;flex-wrap:wrap;min-width:0}
+body.light-ui.desktop .lui-tb2-r{display:flex;align-items:center;gap:8px;flex:none}
+body.light-ui.desktop .lui-tbk{display:flex;align-items:center;gap:8px;height:34px;padding:0 12px;border-radius:10px;background:#fff;border:1px solid var(--lui-hair)}
+body.light-ui.desktop .lui-tbk-d{width:8px;height:8px;border-radius:50%;flex:none}
+body.light-ui.desktop .lui-tbk b{font-size:13.5px;font-weight:700;color:var(--lui-tx-1)}
+body.light-ui.desktop .lui-tbk span{font-size:11.5px;font-weight:500;color:var(--lui-tx-3)}
+body.light-ui.desktop .lui-tbk-sla.ok{background:#E9F7F5;border-color:transparent;gap:7px}
+body.light-ui.desktop .lui-tbk-sla.ok .lui-tbk-dot{width:8px;height:8px;border-radius:50%;background:#22C55E;flex:none}
+body.light-ui.desktop .lui-tbk-sla .lui-tbk-slatx{font-size:11.5px;font-weight:600;color:#0E7369}
+body.light-ui.desktop .lui-tbk-sla.warn{background:#FEF3E2;border-color:transparent}
+body.light-ui.desktop .lui-tbk-sla.warn b,body.light-ui.desktop .lui-tbk-sla.warn span{color:#B45309}
+
+/* A7) Suprime cluster flutuante no A quadro (SLA vai p/ KPI da toolbar; sino/avatar no header) */
+body.light-ui.lui-aq .slamon,
+body.light-ui.lui-aq .slaib-bell,
+body.light-ui.lui-aq #cornerAvatar{display:none !important}
+
+/* A8) Sidebar = marca A ("7" teal + wordmark Agenda ID Seven) + nav compacta */
+body.light-ui.desktop .nav .sb-brand .nm-legacy{display:none !important}
+body.light-ui.desktop .nav .sb-brand .nm-lui{display:inline !important}
+body.light-ui.desktop .nav .sb-brand .logo.sm.brandlogo{background:linear-gradient(150deg,#2DD4BF,#0D9488) !important;position:relative}
+body.light-ui.desktop .nav .sb-brand .logo.sm.brandlogo::after{content:'7';position:absolute;inset:0;display:grid;place-items:center;color:#062A2A;font-weight:800;font-size:20px}
+body.light-ui.desktop .nav button.sb-item{height:38px}
+body.light-ui.desktop .nav .sb-sect{padding:14px 14px 6px}
+
+/* A9) Responsivo do header/toolbar A GOLDEN — sino/avatar SEMPRE visíveis; nada espremido/cortado. */
+@media (max-width:1500px){
+  body.light-ui.desktop .lui-ph{gap:12px}
+  body.light-ui.desktop .lui-ph-r{gap:9px}
+  body.light-ui.desktop .lui-search{width:158px}
+  body.light-ui.desktop .lui-ph-c .tchip{padding:6px 10px !important;font-size:12px}
+  body.light-ui.desktop .lui-ph-c .tchip svg{width:14px;height:14px}
+  body.light-ui.desktop .lui-tb2-r{gap:7px}
+  body.light-ui.desktop .lui-tbk{padding:0 10px;gap:7px}
+}
+@media (max-width:1400px){
+  body.light-ui.desktop .lui-ph-c .tchip span{display:none}   /* segmentado icone-only quando estreito (sem ação falsa; mantém proporção) */
+  body.light-ui.desktop .lui-ph-c .tchip{padding:6px 9px !important}
+  body.light-ui.desktop .lui-search{width:150px}
+}
 </style>
 </head>
 <body>
@@ -7764,6 +7826,44 @@ function renderPersonBoard(){
   const COLS=designerBoardView?DESIGNER_COLS4:SOCIAL_COLS4;
   const colOf=designerBoardView?(t=>designerColView(t)):(t=>personBoardCol(t,pid));
   const byStatus=COLS.map(st=>list.filter(t=>colOf(t)===st.key).sort((a,b)=>{const da=dtMs(a.dueDate||a.due,a.dueTime||'23:59')||9e15;const dbb=dtMs(b.dueDate||b.due,b.dueTime||'23:59')||9e15;return da-dbb;}));
+  /* ===== I7.7.1 — A GOLDEN PARITY (Meu quadro). Gated body.light-ui. Reposiciona controles REAIS
+     (busca #bSearch, chips de contexto/taskChips, filtro por responsável data-bresp, sino/avatar
+     via data-tab, KPIs derivados de byStatus) na composição aprovada em A.html @473f716f.
+     Zero função nova. O caminho legado (sem light-ui) segue INTACTO no assembly abaixo. ===== */
+  if(_lui){
+    const nAf=(byStatus[0]||[]).length, nAnd=(byStatus[1]||[]).length, nDone=(byStatus[COLS.length-1]||[]).length;
+    const nTot=list.length;
+    const _lt=list.filter(t=>{const d0=taskDeadline(t);return d0&&d0.late;}).length;
+    const firstN=n=>String(n||'').split(' ')[0]||'';
+    const respChips=_people.map(a=>'<button type="button" class="lui-rchip'+(boardRespFilter===a.id?' on':'')+'" data-bresp="'+a.id+'" aria-pressed="'+(boardRespFilter===a.id)+'" style="--kresp:'+userColor(a.id)+'">'+avatar(a,20)+'<span>'+esc(firstN(a.name))+'</span></button>').join('')+
+      '<button type="button" class="lui-rchip lui-rchip-all'+(boardRespFilter?'':' on')+'" data-bresp="" aria-pressed="'+(!boardRespFilter)+'">'+svg('grid')+'<span>Todos</span></button>';
+    const kpi=(dot,val,lbl)=>'<div class="lui-tbk"><span class="lui-tbk-d" style="background:'+dot+'"></span><b class="tnum">'+val+'</b><span>'+lbl+'</span></div>';
+    const sla=_lt?('<div class="lui-tbk lui-tbk-sla warn"><span class="lui-tbk-d" style="background:#F59E0B"></span><b class="tnum">'+_lt+'</b><span>SLA em risco</span></div>')
+      :('<div class="lui-tbk lui-tbk-sla ok"><span class="lui-tbk-dot"></span><span class="lui-tbk-slatx">SLA no prazo</span></div>');
+    return '<div class="scr-head lui-ph">'+
+        '<div class="lui-ph-l"><div class="lui-ph-t">'+(isMe?'Meu quadro':'Quadro de '+esc(firstN(p.name)||'Responsável'))+'</div><div class="lui-ph-s">Fluxo operacional · '+nTot+' tarefa'+(nTot===1?'':'s')+' ativa'+(nTot===1?'':'s')+'</div></div>'+
+        '<div class="lui-ph-c">'+taskChips()+'</div>'+
+        '<div class="lui-ph-r">'+
+          '<span class="lui-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input class="inp bsearch" id="bSearch" placeholder="Buscar tarefas, clientes…" value="'+esc(boardQuery)+'"></span>'+
+          '<button class="lui-hicon" data-tab="notificacoes" title="Notificações">'+svg('bell')+'</button>'+
+          '<button class="lui-havatar" data-tab="perfil" title="Perfil — abrir conta">'+avatar(state.user,34)+'</button>'+
+        '</div>'+
+      '</div>'+
+      '<div class="scr" style="padding-top:0">'+
+        '<div class="lui-tb2">'+
+          '<div class="lui-tb2-l">'+respChips+'</div>'+
+          '<div class="lui-tb2-r">'+
+            kpi('#7B879D',nTot,'Total')+
+            kpi('#F59E0B',nAnd,'Em andamento')+
+            kpi('#5B6CFF',nAf,'A fazer')+
+            kpi('#22C55E',nDone,'Concluídas')+
+            sla+
+          '</div>'+
+        '</div>'+
+        kbv2BoardHtml(COLS.map((st,i)=>({label:st.label,color:st.color,key:st.key,tasks:byStatus[i]})),
+          t=>(hasDesigner(t)&&designerOf(t)===pid)?kbv2Card(t,'designer'):kbv2Card(t))+
+      '</div>';
+  }
   const backTo=isMe?'hub':(roleCat(state.user)==='ADMIN'?'roleboards':'hub');
   let h=
     '<div class="scr-head"><div class="d-board-head"><button class="iconbtn" data-board="'+backTo+'">'+svg('back')+'</button>'+
@@ -9829,7 +9929,10 @@ function kbv2BoardHtml(cols, cardFn){
   return h+'</div></div>';
 }
 function canDelTask(t){const u=state.user;return !!u&&(canSeeAll(u)||t.by===u.id||t.assigneeId===u.id);}
-function afterBoard(){const s=document.getElementById('bSearch');if(s)s.oninput=()=>{boardQuery=s.value;const p=s.selectionStart;render();const n=document.getElementById('bSearch');if(n){n.focus();n.setSelectionRange(p,p);}};}
+function afterBoard(){/* I7.7.1 — marcador do A GOLDEN Meu quadro (gated light-ui): suprime o cluster flutuante
+   (SLA monitor + sino + avatar) só nesta tela; sino/avatar reaparecem no header A. Zero handler novo. */
+  try{document.body.classList.toggle('lui-aq', !!(state.personBoard&&!state.flowView&&document.body.classList.contains('light-ui')));}catch(_){}
+  const s=document.getElementById('bSearch');if(s)s.oninput=()=>{boardQuery=s.value;const p=s.selectionStart;render();const n=document.getElementById('bSearch');if(n){n.focus();n.setSelectionRange(p,p);}};}
 
 // 1.0.109 — eixo do DESIGNER: card no quadro do designer (ou sou o designer atribuído).
 // Mover grava designerFlowStatus (fonte única lida pelo quadro do designer no PC e no Android).
