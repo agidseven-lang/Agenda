@@ -3,3 +3,5 @@ worker-ops-logs/
 .f354vh1-electron-proof/
 .f354w-electron-proof/
 .f354wh1-electron-proof/
+# QA visual output (screenshots/relatórios transitórios — nunca versionados)
+desktop/qa-out-*/
