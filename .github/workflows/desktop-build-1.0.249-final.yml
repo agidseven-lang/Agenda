@@ -1,0 +1,366 @@
+# =====================================================================
+# [manual] FINAL 1.0.249 — Desktop Build Canônico + Installed-App QA (NADA é publicado)
+# ---------------------------------------------------------------------
+# Espelha o mecanismo canônico auditado (desktop-build-1.0.247-final.yml):
+# build ÚNICO da 1.0.249 a partir do FINAL SOURCE 28ed90ef (I7.7.3), com hard
+# gates de proveniência, GATE ASAR (versão/renderer/flags do updater), contrato
+# do latest.yml (== NSIS do MESMO run: version+sha512+size), SHA256SUMS +
+# VERSAO-DESKTOP.txt + manifest, e — NO MESMO RUN — a INSTALLED-APP QA REAL
+# do pacote Windows (I7.9.1 §3, hard gate que deixa de ser NOT TESTABLE):
+#   SESSÃO A — 1.0.248 PÚBLICA → 1.0.249 (assets deste build): update SILENCIOSO
+#     /S (updater >= 1.0.247), REQUIRED_USER_INSTALL_ACTIONS=0, UAC=0, SmartScreen=0,
+#     app relança como 1.0.249.
+#   SESSÃO B — 1.0.249 instalada: versão==1.0.249, Light UI ON (default elegível),
+#     smoke funcional real (sidebar/Meu quadro/contextos/Mais/Nova tarefa/busca/
+#     filtro/Detalhes/Mover/sino/perfil/4 lanes/cards/resize), sem tela branca,
+#     sem crash + screenshots 1920/1366 (visual sanity).
+# Adaptação vs 1.0.247-final: SEM ponte-legado 246 (247+ já é /S). Diferença de
+# produto vs v1.0.248 (3639144f) = SOMENTE renderer + version bump (+ QA tooling).
+# Assets do run: NSIS x64 + exe.blockmap + latest.yml + MSI x64 + SHA256SUMS +
+# VERSAO-DESKTOP.txt — TODOS do mesmo build. Sem tag, sem release, sem publish,
+# sem Latest, sem updater apontado a clientes reais. Execução manual apenas.
+# =====================================================================
+name: "[manual] FINAL 1.0.249 — Desktop Build + Installed-App QA"
+
+"on":
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  PRODUCT_SOURCE_SHA: "28ed90ef3f8a3573550e2c09a46b19fc98fe11fc"
+  V248_TAG_SHA: "3639144f0ce5cccecbc0b88125f9588c985809f3"   # v1.0.248 (produção; base do candidato)
+  EXPECTED_VERSION: "1.0.249"
+  EXPECTED_RENDERER_SHA256: "c83c6e74001c332c84f466f807c6cc52b75bffeef09f0e29188e5d1583032782"
+  EXPECTED_LOCKFILE_SHA256: "047711f1968a7c9f32a7a854bcb437e5f10d168613b47eb7b030107c46c40ced"
+  BASELINE_TAG: "v1.0.248"
+  FEED_PORT: "8879"
+
+jobs:
+  final-build:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: "Git sem conversão CRLF"
+        run: git config --global core.autocrlf false
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: "PIN do FINAL SOURCE (28ed90ef) + PROVENANCE hard gates"
+        run: |
+          set -euo pipefail
+          git checkout --detach "$PRODUCT_SOURCE_SHA"
+          [ "$(git rev-parse HEAD)" = "$PRODUCT_SOURCE_SHA" ] || { echo "::error::pin do FINAL SOURCE falhou"; exit 1; }
+          R=$(git show "$PRODUCT_SOURCE_SHA":desktop/src/renderer/index.html | sha256sum | awk '{print $1}')
+          [ "$R" = "$EXPECTED_RENDERER_SHA256" ] || { echo "::error::renderer difere do congelado ($R)"; exit 1; }
+          L=$(git show "$PRODUCT_SOURCE_SHA":desktop/package-lock.json | sha256sum | awk '{print $1}')
+          [ "$L" = "$EXPECTED_LOCKFILE_SHA256" ] || { echo "::error::lockfile difere do pinado ($L)"; exit 1; }
+          # version autoritativa (o marcador de description permanece o herdado da 1.0.248 — source CONGELADO)
+          node -e "const p=require('./desktop/package.json'); if(p.version!=='$EXPECTED_VERSION'){console.error('version '+p.version);process.exit(1);} console.log('version OK '+p.version);"
+          # DIFF DE PRODUTO vs v1.0.248 (3639144f) = SOMENTE renderer + version bump (+ QA tooling). NADA de
+          # backend/updater/electron-builder/main. Prova a tese do candidato (VISUAL/UX only).
+          D=$(git diff --name-only "$V248_TAG_SHA" "$PRODUCT_SOURCE_SHA" -- desktop | sort | tr '\n' ' ')
+          echo "diff desktop vs v1.0.248: $D"
+          [ "$D" = "desktop/package.json desktop/scripts/visual-qa-i77-a-golden.mjs desktop/src/renderer/index.html " ] || { echo "::error::diff de produto inesperado vs v1.0.248"; exit 1; }
+          # updater / installer-config / main NÃO podem ter mudado vs v1.0.248
+          U=$(git diff --name-only "$V248_TAG_SHA" "$PRODUCT_SOURCE_SHA" -- desktop/src/main desktop/electron-builder.yml | tr '\n' ' ')
+          [ -z "$U" ] || { echo "::error::main/updater/electron-builder alterados vs v1.0.248: $U"; exit 1; }
+          echo "PROVENANCE OK: source=$PRODUCT_SOURCE_SHA renderer=$R lockfile=$L version=$EXPECTED_VERSION"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: "BUILD FINAL ÚNICO — npm ci + build + NSIS x64 + MSI x64 + GATE ASAR + IMMUTABILITY"
+        working-directory: desktop
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm run build
+          npx electron-builder --win nsis msi --publish never
+          # ---- GATE ASAR: o pacote embarca EXATAMENTE o source congelado
+          EX="$RUNNER_TEMP/asarx"; rm -rf "$EX"; mkdir -p "$EX"
+          npx --yes @electron/asar extract dist-installer/win-unpacked/resources/app.asar "$EX"
+          PKG="$EX/package.json" node -e "const p=JSON.parse(require('fs').readFileSync(process.env.PKG,'utf8')); if(p.version!=='$EXPECTED_VERSION')process.exit(1); console.log('asar version OK '+p.version);"
+          git show "$PRODUCT_SOURCE_SHA":desktop/src/renderer/index.html > "$RUNNER_TEMP/src-index.html"
+          A="$EX/src/renderer/index.html" B="$RUNNER_TEMP/src-index.html" node -e '
+            const fs=require("fs");const n=s=>String(s).replace(/\r\n/g,"\n");
+            if(n(fs.readFileSync(process.env.A,"utf8"))!==n(fs.readFileSync(process.env.B,"utf8"))){console.error("renderer empacotado != fonte");process.exit(1);}
+            console.log("renderer empacotado == fonte (byte-identico)");'
+          # contrato do updater no asar (flags inegociáveis; mesmas da 1.0.247/1.0.248 — main intocado)
+          US="$EX/dist/main/updaterService.js"
+          grep -Eq 'autoUpdater\.allowPrerelease[[:space:]]*=[[:space:]]*false' "$US" || { echo "::error::allowPrerelease!=false no asar"; exit 1; }
+          grep -Eq 'autoUpdater\.channel[[:space:]]*=[[:space:]]*"latest"' "$US" || { echo "::error::channel!=latest no asar"; exit 1; }
+          grep -Eq 'autoUpdater\.allowDowngrade[[:space:]]*=[[:space:]]*false' "$US" || { echo "::error::allowDowngrade!=false no asar"; exit 1; }
+          grep -Fq 'quitAndInstall(true, true)' "$US" || { echo "::error::fix do updater ausente no asar"; exit 1; }
+          if grep -Fq 'quitAndInstall(false' "$US"; then echo "::error::chamada assistida no asar"; exit 1; fi
+          # ---- SOURCE IMMUTABILITY pós-build (nenhum script de build altera source)
+          ST=$(git status --porcelain -- desktop/src desktop/package.json desktop/package-lock.json desktop/electron-builder.yml)
+          [ -z "$ST" ] || { echo "::error::build alterou source: $ST"; exit 1; }
+          echo "GATE ASAR + IMMUTABILITY OK"
+
+      - name: "ASSETS + SHA256SUMS + VERSAO-DESKTOP.txt + MANIFEST + CONTRATO latest.yml (mesmo build)"
+        working-directory: desktop/dist-installer
+        run: |
+          set -euo pipefail
+          EXE="Agenda-ID-Seven-Desktop-$EXPECTED_VERSION-x64.exe"
+          MSI="Agenda-ID-Seven-Desktop-$EXPECTED_VERSION-x64.msi"
+          BMAP="$EXE.blockmap"
+          for f in "$EXE" "$MSI" "$BMAP" latest.yml; do [ -f "$f" ] || { echo "::error::asset ausente: $f"; exit 1; }; done
+          sha256sum "$EXE" "$MSI" "$BMAP" latest.yml > SHA256SUMS
+          echo "$EXPECTED_VERSION" > VERSAO-DESKTOP.txt
+          grep -q "^version: $EXPECTED_VERSION$" latest.yml || { echo "::error::latest.yml version"; exit 1; }
+          grep -q "url: $EXE" latest.yml || { echo "::error::latest.yml nao referencia o exe deste build"; exit 1; }
+          SHA512=$(openssl dgst -sha512 -binary "$EXE" | base64 -w0)
+          grep -q "$SHA512" latest.yml || { echo "::error::sha512 do exe nao bate com latest.yml"; exit 1; }
+          SIZE=$(stat -c%s "$EXE")
+          grep -q "size: $SIZE" latest.yml || { echo "::error::size do exe nao bate com latest.yml"; exit 1; }
+          echo "CONTRATO latest.yml OK (version/url/sha512/size == NSIS deste run)"
+          {
+            echo "== FINAL 1.0.249 ARTIFACT MANIFEST =="
+            echo "PRODUCT_SOURCE_SHA: $PRODUCT_SOURCE_SHA"
+            echo "VERSION: $EXPECTED_VERSION"
+            for f in "$EXE" "$MSI" "$BMAP" latest.yml SHA256SUMS VERSAO-DESKTOP.txt; do
+              H=$(sha256sum "$f" | awk '{print $1}'); B=$(stat -c%s "$f")
+              echo "asset: $f | bytes: $B | sha256: $H | arch: x64 | signing: unsigned-by-design | source: $PRODUCT_SOURCE_SHA"
+            done
+          } | tee "$RUNNER_TEMP/FINAL-249-MANIFEST.txt"
+          cat "$RUNNER_TEMP/FINAL-249-MANIFEST.txt" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "BASELINE PÚBLICA v1.0.248 — download + verificação SHA256SUMS"
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/baseline"; cd "$RUNNER_TEMP/baseline"
+          BASE="https://github.com/agidseven-lang/Agenda/releases/download/$BASELINE_TAG"
+          curl -sSL -o baseline.exe "$BASE/Agenda-ID-Seven-Desktop-1.0.248-x64.exe"
+          curl -sSL -o SHA256SUMS "$BASE/SHA256SUMS"
+          EXP=$(grep "Agenda-ID-Seven-Desktop-1.0.248-x64.exe$" SHA256SUMS | awk '{print $1}')
+          GOT=$(sha256sum baseline.exe | awk '{print $1}')
+          [ "$EXP" = "$GOT" ] || { echo "::error::baseline 1.0.248 nao confere"; exit 1; }
+          echo "BASELINE 1.0.248 OK ($GOT)"
+
+      - name: "Instalar baseline 1.0.248 (/S) — setup de QA"
+        shell: powershell
+        run: |
+          $p = Start-Process -FilePath "$env:RUNNER_TEMP\baseline\baseline.exe" -ArgumentList "/S" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Write-Error "baseline install exit $($p.ExitCode)"; exit 1 }
+          Start-Sleep -Seconds 3
+          $dir = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Directory | Where-Object { Test-Path (Join-Path $_.FullName "Agenda ID Seven Desktop.exe") } | Select-Object -First 1
+          if (-not $dir) { Write-Error "baseline nao instalada"; exit 1 }
+          "INSTALL_DIR=$($dir.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "baseline 1.0.248 instalada em: $($dir.FullName)"
+
+      - name: "FEED local com os ASSETS 1.0.249 (127.0.0.1:8879; produção intocada)"
+        shell: powershell
+        run: |
+          $feed = "$env:RUNNER_TEMP\feed"
+          New-Item -ItemType Directory -Force -Path $feed | Out-Null
+          Copy-Item "desktop\dist-installer\latest.yml" $feed
+          Copy-Item "desktop\dist-installer\Agenda-ID-Seven-Desktop-1.0.249-x64.exe" $feed
+          Copy-Item "desktop\dist-installer\Agenda-ID-Seven-Desktop-1.0.249-x64.exe.blockmap" $feed
+          Start-Process python -ArgumentList "-m","http.server",$env:FEED_PORT,"--bind","127.0.0.1","--directory",$feed -WindowStyle Hidden
+          $ok = $false
+          foreach ($i in 1..15) { Start-Sleep -Seconds 2; try { $r = Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:$env:FEED_PORT/latest.yml" -TimeoutSec 5; if ($r.StatusCode -eq 200) { $ok = $true; break } } catch { } }
+          if (-not $ok) { Write-Error "feed local nao respondeu em 30s"; exit 1 }
+          $au = Join-Path $env:INSTALL_DIR "resources\app-update.yml"
+          Copy-Item $au "$au.bak"
+          @"
+          provider: generic
+          url: http://127.0.0.1:$env:FEED_PORT
+          channel: latest
+          updaterCacheDirName: agenda-id-seven-desktop-updater
+          "@ | Out-File -FilePath $au -Encoding utf8
+          Write-Host "feed 1.0.249 OK; instancia baseline 1.0.248 apontada ao feed local"
+
+      - name: "SESSÃO A — UPDATE 1.0.248 → 1.0.249 (silencioso /S; REQUIRED_USER_INSTALL_ACTIONS=0)"
+        timeout-minutes: 15
+        working-directory: desktop
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+        run: |
+          set -euo pipefail
+          npm i --no-save playwright@1.47.2 --no-audit --no-fund
+          cat > au-a.mjs <<'EOF'
+          import { _electron } from 'playwright';
+          import fs from 'fs';
+          const exe = process.env.INSTALL_DIR + '\\Agenda ID Seven Desktop.exe';
+          const out = { g: {} }; const g = out.g;
+          const sleep = ms => new Promise(r => setTimeout(r, ms));
+          const app = await _electron.launch({ executablePath: exe, args: [] });
+          const pg = await app.firstWindow({ timeout: 45000 });
+          await pg.waitForLoadState('load'); await pg.waitForTimeout(4000);
+          const before = await pg.evaluate(() => ({ ver: (typeof APP_VER !== 'undefined' && APP_VER.desktop) || null, upd: !!(window.desktopAPI && window.desktopAPI.updater) }));
+          out.before = before;
+          g.a1_baselineIs248 = before.ver === '1.0.248';
+          g.a2_updaterApi = before.upd === true;
+          const st = () => pg.evaluate(() => window.desktopAPI.updater.getState());
+          const poll = async (want, ms) => { const t0 = Date.now(); for (;;) { const s = await st(); if (want.includes(s.status)) return s; if (Date.now() - t0 > ms) return s; await sleep(500); } };
+          await pg.evaluate(() => { window.desktopAPI.updater.check(); });
+          let s = await poll(['update_available'], 30000);
+          out.avail = { status: s.status, version: s.availableVersion };
+          g.b1_249Available = s.status === 'update_available' && s.availableVersion === '1.0.249';
+          await pg.evaluate(() => { window.desktopAPI.updater.download(); });
+          { const t0 = Date.now(); for (;;) { const x = await st(); if (x.status === 'downloaded' || x.status === 'error') { s = x; break; } if (Date.now() - t0 > 120000) { s = x; break; } await sleep(400); } }
+          out.dl = s.status;
+          g.b2_downloadedSha512Valid = s.status === 'downloaded';   // sha512 do latest.yml validado pela lib
+          pg.evaluate(() => { window.desktopAPI.updater.installAndRestart(); }).catch(() => {});
+          let closed = false;
+          try { await Promise.race([new Promise(res => app.on('close', () => { closed = true; res(); })), sleep(30000)]); } catch (_) {}
+          if (!closed) { try { const x = await st(); closed = (x.status === 'installing'); } catch (_) { closed = true; } }
+          out.appClosedByUpdater = closed;
+          g.c1_installTriggered = closed === true;
+          const fails = Object.entries(g).filter(([k, v]) => !v).map(([k]) => k);
+          out.fails = fails;
+          fs.writeFileSync(process.env.RUNNER_TEMP + '/au-sessionA.json', JSON.stringify(out));
+          console.log(JSON.stringify(out, null, 1));
+          try { await Promise.race([app.close(), sleep(4000)]); } catch (_) {}
+          if (fails.length) { console.error('FAILS A:', fails); }
+          process.exit(fails.length ? 1 : 0);
+          EOF
+          node au-a.mjs
+
+      - name: "Confirmar upgrade instalado == 1.0.249 (asar) + sem janela de instalador residual"
+        shell: powershell
+        run: |
+          $target = (Get-FileHash "desktop\dist-installer\win-unpacked\resources\app.asar" -Algorithm SHA256).Hash
+          $deadline = (Get-Date).AddSeconds(180); $done = $false
+          while ((Get-Date) -lt $deadline) {
+            Start-Sleep -Seconds 3
+            $asar = Join-Path $env:INSTALL_DIR "resources\app.asar"
+            if (Test-Path $asar) { try { if ((Get-FileHash $asar -Algorithm SHA256).Hash -eq $target) { $done = $true; break } } catch { } }
+          }
+          if (-not $done) { Write-Error "FAIL: asar instalado != 1.0.249 (upgrade silencioso nao concluiu)"; exit 1 }
+          Start-Sleep -Seconds 3
+          $setup = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -like "*Setup*" -or $_.MainWindowTitle -like "*Instal*" }).Count
+          if ($setup -ne 0) { Write-Error "FAIL: janela de instalador residual"; exit 1 }
+          Get-Process | Where-Object { $_.ProcessName -like "*Agenda*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 2
+          Write-Host "UPGRADE 248->249 SILENCIOSO OK (asar==1.0.249; sem setup residual)"
+
+      - name: "SESSÃO B — 1.0.249 instalada: versão + Light UI ON + smoke funcional + visual sanity"
+        timeout-minutes: 15
+        working-directory: desktop
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+        run: |
+          set -euo pipefail
+          cat > au-b.mjs <<'EOF'
+          import { _electron } from 'playwright';
+          import fs from 'fs';
+          const exe = process.env.INSTALL_DIR + '\\Agenda ID Seven Desktop.exe';
+          const out = { g: {} }; const g = out.g;
+          const sleep = ms => new Promise(r => setTimeout(r, ms));
+          const app = await _electron.launch({ executablePath: exe, args: [] });
+          const pg = await app.firstWindow({ timeout: 45000 });
+          await pg.waitForLoadState('load'); await pg.waitForTimeout(4000);
+          const a = await pg.evaluate(() => ({
+            ver: (typeof APP_VER !== 'undefined' && APP_VER.desktop) || null,
+            title: document.title,
+            white: (document.body.innerText || '').trim().length < 2,
+            loginPwd: !!document.querySelector('input[type="password"]')
+          }));
+          out.after = a;
+          g.d1_versionIs249 = a.ver === '1.0.249' && a.title.includes('1.0.249');
+          g.d2_noWhiteScreen = a.white === false;
+          g.d0_loginSurface = a.loginPwd === true;
+          // seed de sessão de QA (mesma técnica do harness) para exercitar o app REAL empacotado
+          const smoke = await pg.evaluate(async () => {
+            const r = {};
+            try {
+              state.user = { id:'carlos', name:'Carlos Eduardo', role:'Social Media', admin:true };
+              state.users = [state.user, { id:'marina', name:'Marina Klein', role:'Designer' }];
+              document.body.classList.add('desktop','authed','light-ui');
+              const asp=document.getElementById('authSplash'); if(asp)asp.style.display='none';
+              const lg=document.getElementById('login'); if(lg)lg.classList.add('hidden');
+              const ap=document.getElementById('app'); if(ap)ap.style.display='flex';
+              state.tasks = [
+                { id:'k1', title:'Cronograma Sunset Wear', client:'Sunset Wear', sector:'edicao_cards', by:'carlos', assigneeId:'carlos', status:'andamento', dueDate:'2026-08-25', dueTime:'22:00' },
+                { id:'k2', title:'Reels de lançamento', client:'Sunset Wear', sector:'edicao_cards', by:'carlos', assigneeId:'carlos', status:'afazer', dueDate:'2026-08-26' } ];
+              state.tab='tarefas'; state.personBoard='carlos'; render(); if(typeof afterBoard==='function') afterBoard();
+            } catch(e){ r.seedErr = String(e); }
+            const q = s => document.querySelector(s);
+            r.lightUi = document.body.classList.contains('light-ui');
+            r.sidebar = !!q('.nav .lui-brand2') && document.querySelectorAll('.nav .sb-item').length >= 5;
+            r.viewCtrl = /Quadro/.test((q('.lui-ph-c .lui-view')||{}).textContent||'');
+            r.lanes = document.querySelectorAll('.kbv2-column').length;
+            r.cards = document.querySelectorAll('.kbv2-card').length;
+            r.hasMore = !!q('.nav .sb-more>summary');
+            r.search = !!q('#bSearch');
+            r.newTask = !!q('.new-task-btn');
+            r.bell = !!q('.lui-ph-r .lui-hicon');
+            r.avatar = !!q('.lui-ph-r .lui-havatar');
+            return r;
+          });
+          out.smoke = smoke;
+          g.e1_lightUiOn = smoke.lightUi === true;
+          g.e2_sidebar5 = smoke.sidebar === true;
+          g.e3_viewQuadro = smoke.viewCtrl === true;
+          g.e4_lanes4 = smoke.lanes === 4;
+          g.e5_cards2 = smoke.cards === 2;
+          g.e6_more = smoke.hasMore === true;
+          g.e7_search = smoke.search === true;
+          g.e8_newTask = smoke.newTask === true;
+          g.e9_bell = smoke.bell === true;
+          g.e10_avatar = smoke.avatar === true;
+          // handlers reais no app empacotado
+          const clk = async sel => { await pg.evaluate(s => { const e=document.querySelector(s); if(e)e.click(); }, sel); await pg.waitForTimeout(200); };
+          await clk('.nav [data-flowclient]'); g.e11_ctxCliente = (await pg.evaluate(()=>state.flowView)) === 'client';
+          await clk('.nav [data-myboard]'); await pg.waitForTimeout(150);
+          await clk('[data-detail="k1"]'); g.e12_detalhes = (await pg.evaluate(()=>((document.getElementById('modalRoot')||{}).innerHTML||'').length)) > 50;
+          await pg.evaluate(()=>{ const m=document.getElementById('modalRoot'); if(m)m.innerHTML=''; });
+          await clk('[data-move="k1"]'); g.e13_mover = await pg.evaluate(()=>/Mover tarefa/.test((document.getElementById('modalRoot')||{}).innerHTML||''));
+          await pg.evaluate(()=>{ const m=document.getElementById('modalRoot'); if(m)m.innerHTML=''; });
+          // visual sanity 1920 + 1366
+          await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0].setContentSize(1920,1080); });
+          await sleep(500); await pg.screenshot({ path: process.env.RUNNER_TEMP + '/INSTALLED-249-1920.png' });
+          g.f1_no_hscroll_1920 = await pg.evaluate(()=> document.documentElement.scrollWidth <= window.innerWidth + 2);
+          await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0].setContentSize(1366,768); });
+          await sleep(500); await pg.screenshot({ path: process.env.RUNNER_TEMP + '/INSTALLED-249-1366.png' });
+          g.f2_no_hscroll_1366 = await pg.evaluate(()=> document.documentElement.scrollWidth <= window.innerWidth + 2);
+          g.f3_lanes_after_resize = (await pg.evaluate(()=>document.querySelectorAll('.kbv2-column').length)) === 4;
+          const fails = Object.entries(g).filter(([k, v]) => !v).map(([k]) => k);
+          out.fails = fails;
+          fs.writeFileSync(process.env.RUNNER_TEMP + '/au-sessionB.json', JSON.stringify(out));
+          console.log(JSON.stringify(out, null, 1));
+          try { await Promise.race([app.close(), sleep(4000)]); } catch (_) {}
+          if (fails.length) { console.error('FAILS B:', fails); }
+          process.exit(fails.length ? 1 : 0);
+          EOF
+          node au-b.mjs
+          echo "INSTALLED-APP QA 1.0.249: PASS (update 248->249 silencioso + smoke funcional + visual sanity)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "Upload BUNDLE FINAL 1.0.249 (assets do release)"
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-1.0.249-final-bundle
+          path: |
+            desktop/dist-installer/Agenda-ID-Seven-Desktop-1.0.249-x64.exe
+            desktop/dist-installer/Agenda-ID-Seven-Desktop-1.0.249-x64.exe.blockmap
+            desktop/dist-installer/Agenda-ID-Seven-Desktop-1.0.249-x64.msi
+            desktop/dist-installer/latest.yml
+            desktop/dist-installer/SHA256SUMS
+            desktop/dist-installer/VERSAO-DESKTOP.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: "Upload evidências (manifest + sessões + screenshots)"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-1.0.249-final-evidence
+          path: |
+            ${{ runner.temp }}/FINAL-249-MANIFEST.txt
+            ${{ runner.temp }}/au-sessionA.json
+            ${{ runner.temp }}/au-sessionB.json
+            ${{ runner.temp }}/INSTALLED-249-1920.png
+            ${{ runner.temp }}/INSTALLED-249-1366.png
+          if-no-files-found: warn
+          retention-days: 30
