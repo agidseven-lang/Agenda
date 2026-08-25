@@ -261,6 +261,11 @@ jobs:
           const app = await _electron.launch({ executablePath: exe, args: [] });
           const pg = await app.firstWindow({ timeout: 45000 });
           await pg.waitForLoadState('load'); await pg.waitForTimeout(4000);
+          // DESKTOP VIEWPORT ANTES do seed: isDesktop()=IS_ELECTRON_APP(=!!window.api)||matchMedia('(min-width:1024px)').
+          // O app expõe window.desktopAPI (não window.api) ⇒ IS_ELECTRON_APP=false ⇒ isDesktop() depende da largura;
+          // a SIDEBAR é desktop-gated no render(). Redimensiona p/ 1920x1080 (condição real do desktop elegível ≥1024).
+          try { await app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows()[0]; if (w) { w.setContentSize(1920, 1080); } }); } catch (_) {}
+          await pg.waitForTimeout(800);
           const a = await pg.evaluate(() => ({
             ver: (typeof APP_VER !== 'undefined' && APP_VER.desktop) || null,
             title: document.title,
@@ -297,6 +302,9 @@ jobs:
             r.newTask = !!q('.new-task-btn');
             r.bell = !!q('.lui-ph-r .lui-hicon');
             r.avatar = !!q('.lui-ph-r .lui-havatar');
+            r.isDesktop = (typeof isDesktop === 'function' ? isDesktop() : null);
+            r.innerW = window.innerWidth;
+            r.navChildren = (document.getElementById('bottomNav') || {}).childElementCount || 0;
             return r;
           });
           out.smoke = smoke;
