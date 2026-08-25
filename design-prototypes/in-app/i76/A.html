@@ -33,7 +33,7 @@
   .brand{display:flex; align-items:center; gap:11px; padding:2px 6px 8px}
   .logo{width:34px; height:34px; border-radius:9px; background:linear-gradient(150deg,#2DD4BF,#0D9488); display:grid; place-items:center; color:#062a2a; font-weight:800; font-size:17px; box-shadow:0 4px 10px rgba(13,148,136,.35)}
   .brand .wm{display:flex; flex-direction:column; line-height:1}
-  .brand .wm b{color:#fff; font-size:15px; font-weight:800; letter-spacing:-.01em}
+  .brand .wm b{color:#fff; font-size:15px; font-weight:700; letter-spacing:-.01em}
   .brand .wm span{color:rgba(255,255,255,.5); font-size:8.5px; font-weight:700; letter-spacing:.16em; margin-top:3px}
   .newtask{margin-top:2px; display:flex; align-items:center; justify-content:center; gap:8px; height:39px; border-radius:10px; color:#fff; font-size:13px; font-weight:700; background:linear-gradient(180deg,#0FA093,#0C857A); box-shadow:0 6px 16px rgba(13,148,136,.30), inset 0 1px 0 rgba(255,255,255,.18)}
   .navlabel{color:rgba(255,255,255,.36); font-size:9.5px; font-weight:700; letter-spacing:.13em; padding:12px 6px 4px}
@@ -55,13 +55,13 @@
   .main{display:flex; flex-direction:column; min-width:0; background:var(--s-work)}
   .hd{height:60px; flex:0 0 60px; display:flex; align-items:center; justify-content:space-between; padding:0 24px; gap:20px; background:#F3F7FB; border-bottom:1px solid var(--line)}
   .ctx{display:flex; flex-direction:column; gap:2px}
-  .ctx b{font-size:16.5px; font-weight:800; letter-spacing:-.012em}
+  .ctx b{font-size:16.5px; font-weight:700; letter-spacing:-.011em}
   .ctx span{font-size:11.5px; font-weight:500; color:var(--ink3)}
   .vtabs{display:flex; gap:2px; padding:3px; border-radius:10px; background:var(--s-app)}
   .vtab{padding:6px 15px; border-radius:8px; font-size:12.5px; font-weight:500; color:var(--ink3)}
   .vtab.on{background:#fff; color:var(--ink); font-weight:600; box-shadow:0 1px 2px rgba(15,42,60,.10)}
   .hact{display:flex; align-items:center; gap:12px}
-  .search{display:flex; align-items:center; gap:9px; width:236px; height:36px; padding:0 12px; border-radius:9px; background:#fff; border:1px solid var(--line); color:var(--ink3); font-size:12.5px}
+  .search{display:flex; align-items:center; gap:9px; width:236px; height:36px; padding:0 12px; border-radius:9px; background:#fff; border:1px solid var(--line); color:var(--ink3); font-size:12.5px; white-space:nowrap; overflow:hidden}
   .search svg{width:16px; height:16px; stroke:var(--ink3); stroke-width:2; fill:none}
   .iconbtn{width:36px; height:36px; border-radius:9px; background:#fff; border:1px solid var(--line); display:grid; place-items:center; position:relative}
   .iconbtn svg{width:18px; height:18px; stroke:var(--ink2); stroke-width:2; fill:none}
@@ -78,7 +78,7 @@
   .kpis{display:flex; align-items:center; gap:8px}
   .kpi{display:flex; align-items:center; gap:8px; height:34px; padding:0 13px; border-radius:9px; background:#fff; border:1px solid var(--line)}
   .kpi .kd{width:8px; height:8px; border-radius:50%}
-  .kpi b{font-size:13.5px; font-weight:800}
+  .kpi b{font-size:13.5px; font-weight:700}
   .kpi span{font-size:11.5px; font-weight:500; color:var(--ink3)}
   .kpi.sla{background:var(--teal-bg); border-color:transparent; color:var(--teal-d); font-weight:600; font-size:11.5px; gap:7px}
 
@@ -93,17 +93,22 @@
     box-shadow:0 1px 2px rgba(15,42,60,.05), 0 6px 16px rgba(15,42,60,.05)}
   .colhd{display:flex; align-items:center; gap:9px; padding:2px 4px 12px; margin-bottom:2px; border-bottom:1px solid var(--line)}
   .cdot{width:9px; height:9px; border-radius:50%}
-  .colhd b{font-size:13px; font-weight:800; color:var(--ink); letter-spacing:-.005em}
+  .colhd b{font-size:13px; font-weight:700; color:var(--ink); letter-spacing:-.005em}
   .ccount{margin-left:auto; font-size:11px; font-weight:700; color:var(--ink3); background:#fff; border:1px solid var(--line); border-radius:8px; padding:2px 8px}
   .colbody{display:flex; flex-direction:column; gap:11px; padding-top:11px}
-  .add{display:flex; align-items:center; justify-content:center; gap:6px; height:38px; padding:0 10px; border-radius:11px; color:var(--ink3); font-size:12px; font-weight:600; border:1px dashed var(--line2); background:rgba(255,255,255,.5); margin-top:11px}
+  .add{display:flex; align-items:center; justify-content:center; gap:6px; height:38px; padding:0 10px; border-radius:11px; color:var(--ink3); font-size:12px; font-weight:600; border:1px dashed var(--line2); background:rgba(255,255,255,.5); margin-top:11px; cursor:pointer; transition:background .16s ease, color .16s ease, border-color .16s ease}
+  .add:hover{background:#fff; color:var(--teal-d); border-color:var(--teal)}
   .add svg{width:15px; height:15px; stroke:var(--ink3); stroke-width:2; fill:none}
+  .add:hover svg{stroke:var(--teal-d)}
   .drop{flex:1; min-height:56px; margin-top:11px; border-radius:12px; border:1px dashed #DCE4EC;
     background:rgba(255,255,255,.30); display:flex; align-items:center; justify-content:center}
   .drop > span{font-size:10.5px; font-weight:600; color:#AEB9C9; letter-spacing:.02em}
 
   /* task card — larger & more legible for kanban-centric */
-  .card{position:relative; background:var(--s-card); border:1px solid var(--line); border-radius:13px; padding:15px 16px 14px 17px; box-shadow:var(--e1); overflow:hidden}
+  .card{position:relative; background:var(--s-card); border:1px solid var(--line); border-radius:13px; padding:15px 16px 14px 17px; box-shadow:var(--e1); overflow:hidden; transition:box-shadow .16s ease, transform .16s ease, border-color .16s ease}
+  .card:hover{box-shadow:var(--e2); transform:translateY(-1px); border-color:var(--line2)}
+  .card:focus-visible{outline:2px solid var(--teal); outline-offset:2px}
+  .card.dragging{opacity:.92; box-shadow:0 14px 30px rgba(15,42,60,.18); transform:rotate(1.2deg) scale(1.01)}
   .card::before{content:""; position:absolute; left:0; top:0; bottom:0; width:3px; border-top-left-radius:13px; border-bottom-left-radius:13px}
   .card.k-todo::before{background:var(--todo)} .card.k-doing::before{background:var(--doing)}
   .crow{display:flex; align-items:center; justify-content:space-between; margin-bottom:7px}
@@ -111,7 +116,7 @@
   .cchip{display:inline-flex; align-items:center; height:20px; padding:0 8px; border-radius:8px; font-size:10px; font-weight:700}
   .cchip.todo{background:var(--todo-bg); color:var(--todo-tx)}
   .cchip.doing{background:var(--doing-bg); color:var(--doing-tx)}
-  .ctitle{font-size:15px; font-weight:800; letter-spacing:-.01em; line-height:1.32; margin-bottom:11px}
+  .ctitle{font-size:15px; font-weight:700; letter-spacing:-.011em; line-height:1.32; margin-bottom:11px}
   .prog{height:6px; border-radius:3px; background:var(--s-board); overflow:hidden; margin:11px 0}
   .prog i{display:block; height:100%; border-radius:3px; background:linear-gradient(90deg,#F59E0B,#F97316)}
   .cfoot{display:flex; align-items:center; justify-content:space-between; margin-top:11px; padding-top:11px; border-top:1px solid var(--line)}
@@ -119,19 +124,36 @@
   .cmeta svg{width:13px; height:13px; stroke:var(--ink3); stroke-width:2; fill:none}
   .cav{width:24px; height:24px; border-radius:50%; background:linear-gradient(150deg,#14B8A6,#0D9488); display:grid; place-items:center; color:#fff; font-weight:800; font-size:9.5px}
 
-  /* empty state — lives inside the receptive drop zone (purposeful, not a floating void) */
-  .empty{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:7px; text-align:center; color:var(--ink3)}
-  .empty svg{width:26px; height:26px; stroke:var(--ink4); stroke-width:1.6; fill:none}
-  .empty b{font-size:12px; font-weight:600; color:var(--ink3)}
-  .empty span{font-size:10.5px; font-weight:500; color:var(--ink4)}
+  /* empty state — quiet single line inside the receptive drop zone (never shouting) */
+  .empty{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; text-align:center; color:var(--ink4)}
+  .empty svg{width:21px; height:21px; stroke:var(--ink4); stroke-width:1.6; fill:none; opacity:.85}
+  .empty b{font-size:11.5px; font-weight:500; color:var(--ink3)}
 
-  /* responsive */
+  /* responsive — same interface at every width; controlled compaction only */
+  @media (max-width:1560px){
+    .app{grid-template-columns:236px 1fr}
+    .search{width:196px}
+    .kpi{padding:0 11px}
+    .board{margin:0 20px 18px}
+    .hd,.tb{padding-left:20px; padding-right:20px}
+  }
   @media (max-width:1400px){
-    .app{grid-template-columns:232px 1fr}
+    .app{grid-template-columns:224px 1fr}
+    .search{width:172px}
+    .vtab{padding:6px 13px}
+    .chip{padding:0 10px 0 8px}
+    .kpi{padding:0 10px; gap:7px}
+    .kpi span{font-size:11px}
+    .kpis{gap:7px}
+    .tbl{gap:8px}
+    .board{gap:13px; margin:0 16px 16px; padding:13px}
+    .col{padding:14px 13px 12px}
+    .hd,.tb{padding-left:16px; padding-right:16px}
+  }
+  @media (max-width:1240px){
     .search{width:150px}
     .kpi span{display:none}
-    .board{gap:12px; margin:0 18px 16px; padding:14px}
-    .hd,.tb{padding-left:18px; padding-right:18px}
+    .kpi{padding:0 9px}
   }
 </style>
 
@@ -210,13 +232,13 @@
       <div class="col">
         <div class="colhd"><span class="cdot" style="background:var(--review)"></span><b>Revisão</b><span class="ccount">0</span></div>
         <div class="add"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Adicionar tarefa</div>
-        <div class="drop"><div class="empty"><svg viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.4 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.4-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.8 1.1z"/></svg><b>Sem tarefas em revisão</b><span>Aprovações entram aqui</span></div></div>
+        <div class="drop"><div class="empty"><svg viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.4 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.4-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.8 1.1z"/></svg><b>Sem tarefas em revisão</b></div></div>
       </div>
 
       <div class="col">
         <div class="colhd"><span class="cdot" style="background:var(--done)"></span><b>Finalizado</b><span class="ccount">0</span></div>
         <div class="add"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Adicionar tarefa</div>
-        <div class="drop"><div class="empty"><svg viewBox="0 0 24 24"><path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><b>Nada concluído ainda</b><span>Entregas aprovadas aparecem aqui</span></div></div>
+        <div class="drop"><div class="empty"><svg viewBox="0 0 24 24"><path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><b>Nada concluído ainda</b></div></div>
       </div>
     </section>
   </div>
