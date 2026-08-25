@@ -6,8 +6,8 @@
  *   "Agenda ID Seven — A Kanban Golden (I7.6.1)"
  *
  * ESTADO: a formalização via use_figma está BLOQUEADA pela cota mensal do plano
- * Starter/View (20 chamadas/mês, esgotada). Rode este seed quando a cota resetar
- * OU em sessão com seat Dev/Full. NÃO fazer upgrade pago (proibido pela política zero-cost).
+ * Starter/Free (esgotada). Rota autorizada ÚNICA: rodar este seed quando a cota mensal
+ * do plano gratuito resetar. NÃO fazer upgrade pago, NÃO usar Dev/Full seat, sem custo (R$0).
  *
  * AUTORIDADE DE SPEC: design-prototypes/in-app/i76/A.html (Golden validado, 3 resoluções).
  * Este seed constrói o SHELL + SIDEBAR com auto-layout responsivo. As seções restantes

@@ -4,6 +4,13 @@
 > A é a **source of truth** da tela **Meu quadro**. Esta decisão sobrescreve interpretações anteriores.
 > Premium Score é ferramenta de QA; **a autoridade final de direção é o OWNER.**
 
+> **CHECKPOINT — OWNER REVIEW I7.6.1 (por escrito):**
+> `A GOLDEN VISUAL/SPEC = APPROVED` — `A-GOLDEN-1920 = APPROVED` · `A-GOLDEN-WIN125 = APPROVED` · `A-GOLDEN-1366 = APPROVED`.
+> **FREEZE VISUAL:** nenhuma alteração cosmética a mais no `A.html`; não perseguir Premium Score (91/100 **não** é blocker). Commit de referência do checkpoint: **`473f716f`**.
+> **Correção de status obrigatória — NÃO registrar "A FIGMA GOLDEN = APPROVED":**
+> `FIGMA FILE CREATED = YES` · `FIGMA CANVAS BUILT = NO` · `FIGMA RE-READ = NO` · `FIGMA GOLDEN = PENDING` · `FIGMA GOLDEN APPROVAL = NO-GO`.
+> Estado final da etapa: `I7.6.1 A GOLDEN VISUAL/SPEC = APPROVED` · `I7.6.1 FIGMA FORMALIZATION = PENDING` · `I7.7 = NO-GO`.
+
 Laboratório visual isolado. **NÃO é produção.** Agenda 1.0.248 permanece FROZEN — renderer, PWA,
 backend, updater, workflows e tags intocados. Sem 1.0.249. Implementação (I7.7) = NO-GO.
 
@@ -96,9 +103,27 @@ tarefas — escolhida pelo OWNER. Não é defeito a corrigir (preencher o espaç
 - **BLOQUEIO real:** `use_figma` (a construção) retornou *"You've reached the Figma MCP tool call
   limit on the Starter plan."* — a **cota mensal de chamadas MCP do plano gratuito está esgotada**.
   Só `create_new_file`/`whoami` são isentas; a construção NÃO é isenta na prática.
-- **Zero-cost preservado:** NÃO foi feito upgrade pago (proibido). A formalização Figma fica
-  **preparada e pendente** do reset mensal da cota (ou de uma sessão com seat Dev/Full).
+- **Zero-cost preservado:** NÃO foi feito upgrade pago (proibido). **Rota autorizada única:**
+  aguardar o **reset mensal da cota do plano gratuito (Starter/Free)**. Sem Professional, sem
+  Dev/Full seat, sem upgrade, sem créditos, sem qualquer solução com custo. Sem reconstrução manual do owner.
 - **Autoridade de spec atual:** este **A GOLDEN (HTML)** — validado, 3 resoluções, Inter real —
   é a spec fiel que a formalização Figma vai espelhar quando a cota permitir.
 
+### Status corrigido pelo owner (I7.6.1) — NÃO registrar "A FIGMA GOLDEN = APPROVED"
+```
+FIGMA FILE CREATED    = YES   (AtRDxg4kwTYgaIfcjrjckT)
+FIGMA CANVAS BUILT    = NO
+FIGMA RE-READ         = NO
+FIGMA GOLDEN          = PENDING
+FIGMA GOLDEN APPROVAL = NO-GO
+```
+
+### FIGMA-FIRST — rota de formalização (executar quando o plano gratuito permitir de novo)
+1. usar o arquivo Figma já criado (`AtRDxg4kwTYgaIfcjrjckT`); 2. construir A **1:1** a partir do Golden
+aprovado; 3. não reinterpretar; 4. não redesenhar; 5. preservar arquitetura, proporções e sistema
+visual; 6. construir os frames `A-GOLDEN-1920` / `A-GOLDEN-WIN125` / `A-GOLDEN-1366`; 7. re-read real
+via MCP; 8. validar estrutura; 9. obter evidência visual; 10. apresentar como **A FIGMA GOLDEN
+CANDIDATE**. Só **depois** dessa evidência pode existir `A FIGMA GOLDEN = APPROVED`.
+
 `FIGMA_STARTER_MCP_QUOTA = EXHAUSTED (monthly)` · `FIGMA_CONNECTOR = ON` · `FIGMA_A_FILE = AtRDxg4kwTYgaIfcjrjckT`
+`I7.6.1 A GOLDEN VISUAL/SPEC = APPROVED` · `I7.6.1 FIGMA FORMALIZATION = PENDING` · `I7.7 = NO-GO`
