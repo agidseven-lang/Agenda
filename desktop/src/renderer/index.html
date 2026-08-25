@@ -4276,6 +4276,65 @@ body.light-ui.desktop .sb-footer.lui-foot2{padding:10px 12px 4px;font-size:10.5p
 /* A11) Header center = único controle real "Quadro" (proporção do A; sem view falsa) */
 body.light-ui.desktop .lui-view{display:inline-flex;align-items:center;gap:7px;height:30px;padding:6px 15px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--lui-tx-1);background:#fff;box-shadow:0 1px 2px rgba(15,42,60,.10)}
 body.light-ui.desktop .lui-view svg{width:15px;height:15px;stroke:var(--lui-tx-2)}
+
+/* ============================================================================
+   I7.7.3 — A GOLDEN MICRO-CRAFT PASS. Escopo: body.light-ui.desktop.
+   Refino cirúrgico dos 4 P2 (Brand · Mais · Card · Header "Quadro") contra a
+   referência IMUTÁVEL A.html @473f716f. SOMENTE craft visual (dimensões,
+   tipografia, superfície, densidade, alinhamento) — ZERO markup/handler/dado/
+   arquitetura. Vem por último no <head> ⇒ vence por ordem de origem. A
+   arquitetura aprovada em I7.7.2 permanece congelada. =========================== */
+
+/* ---- P2-B · BRAND lockup calibrado ao A GOLDEN (ref: .logo 34/rad9/17 · .wm 15/8.5) ---- */
+body.light-ui.desktop .nav .sb-brand.lui-brand2{gap:11px;padding:20px 8px 12px}
+body.light-ui.desktop .nav .lui-brand2 .logo.sm.brandlogo{width:34px;height:34px;border-radius:9px;box-shadow:0 4px 10px rgba(13,148,136,.35),inset 0 1px 0 rgba(255,255,255,.22)}
+body.light-ui.desktop .nav .sb-brand .logo.sm.brandlogo::after{font-size:17px}
+body.light-ui.desktop .lui-wm-a{font-size:15px;color:#FFFFFF;letter-spacing:-.01em}
+body.light-ui.desktop .lui-wm-b{font-size:8.5px;letter-spacing:.16em;margin-top:3px;color:rgba(255,255,255,.5)}
+/* micro-status de sincronização = SECUNDÁRIO (não compete com Agenda/ID SEVEN): menor, sem halo */
+body.light-ui.desktop .lui-sync{width:12px;height:12px;opacity:.9}
+body.light-ui.desktop .lui-sync .dot{width:6px;height:6px;background:#2FB98E;box-shadow:none}
+
+/* ---- P2-A · "MAIS" disclosure = peer discreto dos itens de nav (não 2ª sidebar) ----
+   Casa a geometria real do .sb-item (gap10/pad0-10/rad10/svg17/12.5) mantendo cor
+   secundária; lista aberta compacta + trilho de aninhamento sutil. */
+body.light-ui.desktop .sb-more>summary{height:38px;gap:10px;padding:0 10px;border-radius:10px;font-size:12.5px;font-weight:600;color:var(--lui-sb-dim)}
+body.light-ui.desktop .sb-more>summary span{font-size:12.5px;font-weight:600}
+body.light-ui.desktop .sb-more>summary svg{width:17px;height:17px;color:var(--lui-sb-dim)}
+body.light-ui.desktop .sb-more>summary:hover{background:rgba(255,255,255,.05);color:#EAF1F2}
+body.light-ui.desktop .sb-more>summary:hover svg{color:#EAF1F2}
+body.light-ui.desktop .sb-more>summary::after{width:6px;height:6px;opacity:.6}
+body.light-ui.desktop .sb-more[open]>summary{color:#EAF1F2}
+body.light-ui.desktop .sb-more[open]>summary svg{color:#EAF1F2}
+body.light-ui.desktop .sb-more-list{gap:1px;padding:2px 0 2px 11px;margin:2px 0 0 9px;border-left:1px solid rgba(255,255,255,.08)}
+body.light-ui.desktop .sb-more-list button.sb-item{height:32px}
+body.light-ui.desktop .sb-more-list button.sb-item svg{width:16px !important;height:16px !important;opacity:.92}
+body.light-ui.desktop .sb-more-list button.sb-item span{font-size:12px !important;font-weight:500 !important}
+
+/* ---- P2-C · TASK CARD craft → linguagem A GOLDEN. Estrutura/slots/dados/ordem
+   PRESERVADOS (apenas acabamento). Ref: .card branco + hairline frio + radius 13 +
+   sombra e1 + lift no hover; título 15/700/-.011em/1.32; chip proporção 8/10. ---- */
+body.light-ui.desktop .kbv2-card{padding:15px 16px 14px 17px;gap:10px;border-radius:13px;border:1px solid #DCE3EC;box-shadow:0 1px 2px rgba(15,42,60,.05);transition:box-shadow .16s ease,transform .16s ease,border-color .16s ease}
+body.light-ui.desktop .kbv2-card:hover{box-shadow:0 1px 2px rgba(15,42,60,.05),0 8px 20px rgba(15,42,60,.07);transform:translateY(-1px);border-color:#CBD5E3}
+/* barra de acento à ESQUERDA (assinatura A GOLDEN), na cor do status (--kacc) — presentation-only */
+body.light-ui.desktop .kbv2-card::before{display:block;content:"";position:absolute;left:0;top:0;bottom:0;right:auto;width:3px;height:auto;border-radius:13px 0 0 13px;background:var(--kacc,#98A0AE);opacity:.9}
+body.light-ui.desktop .kbv2-title{font-size:15px;font-weight:700;line-height:1.32;letter-spacing:-.011em}
+body.light-ui.desktop .kbv2-card-chips .kbv2-chip:first-child{font-size:10px;letter-spacing:.06em;padding:3px 9px;border-radius:8px}
+body.light-ui.desktop .kbv2-tier{font-size:13px;font-weight:600}
+body.light-ui.desktop .kbv2-tier::before{font-size:10.5px;letter-spacing:.02em}
+body.light-ui.desktop .kbv2-card-date{font-size:12px}
+/* avatar do responsável: 24 + anel limpo (gap 1.5px na cor da superfície, ref micro-craft) */
+body.light-ui.desktop .kbv2-av .av{box-shadow:0 0 0 1.5px var(--lui-surface),0 0 0 3px var(--kresp,#C7CCD6) !important}
+/* progresso: trilho um pouco mais presente (ref ~6px), extremidades arredondadas, cor da coluna */
+body.light-ui.desktop .kbv2-card-rail i{height:5px}
+
+/* ---- P2-D · Header view control "Quadro" = segmented single-state (ref .vtabs/.vtab.on).
+   Track = superfície app do A (#E7EDF3, sem borda); pill ativa branca com sombra. Verdade
+   funcional preservada: existe SÓ a view real "Quadro" (sem Timeline/Lista falsas). ---- */
+body.light-ui.desktop .lui-ph-c{background:#E7EDF3;border-color:transparent;padding:3px}
+body.light-ui.desktop .lui-view{padding:6px 15px;border-radius:8px;font-size:12.5px;font-weight:600}
+/* ref = segmento text-only "Quadro"; o glifo 'grid' do produto renderiza como aperture ⇒ oculto (verdade funcional intacta: nada de views falsas) */
+body.light-ui.desktop .lui-view svg{display:none}
 </style>
 </head>
 <body>
