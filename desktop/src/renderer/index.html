@@ -4136,6 +4136,59 @@ body.light-ui.desktop .pr-sheet .btn:focus-visible,
 body.light-ui.desktop .pr-sheet .sp-x:focus-visible,
 body.light-ui.desktop .pr-sheet .pr-thumb-x:focus-visible{outline:2px solid #4353D8;outline-offset:2px}
 </style>
+<style id="i77-a-golden">
+/* ============================================================================
+   I7.7 — A GOLDEN implementation (tela "Meu quadro"). Escopo: body.light-ui.desktop.
+   Referência IMUTÁVEL: design-prototypes/in-app/i76/A.html @ commit 473f716f.
+   VISUAL/UX apenas — zero handler, zero markup funcional, zero mudança de lógica.
+   Colocado por ÚLTIMO no <head> para vencer por ordem de origem (mesma especificidade).
+   ============================================================================ */
+/* A1) Acento de marca → TEAL (assinatura do A GOLDEN). Retinta tokens (supersede o CTA
+   #3B5CF9→#E604AE). Propaga o brand teal ao shell compartilhado; funcionalmente inerte. */
+body.light-ui{
+  --lui-brand:#14B8A6; --lui-brand-ink:#0E7369;
+  --lui-focus:#0D9488; --lui-focus-halo:rgba(13,148,136,.14);
+  --lui-grad:linear-gradient(180deg,#0FA093,#0C857A);
+  --lui-grad-shadow:0 6px 16px rgba(13,148,136,.30);
+}
+body.light-ui.desktop .nav .new-task-btn{box-shadow:0 6px 16px rgba(13,148,136,.30),inset 0 1px 0 rgba(255,255,255,.18)}
+body.light-ui.desktop .nav .new-task-btn:hover{box-shadow:0 10px 24px rgba(13,148,136,.38)}
+body.light-ui.desktop .nav .sb-brand .logo.sm{box-shadow:0 8px 20px rgba(13,148,136,.38),inset 0 1px 0 rgba(255,255,255,.24)}
+body.light-ui.desktop .nav button.sb-item.on::before{background:linear-gradient(180deg,#5EEAD4,#0D9488)}
+body.light-ui.desktop .nav button.sb-item.on svg{color:#5EEAD4}
+
+/* A2) Palco do Kanban = canvas de trabalho + lanes contidas (A GOLDEN). */
+body.light-ui.desktop .kbv2-board-surface{
+  background:
+    radial-gradient(circle at 1px 1px, rgba(15,42,60,.05) 1px, transparent 0) 0 0/22px 22px,
+    linear-gradient(180deg,#DFE6EF,#D8E1EB);
+  border:1px solid #DCE3EC; border-radius:18px;
+  box-shadow:inset 0 1px 3px rgba(15,42,60,.06);
+  padding:16px; margin-top:12px;
+}
+body.light-ui.desktop .kbv2-board{display:flex;flex-wrap:nowrap;gap:16px;align-items:stretch}
+body.light-ui.desktop .kbv2-column,
+body.light-ui.desktop .kbv2-column-active{
+  flex:1 1 0; min-width:216px;
+  background:linear-gradient(180deg,#F7FAFD,#F1F6FB);
+  border:1px solid #E4EBF3; border-radius:14px;
+  box-shadow:0 1px 2px rgba(15,42,60,.05),0 6px 16px rgba(15,42,60,.05);
+  padding:13px 12px 12px;
+}
+body.light-ui.desktop .kbv2-column-header{padding:2px 4px 12px;border-bottom:1px solid #E4EBF3;margin-bottom:2px}
+body.light-ui.desktop .kbv2-column-body{gap:13px;padding:11px 2px 0}
+body.light-ui.desktop .kbv2-column-add{background:rgba(255,255,255,.5);border:1px dashed #CBD5E3;margin:11px 2px 2px}
+body.light-ui.desktop .kbv2-column-add:hover{background:#fff;color:#0E7369;border-color:#0D9488}
+
+/* A3) Empty state quieto (uma linha, nunca gritando) — kbv2Empty emite .lui-empty sob light-ui. */
+body.light-ui.desktop .kbv2-empty2.lui-empty{border:1px dashed #DCE4EC;background:rgba(255,255,255,.34);border-radius:12px;padding:22px 12px;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;box-shadow:none}
+body.light-ui.desktop .kbv2-empty2.lui-empty svg{width:21px;height:21px;color:#9AA6B8;opacity:.85}
+body.light-ui.desktop .kbv2-empty2.lui-empty .t{font-size:11.5px;font-weight:500;color:#7B879D;letter-spacing:0;text-transform:none}
+body.light-ui.desktop .kbv2-empty2.lui-empty .s{display:none}
+
+/* A4) Micro-craft do card: título com peso/tracking A GOLDEN. */
+body.light-ui.desktop .kbv2-title{font-weight:700;letter-spacing:-.011em}
+</style>
 </head>
 <body>
 
@@ -8863,6 +8916,12 @@ function kbv2Empty(kind){
    check:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="24" cy="24" r="16"/><path d="M17 24.5l5 5 9-10"/></svg>',
    list:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="6" width="28" height="36" rx="3"/><path d="M17 16h14M17 24h14M17 32h9"/></svg>'};
   const ic=/afazer/.test(k)?IC.plus:(/revis|ajuste/.test(k)?IC.search:(/aprovado|concluido|entregue/.test(k)?IC.check:IC.list));
+  /* I7.7 A GOLDEN (gated em body.light-ui): empty-state QUIETO de uma linha por coluna + ícone.
+     O legado (sem light-ui) permanece BYTE-IDÊNTICO no return abaixo. */
+  if(document.body.classList.contains('light-ui')){
+    const lbl=/afazer/.test(k)?'Sem tarefas a fazer':(/revis|ajuste/.test(k)?'Sem tarefas em revisão':(/aprovado|concluido|entregue/.test(k)?'Nada concluído ainda':'Sem tarefas'));
+    return '<div class="kbv2-empty2 lui-empty" data-empty-state="1">'+ic+'<div class="t">'+esc(lbl)+'</div></div>';
+  }
   void ic; /* F3.3.70D3R10I — empty-state inequivoco (mockup aprovado): tracejado + rotulo, jamais parecido com card */
   return '<div class="kbv2-empty2" data-empty-state="1">'+
     '<div class="t">— Coluna vazia —</div>'+
