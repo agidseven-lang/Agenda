@@ -4413,6 +4413,148 @@ body.light-ui.desktop .kbv2-column:last-child .kbv2-card::before{top:12px;right:
   body.light-ui.desktop .kbv2-card:not(:has(.kbv2-card-summary)) .kbv2-card-chk{margin-top:12px}
   body.light-ui.desktop .kbv2-card-summary .kbv2-sum-main,body.light-ui.desktop .kbv2-card-chk span{white-space:nowrap;font-size:10.5px}
 }
+
+/* ============================================================================
+   LIGHT UI — I7.14 · PREMIUM FLOW CONTINUITY (F6 Detalhe + F2 Cliente)
+   Continuidade da linguagem aprovada na 1.0.250 (F1 GOLDEN + Task Card I7.10)
+   na MESMA jornada: card premium → Central de Detalhes → fluxo Cliente.
+   CSS-first, aditivo, escopado. Superfícies intactas: markup/handlers reais.
+   ESCOPO ESTRITO:
+   - Central: SÓ as apresentações drawer da jornada ([data-detorigin="mine"] e
+     [data-detorigin="client"]); o modal default F6 (:not([data-detorigin])) e
+     as origens designers/socials/sectors NÃO são tocados.
+   - Cliente: .scr-client + o scr-head imediatamente acoplado a ele (:has).
+   Monitor SLA do topo = componente Golden COMPARTILHADO com F1 aprovado —
+   intocado por decisão de escopo (mudá-lo vazaria para F1).
+   ========================================================================== */
+/* ---- D1) HEAD: setor = dot+texto (gramática do card; cor real vem inline no badge) ---- */
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-badge,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-badge{background:transparent !important;padding:0;border-radius:0;gap:7px;font-size:10px;font-weight:750;letter-spacing:.07em;text-transform:uppercase}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-badge::before,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-badge::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor;flex:0 0 auto}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-badge svg,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-badge svg{display:none}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-badge span,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-badge span{color:#435060}
+/* ---- D2) HERO tipográfico: título + cliente como identidade (mesma régua do card) ---- */
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-title,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-title{font-size:20px;font-weight:750;letter-spacing:-.016em;line-height:1.24;color:#10182B;padding-top:2px}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-client,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-client{font-size:12.5px;font-weight:600;color:#5A6474;gap:6px}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-client svg,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-client svg{width:13px;height:13px;opacity:.55}
+/* ---- D3) CHIPS DE ESTADO: dot semântico + texto ink quieto; prioridade = micro-sinal âmbar ---- */
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-chips,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-chips{gap:14px;margin-top:10px}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-chips .rev-chip,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-chips .rev-chip{background:transparent !important;color:#3D4654 !important;padding:0;border-radius:0;box-shadow:none;font-size:10.5px;font-weight:750;letter-spacing:.06em;text-transform:uppercase;gap:7px}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-chips .rev-chip .dotc,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-chips .rev-chip .dotc{width:6px;height:6px}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-chips .rev-chip:not(:has(.dotc)),
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-chips .rev-chip:not(:has(.dotc)){color:#A16207 !important;font-size:10px}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-chips .rev-chip-soft,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-chips .rev-chip-soft{background:transparent !important;box-shadow:inset 0 0 0 1px #E3DAC4;color:#8A6D1F !important;padding:2px 8px;border-radius:6px;font-size:9px;letter-spacing:.06em}
+/* ---- D4) PESSOAS: fichas 44px → linha compacta premium (inset raso, avatar 30) ---- */
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-people,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-people{gap:8px;margin-top:14px;grid-template-columns:1fr}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-person,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-person{width:100%}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-person,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-person{border:0;background:#F5F8FB;border-radius:10px;padding:10px 12px;gap:10px;align-items:center}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-person .av,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-person .av{width:30px !important;height:30px !important;font-size:11px !important;border-radius:9px}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-person-l,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-person-l{font-size:8.5px;font-weight:750;letter-spacing:.07em;text-transform:uppercase;color:#98A1AD;line-height:1.35}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-person-n,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-person-n{font-size:12.5px;font-weight:700;color:#1B2534;line-height:1.3}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-person-r,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-person-r{font-size:10.5px;font-weight:500;color:#7A8494}
+/* ---- D5) HERO OPERACIONAL: estado = dot + ink (sem caixa tintada); próxima ação = inset raso ---- */
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-hero,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-hero{margin-top:16px}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-hero-status,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-hero-status{background:transparent !important;border:0 !important;padding:0;gap:9px}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-hero-dot,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-hero-dot{width:7px;height:7px}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-hero-l,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-hero-l{color:#16202C !important;font-size:14px;font-weight:750;letter-spacing:-.01em}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-hero-s,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-hero-s{color:#66707F;font-size:12px;margin-top:2px}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-hero-next,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-hero-next{background:#F5F8FB;border:0;border-radius:10px;padding:11px 13px;margin-top:12px}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-hero-nk,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-hero-nk{color:#98A1AD;font-size:9.5px;font-weight:750;letter-spacing:.07em;text-transform:uppercase}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-hero-nt,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-hero-nt{color:#243041;font-size:13px;font-weight:600;margin-top:3px;line-height:1.4}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-hero-ok,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-hero-ok{font-size:8.5px;font-weight:750;letter-spacing:.07em;text-transform:uppercase;color:#98A1AD}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-hero-on,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-hero-on{font-size:12.5px;font-weight:700;color:#1B2534}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-hero-or,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-hero-or{font-weight:500;color:#7A8494}
+/* ---- D6) SEÇÕES: kicker 9.5 uppercase + respiro em grade (ritmo do card) ---- */
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-sec,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-sec{font-size:9.5px;font-weight:750;letter-spacing:.08em;text-transform:uppercase;color:#98A1AD;margin-top:22px;padding-top:14px;border-top:1px solid #EDF1F6}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-sec-c,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-sec-c{color:#5A6474;font-weight:700}
+/* ---- D7) SLA / RESPOSTA DO CLIENTE / DESIGNER: tinta gritada → superfície neutra + semântica no chip ---- */
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-cresp,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-cresp{background:#F9FBFD !important;border:1px solid #E7EDF3 !important;border-radius:10px;padding:12px 13px}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-cresp .rev-chip,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-cresp .rev-chip{background:transparent !important;padding:0;font-size:10.5px;font-weight:750;letter-spacing:.05em;text-transform:uppercase;box-shadow:none;gap:6px}
+/* ---- D8) ACORDEÕES/CHECKLIST/DATAS: hairline + tipografia quieta ---- */
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-acc,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-acc{border:1px solid #E7EDF3;border-radius:10px;background:#fff}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-acc-k,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-acc-k{font-size:8.5px;font-weight:750;letter-spacing:.06em;color:#98A1AD}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-acc-t,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-acc-t{font-size:12.5px;font-weight:650;color:#1B2534}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-dates,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-dates{gap:8px 18px}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-dates *,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-dates *{font-variant-numeric:tabular-nums}
+/* ---- D9) FOOTER: hierarquia de ações (primária real intocada; destrutiva = quieta) ---- */
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-actions .btn,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-actions .btn{border-radius:11px;font-size:13px;font-weight:650}
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-actions .btn.danger,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="mine"] .det-actions .btn[data-del],
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-actions .btn.danger,
+body.light-ui.desktop .modal-back[data-detmodal][data-detorigin="client"] .det-actions .btn[data-del]{background:transparent !important;border:1px solid #F1D8D8 !important;color:#B4232A !important;box-shadow:none !important}
+/* ============================================================================
+   F2 · CLIENTE — irmã direta do Meu quadro (header, strip, toolbar, empties)
+   ========================================================================== */
+/* ---- C1) HEADER na régua do F1: título 17/800, sub quieta, sem tile de ícone ---- */
+body.light-ui.desktop #content .scr-head:has(+ .scr.scr-client) .d-bh-icon{display:none}
+body.light-ui.desktop #content .scr-head:has(+ .scr.scr-client) .d-bh-title{font-size:17px;font-weight:800;letter-spacing:-.014em;color:#10182B}
+body.light-ui.desktop #content .scr-head:has(+ .scr.scr-client) .d-bh-sub{font-size:12px;font-weight:500;color:#66707F;margin-top:2px}
+/* ---- C2) STRIP DE APROVAÇÕES: inset raso premium (sem moldura dupla) ---- */
+body.light-ui.desktop .scr-client .wfap-bar{background:#F5F8FB;border:0;border-radius:12px;box-shadow:none;padding:12px 14px}
+body.light-ui.desktop .scr-client .wfap-tt{font-size:9.5px;font-weight:750;letter-spacing:.07em;text-transform:uppercase;color:#98A1AD}
+body.light-ui.desktop .scr-client .wfap-sub,body.light-ui.desktop .scr-client .wfap-summary{font-size:12.5px;font-weight:600;color:#3D4654}
+body.light-ui.desktop .scr-client .wfap-ic{background:#fff;border:1px solid #E7EDF3;color:#22B8A6;border-radius:9px}
+body.light-ui.desktop .scr-client .wfap-badge{background:#fff;border:1px solid #E7EDF3;color:#1B2534;font-weight:750}
+body.light-ui.desktop .scr-client .wfap-badge-zero{color:#98A1AD}
+body.light-ui.desktop .scr-client .wfap-open{border-radius:9px;font-weight:650}
+/* ---- C3) TOOLBAR: busca na régua do F1; kbd "⌘K" (decorativo, sem handler) sai; abas = segmented quieto ---- */
+body.light-ui.desktop .scr-client .d-board-tools{gap:12px;background:transparent;border:0;box-shadow:none;padding:0;margin:14px 0 12px}
+body.light-ui.desktop .scr-client .bsearch-wrap{flex:0 1 360px}
+body.light-ui.desktop .scr-client .bsearch{background:#fff;border:1px solid #E7EDF3;border-radius:11px;font-size:12.5px;box-shadow:none}
+body.light-ui.desktop .scr-client .bsearch:focus{border-color:#B9D2E8;box-shadow:0 0 0 3px rgba(34,184,166,.12)}
+body.light-ui.desktop .scr-client .bsearch-kbd{display:none}
+body.light-ui.desktop .scr-client .d-board-tools{justify-content:space-between}
+body.light-ui.desktop .scr-client .tchips{background:#EEF2F6;border:0;border-radius:11px;padding:3px;gap:2px;flex:0 0 auto;width:auto;margin-left:auto;justify-content:flex-end}
+body.light-ui.desktop .scr-client .tchips .tchip{background:transparent;border:0;box-shadow:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:650;color:#5A6675;letter-spacing:0}
+body.light-ui.desktop .scr-client .tchips .tchip svg{width:13px;height:13px;opacity:.7}
+body.light-ui.desktop .scr-client .tchips .tchip.on{background:#fff;color:#16202C;box-shadow:0 1px 2px rgba(16,32,44,.10)}
+/* ---- C3b) ESTADO DO FLUXO no card do cliente: pílula absoluta truncada (150px) → linha quieta integral ---- */
+body.light-ui.desktop .scr-client .kbv2-card-top{flex-wrap:wrap;row-gap:3px}
+body.light-ui.desktop .scr-client .kbv2-card .kbv2-status{position:static !important;background:transparent !important;border:0 !important;box-shadow:none;padding:0;margin:2px 0 0 !important;max-width:100%;flex:0 0 100%;order:9;white-space:normal;overflow:visible;text-overflow:clip;font-size:10.5px;font-weight:650;color:#5A6474;line-height:1.35;text-align:left;justify-content:flex-start}
+/* ---- C4) EMPTY STATES quietos (skill: uma linha discreta, nunca protagonistas) ---- */
+body.light-ui.desktop .scr-client .kbv2-empty2{border:0 !important;background:transparent !important;box-shadow:none;padding:22px 8px;min-height:0}
+body.light-ui.desktop .scr-client .kbv2-empty2 svg{opacity:.45;transform:scale(.85)}
+body.light-ui.desktop .scr-client .kbv2-empty2{font-size:12px;font-weight:600;color:#98A1AD}
+body.light-ui.desktop .scr-client .kbv2-column-add{border:1px solid #E7EDF3;border-style:solid;background:#fff;border-radius:10px;color:#5A6675;font-weight:650}
+body.light-ui.desktop .scr-client .kbv2-column-add:hover{border-color:#CBD8E4;color:#16202C}
 </style>
 </head>
 <body>
