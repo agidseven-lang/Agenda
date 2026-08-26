@@ -325,7 +325,7 @@ jobs:
             r.t1_grid = cs ? cs.display === 'grid' : false;
             r.t2_dueTop = card2 ? (card2.querySelector('.kbv2-due') && getComputedStyle(card2.querySelector('.kbv2-due')).display !== 'none') : false;
             r.t3_titleHero = card2 ? (() => { const t = card2.querySelector('.kbv2-title'); const tc = getComputedStyle(t); return parseFloat(tc.fontSize) >= 14.5 && parseInt(tc.fontWeight) >= 650 && t.scrollHeight <= t.clientHeight + 4; })() : false;
-            r.t4_subtitle = card2 ? (() => { const s2 = card2.querySelector('.kbv2-tier'); return !!s2 && /Hospital Visao/.test(s2.textContent) && getComputedStyle(s2, '::before').content === 'none'; })() : false;
+            r.t4_subtitle = card2 ? (() => { const s2 = card2.querySelector('.kbv2-tier'); return !!s2 && /Hospital Visao/.test(s2.textContent) && getComputedStyle(s2, '::before').display === 'none'; })() : false;
             r.t5_metaGrid = card2 ? (getComputedStyle(card2.querySelector('.kbv2-card-chips'), '::before').content.includes('Setor') && getComputedStyle(card2.querySelector('.kbv2-card-date'), '::before').content.includes('Prazo')) : false;
             r.t5b_shortDate = card2 ? (() => { const b = card2.querySelector('.kbv2-date-s'); return !!b && getComputedStyle(b).display !== 'none' && / · /.test(b.textContent); })() : false;
             r.t6_priorityQuiet = card2 ? (() => { const pr = [...card2.querySelectorAll('.kbv2-chip')].find(x => /Prioridade/i.test(x.textContent)); if (!pr) return false; const pcs = getComputedStyle(pr); return pcs.backgroundColor === 'rgba(0, 0, 0, 0)' && parseFloat(pcs.fontSize) < 11; })() : false;
@@ -363,9 +363,9 @@ jobs:
           g.F2_mais = await pg.evaluate(() => { const d = document.querySelector('.nav .sb-more'); return !!d && d.open === true; });
           await clk('.nav .sb-more>summary');
           await clk('.new-task-btn');
-          g.F3_novaTarefa = await pg.evaluate(() => ((document.getElementById('modalRoot') || {}).innerHTML || '').length > 50 || !!document.querySelector('.wizard, [data-wizard], .nt-sheet'));
-          await pg.keyboard.press('Escape'); await pg.waitForTimeout(200);
-          await pg.evaluate(() => { const m = document.getElementById('modalRoot'); if (m) m.innerHTML = ''; });
+          g.F3_novaTarefa = await pg.evaluate(() => !!document.querySelector('.form-wrap .stepper') && /Nova tarefa/.test((document.querySelector('.form-wrap .scr-head') || {}).textContent || '') && !!state.form);
+          await clk('[data-form="close"]');
+          g.F3_wizardClosed = await pg.evaluate(() => state.form === null && document.querySelectorAll('.kbv2-column').length === 4 && !!document.querySelector('[data-cardmenu="k2"], [data-detail="k2"]'));
           await clk('[data-detail="k2"]');
           g.F_detalhes = (await pg.evaluate(() => ((document.getElementById('modalRoot') || {}).innerHTML || '').length)) > 50;
           await pg.evaluate(() => { const m = document.getElementById('modalRoot'); if (m) m.innerHTML = ''; });
