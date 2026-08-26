@@ -141,7 +141,7 @@ jobs:
           if ($auTxt -notmatch "provider:\s*github")      { Write-Error "app-update.yml nao e provider github"; exit 1 }
           if ($auTxt -notmatch "owner:\s*agidseven-lang") { Write-Error "app-update.yml owner incorreto"; exit 1 }
           if ($auTxt -notmatch "repo:\s*Agenda")          { Write-Error "app-update.yml repo incorreto"; exit 1 }
-          if ($auTxt -match "127\.0\.0\.1" -or $auTxt -match "localhost") { Write-Error "feed LOCAL detectado — proibido no canary publico"; exit 1 }
+          if ($auTxt -match "127\.0\.0\.1" -or $auTxt -match "localhost") { Write-Error "feed LOCAL detectado - proibido no canary publico"; exit 1 }
           "UPDATE FEED TYPE: PUBLIC GITHUB RELEASE (github/agidseven-lang/Agenda, channel latest; sem localhost)" | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
 
       - name: "Preparar harness (Playwright + @electron/asar; NENHUM code de produto)"
@@ -229,7 +229,7 @@ jobs:
               if ($ver -eq "1.0.249") { $ok = $true; break }
             }
           }
-          if (-not $ok) { Write-Error "FAIL: asar instalado != 1.0.249 (got '$ver') — upgrade silencioso via feed publico nao concluiu"; exit 1 }
+          if (-not $ok) { Write-Error "FAIL: asar instalado != 1.0.249 (got '$ver') - upgrade silencioso via feed publico nao concluiu"; exit 1 }
           Start-Sleep -Seconds 3
           $setup = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -like "*Setup*" -or $_.MainWindowTitle -like "*Instal*" }).Count
           if ($setup -ne 0) { Write-Error "FAIL: janela de instalador residual (update nao foi silencioso)"; exit 1 }
