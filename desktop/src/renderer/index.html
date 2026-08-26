@@ -4335,6 +4335,84 @@ body.light-ui.desktop .lui-ph-c{background:#E7EDF3;border-color:transparent;padd
 body.light-ui.desktop .lui-view{padding:6px 15px;border-radius:8px;font-size:12.5px;font-weight:600}
 /* ref = segmento text-only "Quadro"; o glifo 'grid' do produto renderiza como aperture ⇒ oculto (verdade funcional intacta: nada de views falsas) */
 body.light-ui.desktop .lui-view svg{display:none}
+
+/* ============================================================================
+   I7.10 · PREMIUM TASK CARD — OWNER VISUAL REFERENCE (craft-level adaptation)
+   Reorganização de PESOS/HIERARQUIA do card real (mesmos dados, mesmos handlers):
+   status topo (dado real .kbv2-due/.kbv2-sla) → HERO título → subtitle cliente
+   (sem label-formulário) → METADATA GRID (Setor | Prazo curto) → INSET operacional
+   (Progresso + % reais) → footer coeso (responsáveis | contagens). Apresentação
+   100% CSS grid sobre o markup real do kbv2Card (order preservando slots); única
+   adição de DOM: .kbv2-date-s (nasce display:none — legado intacto). Escopo
+   estrito body.light-ui.desktop; drawer/handlers/dark intocados. Revertível.
+   ========================================================================== */
+/* ---- superfície: hairline fria + radius 14 + sombra quase imperceptível; SEM barra lateral ---- */
+body.light-ui.desktop .kbv2-card{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);column-gap:12px;row-gap:0;align-items:start;padding:14px 16px 14px;border-radius:14px;border:1px solid #E4EAF1;box-shadow:0 1px 2px rgba(15,42,60,.04)}
+body.light-ui.desktop .kbv2-card:hover{border-color:#D4DDE8;box-shadow:0 1px 2px rgba(15,42,60,.04),0 10px 26px rgba(15,42,60,.08);transform:translateY(-1px)}
+body.light-ui.desktop .kbv2-card::before{display:none}
+body.light-ui.desktop .kbv2-card>*{grid-column:1 / -1;min-width:0}
+/* ---- 0) TOPO: estado de prazo REAL (dot 6px + texto ink) à esquerda; SLA real + ⋯ à direita ---- */
+body.light-ui.desktop .kbv2-card-top{display:flex !important;order:0;margin:0 0 11px;padding:0 34px 0 0;min-height:18px;align-items:center;justify-content:flex-start;gap:8px}
+body.light-ui.desktop .kbv2-due{display:inline-flex !important;align-items:center;gap:6px;margin:0;padding:0 !important;background:transparent !important;border:0 !important;font-size:11px;font-weight:750;letter-spacing:.015em;color:color-mix(in srgb,var(--kdue,#98A0AE) 55%,#243041) !important}
+body.light-ui.desktop .kbv2-due::before{content:'';flex:0 0 auto;width:6px;height:6px;border-radius:50%;background:var(--kdue,#98A0AE)}
+body.light-ui.desktop .kbv2-top-r{display:flex;align-items:center;gap:8px;margin-left:0;justify-content:flex-start}
+body.light-ui.desktop .kbv2-sla{margin:0 0 0 auto;font-size:9px;font-weight:800}
+/* ---- 1) HERO: título 15/700 + cliente como identidade (sem rótulo "Cliente") ---- */
+body.light-ui.desktop .kbv2-card-main{order:1;display:flex;flex-direction:column;margin:0;padding-right:26px}
+body.light-ui.desktop .kbv2-title{font-size:15px;font-weight:700;line-height:1.3;letter-spacing:-.012em;color:#101828}
+body.light-ui.desktop .kbv2-tier{margin:3px 0 0;font-size:12.5px;font-weight:600;color:#5A6474;letter-spacing:0}
+body.light-ui.desktop .kbv2-tier::before{display:none}
+/* ---- 2) METADATA GRID editorial: SETOR (col 1) | PRAZO (col 2) — labels 9.5 uppercase ---- */
+body.light-ui.desktop .kbv2-card-chips{order:2;grid-column:1;display:flex;flex-direction:column;align-items:flex-start;gap:4px;margin:13px 0 0}
+body.light-ui.desktop .kbv2-card-chips::before{content:'Setor';font-size:9.5px;font-weight:750;letter-spacing:.07em;text-transform:uppercase;color:#98A2B0}
+body.light-ui.desktop .kbv2-card-chips .kbv2-chip:first-child{display:inline-flex;align-items:center;gap:6px;padding:0;border:0 !important;border-radius:0;background:transparent !important;font-size:12px;font-weight:650;letter-spacing:0;text-transform:none;color:#2A3342 !important}
+body.light-ui.desktop .kbv2-card-chips .kbv2-chip:first-child .kbv2-chip-dot{display:inline-block;width:5px;height:5px;border-radius:50%;flex:0 0 auto}
+/* prioridade = micro-sinal âmbar (nunca adesivo): texto 10.5/750 + dot terroso */
+body.light-ui.desktop .kbv2-card-chips .kbv2-chip:not(:first-child):not(.kbv2-chip-soft){display:inline-flex;align-items:center;gap:5px;margin:6px 0 0;padding:0;border:0 !important;border-radius:0;background:transparent !important;font-size:9.5px;font-weight:750;letter-spacing:.05em;text-transform:uppercase;color:#A16207 !important}
+body.light-ui.desktop .kbv2-card-chips .kbv2-chip:not(:first-child):not(.kbv2-chip-soft) .kbv2-chip-dot{display:inline-block;width:4px;height:4px;border-radius:50%;background:#F59E0B !important;flex:0 0 auto}
+body.light-ui.desktop .kbv2-card-date{order:2;grid-column:2;display:flex;flex-wrap:wrap;align-content:flex-start;align-items:center;gap:4px 5px;margin:13px 0 0;font-size:12px}
+body.light-ui.desktop .kbv2-card-date::before{content:'Prazo';flex:0 0 100%;font-size:9.5px;font-weight:750;letter-spacing:.07em;text-transform:uppercase;color:#98A2B0}
+body.light-ui.desktop .kbv2-card-date svg{display:none}
+body.light-ui.desktop .kbv2-card-date>span{display:none}
+body.light-ui.desktop .kbv2-date-s{display:inline !important;font-size:12px;font-weight:650;color:#1D2939;font-variant-numeric:tabular-nums;letter-spacing:0}
+/* ---- 3) INSET OPERACIONAL (só onde há progresso real): rótulo + % + trilho 3px ---- */
+body.light-ui.desktop .kbv2-card-rail{order:5;margin:12px 0 0;padding:27px 12px 12px;background:#F5F8FB;border-radius:10px;position:relative;display:flex;align-items:center;gap:0}
+body.light-ui.desktop .kbv2-card-rail::before{content:'Progresso';position:absolute;left:12px;top:10px;font-size:9.5px;font-weight:750;letter-spacing:.07em;text-transform:uppercase;color:#8A94A2}
+body.light-ui.desktop .kbv2-card-rail i{flex:1 1 auto;width:auto;height:3px;border-radius:0;margin:0;background:#E2E8F0;box-shadow:none !important}
+body.light-ui.desktop .kbv2-card-rail i:first-child{border-radius:2px 0 0 2px}
+body.light-ui.desktop .kbv2-card-rail i:last-of-type{border-radius:0 2px 2px 0}
+body.light-ui.desktop .kbv2-card-rail i.done,body.light-ui.desktop .kbv2-card-rail i.cur{background:var(--kc2,var(--kc)) !important}
+body.light-ui.desktop .kbv2-card-rail i.att{flex:0 0 7px;height:7px;border-radius:50%;margin-left:6px;background:#F59E0B}
+body.light-ui.desktop .kbv2-pct{display:block !important;position:relative;z-index:1;order:6;justify-self:end;align-self:start;margin:-33px 12px -11px 0;font-size:11px;font-weight:750;line-height:11px;color:#3A4453;font-variant-numeric:tabular-nums}
+/* ---- 4) FOOTER coeso: responsáveis (esq) | contagens reais (dir, baseline única) ---- */
+body.light-ui.desktop .kbv2-card-profile{order:7;grid-column:1;display:flex;align-items:center;margin:14px 0 0;min-height:24px}
+body.light-ui.desktop .kbv2-card-summary{order:8;grid-column:2;justify-self:end;align-self:center;display:flex;align-items:center;gap:5px;margin:14px 0 0;padding:0;background:transparent;border:0}
+body.light-ui.desktop .kbv2-card-summary .kbv2-sum-main{font-size:11px;font-weight:650;color:#6B7686}
+body.light-ui.desktop .kbv2-card-chk{order:9;grid-column:2;justify-self:end;display:flex;align-items:center;gap:5px;margin:3px 0 0;font-size:11px;font-weight:650;color:#6B7686}
+body.light-ui.desktop .kbv2-card:not(:has(.kbv2-card-summary)) .kbv2-card-chk{margin-top:14px;align-self:center}
+body.light-ui.desktop .kbv2-card-chk svg,body.light-ui.desktop .kbv2-card-summary .kbv2-sum-k svg{width:12px;height:12px;color:#9AA4B2}
+body.light-ui.desktop .kbv2-card-summary .kbv2-sum-main,body.light-ui.desktop .kbv2-card-chk span{white-space:nowrap}
+/* ---- ações: ⋯ com alvo 26px; Detalhes overlay/Mover reais intactos.
+        Mover (hover/foco) ancora no TOPO ao lado do ⋯ — nunca cobre dados do footer ---- */
+body.light-ui.desktop .kbv2-more{top:12px;right:12px}
+body.light-ui.desktop .kbv2-btn[data-move]{top:10px;right:44px;bottom:auto;height:26px;border-radius:8px}
+body.light-ui.desktop .kbv2-card:hover .kbv2-sla,body.light-ui.desktop .kbv2-card:focus-within .kbv2-sla{margin-right:64px}
+body.light-ui.desktop .kbv2-btn-dots{width:26px;height:26px;border-radius:8px;font-size:14px;color:#9AA4B2}
+body.light-ui.desktop .kbv2-btn-dots:hover{color:#3A4453;border-color:#E4EAF1}
+body.light-ui.desktop .kbv2-btn-main{border-radius:14px}
+/* concluída (col 4): selo verde alinhado ao novo topo */
+body.light-ui.desktop .kbv2-column:last-child .kbv2-card::before{top:12px;right:44px}
+/* ---- densidade 1366 (lanes estreitas): apertar gaps secundários, nunca a leitura ---- */
+@media (max-width:1439.98px){
+  body.light-ui.desktop .kbv2-card{padding:13px 14px 13px;column-gap:10px;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr)}
+  body.light-ui.desktop .kbv2-card-chips,body.light-ui.desktop .kbv2-card-date{margin-top:11px}
+  body.light-ui.desktop .kbv2-card-chips .kbv2-chip:first-child{font-size:11.5px}
+  body.light-ui.desktop .kbv2-card-rail{margin-top:11px;padding:25px 11px 11px}
+  body.light-ui.desktop .kbv2-pct{margin:-33px 11px -11px 0}
+  body.light-ui.desktop .kbv2-card-profile,body.light-ui.desktop .kbv2-card-summary{margin-top:12px}
+  body.light-ui.desktop .kbv2-card:not(:has(.kbv2-card-summary)) .kbv2-card-chk{margin-top:12px}
+  body.light-ui.desktop .kbv2-card-summary .kbv2-sum-main,body.light-ui.desktop .kbv2-card-chk span{white-space:nowrap;font-size:10.5px}
+}
 </style>
 </head>
 <body>
@@ -9884,6 +9962,9 @@ function kbv2ContentSlot(t, cron, s, clientView, isCron){
   }
   return box('Sem itens vinculados','detalhes na tarefa','kbv2-sum-empty');
 }
+/* I7.10 — formatação APRESENTACIONAL curta de prazo ("26 ago · 17:00"): puro/read-only,
+   consumido só pelo nó aditivo .kbv2-date-s (tema claro). Dado real segue em fmtDateBR. */
+function kbv2ShortDate(d,tm){try{var p=String(d).split('-');var M=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];var s=Number(p[2])+' '+(M[Number(p[1])-1]||'');return tm?(s+' · '+tm):s;}catch(_){return '';}}
 function kbv2Card(t, persp){
   const designerView = persp==='designer' && isClientSector(secOf(t.sector).key) && hasDesigner(t);
   const clientView = persp==='client' && isClientSector(secOf(t.sector).key);
@@ -10015,7 +10096,10 @@ function kbv2Card(t, persp){
        '</div>';
   }
   // 10) data
-  if(t.dueDate||t.due)h+='<div class="kbv2-card-date">'+svg('calendar')+'<span>'+fmtDateBR(t.dueDate||t.due)+(t.dueTime?' às '+esc(t.dueTime):'')+'</span></div>';
+  /* I7.10 — data curta APRESENTACIONAL ("26 ago · 17:00") como nó ADITIVO nascido
+     display:none (legado byte-visual intacto — mesmo padrão do kbv2-av-by/kbv2-pct);
+     revelada só pelo tema claro. O dado real completo permanece no <span> e no title. */
+  if(t.dueDate||t.due)h+='<div class="kbv2-card-date" title="'+esc('Prazo '+fmtDateBR(t.dueDate||t.due)+(t.dueTime?' às '+t.dueTime:''))+'">'+svg('calendar')+'<span>'+fmtDateBR(t.dueDate||t.due)+(t.dueTime?' às '+esc(t.dueTime):'')+'</span><b class="kbv2-date-s" style="display:none">'+kbv2ShortDate(t.dueDate||t.due,t.dueTime)+'</b></div>';
   // 11) footer ações (reutiliza handlers existentes via data-*)
   h+='<div class="kbv2-card-footer">'+
        '<button class="kbv2-btn kbv2-btn-main" data-detail="'+t.id+'">'+svg('eye')+'<span>Detalhes</span></button>'+
