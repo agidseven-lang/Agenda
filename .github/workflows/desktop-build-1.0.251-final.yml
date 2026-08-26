@@ -2,19 +2,19 @@
 # [manual] FINAL 1.0.251 — Desktop Build Canonico + Installed-App QA (NADA e publicado)
 # ---------------------------------------------------------------------
 # Espelha o mecanismo canonico auditado (desktop-build-1.0.250-final.yml):
-# build UNICO da 1.0.250 a partir do FINAL SOURCE ff762ac7 (I7.14 Premium Flow
+# build UNICO da 1.0.251 a partir do FINAL SOURCE 7091056a (I7.14 Premium Flow
 # Continuity aprovado + bump), com hard gates de proveniencia, GATE ASAR (versao/renderer/
 # flags do updater), contrato do latest.yml (== NSIS do MESMO run), SHA256SUMS +
 # VERSAO-DESKTOP.txt + manifest, e — NO MESMO RUN — a INSTALLED-APP QA REAL:
 #   SESSAO A — 1.0.250 PUBLICA -> 1.0.251 (assets deste build): update SILENCIOSO
-#     /S, REQUIRED_USER_INSTALL_ACTIONS=0, app relanca como 1.0.250.
-#   SESSAO B — 1.0.251 instalada: versao==1.0.250, Light UI ON, smoke funcional
+#     /S, REQUIRED_USER_INSTALL_ACTIONS=0, app relanca como 1.0.251.
+#   SESSAO B — 1.0.251 instalada: versao==1.0.251, Light UI ON, smoke funcional
 #     real + REGRESSAO DO TASK CARD APROVADO (I7.10: status topo .kbv2-due,
 #     metadata grid Setor/Prazo, prazo curto .kbv2-date-s, inset de progresso +
 #     %, footer coeso, Mover no topo em hover, surface Cliente com card cron) +
 #     screenshots 1920/1536(Win125)/1366 + crops card/hover/cliente (evidencia).
-# Diff de produto vs v1.0.250 (28ed90ef) = renderer + package.json (bump) +
-# QA tooling (visual-qa-i710-task-card.mjs) — NADA de main/updater/builder.
+# Diff de produto vs v1.0.250 (ff762ac7) = renderer + package.json (bump) +
+# QA tooling (visual-qa-i714-flow-continuity.mjs) — NADA de main/updater/builder.
 # Sem tag, sem release, sem publish, sem Latest, sem RC_RELEASE_GO. Manual apenas.
 # =====================================================================
 name: "[manual] FINAL 1.0.251 — Desktop Build + Installed-App QA"
@@ -50,7 +50,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: "PIN do FINAL SOURCE (ff762ac7) + PROVENANCE hard gates"
+      - name: "PIN do FINAL SOURCE (7091056a) + PROVENANCE hard gates"
         run: |
           set -euo pipefail
           git checkout --detach "$PRODUCT_SOURCE_SHA"
@@ -60,8 +60,8 @@ jobs:
           L=$(git show "$PRODUCT_SOURCE_SHA":desktop/package-lock.json | sha256sum | awk '{print $1}')
           [ "$L" = "$EXPECTED_LOCKFILE_SHA256" ] || { echo "::error::lockfile difere do pinado ($L)"; exit 1; }
           node -e "const p=require('./desktop/package.json'); if(p.version!=='$EXPECTED_VERSION'){console.error('version '+p.version);process.exit(1);} console.log('version OK '+p.version);"
-          # DIFF DE PRODUTO vs v1.0.250 (28ed90ef) = renderer + bump + QA tooling. NADA de
-          # backend/updater/electron-builder/main. Prova a tese do candidato (Task Card only).
+          # DIFF DE PRODUTO vs v1.0.250 (ff762ac7) = renderer + bump + QA tooling. NADA de
+          # backend/updater/electron-builder/main. Prova a tese do candidato (Flow Continuity only).
           D=$(git diff --name-only "$V250_TAG_SHA" "$PRODUCT_SOURCE_SHA" -- desktop | sort | tr '\n' ' ')
           echo "diff desktop vs v1.0.250: $D"
           [ "$D" = "desktop/package.json desktop/scripts/visual-qa-i714-flow-continuity.mjs desktop/src/renderer/index.html " ] || { echo "::error::diff de produto inesperado vs v1.0.250"; exit 1; }
@@ -179,7 +179,7 @@ jobs:
           channel: latest
           updaterCacheDirName: agenda-id-seven-desktop-updater
           "@ | Out-File -FilePath $au -Encoding utf8
-          Write-Host "feed 1.0.250 OK; instancia baseline 1.0.250 apontada ao feed local"
+          Write-Host "feed 1.0.251 OK; instancia baseline 1.0.250 apontada ao feed local"
 
       - name: "SESSAO A — UPDATE 1.0.250 -> 1.0.251 (silencioso /S; REQUIRED_USER_INSTALL_ACTIONS=0)"
         timeout-minutes: 15
@@ -507,7 +507,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: "Upload evidencias (manifest + sessoes + screenshots RC250)"
+      - name: "Upload evidencias (manifest + sessoes + screenshots RC251)"
         if: always()
         uses: actions/upload-artifact@v4
         with:
