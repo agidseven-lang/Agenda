@@ -55,6 +55,8 @@ const SEED_MATRIX = () => {
     { id: 'm05', title: 'Edição de vídeos — Agosto', client: 'Hospital Visão', sector: 'edicao_midia', by: 'carlos', assigneeId: 'carlos', status: 'andamento', dueDate: D(1), dueTime: '17:00', videos: [{ tema: 'v1' }, { tema: 'v2' }, { tema: 'v3' }] },
     { id: 'm06', title: 'Pack de stories semanais', client: 'Sunset Wear', sector: 'edicao_cards', by: 'carlos', assigneeId: 'carlos', status: 'andamento', dueDate: D(2), dueTime: '15:00', checklist: [{ t: '1', d: 1 }, { t: '2', d: 1 }, { t: '3' }, { t: '4' }, { t: '5' }], cardLegenda: 'Semana 35' },
     { id: 'm07', title: 'Vídeo manifesto da marca', client: 'Colégio Alfa', sector: 'edicao_midia', by: 'carlos', assigneeId: 'carlos', status: 'andamento', dueDate: D(-1), dueTime: '12:00', priority: true, videos: [{ tema: 'v1' }] },
+    /* estado 08 = ASSIGNEE FALLBACK TO CREATOR: sem assigneeId, o respOf REAL do produto
+       apresenta o CRIADOR (by) como responsável — não existe card visualmente sem pessoa. */
     { id: 'm08', title: 'Legendas do lançamento', client: 'Sunset Wear', sector: 'copywriting', by: 'carlos', assigneeId: null, status: 'andamento', dueDate: D(1), dueTime: '18:00' },
     /* Revisão */
     { id: 'm09', title: 'Reels de lançamento', client: 'Sunset Wear', sector: 'edicao_cards', by: 'carlos', assigneeId: 'carlos', status: 'revisao', dueDate: D(1), dueTime: '12:00', cardLegenda: 'Coleção' },
@@ -114,7 +116,8 @@ for (const t of [{ name: '1920', w: 1920, h: 1080, dsf: 2 }, { name: 'win125', w
   const m = await page.evaluate(() => ({
     cards: document.querySelectorAll('.kbv2-card').length,
     counts: [...document.querySelectorAll('.kbv2-ccount')].map(x => x.textContent.trim()),
-    semResp: (document.querySelector('[data-detail="m08"]') ? true : document.body.innerText.includes('Sem responsável')) || !!document.querySelector('.kbv2-card .av svg'),
+    /* verdade funcional: sem assignee ⇒ respOf cai no criador (avatar do by) — validar ISSO */
+    assigneeFallbackToCreator: (() => { const c = [...document.querySelectorAll('.kbv2-card')].find(x => x.querySelector('[data-cardmenu="m08"], [data-detail="m08"]')); return c ? !!c.querySelector('.kbv2-av .av') : null; })(),
     doisAvs: (() => { const c = [...document.querySelectorAll('.kbv2-card')].find(x => x.querySelector('[data-detail="m11"], [data-cardmenu="m11"]')); return c ? !!c.querySelector('.kbv2-av-by') : null; })(),
     hscroll: document.documentElement.scrollWidth > window.innerWidth
   }));
@@ -151,9 +154,17 @@ for (const t of [{ name: '1920', w: 1920, h: 1080, dsf: 2 }, { name: 'win125', w
   await page.waitForTimeout(300);
   g.filter = await page.evaluate(() => { const c = document.querySelector('.lui-rchip-all'); if (c) c.click(); return !!c; });
   g.checklistLine = await page.evaluate(() => document.body.innerText.includes('0 de 5 no checklist'));
+  /* I7.10.1 — card REAL na superfície Cliente: seed cron de QA (setor cliente 'cronograma');
+     harness-only, nada persiste (firebase stub, http local). Valida ausência de CSS leak,
+     layout íntegro e ações disponíveis com a nova linguagem do card. */
+  await page.evaluate(() => { state.tasks.push({ id: 'c1', title: 'Cronograma Setembro — Sunset Wear', client: 'Sunset Wear', sector: 'cronograma', by: 'carlos', assigneeId: 'carlos', status: 'afazer', dueDate: '2026-08-29', dueTime: '10:00', cronContents: [{ tema: 'Tema 1' }, { tema: 'Tema 2' }, { tema: 'Tema 3' }] }); render(); });
+  await page.waitForTimeout(250);
   await clk('.nav [data-flowclient]');
   g.clientContext = await page.evaluate(() => state.flowView === 'client');
+  g.clientCardRendered = await page.evaluate(() => document.querySelectorAll('.scr-client .kbv2-card').length >= 1);
+  g.clientCardSane = await page.evaluate(() => { const c = document.querySelector('.scr-client .kbv2-card'); if (!c) return false; const cs = getComputedStyle(c); const t = c.querySelector('.kbv2-title'); return cs.display === 'grid' && !!t && parseFloat(getComputedStyle(t).fontSize) >= 14 && !!c.querySelector('.kbv2-btn-main, [data-detail]'); });
   await page.screenshot({ path: path.join(OUT, 'I710-CLIENT-SURFACE-1920.png') });
+  { const cc = await page.$('.scr-client .kbv2-card'); if (cc) await cc.screenshot({ path: path.join(OUT, 'I710-CLIENT-CARD.png') }); }
   await clk('.nav [data-myboard]');
   g.noHscroll = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2);
   g.noPageError = errs.length === 0;
