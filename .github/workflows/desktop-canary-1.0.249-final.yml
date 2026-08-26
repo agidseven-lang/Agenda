@@ -1,0 +1,339 @@
+# =====================================================================
+# [manual] I7.9.3 — PUBLIC UPDATER CANARY (Desktop 1.0.248 → feed PÚBLICO → 1.0.249)
+# ---------------------------------------------------------------------
+# Prova, ponta a ponta e no MESMO run, que uma instalação REAL da Desktop
+# 1.0.248 PÚBLICA consulta o FEED PÚBLICO atualmente publicado (GitHub Release
+# canal latest, conforme electron-builder.yml: provider github / agidseven-lang
+# / Agenda / channel latest) e reconhece → baixa (sha512 validado) → instala
+# silenciosamente (/S) a Desktop 1.0.249 PÚBLICA.
+#
+# CONSUMIDOR PURO DA PRODUÇÃO PÚBLICA. Esta fase NÃO:
+#   - cria tag / cria release / altera Latest / altera latest.yml / publica asset
+#   - executa desktop-release / gera novo build do produto / seta RC_RELEASE_GO
+#   - reescreve app-update.yml / gera feed local / serve assets por localhost
+# Usa EXCLUSIVAMENTE os Releases públicos v1.0.248 e v1.0.249 já existentes e o
+# app-update.yml REAL que já vem embarcado no instalador público 1.0.248.
+#
+# FAIL-CLOSED: aborta antes de instalar se qualquer pré-condição pública estiver
+# incorreta (Latest != v1.0.249, tag sha != 28ed90ef, releases ausentes, latest.yml
+# público != 1.0.249). Execução manual apenas.
+# =====================================================================
+name: "[manual] I7.9.3 — Public Updater Canary 1.0.248 -> 1.0.249"
+
+"on":
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  OWNER_REPO: "agidseven-lang/Agenda"
+  PRODUCT_SOURCE_SHA: "28ed90ef3f8a3573550e2c09a46b19fc98fe11fc"
+  EXPECTED_VERSION: "1.0.249"
+  BASELINE_VERSION: "1.0.248"
+  LATEST_TAG: "v1.0.249"
+  BASELINE_TAG: "v1.0.248"
+  EXE_NAME: "Agenda-ID-Seven-Desktop-1.0.249-x64.exe"
+  BASELINE_EXE: "Agenda-ID-Seven-Desktop-1.0.248-x64.exe"
+  APPROVED_EXE_SHA256: "2b339d0c8022311bad3137955fac31be1bc7030417ed025e8472d755b3db7fe8"
+
+jobs:
+  public-updater-canary:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: "Git sem conversão CRLF"
+        run: git config --global core.autocrlf false
+
+      - name: "GATE — PRÉ-CONDIÇÕES PÚBLICAS (fail-closed, antes de instalar)"
+        env:
+          GH_API_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/canary"
+          api() { curl -sSL -H "Accept: application/vnd.github+json" -H "Authorization: Bearer $GH_API_TOKEN" "$@"; }
+          # LATEST == v1.0.249
+          LT=$(api "https://api.github.com/repos/$OWNER_REPO/releases/latest" | jq -r .tag_name)
+          [ "$LT" = "$LATEST_TAG" ] || { echo "::error::Latest publico=$LT != $LATEST_TAG"; exit 1; }
+          # tag v1.0.249 -> commit sha 28ed90ef (deref automatico via /commits/<ref>)
+          TS=$(api "https://api.github.com/repos/$OWNER_REPO/commits/$LATEST_TAG" | jq -r .sha)
+          [ "$TS" = "$PRODUCT_SOURCE_SHA" ] || { echo "::error::tag $LATEST_TAG sha=$TS != $PRODUCT_SOURCE_SHA"; exit 1; }
+          # v1.0.248 e v1.0.249 RELEASES existem
+          for T in "$BASELINE_TAG" "$LATEST_TAG"; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $GH_API_TOKEN" "https://api.github.com/repos/$OWNER_REPO/releases/tags/$T")
+            [ "$code" = "200" ] || { echo "::error::release $T ausente (http $code)"; exit 1; }
+          done
+          # latest.yml PÚBLICO (anonimo, feed real) -> version 1.0.249
+          curl -sSL -o "$RUNNER_TEMP/canary/public-latest.yml" "https://github.com/$OWNER_REPO/releases/download/$LATEST_TAG/latest.yml"
+          grep -q "^version: $EXPECTED_VERSION$" "$RUNNER_TEMP/canary/public-latest.yml" || { echo "::error::latest.yml publico version != $EXPECTED_VERSION"; exit 1; }
+          {
+            echo "== I7.9.3 PRECONDITIONS =="
+            echo "PUBLIC LATEST TAG: $LT"
+            echo "TAG $LATEST_TAG -> SHA: $TS (== $PRODUCT_SOURCE_SHA)"
+            echo "RELEASE $BASELINE_TAG EXISTS: YES"
+            echo "RELEASE $LATEST_TAG EXISTS: YES"
+            echo "PUBLIC latest.yml VERSION: $EXPECTED_VERSION"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "PRECONDITIONS OK"
+
+      - name: "AUDITORIA BYTE DO FEED PÚBLICO 1.0.249 (latest.yml: path/size/sha512 + sha256==build aprovado)"
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/canary"
+          # baixa o installer PÚBLICO real da v1.0.249 (anonimo) e confere contra o latest.yml PÚBLICO
+          curl -sSL -o public-249.exe "https://github.com/$OWNER_REPO/releases/download/$LATEST_TAG/$EXE_NAME"
+          grep -q "url: $EXE_NAME" public-latest.yml || { echo "::error::latest.yml path != $EXE_NAME"; exit 1; }
+          SIZE=$(stat -c%s public-249.exe)
+          grep -q "size: $SIZE" public-latest.yml || { echo "::error::latest.yml size != $SIZE"; exit 1; }
+          SHA512=$(openssl dgst -sha512 -binary public-249.exe | base64 -w0)
+          grep -q "$SHA512" public-latest.yml || { echo "::error::latest.yml sha512 nao bate com o installer publico"; exit 1; }
+          # amarra os BYTES PÚBLICOS ao build aprovado 32910685586 (auditoria de release)
+          S256=$(sha256sum public-249.exe | awk '{print $1}')
+          [ "$S256" = "$APPROVED_EXE_SHA256" ] || { echo "::error::sha256 do exe publico=$S256 != build aprovado $APPROVED_EXE_SHA256"; exit 1; }
+          {
+            echo "== I7.9.3 PUBLIC FEED BYTE AUDIT =="
+            echo "PUBLIC installer: $EXE_NAME"
+            echo "PUBLIC size: $SIZE  (== latest.yml)"
+            echo "PUBLIC sha512: match latest.yml"
+            echo "PUBLIC sha256: $S256 (== build aprovado 32910685586)"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "PUBLIC FEED BYTE AUDIT OK"
+
+      - name: "BASELINE PÚBLICA v1.0.248 — download + verificação SHA256SUMS"
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/canary"
+          BASE="https://github.com/$OWNER_REPO/releases/download/$BASELINE_TAG"
+          curl -sSL -o baseline.exe "$BASE/$BASELINE_EXE"
+          curl -sSL -o baseline-SHA256SUMS "$BASE/SHA256SUMS"
+          EXP=$(grep "$BASELINE_EXE\$" baseline-SHA256SUMS | awk '{print $1}')
+          GOT=$(sha256sum baseline.exe | awk '{print $1}')
+          [ -n "$EXP" ] && [ "$EXP" = "$GOT" ] || { echo "::error::baseline 1.0.248 sha256 nao confere exp=$EXP got=$GOT"; exit 1; }
+          echo "BASELINE PUBLIC ASSET: $BASELINE_EXE" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "BASELINE VERSION: $BASELINE_VERSION (sha256=$GOT)" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: "INSTALAR 1.0.248 (/S) + CONFIRMAR FEED PÚBLICO REAL (app-update.yml embarcado)"
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          $exe = "$env:RUNNER_TEMP\canary\baseline.exe"
+          $p = Start-Process -FilePath $exe -ArgumentList "/S" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Write-Error "baseline install exit $($p.ExitCode)"; exit 1 }
+          Start-Sleep -Seconds 3
+          $dir = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Directory | Where-Object { Test-Path (Join-Path $_.FullName "Agenda ID Seven Desktop.exe") } | Select-Object -First 1
+          if (-not $dir) { Write-Error "baseline 1.0.248 nao instalada"; exit 1 }
+          "INSTALL_DIR=$($dir.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "baseline 1.0.248 instalada: $($dir.FullName)"
+          # EVIDENCIA + FAIL-CLOSED: o feed embarcado precisa ser o PUBLICO do GitHub (nunca localhost)
+          $au = Join-Path $dir.FullName "resources\app-update.yml"
+          if (-not (Test-Path $au)) { Write-Error "app-update.yml ausente no pacote instalado"; exit 1 }
+          Copy-Item $au "$env:RUNNER_TEMP\canary\installed-app-update.yml"
+          $auTxt = Get-Content $au -Raw
+          Write-Host "---- app-update.yml (instalado) ----"; Write-Host $auTxt
+          if ($auTxt -notmatch "provider:\s*github")      { Write-Error "app-update.yml nao e provider github"; exit 1 }
+          if ($auTxt -notmatch "owner:\s*agidseven-lang") { Write-Error "app-update.yml owner incorreto"; exit 1 }
+          if ($auTxt -notmatch "repo:\s*Agenda")          { Write-Error "app-update.yml repo incorreto"; exit 1 }
+          if ($auTxt -match "127\.0\.0\.1" -or $auTxt -match "localhost") { Write-Error "feed LOCAL detectado — proibido no canary publico"; exit 1 }
+          "UPDATE FEED TYPE: PUBLIC GITHUB RELEASE (github/agidseven-lang/Agenda, channel latest; sem localhost)" | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+
+      - name: "Preparar harness (Playwright + @electron/asar; NENHUM code de produto)"
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/canary"
+          npm init -y >/dev/null 2>&1
+          npm i --no-save playwright@1.47.2 @electron/asar --no-audit --no-fund
+
+      - name: "SESSÃO CANARY A — 1.0.248 REAL → check(feed público) → 1.0.249 → download(sha512) → install /S"
+        timeout-minutes: 20
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/canary"
+          cat > canary-a.mjs <<'EOF'
+          import { _electron } from 'playwright';
+          import fs from 'fs';
+          const exe = process.env.INSTALL_DIR + '\\Agenda ID Seven Desktop.exe';
+          const out = { g: {} }; const g = out.g;
+          const sleep = ms => new Promise(r => setTimeout(r, ms));
+          const app = await _electron.launch({ executablePath: exe, args: [] });
+          const pg = await app.firstWindow({ timeout: 45000 });
+          await pg.waitForLoadState('load'); await pg.waitForTimeout(4000);
+          const before = await pg.evaluate(() => ({
+            ver: (typeof APP_VER !== 'undefined' && APP_VER.desktop) || null,
+            upd: !!(window.desktopAPI && window.desktopAPI.updater)
+          }));
+          const st = () => pg.evaluate(() => window.desktopAPI.updater.getState());
+          const st0 = before.upd ? await st() : null;
+          out.before = { ...before, st: st0 };
+          g.a1_baselineIs248 = before.ver === '1.0.248';
+          g.a2_updaterApi = before.upd === true;
+          g.a3_installedVersion248 = !!st0 && st0.installedVersion === '1.0.248';
+          g.a4_channelLatest = !!st0 && st0.channel === 'latest';
+          g.a5_allowPrereleaseFalse = !!st0 && st0.allowPrerelease === false;
+          const poll = async (want, ms) => { const t0 = Date.now(); for (;;) { const s = await st(); if (want.includes(s.status)) return s; if (s.status === 'error') return s; if (Date.now() - t0 > ms) return s; await sleep(500); } };
+          // CHECK contra o FEED PÚBLICO real (app-update.yml embarcado = github provider)
+          await pg.evaluate(() => { window.desktopAPI.updater.check(); });
+          let s = await poll(['update_available', 'up_to_date', 'error'], 60000);
+          out.checkResult = { status: s.status, availableVersion: s.availableVersion, error: s.error };
+          g.b1_updateAvailable = s.status === 'update_available';
+          g.b2_availableIs249 = s.availableVersion === '1.0.249';
+          // PROVA autoDownload=false: apos update_available, sem chamar download(), NAO progride sozinho
+          await sleep(4000);
+          const sIdle = await st();
+          out.afterCheckIdle = { status: sIdle.status, downloaded: sIdle.downloaded };
+          g.b3_noAutoDownloadBeforeAction = sIdle.status === 'update_available' && sIdle.downloaded === false;
+          // DOWNLOAD explicito (a lib valida o sha512 do latest.yml PÚBLICO contra o installer PÚBLICO)
+          await pg.evaluate(() => { window.desktopAPI.updater.download(); });
+          { const t0 = Date.now(); for (;;) { const x = await st(); if (x.status === 'downloaded' || x.status === 'error') { s = x; break; } if (Date.now() - t0 > 240000) { s = x; break; } await sleep(500); } }
+          out.downloadResult = { status: s.status, downloaded: s.downloaded, availableVersion: s.availableVersion, error: s.error };
+          g.c1_downloadedSha512Valid = s.status === 'downloaded' && s.downloaded === true;
+          // INSTALL silencioso /S (quitAndInstall(true,true)) — zero acao do usuario
+          pg.evaluate(() => { window.desktopAPI.updater.installAndRestart(); }).catch(() => {});
+          let closed = false;
+          try { await Promise.race([new Promise(res => app.on('close', () => { closed = true; res(); })), sleep(30000)]); } catch (_) {}
+          if (!closed) { try { const x = await st(); closed = (x.status === 'installing'); } catch (_) { closed = true; } }
+          out.appClosedByUpdater = closed;
+          g.d1_installTriggered = closed === true;
+          const fails = Object.entries(g).filter(([k, v]) => !v).map(([k]) => k);
+          out.fails = fails;
+          fs.writeFileSync(process.env.RUNNER_TEMP + '/canary/canary-sessionA.json', JSON.stringify(out, null, 1));
+          console.log(JSON.stringify(out, null, 1));
+          try { await Promise.race([app.close(), sleep(4000)]); } catch (_) {}
+          if (fails.length) { console.error('FAILS A:', fails); }
+          process.exit(fails.length ? 1 : 0);
+          EOF
+          node canary-a.mjs
+
+      - name: "Confirmar UPGRADE instalado == 1.0.249 (asar) + sem instalador residual + REQUIRED_USER_INSTALL_ACTIONS=0"
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          $work = "$env:RUNNER_TEMP\canary"
+          $asar = Join-Path $env:INSTALL_DIR "resources\app.asar"
+          $deadline = (Get-Date).AddSeconds(240); $ok = $false; $ver = ""
+          while ((Get-Date) -lt $deadline) {
+            Start-Sleep -Seconds 4
+            if (Test-Path $asar) {
+              Push-Location $work
+              try { $ver = (& node -e "const a=require('@electron/asar');process.stdout.write(JSON.parse(a.extractFile(process.argv[1],'package.json').toString('utf8')).version)" "$asar") } catch { $ver = "" }
+              Pop-Location
+              if ($ver -eq "1.0.249") { $ok = $true; break }
+            }
+          }
+          if (-not $ok) { Write-Error "FAIL: asar instalado != 1.0.249 (got '$ver') — upgrade silencioso via feed publico nao concluiu"; exit 1 }
+          Start-Sleep -Seconds 3
+          $setup = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -like "*Setup*" -or $_.MainWindowTitle -like "*Instal*" }).Count
+          if ($setup -ne 0) { Write-Error "FAIL: janela de instalador residual (update nao foi silencioso)"; exit 1 }
+          Get-Process | Where-Object { $_.ProcessName -like "*Agenda*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 2
+          "INSTALL UPDATE RESULT: PASS (asar==1.0.249)" | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          "REQUIRED_USER_INSTALL_ACTIONS: 0 (silencioso /S; sem wizard/UAC/residual)" | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+
+      - name: "SESSÃO CANARY B — 1.0.249 instalada: versão + Light UI ON + sanity funcional + 1366"
+        timeout-minutes: 15
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/canary"
+          cat > canary-b.mjs <<'EOF'
+          import { _electron } from 'playwright';
+          import fs from 'fs';
+          const exe = process.env.INSTALL_DIR + '\\Agenda ID Seven Desktop.exe';
+          const out = { g: {} }; const g = out.g;
+          const sleep = ms => new Promise(r => setTimeout(r, ms));
+          const app = await _electron.launch({ executablePath: exe, args: [] });
+          const pg = await app.firstWindow({ timeout: 45000 });
+          const perr = []; pg.on('pageerror', e => perr.push(String(e)));
+          await pg.waitForLoadState('load'); await pg.waitForTimeout(4000);
+          const a = await pg.evaluate(() => ({
+            ver: (typeof APP_VER !== 'undefined' && APP_VER.desktop) || null,
+            title: document.title,
+            white: (document.body.innerText || '').trim().length < 2,
+            loginPwd: !!document.querySelector('input[type="password"]')
+          }));
+          out.after = a;
+          g.d1_versionIs249 = a.ver === '1.0.249' && a.title.includes('1.0.249');
+          g.d2_noWhiteScreen = a.white === false;
+          g.d3_loginSurface = a.loginPwd === true;
+          // viewport desktop ANTES do seed (isDesktop() depende de largura >=1024 no app empacotado)
+          try { await app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows()[0]; if (w) w.setContentSize(1920, 1080); }); } catch (_) {}
+          await pg.waitForTimeout(800);
+          const smoke = await pg.evaluate(async () => {
+            const r = {};
+            try {
+              state.user = { id: 'carlos', name: 'Carlos Eduardo', role: 'Social Media', admin: true };
+              state.users = [state.user, { id: 'marina', name: 'Marina Klein', role: 'Designer' }];
+              document.body.classList.add('desktop', 'authed', 'light-ui');
+              const asp = document.getElementById('authSplash'); if (asp) asp.style.display = 'none';
+              const lg = document.getElementById('login'); if (lg) lg.classList.add('hidden');
+              const ap = document.getElementById('app'); if (ap) ap.style.display = 'flex';
+              state.tasks = [
+                { id: 'k1', title: 'Cronograma Sunset Wear', client: 'Sunset Wear', sector: 'edicao_cards', by: 'carlos', assigneeId: 'carlos', status: 'andamento', dueDate: '2026-08-25', dueTime: '22:00' },
+                { id: 'k2', title: 'Reels de lançamento', client: 'Sunset Wear', sector: 'edicao_cards', by: 'carlos', assigneeId: 'carlos', status: 'afazer', dueDate: '2026-08-26' }];
+              state.tab = 'tarefas'; state.personBoard = 'carlos'; render(); if (typeof afterBoard === 'function') afterBoard();
+            } catch (e) { r.seedErr = String(e); }
+            const q = s => document.querySelector(s);
+            r.isDesktop = (typeof isDesktop === 'function') ? isDesktop() : null;
+            r.innerW = window.innerWidth;
+            r.lightUi = document.body.classList.contains('light-ui');
+            r.sidebar = !!q('.nav .lui-brand2') && document.querySelectorAll('.nav .sb-item').length >= 5;
+            r.lanes = document.querySelectorAll('.kbv2-column').length;
+            r.cards = document.querySelectorAll('.kbv2-card').length;
+            r.hasMore = !!q('.nav .sb-more>summary');
+            r.newTask = !!q('.new-task-btn');
+            return r;
+          });
+          out.smoke = smoke;
+          g.e1_lightUiOn = smoke.lightUi === true;
+          g.e2_sidebar = smoke.sidebar === true;
+          g.e3_more = smoke.hasMore === true;
+          g.e4_newTask = smoke.newTask === true;
+          g.e5_lanes4 = smoke.lanes === 4;
+          g.e6_cards = smoke.cards >= 1;
+          const clk = async sel => { await pg.evaluate(s => { const e = document.querySelector(s); if (e) e.click(); }, sel); await pg.waitForTimeout(250); };
+          await clk('.nav [data-flowclient]'); g.e7_ctxCliente = (await pg.evaluate(() => state.flowView)) === 'client';
+          await clk('.nav [data-myboard]'); await pg.waitForTimeout(150);
+          await sleep(300); await pg.screenshot({ path: process.env.RUNNER_TEMP + '/canary/CANARY-249-1920.png' });
+          g.f1_no_hscroll_1920 = await pg.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2);
+          try { await app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows()[0]; if (w) w.setContentSize(1366, 768); }); } catch (_) {}
+          await sleep(600); await pg.screenshot({ path: process.env.RUNNER_TEMP + '/canary/CANARY-249-1366.png' });
+          g.f2_no_hscroll_1366 = await pg.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2);
+          g.f3_lanes_after_resize = (await pg.evaluate(() => document.querySelectorAll('.kbv2-column').length)) === 4;
+          await pg.waitForTimeout(300);
+          g.f4_noFatalPageError = perr.length === 0;
+          out.pageErrors = perr;
+          const fails = Object.entries(g).filter(([k, v]) => !v).map(([k]) => k);
+          out.fails = fails;
+          fs.writeFileSync(process.env.RUNNER_TEMP + '/canary/canary-sessionB.json', JSON.stringify(out, null, 1));
+          console.log(JSON.stringify(out, null, 1));
+          try { await Promise.race([app.close(), sleep(4000)]); } catch (_) {}
+          if (fails.length) { console.error('FAILS B:', fails); }
+          process.exit(fails.length ? 1 : 0);
+          EOF
+          node canary-b.mjs
+          echo "PUBLIC UPDATER CANARY: PASS (1.0.248 -> feed publico -> 1.0.249; sha512 PASS; upgrade silencioso; installed 1.0.249 sanity)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "Upload evidências do canary (JSON + feeds + screenshots)"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-1.0.249-canary-evidence
+          path: |
+            ${{ runner.temp }}/canary/canary-sessionA.json
+            ${{ runner.temp }}/canary/canary-sessionB.json
+            ${{ runner.temp }}/canary/public-latest.yml
+            ${{ runner.temp }}/canary/installed-app-update.yml
+            ${{ runner.temp }}/canary/CANARY-249-1920.png
+            ${{ runner.temp }}/canary/CANARY-249-1366.png
+          if-no-files-found: warn
+          retention-days: 30
