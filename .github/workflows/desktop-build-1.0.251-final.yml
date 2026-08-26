@@ -470,7 +470,7 @@ jobs:
           g.D12_mover = g.f2_mover === true;
           // D14 dense state (cron + prioridade + atraso + designer + resposta do cliente)
           await clk('[data-detail="k6"]');
-          g.D14_dense = await pg.evaluate(() => { const t = (document.getElementById('modalRoot') || {}).innerText || ''; return /Cliente pediu ajuste|Resposta do cliente/i.test(t) && /Prioridade/.test(t) && document.documentElement.scrollWidth <= window.innerWidth + 2; });
+          g.D14_dense = await pg.evaluate(() => { const t = (document.getElementById('modalRoot') || {}).innerText || ''; return /Cliente pediu ajuste|Resposta do cliente/i.test(t) && /Prioridade/i.test(t) && document.documentElement.scrollWidth <= window.innerWidth + 2; });
           await pg.screenshot({ path: process.env.RUNNER_TEMP + '/RC251-DETAIL-DENSE.png' });
           await clk('.det-x');
           // D15 long title sem clipping horizontal
