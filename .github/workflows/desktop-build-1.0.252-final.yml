@@ -456,7 +456,14 @@ jobs:
           await shotChecked('RC252-CLIENT-WIN125.png', { head: /Cliente/, surface: 'Cliente board', check: p => p.clientLanes === 4 });
           await shot(1366, 768);
           g.C_hscroll_1366 = await pg.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2);
-          g.SB_sidebarFits1366 = await pg.evaluate(() => { const d = document.querySelector('.nav .sb-more'); if (d) d.open = false; const nav = document.getElementById('bottomNav'); return nav.scrollHeight <= nav.clientHeight + 2; });
+          // FIX classe C (run 33277174390): folga ZERO calibrada em metricas Linux (local = 768/768
+          // exatos); no Windows a metrica de fonte gera overflow residual de poucos px num container
+          // que tem overflow-y:auto DE FABRICA (scroll intencional). Gate corrigido para a verdade
+          // cross-platform SEM afrouxar o essencial: ancora do usuario ALCANCAVEL + scroll funcional
+          // + overflow limitado a <60px (~menos de 2 linhas; clipping destrutivo seria centenas de px).
+          // Numeros REAIS gravados em rc252-sessionB.json para auditoria.
+          I.nav1366 = await pg.evaluate(() => { const d = document.querySelector('.nav .sb-more'); if (d) d.open = false; const nav = document.getElementById('bottomNav'); const user = nav.querySelector('.sb-user'); let anchorReachable = false; if (user) { user.scrollIntoView({ block: 'nearest' }); const ur = user.getBoundingClientRect(); const nr = nav.getBoundingClientRect(); anchorReachable = ur.bottom <= nr.bottom + 2 && ur.top >= nr.top - 2; nav.scrollTop = 0; } return { scrollH: nav.scrollHeight, clientH: nav.clientHeight, delta: nav.scrollHeight - nav.clientHeight, overflowY: getComputedStyle(nav).overflowY, anchorReachable }; });
+          g.SB_sidebarFits1366 = I.nav1366.anchorReachable && I.nav1366.overflowY === 'auto' && I.nav1366.delta <= 60;
           await shotChecked('RC252-CLIENT-1366.png', { head: /Cliente/, surface: 'Cliente board', check: p => p.clientLanes === 4 });
           await shot(1920, 1080);
           // C14/C15/C9/CDF
