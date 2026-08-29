@@ -4555,6 +4555,15 @@ body.light-ui.desktop .scr-client .kbv2-empty2 svg{opacity:.45;transform:scale(.
 body.light-ui.desktop .scr-client .kbv2-empty2{font-size:12px;font-weight:600;color:#98A1AD}
 body.light-ui.desktop .scr-client .kbv2-column-add{border:1px solid #E7EDF3;border-style:solid;background:#fff;border-radius:10px;color:#5A6675;font-weight:650}
 body.light-ui.desktop .scr-client .kbv2-column-add:hover{border-color:#CBD8E4;color:#16202C}
+/* ==========================================================================
+   LIGHT UI — I7.17.2B · CONTEXTUAL NAV CLEANUP (desktop light-ui)
+   taskChips() deixa de emitir a navegacao global duplicada nos boards deste
+   modo (a sidebar Option B ja carrega os 5 contextos). O container .tchips
+   que ficar VAZIO some, para a toolbar restante (busca/filtros/acoes) manter
+   alinhamento intencional; quando sobra filtro real (ex.: "Minhas tarefas"
+   no board de setor) o container permanece. Mobile/legado intocados.
+   ========================================================================== */
+body.light-ui.desktop .d-board-tools .tchips:empty{display:none}
 </style>
 </head>
 <body>
@@ -8366,6 +8375,13 @@ function activeTab(){
 function tabIcon(k){return {mine:'person',client:'eye',designers:'image',socials:'group',hub:'grid'}[k]||'grid';}
 // 1.0.103 — chips premium COM ÍCONES (Meu quadro/Cliente/Designers/Social Medias/Setores).
 function taskChips(){
+  /* I7.17.2B — DESKTOP light-ui: estes 5 chips sao navegacao GLOBAL duplicada da sidebar
+     Option B aprovada (I7.17.1 classificou como REDUNDANCIA PURA; mesmos labels/handlers/
+     destinos da sidebar). Neste modo a toolbar dos boards volta a ser busca+filtros+acoes.
+     MOBILE e LEGADO (sem light-ui) PRESERVAM os chips: la eles seguem sendo a UNICA
+     navegacao entre contextos (bottom-nav/TABS legado nao tem os contextos de trabalho).
+     Nenhum handler/destino alterado — a remocao e somente de render neste modo. */
+  if(isDesktop()&&document.body.classList.contains('light-ui'))return '';
   const u=state.user;const see=canSeeAll(u);const act=activeTab();
   const tabs=[{k:'mine',l:'Meu quadro',a:'data-myboard="1"'}];
   if(see){tabs.push({k:'client',l:'Cliente',a:'data-flowclient="1"'});
