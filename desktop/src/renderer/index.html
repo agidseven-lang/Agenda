@@ -7319,12 +7319,18 @@ function afterPrioridades(){
 /* F3.5.4R:END */
 function navBtn(t){const on=state.tab===t.k&&!state.form;return '<button class="'+(on?'on':'')+'" data-tab="'+t.k+'">'+svg(t.i)+(typeof notifNavBadge==='function'?notifNavBadge(t.k):'')+'<span>'+t.l+'</span></button>';}
 function sbItem(t){const on=state.tab===t.k&&!state.form;return '<button class="sb-item '+(on?'on':'')+'" data-tab="'+t.k+'">'+svg(t.i)+(typeof notifNavBadge==='function'?notifNavBadge(t.k):'')+'<span>'+t.l+'</span></button>';}
-/* I7.7.2 — A GOLDEN nav architecture (gated body.light-ui). Contextos de trabalho = navegação
-   PRIMÁRIA (como no A GOLDEN), reutilizando handlers/destinos REAIS (data-myboard/data-flowclient/
-   data-flowdesigners/data-flowsocials/data-board=hub). Seções do app viram grupo secundário
-   compacto (Agenda/Relatórios/Configurações) + "Mais" (disclosure NATIVO <details>, zero handler
-   novo) preservando acesso a Prioridades/Hoje/Tarefas/Equipe/Perfil/Executivo/Notificações.
-   Nenhuma rota falsa, nenhuma permissão alterada. Legado (sem light-ui) permanece intacto. */
+/* I7.17.2A — TARGET IA OPTION B (aprovada pelo owner em I7.17.1; gated body.light-ui).
+   PRINCIPAL = Hoje (landing real do boot — state init tab:'hoje') + contextos de trabalho
+   com handlers/destinos REAIS (data-myboard/data-flowclient/data-flowdesigners/
+   data-flowsocials/data-board=hub); "Quadros" e RENAME de navegacao do antigo "Setores"
+   (MESMO destino renderHub). FERRAMENTAS = Agenda/Relatorios/"Painel SLA" (rename visual
+   do Executivo; MESMO tab 'exec'/renderExecPanel — sem fusao com Relatorios). MAIS
+   (disclosure NATIVO <details>, zero handler novo) = Prioridades/Equipe/Perfil/
+   Notificacoes. CONTA (ancorada ao rodape) = Configuracoes + ancora real do usuario.
+   Mais->Tarefas REMOVIDO (TRUE DUPLICATE do Hub provado em I7.17.1: mesmo state + mesmo
+   renderer + innerHTML identico) — o selected-state de tab 'tarefas' volta a ter 1 dono
+   por contexto (activeTab). Nenhuma rota falsa, nenhuma permissao alterada, nenhum
+   destino funcional perdido. Legado (sem light-ui) e mobile permanecem intactos. */
 function luiSidebarNav(){
   const u=state.user||{}; const see=(typeof canSeeAll==='function')&&canSeeAll(u);
   const onTasks=state.tab==='tarefas'; const act=(onTasks&&typeof activeTab==='function')?activeTab():null;
@@ -7334,19 +7340,21 @@ function luiSidebarNav(){
     '<span class="lui-sync" title="Sincronizado"><span class="dot"></span></span></div>'+
     '<button class="new-task-btn" data-fab="1"><span class="new-task-icon">'+svg('plus')+'</span><span class="new-task-label">Nova tarefa</span></button>'+
     '<div class="sb-sect">Principal</div>'+
+    sbItem({k:'hoje',l:'Hoje',i:'today'})+
     ctx('Meu quadro','person','data-myboard="1"',act==='mine')+
     (see?ctx('Cliente','eye','data-flowclient="1"',act==='client'):'')+
     (see?ctx('Designers','image','data-flowdesigners="1"',act==='designers'):'')+
     (see?ctx('Social Medias','group','data-flowsocials="1"',act==='socials'):'')+
-    ctx('Setores','grid','data-board="hub"',act==='hub')+
+    ctx('Quadros','grid','data-board="hub"',act==='hub')+
     '<div class="sb-sect">Ferramentas</div>'+
     sbItem({k:'agenda',l:'Agenda',i:'calendar'})+
     sbItem({k:'relatorios',l:'Relatórios',i:'bars'})+
-    sbItem({k:'config',l:'Configurações',i:'gear'});
-  const moreItems=[{k:'prioridades',l:'Minhas Prioridades',i:'gauge'},{k:'hoje',l:'Hoje',i:'today'},{k:'tarefas',l:'Tarefas',i:'checklist'},{k:'equipe',l:'Equipe',i:'group'},{k:'perfil',l:'Perfil',i:'person'},{k:'exec',l:'Executivo',i:'gauge'},{k:'notificacoes',l:'Notificações',i:'bell'}];
-  const moreOpen=['prioridades','hoje','equipe','perfil','exec','notificacoes'].indexOf(state.tab)>=0;
+    sbItem({k:'exec',l:'Painel SLA',i:'gauge'});
+  const moreItems=[{k:'prioridades',l:'Minhas Prioridades',i:'gauge'},{k:'equipe',l:'Equipe',i:'group'},{k:'perfil',l:'Perfil',i:'person'},{k:'notificacoes',l:'Notificações',i:'bell'}];
+  const moreOpen=['prioridades','equipe','perfil','notificacoes'].indexOf(state.tab)>=0;
   h+='<details class="sb-more"'+(moreOpen?' open':'')+'><summary class="sb-item sb-more-t">'+svg('dots')+'<span>Mais</span></summary><div class="sb-more-list">'+moreItems.map(sbItem).join('')+'</div></details>';
   h+='<div class="sb-spacer"></div>';
+  h+='<div class="sb-sect">Conta</div>'+sbItem({k:'config',l:'Configurações',i:'gear'});
   h+='<button class="sb-user" data-tab="perfil" title="Conta — abrir Perfil / Sair da conta">'+avatar(u,34)+'<span class="su-m"><span class="su-n">'+esc(u.name||'Conta')+'</span><span class="su-r">'+esc(u.role||'Equipe')+(u.admin?' · admin':'')+'</span></span></button>';
   h+='<div class="sb-footer lui-foot2" title="Desktop '+APP_VER.desktop+' · '+APP_VER.tag+' · produção">Desktop '+esc(APP_VER.desktop)+'</div>';
   return h;
