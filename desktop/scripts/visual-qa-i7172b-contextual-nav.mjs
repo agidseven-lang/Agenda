@@ -1,4 +1,4 @@
-/* I7.17.2B — QA do candidato Contextual Nav Cleanup (gemeo versionado do harness executado; requer BASE2A_DIR).
+/* I7.17.2B — QA do candidato Contextual Nav Cleanup (gemeo versionado E1: reveal suprimido em QA + hard gate anti-login por captura + manifesto; requer BASE2A_DIR).
  * Serve CANDIDATO (worktree 2B) e BASE2A (renderer @33d01275 aprovado) no mesmo run.
  * Gates: tchips globais removidos nas 4 superficies desktop lui + preservacao de busca/
  * filtros/acoes + Meu quadro lui byte-identico + mobile/legado preservados + sidebar 2A
@@ -30,6 +30,11 @@ const mkPage = async (port, vw, vh) => {
   await pg.addInitScript(() => { const P = new Proxy(function () {}, { get: () => P, apply: () => P, construct: () => P }); window.firebase = P; });
   await pg.goto(`http://127.0.0.1:${port}/index.html`, { waitUntil: 'domcontentloaded' });
   await pg.waitForFunction(() => typeof state !== 'undefined' && typeof render === 'function', null, { timeout: 45000 });
+  /* E1 ROOT-CAUSE FIX (harness-only): sem window.desktopAPI a maquina de boot F3.5.5C-H1
+     chama _revealLogin('no_bridge') ~12s apos o load e o login pinta POR CIMA da sessao
+     de QA (foi exatamente isso que invalidou o pacote 2B). Em contexto de QA suprimimos o
+     reveal (registrando cada tentativa) — comportamento de PRODUTO intocado. */
+  await pg.evaluate(() => { window.__qaRevealSuppressed = []; window._revealLogin = function (reason) { window.__qaRevealSuppressed.push(String(reason || '')); }; });
   await pg.waitForTimeout(700); return pg;
 };
 const pgC = await mkPage(sv1.address().port);
@@ -71,6 +76,32 @@ const seed = async (pg, mode) => { await pg.evaluate(SEED, seedArgs, ); };
 const seed2 = async (pg, mode) => { await pg.evaluate(args => { (0, eval)('(' + args.fn + ')')(args.sa, args.mode); }, { fn: SEED.toString(), sa: seedArgs, mode }); await pg.waitForTimeout(500); };
 await seed2(pgC, 'lui'); await seed2(pgB, 'lui');
 
+const MANIFEST = [];
+const surfaceProbe = pg => pg.evaluate(() => {
+  const l = document.getElementById('login');
+  const loginPresent = !!l && !l.classList.contains('hidden') && getComputedStyle(l).display !== 'none' && l.getBoundingClientRect().width > 0;
+  const el = document.querySelector('#content .scr-head, #content .h-title, #content .exec-ttl, #content .nc-ttl, #content .lui-ph-t');
+  const heading = (((el && el.textContent) || '').trim() || (document.getElementById('content').innerText || '').trim()).replace(/\s+/g, ' ').slice(0, 70);
+  return { loginPresent, heading,
+    sidebar: !!document.querySelector('#bottomNav .sb-item'),
+    clientLanes: document.querySelectorAll('.scr-client .kbv2-column').length,
+    lanes: document.querySelectorAll('.kbv2-column').length,
+    hubCards: document.querySelectorAll('#content .bcard').length,
+    suppressed: (window.__qaRevealSuppressed || []).length,
+    vw: window.innerWidth + 'x' + window.innerHeight };
+});
+const shotChecked = async (pg, name, expect) => {
+  const p = await surfaceProbe(pg);
+  const headOk = expect.head.test(p.heading);
+  const extraOk = expect.check ? expect.check(p) : true;
+  const valid = !p.loginPresent && headOk && extraOk && p.sidebar;
+  MANIFEST.push({ filename: name, sourceSha: expect.src, viewport: p.vw, expectedSurface: expect.surface,
+    actualSurface: p.loginPresent ? 'LOGIN' : p.heading.slice(0, 40), expectedHeading: String(expect.head),
+    actualHeading: p.heading, loginPresent: p.loginPresent, revealSuppressedCount: p.suppressed, screenshotValid: valid });
+  if (!valid) { g['SHOT_' + name.replace(/[^A-Za-z0-9]/g, '_')] = false; return false; }
+  await pg.waitForTimeout(250); await pg.screenshot({ path: path.join(OUT, name) }); return true;
+};
+const CAND_SRC = 'worktree@96b88185 (2B)'; const BASE_SRC = '33d01275 (2A aprovado)';
 const clkSide = async (pg, label) => { await pg.evaluate(t => {
   const d = document.querySelector('.nav .sb-more'); if (d && [...d.querySelectorAll('.sb-item')].some(x => ((x.querySelector('span:last-of-type') || {}).textContent || '') === t)) d.open = true;
   const it = [...document.querySelectorAll('#bottomNav .sb-item')].find(x => ((x.querySelector('span:last-of-type') || {}).textContent || '') === t);
@@ -297,9 +328,10 @@ out.pageErrorsMobile = pgM._errs; out.pageErrorsLegacy = pgL._errs;
 // ---------- responsivo (§16) + shots (§17) ----------
 const shotFull = async (pg, name) => { await pg.waitForTimeout(400); await pg.screenshot({ path: path.join(OUT, name) }); };
 const setVp = async (pg, w, h) => { await pg.setViewportSize({ width: w, height: h }); await pg.waitForTimeout(450); };
-// Cliente candidato 3 viewports + hscroll
+// Cliente candidato 3 viewports + hscroll (cada captura passa pelo hard gate anti-login)
 await clkSide(pgC, 'Cliente');
 out.resp = {};
+const EXP_CLIENT = { head: /Cliente/, surface: 'Cliente board', src: CAND_SRC, check: p => p.clientLanes === 4 };
 for (const [name, w, h] of [['1920', 1920, 1080], ['win125', 1536, 864], ['1366', 1366, 768]]) {
   await setVp(pgC, w, h);
   out.resp['client_' + name] = await pgC.evaluate(() => ({
@@ -309,33 +341,41 @@ for (const [name, w, h] of [['1920', 1920, 1080], ['win125', 1536, 864], ['1366'
     lanes: document.querySelectorAll('.scr-client .kbv2-column').length,
     sidebarFirst: ((document.querySelector('#bottomNav .sb-item span:last-of-type') || {}).textContent || '')
   }));
-  await shotFull(pgC, 'I7172B-CLIENT-' + (name === 'win125' ? 'WIN125' : name.toUpperCase()) + '.png');
+  await shotChecked(pgC, 'I7172B-CLIENT-' + (name === 'win125' ? 'WIN125' : name.toUpperCase()) + '.png', EXP_CLIENT);
 }
 g.RS_client = ['1920', 'win125', '1366'].every(k => { const v = out.resp['client_' + k]; return !v.hscroll && v.searchVisible && v.lanes === 4 && v.sidebarFirst === 'Hoje'; });
 await setVp(pgC, 1920, 1080);
-await shotFull(pgC, 'I7172B-CLIENT-AFTER.png');
-// BEFORE (base2A)
+await shotChecked(pgC, 'I7172B-CLIENT-AFTER.png', EXP_CLIENT);
+// BEFORE (base2A) — mesma asserts na pagina base
 await pgB.evaluate(() => { state.tab = 'tarefas'; state.flowView = 'client'; state.personBoard = null; render(); });
 await pgB.waitForTimeout(450);
-await shotFull(pgB, 'I7172B-CLIENT-BEFORE.png');
+await shotChecked(pgB, 'I7172B-CLIENT-BEFORE.png', { head: /Cliente/, surface: 'Cliente board (2A)', src: BASE_SRC, check: p => p.clientLanes === 4 });
 // Meu quadro before/after
-await clkSide(pgC, 'Meu quadro'); await shotFull(pgC, 'I7172B-MEUQUADRO-AFTER.png');
-await clkSide(pgB, 'Meu quadro'); await shotFull(pgB, 'I7172B-MEUQUADRO-BEFORE.png');
+await clkSide(pgC, 'Meu quadro');
+await shotChecked(pgC, 'I7172B-MEUQUADRO-AFTER.png', { head: /Meu quadro/, surface: 'Meu quadro', src: CAND_SRC, check: p => p.lanes === 4 });
+await clkSide(pgB, 'Meu quadro');
+await shotChecked(pgB, 'I7172B-MEUQUADRO-BEFORE.png', { head: /Meu quadro/, surface: 'Meu quadro (2A)', src: BASE_SRC, check: p => p.lanes === 4 });
 // demais AFTER
-await clkSide(pgC, 'Designers'); await shotFull(pgC, 'I7172B-DESIGNERS-AFTER.png');
-await clkSide(pgC, 'Social Medias'); await shotFull(pgC, 'I7172B-SOCIALMEDIAS-AFTER.png');
+await clkSide(pgC, 'Designers');
+await shotChecked(pgC, 'I7172B-DESIGNERS-AFTER.png', { head: /Designer|Quadro de/, surface: 'Designers', src: CAND_SRC, check: p => p.lanes >= 3 });
+await clkSide(pgC, 'Social Medias');
+await shotChecked(pgC, 'I7172B-SOCIALMEDIAS-AFTER.png', { head: /Social|Quadro de/, surface: 'Social Medias', src: CAND_SRC, check: p => p.lanes >= 3 });
 await clkSide(pgC, 'Quadros');
-await pgC.evaluate(() => { const b = [...document.querySelectorAll('#content .bcard')].find(x => /Edição de Cards/.test(x.textContent)); if (b) b.click(); });
-await pgC.waitForTimeout(450);
-await shotFull(pgC, 'I7172B-QUADROS-AFTER.png');
-// contexto final Option B
+await shotChecked(pgC, 'I7172B-QUADROS-AFTER.png', { head: /Quadros/, surface: 'Hub Quadros', src: CAND_SRC, check: p => p.hubCards >= 5 });
+// contexto final Option B (sidebar aprovada + toolbar limpa + board real)
 await clkSide(pgC, 'Cliente');
-await shotFull(pgC, 'I7172B-OPTION-B-FULL-CONTEXT.png');
+await shotChecked(pgC, 'I7172B-OPTION-B-FULL-CONTEXT.png', EXP_CLIENT);
+// gates agregados de integridade de evidencia
+g.SCREENSHOT_NOT_LOGIN = MANIFEST.every(m => m.loginPresent === false);
+g.MANIFEST_allValid = MANIFEST.length >= 11 && MANIFEST.every(m => m.screenshotValid === true);   // 11 capturas diretas; os 2 composites sao compostos DEPOIS somente de frames validos e anexados ao manifesto
+I.revealSuppressed = { cand: await pgC.evaluate(() => (window.__qaRevealSuppressed || [])), base: await pgB.evaluate(() => (window.__qaRevealSuppressed || [])) };
+fs.writeFileSync(path.join(OUT, 'i7172b-evidence-manifest.json'), JSON.stringify(MANIFEST, null, 1));
 
 g.P_noPageErrors = pgC._errs.length === 0 && pgM._errs.length === 0 && pgL._errs.length === 0;
 out.pageErrorsCandidate = pgC._errs;
 const fails = Object.entries(g).filter(([k, v]) => !v).map(([k]) => k);
 out.fails = fails;
+out.manifest = MANIFEST;
 fs.writeFileSync(path.join(OUT, 'i7172b-qa.json'), JSON.stringify(out, null, 1));
 console.log('GATES:', Object.keys(g).length, 'TRUE:', Object.values(g).filter(Boolean).length);
 console.log('FAILS:', JSON.stringify(fails));
