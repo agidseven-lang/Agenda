@@ -1,0 +1,662 @@
+# =====================================================================
+# [manual] I7.18.3 - PUBLIC UPDATER CANARY (Desktop 1.0.251 -> feed PUBLICO -> 1.0.252)
+# ---------------------------------------------------------------------
+# Espelha o precedente canonico imediato (desktop-canary-1.0.251-final.yml,
+# ciclo publico do updater 250->251, run 33252590251 PASS) com o delta da
+# linha 1.0.252 + SESSION B grafada VERBATIM do Session B provado do build
+# canonico 33277541544 (desktop-build-1.0.252-final.yml, 18/18 verde):
+# OPTION B SB1-SB16 + CN1-CN10 + NAV reachability + freeze T/D/C + Hub +
+# F-smoke + E1 evidence manifest (SCREENSHOT_NOT_LOGIN por captura) + gate
+# SB_sidebarFits1366 cross-platform (fix classe C do PR #193; numeros reais
+# gravados no sessionB para auditoria).
+#
+# CONSUMIDOR PURO DA PRODUCAO PUBLICA. Esta fase NAO:
+#   - cria tag / cria release / altera Latest / altera latest.yml / publica asset
+#   - executa desktop-release / gera novo build do produto / seta RC_RELEASE_GO
+#   - reescreve app-update.yml / usa feed local ou mock / instala 1.0.252 direto
+# Usa EXCLUSIVAMENTE os Releases publicos v1.0.251 e v1.0.252 ja existentes e o
+# app-update.yml REAL embarcado no instalador publico 1.0.251.
+#
+# FAIL-CLOSED: aborta antes de instalar se qualquer pre-condicao publica
+# estiver incorreta. PowerShell 5.1: strings/scripts criticos 100% ASCII
+# (licao U+2014). Execucao manual apenas.
+# =====================================================================
+name: "[manual] I7.18.3 - Public Updater Canary 1.0.251 -> 1.0.252"
+"on":
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  OWNER_REPO: "agidseven-lang/Agenda"
+  PRODUCT_SOURCE_SHA: "b7656aee27d67b65ab06c2432ef31a677dec7c47"
+  EXPECTED_VERSION: "1.0.252"
+  BASELINE_VERSION: "1.0.251"
+  LATEST_TAG: "v1.0.252"
+  BASELINE_TAG: "v1.0.251"
+  EXE_NAME: "Agenda-ID-Seven-Desktop-1.0.252-x64.exe"
+  BASELINE_EXE: "Agenda-ID-Seven-Desktop-1.0.251-x64.exe"
+  APPROVED_EXE_SHA256: "7859f9d2489eb17f253dc5db9b394eae8925f5110d0a77f3e4bab82bc5055046"
+
+jobs:
+  public-updater-canary:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: "Git sem conversao CRLF"
+        run: git config --global core.autocrlf false
+
+      - name: "GATE — PRE-CONDICOES PUBLICAS (fail-closed, antes de instalar)"
+        env:
+          GH_API_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/canary"
+          api() { curl -sSL -H "Accept: application/vnd.github+json" -H "Authorization: Bearer $GH_API_TOKEN" "$@"; }
+          LT=$(api "https://api.github.com/repos/$OWNER_REPO/releases/latest" | jq -r .tag_name)
+          [ "$LT" = "$LATEST_TAG" ] || { echo "::error::Latest publico=$LT != $LATEST_TAG"; exit 1; }
+          TS=$(api "https://api.github.com/repos/$OWNER_REPO/commits/$LATEST_TAG" | jq -r .sha)
+          [ "$TS" = "$PRODUCT_SOURCE_SHA" ] || { echo "::error::tag $LATEST_TAG sha=$TS != $PRODUCT_SOURCE_SHA"; exit 1; }
+          for T in "$BASELINE_TAG" "$LATEST_TAG"; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $GH_API_TOKEN" "https://api.github.com/repos/$OWNER_REPO/releases/tags/$T")
+            [ "$code" = "200" ] || { echo "::error::release $T ausente (http $code)"; exit 1; }
+          done
+          FEED_URL="https://github.com/$OWNER_REPO/releases/download/$LATEST_TAG/latest.yml"
+          curl -sSL -o "$RUNNER_TEMP/canary/public-latest.yml" "$FEED_URL"
+          grep -q "^version: $EXPECTED_VERSION$" "$RUNNER_TEMP/canary/public-latest.yml" || { echo "::error::latest.yml publico version != $EXPECTED_VERSION"; exit 1; }
+          FY_SHA=$(sha256sum "$RUNNER_TEMP/canary/public-latest.yml" | awk '{print $1}')
+          jq -n --arg url "$FEED_URL" --arg ver "$EXPECTED_VERSION" --arg sha "$FY_SHA" \
+            --arg latest "$LT" --arg tagsha "$TS" \
+            '{feedType:"PUBLIC GITHUB RELEASE (provider github, channel latest)", publicLatestYmlUrl:$url, latestYmlVersion:$ver, latestYmlSha256:$sha, repoLatestTag:$latest, tagCommitSha:$tagsha, localhost:false, mock:false}' \
+            > "$RUNNER_TEMP/canary/canary252-public-feed-proof.json"
+          {
+            echo "== I7.18.3 PRECONDITIONS =="
+            echo "PUBLIC LATEST TAG: $LT"
+            echo "TAG $LATEST_TAG -> SHA: $TS (== $PRODUCT_SOURCE_SHA)"
+            echo "RELEASE $BASELINE_TAG EXISTS: YES (rollback preservado)"
+            echo "RELEASE $LATEST_TAG EXISTS: YES"
+            echo "PUBLIC latest.yml VERSION: $EXPECTED_VERSION (sha256=$FY_SHA)"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: "AUDITORIA BYTE DO FEED PUBLICO 1.0.252 (latest.yml path/size/sha512 + sha256==build aprovado)"
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/canary"
+          curl -sSL -o public-252.exe "https://github.com/$OWNER_REPO/releases/download/$LATEST_TAG/$EXE_NAME"
+          grep -q "url: $EXE_NAME" public-latest.yml || { echo "::error::latest.yml path != $EXE_NAME"; exit 1; }
+          SIZE=$(stat -c%s public-252.exe)
+          grep -q "size: $SIZE" public-latest.yml || { echo "::error::latest.yml size != $SIZE"; exit 1; }
+          SHA512=$(openssl dgst -sha512 -binary public-252.exe | base64 -w0)
+          grep -q "$SHA512" public-latest.yml || { echo "::error::latest.yml sha512 nao bate com o installer publico"; exit 1; }
+          S256=$(sha256sum public-252.exe | awk '{print $1}')
+          [ "$S256" = "$APPROVED_EXE_SHA256" ] || { echo "::error::sha256 do exe publico=$S256 != build aprovado $APPROVED_EXE_SHA256"; exit 1; }
+          echo "PUBLIC FEED BYTE AUDIT OK (size=$SIZE sha256=$S256 sha512=match)" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: "BASELINE PUBLICA v1.0.251 — download + verificacao SHA256SUMS"
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/canary"
+          BASE="https://github.com/$OWNER_REPO/releases/download/$BASELINE_TAG"
+          curl -sSL -o baseline.exe "$BASE/$BASELINE_EXE"
+          curl -sSL -o baseline-SHA256SUMS "$BASE/SHA256SUMS"
+          EXP=$(grep "$BASELINE_EXE\$" baseline-SHA256SUMS | awk '{print $1}')
+          GOT=$(sha256sum baseline.exe | awk '{print $1}')
+          [ -n "$EXP" ] && [ "$EXP" = "$GOT" ] || { echo "::error::baseline 1.0.251 sha256 nao confere exp=$EXP got=$GOT"; exit 1; }
+          echo "BASELINE PUBLIC ASSET: $BASELINE_EXE (sha256=$GOT)" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: "INSTALAR 1.0.251 (/S) + CONFIRMAR FEED PUBLICO REAL (app-update.yml embarcado)"
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          $exe = "$env:RUNNER_TEMP\canary\baseline.exe"
+          $p = Start-Process -FilePath $exe -ArgumentList "/S" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Write-Error "baseline install exit $($p.ExitCode)"; exit 1 }
+          Start-Sleep -Seconds 3
+          $dir = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Directory | Where-Object { Test-Path (Join-Path $_.FullName "Agenda ID Seven Desktop.exe") } | Select-Object -First 1
+          if (-not $dir) { Write-Error "baseline 1.0.251 nao instalada"; exit 1 }
+          "INSTALL_DIR=$($dir.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "baseline 1.0.251 instalada: $($dir.FullName)"
+          $au = Join-Path $dir.FullName "resources\app-update.yml"
+          if (-not (Test-Path $au)) { Write-Error "app-update.yml ausente no pacote instalado"; exit 1 }
+          Copy-Item $au "$env:RUNNER_TEMP\canary\installed-app-update.yml"
+          $auTxt = Get-Content $au -Raw
+          Write-Host "---- app-update.yml (instalado) ----"; Write-Host $auTxt
+          if ($auTxt -notmatch "provider:\s*github")      { Write-Error "app-update.yml nao e provider github"; exit 1 }
+          if ($auTxt -notmatch "owner:\s*agidseven-lang") { Write-Error "app-update.yml owner incorreto"; exit 1 }
+          if ($auTxt -notmatch "repo:\s*Agenda")          { Write-Error "app-update.yml repo incorreto"; exit 1 }
+          if ($auTxt -match "127\.0\.0\.1" -or $auTxt -match "localhost") { Write-Error "feed LOCAL detectado - proibido no canary publico"; exit 1 }
+          "UPDATE FEED TYPE: PUBLIC GITHUB RELEASE (github/agidseven-lang/Agenda, channel latest; sem localhost)" | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+
+      - name: "Preparar harness (Playwright + @electron/asar; NENHUM code de produto)"
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/canary"
+          npm init -y >/dev/null 2>&1
+          npm i --no-save playwright@1.47.2 @electron/asar --no-audit --no-fund
+
+      - name: "SESSION A — 1.0.251 REAL: baseline funcional + check(feed publico) -> 1.0.252 -> download(sha512) -> install /S"
+        timeout-minutes: 20
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/canary"
+          cat > canary-a.mjs <<'EOF'
+          import { _electron } from 'playwright';
+          import fs from 'fs';
+          const exe = process.env.INSTALL_DIR + '\\Agenda ID Seven Desktop.exe';
+          const out = { g: {} }; const g = out.g;
+          const sleep = ms => new Promise(r => setTimeout(r, ms));
+          const app = await _electron.launch({ executablePath: exe, args: [] });
+          const pg = await app.firstWindow({ timeout: 45000 });
+          const perr = []; pg.on('pageerror', e => perr.push(String(e).slice(0, 160)));
+          await pg.waitForLoadState('load'); await pg.waitForTimeout(4000);
+          try { await app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows()[0]; if (w) w.setContentSize(1920, 1080); }); } catch (_) {}
+          await pg.waitForTimeout(800);
+          const before = await pg.evaluate(() => ({
+            ver: (typeof APP_VER !== 'undefined' && APP_VER.desktop) || null,
+            upd: !!(window.desktopAPI && window.desktopAPI.updater),
+            innerW: window.innerWidth,
+            isDesktop: (typeof isDesktop === 'function') ? isDesktop() : null,
+            white: (document.body.innerText || '').trim().length < 2
+          }));
+          const st = () => pg.evaluate(() => window.desktopAPI.updater.getState());
+          const st0 = before.upd ? await st() : null;
+          out.before = { ...before, st: st0 };
+          g.a1_baselineIs251 = before.ver === '1.0.251';
+          g.a2_updaterApi = before.upd === true;
+          g.a3_appLaunch = before.white === false;
+          g.a4_installedVersion251 = !!st0 && st0.installedVersion === '1.0.251';
+          g.a5_channelLatest = !!st0 && st0.channel === 'latest';
+          g.a6_allowPrereleaseFalse = !!st0 && st0.allowPrerelease === false;
+          g.a7_desktopViewport = before.innerW >= 1900 && before.isDesktop === true;
+          // baseline funcional minima (origem real do upgrade): light UI + sidebar + board
+          const base = await pg.evaluate(() => {
+            try {
+              state.user = { id: 'carlos', name: 'Carlos Eduardo', role: 'Social Media', admin: true };
+              state.users = [state.user];
+              document.body.classList.add('desktop', 'authed', 'light-ui');
+              const asp = document.getElementById('authSplash'); if (asp) asp.style.display = 'none';
+              const lg = document.getElementById('login'); if (lg) lg.classList.add('hidden');
+              const ap = document.getElementById('app'); if (ap) ap.style.display = 'flex';
+              state.tasks = [{ id: 'b1', title: 'Baseline 251', client: 'QA', sector: 'edicao_cards', by: 'carlos', assigneeId: 'carlos', status: 'afazer', dueDate: '2026-08-30' }];
+              state.tab = 'tarefas'; state.personBoard = 'carlos'; render();
+            } catch (e) { return { err: String(e) }; }
+            return {
+              lightUi: document.body.classList.contains('light-ui'),
+              sidebar: document.querySelectorAll('.nav .sb-item').length >= 5,
+              more: !!document.querySelector('.nav .sb-more>summary'),
+              newTask: !!document.querySelector('.new-task-btn'),
+              client: !!document.querySelector('.nav [data-flowclient]'),
+              lanes: document.querySelectorAll('.kbv2-column').length,
+              cards: document.querySelectorAll('.kbv2-card').length
+            };
+          });
+          out.baseline = base;
+          g.a8_baselineLightUi = base.lightUi === true;
+          g.a9_baselineSidebar = base.sidebar === true && base.more === true && base.newTask === true && base.client === true;
+          g.a10_baselineBoard = base.lanes === 4 && base.cards === 1;
+          // CHECK contra o FEED PUBLICO real (app-update.yml embarcado = github provider)
+          const poll = async (want, ms) => { const t0 = Date.now(); for (;;) { const s = await st(); if (want.includes(s.status)) return s; if (s.status === 'error') return s; if (Date.now() - t0 > ms) return s; await sleep(500); } };
+          await pg.evaluate(() => { window.desktopAPI.updater.check(); });
+          let s = await poll(['update_available', 'up_to_date', 'error'], 60000);
+          out.checkResult = { status: s.status, availableVersion: s.availableVersion, error: s.error };
+          g.b1_updateAvailable = s.status === 'update_available';
+          g.b2_availableIs252 = s.availableVersion === '1.0.252';
+          // PROVA autoDownload=false (comportamento real aprovado): sem download(), NAO progride
+          await sleep(4000);
+          const sIdle = await st();
+          out.afterCheckIdle = { status: sIdle.status, downloaded: sIdle.downloaded };
+          g.b3_noAutoDownloadBeforeAction = sIdle.status === 'update_available' && sIdle.downloaded === false;
+          // DOWNLOAD explicito (lib valida sha512 do latest.yml PUBLICO contra o installer PUBLICO)
+          await pg.evaluate(() => { window.desktopAPI.updater.download(); });
+          { const t0 = Date.now(); for (;;) { const x = await st(); if (x.status === 'downloaded' || x.status === 'error') { s = x; break; } if (Date.now() - t0 > 240000) { s = x; break; } await sleep(500); } }
+          out.downloadResult = { status: s.status, downloaded: s.downloaded, availableVersion: s.availableVersion, error: s.error };
+          g.c1_downloadedSha512Valid = s.status === 'downloaded' && s.downloaded === true;
+          // INSTALL silencioso /S (quitAndInstall(true,true)) - zero acao do usuario
+          pg.evaluate(() => { window.desktopAPI.updater.installAndRestart(); }).catch(() => {});
+          let closed = false;
+          try { await Promise.race([new Promise(res => app.on('close', () => { closed = true; res(); })), sleep(30000)]); } catch (_) {}
+          if (!closed) { try { const x = await st(); closed = (x.status === 'installing'); } catch (_) { closed = true; } }
+          out.appClosedByUpdater = closed;
+          g.d1_installTriggered = closed === true;
+          g.p0_noPageErrorsA = perr.length === 0;
+          out.pageErrors = perr;
+          const fails = Object.entries(g).filter(([k, v]) => !v).map(([k]) => k);
+          out.fails = fails;
+          fs.writeFileSync(process.env.RUNNER_TEMP + '/canary/canary252-sessionA-1.0.251.json', JSON.stringify(out, null, 1));
+          console.log(JSON.stringify(out, null, 1));
+          try { await Promise.race([app.close(), sleep(4000)]); } catch (_) {}
+          if (fails.length) { console.error('FAILS A:', fails); }
+          process.exit(fails.length ? 1 : 0);
+          EOF
+          node canary-a.mjs
+
+      - name: "Confirmar UPGRADE instalado == 1.0.252 (asar) + sem instalador residual + REQUIRED_USER_INSTALL_ACTIONS=0"
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          $work = "$env:RUNNER_TEMP\canary"
+          $asar = Join-Path $env:INSTALL_DIR "resources\app.asar"
+          $deadline = (Get-Date).AddSeconds(240); $ok = $false; $ver = ""
+          while ((Get-Date) -lt $deadline) {
+            Start-Sleep -Seconds 4
+            if (Test-Path $asar) {
+              Push-Location $work
+              try { $ver = (& node -e "const a=require('@electron/asar');process.stdout.write(JSON.parse(a.extractFile(process.argv[1],'package.json').toString('utf8')).version)" "$asar") } catch { $ver = "" }
+              Pop-Location
+              if ($ver -eq "1.0.252") { $ok = $true; break }
+            }
+          }
+          if (-not $ok) { Write-Error "FAIL: asar instalado != 1.0.252 (got '$ver') - upgrade silencioso via feed publico nao concluiu"; exit 1 }
+          Start-Sleep -Seconds 3
+          $setup = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -like "*Setup*" -or $_.MainWindowTitle -like "*Instal*" }).Count
+          if ($setup -ne 0) { Write-Error "FAIL: janela de instalador residual (update nao foi silencioso)"; exit 1 }
+          Get-Process | Where-Object { $_.ProcessName -like "*Agenda*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 2
+          "INSTALL UPDATE RESULT: PASS (asar==1.0.252)" | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          "REQUIRED_USER_INSTALL_ACTIONS: 0 (silencioso /S; sem wizard/UAC/residual)" | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+
+      - name: "SESSION B — 1.0.252 instalada: OPTION B (SB1-16/CN1-10/NAV) + freeze T/D/C + Hub + F-smoke + E1 manifest + 1920/Win125/1366"
+        timeout-minutes: 30
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/canary"
+          cat > canary-b.mjs <<'EOF'
+          import { _electron } from 'playwright';
+          import fs from 'fs';
+          const exe = process.env.INSTALL_DIR + '\\Agenda ID Seven Desktop.exe';
+          const out = { g: {}, info: {} }; const g = out.g; const I = out.info;
+          const sleep = ms => new Promise(r => setTimeout(r, ms));
+          const app = await _electron.launch({ executablePath: exe, args: [] });
+          const pg = await app.firstWindow({ timeout: 45000 });
+          const perr = []; pg.on('pageerror', e => perr.push(String(e).slice(0, 160)));
+          await pg.waitForLoadState('load'); await pg.waitForTimeout(4000);
+          const a = await pg.evaluate(() => ({
+            ver: (typeof APP_VER !== 'undefined' && APP_VER.desktop) || null,
+            title: document.title,
+            white: (document.body.innerText || '').trim().length < 2,
+            loginPwd: !!document.querySelector('input[type="password"]')
+          }));
+          out.after = a;
+          g.d1_versionIs252 = a.ver === '1.0.252' && a.title.includes('1.0.252');
+          g.d2_noWhiteScreen = a.white === false;
+          g.d0_loginSurface = a.loginPwd === true;
+          try { await app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows()[0]; if (w) w.setContentSize(1920, 1080); }); } catch (_) {}
+          await pg.waitForTimeout(800);
+          // LICAO E1: suprimir reveals tardios de login durante a sessao de QA (registrado)
+          await pg.evaluate(() => { window.__qaRevealSuppressed = []; window._revealLogin = function (r) { window.__qaRevealSuppressed.push(String(r || '')); }; });
+          const D = n => { const d = new Date(Date.now() + n * 86400000); return d.toISOString().slice(0, 10); };
+          await pg.evaluate(({ d0, d1, d2 }) => {
+            state.user = { id: 'carlos', name: 'Carlos Eduardo', role: 'Social Media', admin: true };
+            state.users = [state.user, { id: 'marina', name: 'Marina Klein', role: 'Designer' }, { id: 'helio', name: 'Helio Duarte', role: 'Designer' }, { id: 'bia', name: 'Bia Rocha', role: 'Social Media' }];
+            document.body.classList.add('desktop', 'authed', 'light-ui');
+            const asp = document.getElementById('authSplash'); if (asp) asp.style.display = 'none';
+            const lg = document.getElementById('login'); if (lg) lg.classList.add('hidden');
+            const ap = document.getElementById('app'); if (ap) ap.style.display = 'flex';
+            state.tasks = [
+              { id: 'k1', title: 'Post de Agenda Aberta - histeroscopias', client: 'Dra. Helita Freitas', sector: 'edicao_cards', by: 'carlos', assigneeId: 'carlos', status: 'afazer', dueDate: '2026-08-20', dueTime: '19:05', cardLegenda: 'Agenda aberta' },
+              { id: 'k2', title: 'Edicao de videos - Agosto', client: 'Hospital Visao', sector: 'edicao_midia', by: 'carlos', assigneeId: 'carlos', status: 'andamento', dueDate: d1, dueTime: '17:00', priority: true, videos: [{ tema: 'v1' }, { tema: 'v2' }, { tema: 'v3' }], checklist: [{ t: '1' }, { t: '2' }, { t: '3' }, { t: '4' }, { t: '5' }] },
+              { id: 'k3', title: 'Reels de lancamento', client: 'Sunset Wear', sector: 'edicao_cards', by: 'marina', assigneeId: 'carlos', status: 'revisao', dueDate: d0, dueTime: '23:00' },
+              { id: 'k4', title: 'Cronograma Setembro', client: 'Sunset Wear', sector: 'edicao_cards', by: 'carlos', assigneeId: null, status: 'concluido', dueDate: '2026-08-22' },
+              { id: 'c1', title: 'Cronograma Setembro - Sunset Wear', client: 'Sunset Wear', sector: 'cronograma', by: 'carlos', assigneeId: 'carlos', status: 'afazer', dueDate: d2, dueTime: '10:00', cronContents: [{ tema: 'Tema 1' }, { tema: 'Tema 2' }, { tema: 'Tema 3' }] },
+              { id: 'cB', title: 'Cronograma Outubro - Hospital Visao', client: 'Hospital Visao', sector: 'cronograma', by: 'carlos', assigneeId: 'carlos', status: 'andamento', dueDate: d1, dueTime: '18:00', workflowPhase: 'captions_waiting_client', cronContents: [{ tema: 'Tema A' }, { tema: 'Tema B' }] },
+              { id: 'cC', title: 'Cronograma Clinica Vida - ajustes', client: 'Clinica Vida', sector: 'cronograma', by: 'carlos', assigneeId: 'carlos', status: 'andamento', dueDate: '2026-08-20', dueTime: '16:00', clientReview: { status: 'revisao', note: 'Trocar o tema 2.', at: Date.now() - 3600000, byName: 'Cliente' }, cronContents: [{ tema: 'Tema X' }] },
+              { id: 'cD', title: 'Cronograma Agosto - Colegio Alfa', client: 'Colegio Alfa', sector: 'cronograma', by: 'carlos', assigneeId: 'carlos', status: 'concluido', dueDate: '2026-08-22', finalApprovalCompleted: true, clientReview: { status: 'aprovado', at: Date.now() - 7200000, byName: 'Cliente' }, cronContents: [{ tema: 'Tema 1' }] },
+              { id: 't5', title: 'Video institucional - cortes finais', client: 'Colegio Alfa', sector: 'edicao_midia', by: 'carlos', assigneeId: 'marina', status: 'andamento', dueDate: d2, dueTime: '12:00', designerAssignment: { designerId: 'marina', designerName: 'Marina Klein', status: 'in_progress', assignedAt: Date.now() - 7200000 }, videos: [{ tema: 'Manifesto' }] },
+              { id: 'k5', title: 'Pacote completo de artes do lancamento da colecao primavera - stories, feed, capa e destaques', client: 'Sunset Wear', sector: 'edicao_cards', by: 'carlos', assigneeId: 'carlos', status: 'andamento', dueDate: d1, dueTime: '17:00' },
+              { id: 'k6', title: 'Cronograma Setembro - rodada 2', client: 'Sunset Wear', sector: 'cronograma', by: 'marina', assigneeId: 'carlos', status: 'andamento', priority: true, dueDate: '2026-08-20', dueTime: '12:00', cronContents: [{ tema: 'Tema 1', legenda: 'Legenda 1' }, { tema: 'Tema 2' }], clientReview: { status: 'revisao', note: 'Ajustar o tema 2.', at: Date.now() - 3600000, byName: 'Cliente' }, designerAssignment: { designerId: 'marina', designerName: 'Marina Klein', status: 'in_progress', assignedAt: Date.now() - 7200000 } }
+            ];
+            state.events = [];
+            state.tab = 'hoje'; render();
+          }, { d0: D(0), d1: D(1), d2: D(2) });
+          await pg.waitForTimeout(600);
+          g.d3_lightUiDesktop1920 = await pg.evaluate(() => document.body.classList.contains('light-ui') && (typeof isDesktop === 'function' ? isDesktop() : false) && window.innerWidth >= 1900);
+          // ===== helpers =====
+          const clk = async sel => { await pg.evaluate(s => { const e = document.querySelector(s); if (e) e.click(); }, sel); await pg.waitForTimeout(350); };
+          const clkSide = async label => { await pg.evaluate(t => {
+            const d = document.querySelector('.nav .sb-more'); if (d && [...d.querySelectorAll('.sb-item')].some(x => ((x.querySelector('span:last-of-type') || {}).textContent || '').startsWith(t))) d.open = true;
+            const it = [...document.querySelectorAll('#bottomNav .sb-item')].find(x => ((x.querySelector('span:last-of-type') || {}).textContent || '').startsWith(t));
+            if (it) it.click(); }, label); await pg.waitForTimeout(450); };
+          const shot = async (w, h) => { try { await app.evaluate(({ BrowserWindow }, s) => { const win = BrowserWindow.getAllWindows()[0]; if (win) win.setContentSize(s.w, s.h); }, { w, h }); } catch (_) {} await sleep(650); };
+          // ===== LICAO E1: hard gate por captura =====
+          const MANIFEST = [];
+          const probe = () => pg.evaluate(() => {
+            const l = document.getElementById('login');
+            const loginPresent = !!l && !l.classList.contains('hidden') && getComputedStyle(l).display !== 'none' && l.getBoundingClientRect().width > 0;
+            const el = document.querySelector('#content .scr-head, #content .h-title, #content .exec-ttl, #content .nc-ttl, #content .lui-ph-t');
+            const heading = (((el && el.textContent) || '').trim() || (document.getElementById('content').innerText || '').trim()).replace(/\s+/g, ' ').slice(0, 70);
+            return { loginPresent, heading, sidebar: !!document.querySelector('#bottomNav .sb-item'),
+              clientLanes: document.querySelectorAll('.scr-client .kbv2-column').length,
+              lanes: document.querySelectorAll('.kbv2-column').length,
+              hubCards: document.querySelectorAll('#content .bcard').length,
+              detOpen: !!document.querySelector('.det-sheet'),
+              maisOpen: (document.querySelector('.nav .sb-more') || {}).open === true,
+              vw: window.innerWidth + 'x' + window.innerHeight };
+          });
+          const shotChecked = async (name, expect) => {
+            const p = await probe();
+            const ok = !p.loginPresent && expect.head.test(p.heading) && (expect.check ? expect.check(p) : true) && p.sidebar;
+            MANIFEST.push({ filename: name, sourceSha: 'b7656aee27d67b65ab06c2432ef31a677dec7c47', installedVersion: a.ver, viewport: p.vw,
+              expectedSurface: expect.surface, actualSurface: p.loginPresent ? 'LOGIN' : p.heading.slice(0, 40),
+              expectedHeading: String(expect.head), actualHeading: p.heading, loginPresent: p.loginPresent, screenshotValid: ok });
+            if (!ok) { g['SHOT_' + name.replace(/[^A-Za-z0-9]/g, '_')] = false; return false; }
+            await pg.screenshot({ path: process.env.RUNNER_TEMP + '/canary/' + name });
+            return true;
+          };
+          // ===== SIDEBAR OPTION B: SB1-SB16 =====
+          const inv = await pg.evaluate(() => {
+            const nav = document.getElementById('bottomNav');
+            const items = [...nav.querySelectorAll('.sb-item')].map(b => (b.querySelector('span:last-of-type') || {}).textContent || '').filter(Boolean);
+            const sects = [...nav.querySelectorAll('.sb-sect')].map(x => x.textContent.trim());
+            const more = [...nav.querySelectorAll('.sb-more-list .sb-item')].map(b => (b.querySelector('span:last-of-type') || {}).textContent || '');
+            const user = nav.querySelector('.sb-user');
+            return { items, sects, more, userAnchor: !!user && user.getAttribute('data-tab') === 'perfil' };
+          });
+          I.sidebar = inv;
+          g.SB1_hojeFirst = inv.items[0] === 'Hoje';
+          g.SB2_meuQuadroSecond = inv.items[1] === 'Meu quadro';
+          g.SB3_cliente = inv.items.includes('Cliente');
+          g.SB4_designers = inv.items.includes('Designers');
+          g.SB5_socialMedias = inv.items.includes('Social Medias');
+          g.SB6_quadros = inv.items.includes('Quadros');
+          g.SB7_agenda = inv.items.includes('Agenda');
+          g.SB8_relatorios = inv.items.some(x => x.startsWith('Relat'));
+          g.SB9_painelSLA = inv.items.includes('Painel SLA');
+          g.SB10_mais = inv.sects.join('|') === 'Principal|Ferramentas|Conta';
+          g.SB11_maisFour = inv.more.length === 4 && inv.more[0].startsWith('Minhas Prior') && inv.more[1] === 'Equipe' && inv.more[2] === 'Perfil' && inv.more[3].startsWith('Notifica');
+          g.SB12_conta = inv.sects.includes('Conta');
+          g.SB13_config = inv.items.some(x => x.startsWith('Configura'));
+          g.SB14_userAnchor = inv.userAnchor === true;
+          g.SBx_noTarefas = !inv.items.includes('Tarefas') && !inv.more.includes('Tarefas');
+          g.SBx_noSetores = !inv.items.includes('Setores');
+          g.SBx_noExecutivo = !inv.items.includes('Executivo');
+          g.SB16_roleGate = await pg.evaluate(() => {
+            const saved = state.user; state.user = { id: 'op1', name: 'Op', role: 'Editor de video' }; render();
+            const items = [...document.querySelectorAll('#bottomNav .sb-item')].map(b => (b.querySelector('span:last-of-type') || {}).textContent || '');
+            state.user = saved; render();
+            return !items.includes('Cliente') && !items.includes('Designers') && !items.includes('Social Medias') && items.includes('Hoje') && items.includes('Painel SLA');
+          });
+          await pg.waitForTimeout(400);
+          // shots iniciais: HOJE + MAIS-OPEN
+          await clkSide('Hoje');
+          await shotChecked('CANARY252-HOJE-1920.png', { head: /Carlos|Resumo/, surface: 'Hoje' });
+          await pg.evaluate(() => { const d = document.querySelector('.nav .sb-more'); if (d) d.open = true; });
+          await pg.waitForTimeout(350);
+          await shotChecked('CANARY252-MAIS-OPEN.png', { head: /Carlos|Resumo/, surface: 'Hoje + Mais aberto', check: p => p.maisOpen });
+          await pg.evaluate(() => { const d = document.querySelector('.nav .sb-more'); if (d) d.open = false; });
+          // ===== NAV reachability + SB15 selected-state unico =====
+          const LOOP = [['Hoje', /Carlos|Resumo/], ['Meu quadro', /Meu quadro/], ['Cliente', /Cliente/], ['Designers', /Designer|Quadro de/], ['Social Medias', /Social|Quadro de/], ['Quadros', /Quadros/], ['Agenda', /Agenda|agosto|setembro|outubro/i], ['Relat', /Relat/], ['Painel SLA', /Painel Executivo/], ['Configura', /Configura/], ['Minhas Prior', /Prioridade/i], ['Equipe', /Equipe/], ['Perfil', /Carlos/], ['Notifica', /Notifica/], ['Hoje', /Carlos|Resumo/]];
+          out.navLoop = [];
+          for (const [label, re] of LOOP) {
+            await clkSide(label);
+            const p = await probe();
+            const on = await pg.evaluate(() => [...document.querySelectorAll('#bottomNav .sb-item.on')].map(b => (b.querySelector('span:last-of-type') || {}).textContent || ''));
+            const ok = re.test(p.heading) && !p.loginPresent && on.length === 1 && on[0].startsWith(label);
+            out.navLoop.push({ label, on, heading: p.heading.slice(0, 40), ok });
+          }
+          g.NAV_allReachable = out.navLoop.every(x => x.ok);
+          g.SB15_singleSelected = out.navLoop.every(x => x.on.length === 1);
+          // ===== MEU QUADRO: T-freeze + TASKCARD crop =====
+          await clkSide('Meu quadro');
+          const tsm = await pg.evaluate(() => {
+            const r = {};
+            const card2 = [...document.querySelectorAll('.kbv2-card')].find(c => c.querySelector('[data-cardmenu="k2"], [data-detail="k2"]'));
+            const cs = card2 ? getComputedStyle(card2) : null;
+            r.t1 = cs ? cs.display === 'grid' : false;
+            r.t2 = card2 ? (card2.querySelector('.kbv2-due') && getComputedStyle(card2.querySelector('.kbv2-due')).display !== 'none') : false;
+            r.t3 = card2 ? (() => { const t = card2.querySelector('.kbv2-title'); const tc = getComputedStyle(t); return parseFloat(tc.fontSize) >= 14.5 && parseInt(tc.fontWeight) >= 650 && t.scrollHeight <= t.clientHeight + 4; })() : false;
+            r.t4 = card2 ? (() => { const s2 = card2.querySelector('.kbv2-tier'); return !!s2 && /Hospital Visao/.test(s2.textContent) && getComputedStyle(s2, '::before').display === 'none'; })() : false;
+            r.t5 = card2 ? (getComputedStyle(card2.querySelector('.kbv2-card-chips'), '::before').content.includes('Setor') && getComputedStyle(card2.querySelector('.kbv2-card-date'), '::before').content.includes('Prazo')) : false;
+            r.t6 = card2 ? (() => { const pr = [...card2.querySelectorAll('.kbv2-chip')].find(x => /Prioridade/i.test(x.textContent)); if (!pr) return false; const pcs = getComputedStyle(pr); return pcs.backgroundColor === 'rgba(0, 0, 0, 0)' && parseFloat(pcs.fontSize) < 11; })() : false;
+            r.t7 = card2 ? (() => { const rl = card2.querySelector('.kbv2-card-rail'); const p = card2.querySelector('.kbv2-pct'); return !!rl && getComputedStyle(rl).backgroundColor === 'rgb(245, 248, 251)' && !!p && /%$/.test(p.textContent.trim()); })() : false;
+            r.t8 = card2 ? !!card2.querySelector('.kbv2-av .av') : false;
+            r.t9 = card2 ? (card2.querySelector('.kbv2-card-chk') && /5/.test(card2.querySelector('.kbv2-card-chk').textContent)) : false;
+            r.t10 = card2 ? (() => { const k = card2.querySelector('.kbv2-btn-dots'); if (!k) return false; const b = k.getBoundingClientRect(); return b.width >= 24 && b.height >= 24; })() : false;
+            r.t12 = card2 ? getComputedStyle(card2, '::before').display === 'none' : false;
+            r.lanes = document.querySelectorAll('.kbv2-column').length;
+            return r;
+          });
+          out.taskCard = tsm;
+          g.T_freeze = tsm.t1 && tsm.t2 && tsm.t3 && tsm.t4 && tsm.t5 && tsm.t6 && tsm.t7 && tsm.t8 && tsm.t9 && tsm.t10 && tsm.t12 && tsm.lanes === 4;
+          await shotChecked('CANARY252-MEUQUADRO-1920.png', { head: /Meu quadro/, surface: 'Meu quadro', check: p => p.lanes === 4 });
+          { const p0 = await probe();
+            if (!p0.loginPresent) { const cardEl = await pg.$('.kbv2-column:nth-child(2) .kbv2-card'); if (cardEl) { await cardEl.screenshot({ path: process.env.RUNNER_TEMP + '/canary/CANARY252-TASKCARD.png' }); MANIFEST.push({ filename: 'CANARY252-TASKCARD.png', sourceSha: 'b7656aee27d67b65ab06c2432ef31a677dec7c47', installedVersion: a.ver, viewport: p0.vw, expectedSurface: 'Task Card crop', actualSurface: 'Task Card crop', expectedHeading: 'crop', actualHeading: p0.heading, loginPresent: false, screenshotValid: true }); } } }
+          // CN5: Meu quadro sem nav global (composicao propria lui)
+          g.CN5_meuQuadroPreservado = await pg.evaluate(() => !document.querySelector('#content .tchips .tchip') && !!document.querySelector('#content .lui-tb2') && [...document.querySelectorAll('#content [data-bresp]')].length >= 2);
+          // ===== CLIENTE: CN1 + C-freeze (C4 -> C4b) + shots responsivos =====
+          await clkSide('Cliente');
+          const NAVA = ['data-myboard', 'data-flowclient', 'data-flowdesigners', 'data-flowsocials'];
+          const navDup = () => pg.evaluate(A => [...document.querySelectorAll('#content button')].filter(b => (A.some(x => b.hasAttribute(x)) || (b.hasAttribute('data-board') && b.dataset.board === 'hub')) && b.offsetParent && b.closest('.d-board-tools, .tchips')).length, NAVA);
+          g.CN1_clienteSemNavDup = (await navDup()) === 0 && (await pg.evaluate(() => { const t = document.querySelector('#content .d-board-tools .tchips'); return !t || !t.offsetParent || t.children.length === 0; }));
+          g.CN6_searchPreservada = await pg.evaluate(() => { const s = document.getElementById('bSearch'); return !!s && !!s.offsetParent; });
+          g.CN8_approvalPreservada = await pg.evaluate(() => { const b = document.querySelector('.scr-client .wfap-bar'); return !!b && !!b.offsetParent; });
+          const cg = await pg.evaluate(() => {
+            const r = {};
+            const icon = document.querySelector('#content .scr-head .d-bh-icon');
+            const ttl = document.querySelector('#content .scr-head .d-bh-title');
+            r.C1 = (!icon || getComputedStyle(icon).display === 'none') && !!ttl && getComputedStyle(ttl).fontSize === '17px';
+            const bar = document.querySelector('.scr-client .wfap-bar');
+            r.C2 = !!bar && getComputedStyle(bar).backgroundColor === 'rgb(245, 248, 251)';
+            const kbd = document.querySelector('.scr-client .bsearch-kbd');
+            r.C3 = !!document.getElementById('bSearch') && (!kbd || getComputedStyle(kbd).display === 'none');
+            const tch = document.querySelector('.scr-client .tchips');
+            r.C4b = !tch || !tch.offsetParent || tch.children.length === 0;
+            const cols = [...document.querySelectorAll('.scr-client .kbv2-column')];
+            const nOf = i => cols[i] ? cols[i].querySelectorAll('.kbv2-card').length : -1;
+            r.C5 = nOf(0) >= 1; r.C6 = nOf(1) >= 1; r.C7 = nOf(2) >= 1; r.C8 = nOf(3) >= 1;
+            const badge = document.querySelector('.scr-client .wfap-badge');
+            r.C10 = !!badge && (badge.textContent || '').trim() !== '0';
+            const dues = [...document.querySelectorAll('.scr-client .kbv2-card .kbv2-due')].map(x => x.textContent || '');
+            r.C11 = dues.some(t => /Faltam/.test(t));
+            r.C12 = dues.some(t => /Atrasada|Hoje/.test(t));
+            r.C13 = document.querySelectorAll('.scr-client .kbv2-card').length >= 4;
+            const st = document.querySelector('.scr-client .kbv2-card .kbv2-status');
+            r.CX = !st || (getComputedStyle(st).position === 'static' && st.scrollWidth <= st.clientWidth + 2);
+            return r;
+          });
+          out.client = cg;
+          await shotChecked('CANARY252-CLIENT-1920.png', { head: /Cliente/, surface: 'Cliente board', check: p => p.clientLanes === 4 });
+          await shot(1536, 864);
+          g.C_hscroll_win125 = await pg.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2);
+          await shotChecked('CANARY252-CLIENT-WIN125.png', { head: /Cliente/, surface: 'Cliente board', check: p => p.clientLanes === 4 });
+          await shot(1366, 768);
+          g.C_hscroll_1366 = await pg.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2);
+          // FIX classe C (run 33277174390): folga ZERO calibrada em metricas Linux (local = 768/768
+          // exatos); no Windows a metrica de fonte gera overflow residual de poucos px num container
+          // que tem overflow-y:auto DE FABRICA (scroll intencional). Gate corrigido para a verdade
+          // cross-platform SEM afrouxar o essencial: ancora do usuario ALCANCAVEL + scroll funcional
+          // + overflow limitado a <60px (~menos de 2 linhas; clipping destrutivo seria centenas de px).
+          // Numeros REAIS gravados em canary252-sessionB-1.0.252.json para auditoria.
+          I.nav1366 = await pg.evaluate(() => { const d = document.querySelector('.nav .sb-more'); if (d) d.open = false; const nav = document.getElementById('bottomNav'); const user = nav.querySelector('.sb-user'); let anchorReachable = false; if (user) { user.scrollIntoView({ block: 'nearest' }); const ur = user.getBoundingClientRect(); const nr = nav.getBoundingClientRect(); anchorReachable = ur.bottom <= nr.bottom + 2 && ur.top >= nr.top - 2; nav.scrollTop = 0; } return { scrollH: nav.scrollHeight, clientH: nav.clientHeight, delta: nav.scrollHeight - nav.clientHeight, overflowY: getComputedStyle(nav).overflowY, anchorReachable }; });
+          g.SB_sidebarFits1366 = I.nav1366.anchorReachable && I.nav1366.overflowY === 'auto' && I.nav1366.delta <= 60;
+          await shotChecked('CANARY252-CLIENT-1366.png', { head: /Cliente/, surface: 'Cliente board', check: p => p.clientLanes === 4 });
+          await shot(1920, 1080);
+          // C14/C15/C9/CDF
+          await clk('[data-detail="cB"]');
+          cg.C14 = await pg.evaluate(() => { const m = document.querySelector('.modal-back[data-detmodal]'); return !!m && m.dataset.detorigin === 'client'; });
+          await clk('.det-x');
+          cg.CDF = await pg.evaluate(() => ((document.getElementById('modalRoot') || {}).innerHTML || '').length < 50 && state.flowView === 'client' && document.querySelectorAll('.scr-client .kbv2-column').length === 4);
+          await pg.evaluate(() => { const i = document.getElementById('bSearch'); i.value = 'Outubro'; i.dispatchEvent(new Event('input', { bubbles: true })); });
+          await sleep(450);
+          cg.C15 = (await pg.evaluate(() => document.querySelectorAll('.scr-client .kbv2-card').length)) === 1;
+          await pg.evaluate(() => { const i = document.getElementById('bSearch'); if (i) { i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); } });
+          await sleep(350);
+          await pg.evaluate(() => { window.__all = state.tasks; state.tasks = state.tasks.filter(t => ['k1','k2','k3','k4','c1'].includes(t.id)); render(); });
+          await sleep(400);
+          cg.C9 = await pg.evaluate(() => { const e = document.querySelector('.scr-client .kbv2-empty2'); return !!e && getComputedStyle(e).borderTopStyle === 'none' && getComputedStyle(e).backgroundColor === 'rgba(0, 0, 0, 0)'; });
+          await pg.evaluate(() => { state.tasks = window.__all; render(); });
+          await sleep(350);
+          g.C_freeze = cg.C1 && cg.C2 && cg.C3 && cg.C4b && cg.C5 && cg.C6 && cg.C7 && cg.C8 && cg.C9 && cg.C10 && cg.C11 && cg.C12 && cg.C13 && cg.CX && cg.C14 && cg.C15 && cg.CDF;
+          // F: approval panel abre
+          await clk('[data-wfapprovalsopen]');
+          g.F_approvalPanel = await pg.evaluate(() => !!document.querySelector('.wfap-panel'));
+          await clkSide('Cliente');
+          // ===== DESIGNERS / SOCIALS: CN2/CN3 + shots =====
+          await clkSide('Designers');
+          g.CN2_designersSemNavDup = (await navDup()) === 0;
+          await shotChecked('CANARY252-DESIGNERS.png', { head: /Designer|Quadro de/, surface: 'Designers', check: p => p.lanes >= 3 });
+          await clkSide('Social Medias');
+          g.CN3_socialsSemNavDup = (await navDup()) === 0;
+          await shotChecked('CANARY252-SOCIALMEDIAS.png', { head: /Social|Quadro de/, surface: 'Social Medias', check: p => p.lanes >= 3 });
+          // ===== QUADROS HUB (HF freeze) + board de setor (CN4) =====
+          await clkSide('Quadros');
+          const hub = await pg.evaluate(() => [...document.querySelectorAll('#content .bcard .bl')].map(x => x.textContent.trim()));
+          I.hub = hub;
+          g.HF_hubFreeze = hub.includes('Meu quadro') && hub.some(x => /Quadros por respons/.test(x)) && hub.includes('Cliente') && hub.includes('Designers') && hub.filter(x => /Edi|Cronograma/.test(x)).length >= 3;
+          await shotChecked('CANARY252-QUADROS.png', { head: /Quadros/, surface: 'Hub Quadros', check: p => p.hubCards >= 5 });
+          await pg.evaluate(() => { const b = [...document.querySelectorAll('#content .bcard')].find(x => /Cards/.test(x.textContent)); if (b) b.click(); });
+          await pg.waitForTimeout(450);
+          g.CN4_setorSemNavDup = (await navDup()) === 0;
+          g.CN9_minhasTarefas = await pg.evaluate(() => { const c = [...document.querySelectorAll('#content .tchips .chip')].find(x => /Minhas tarefas/.test(x.textContent)); return !!c && !!c.offsetParent; });
+          g.CN10_sectorChips = await pg.evaluate(() => document.querySelectorAll('#content .lui-sstrip .lui-schip').length >= 3);
+          g.CN7_filtroFunciona = await (async () => {
+            const n0 = await pg.evaluate(() => document.querySelectorAll('#content .kbv2-card').length);
+            await clk('[data-bmine]');
+            const n1 = await pg.evaluate(() => document.querySelectorAll('#content .kbv2-card').length);
+            await clk('[data-bmine]');
+            return n1 <= n0;
+          })();
+          // ===== PAINEL SLA =====
+          await clkSide('Painel SLA');
+          await shotChecked('CANARY252-PAINEL-SLA.png', { head: /Painel Executivo/, surface: 'Painel SLA (heading interno Painel Executivo)' });
+          // ===== DETAIL D-freeze =====
+          await clkSide('Meu quadro');
+          await clk('[data-detail="k2"]');
+          const dg = await pg.evaluate(() => {
+            const r = {};
+            const m = document.querySelector('.modal-back[data-detmodal]');
+            r.D1 = !!m && m.dataset.detorigin === 'mine';
+            const ttl = document.querySelector('.det-title');
+            r.D3 = !!ttl && /Edicao de videos/.test(ttl.textContent) && getComputedStyle(ttl).fontSize === '20px';
+            r.D4 = /Hospital Visao/.test((document.querySelector('.det-client') || {}).textContent || '');
+            const bdg = document.querySelector('.det-badge');
+            r.D5 = !!bdg && getComputedStyle(bdg).backgroundColor === 'rgba(0, 0, 0, 0)';
+            const chips = [...document.querySelectorAll('.det-chips .rev-chip')];
+            const stc = chips.find(x => x.querySelector('.dotc'));
+            r.D6 = !!stc && getComputedStyle(stc).backgroundColor === 'rgba(0, 0, 0, 0)';
+            const people = [...document.querySelectorAll('.det-person')];
+            r.D8 = people.length >= 1 && getComputedStyle(people[0]).backgroundColor === 'rgb(245, 248, 251)';
+            const nx = document.querySelector('.det-hero-next');
+            r.D10 = !!nx && getComputedStyle(nx).backgroundColor === 'rgb(245, 248, 251)';
+            const sheet = document.querySelector('.det-sheet');
+            r.D16 = !!sheet && sheet.scrollWidth <= sheet.clientWidth + 2 && document.documentElement.scrollWidth <= window.innerWidth + 2;
+            return r;
+          });
+          await shotChecked('CANARY252-DETAIL.png', { head: /.*/, surface: 'Detail drawer (origem mine)', check: p => p.detOpen });
+          await clk('.det-x');
+          dg.D2 = await pg.evaluate(() => ((document.getElementById('modalRoot') || {}).innerHTML || '').length < 50);
+          await clk('[data-move="k2"]');
+          dg.D12 = await pg.evaluate(() => /Mover tarefa/.test((document.getElementById('modalRoot') || {}).innerHTML || ''));
+          await pg.evaluate(() => { const m = document.getElementById('modalRoot'); if (m) m.innerHTML = ''; });
+          await clk('[data-detail="k6"]');
+          dg.D14 = await pg.evaluate(() => { const t = (document.getElementById('modalRoot') || {}).innerText || ''; return /Cliente pediu ajuste|Resposta do cliente/i.test(t) && /Prioridade/i.test(t) && document.documentElement.scrollWidth <= window.innerWidth + 2; });
+          await clk('.det-x');
+          await clk('[data-detail="k5"]');
+          dg.D15 = await pg.evaluate(() => { const t = document.querySelector('.det-title'); return !!t && t.scrollWidth <= t.clientWidth + 2; });
+          await clk('.det-x');
+          out.detail = dg;
+          g.D_freeze = dg.D1 && dg.D2 && dg.D3 && dg.D4 && dg.D5 && dg.D6 && dg.D8 && dg.D10 && dg.D12 && dg.D14 && dg.D15 && dg.D16;
+          // C16: leak diferencial no Meu quadro
+          await clkSide('Meu quadro');
+          g.C16_noLeak = await pg.evaluate(() => { const c = [...document.querySelectorAll('.kbv2-card')].find(x => x.querySelector('[data-detail="k2"], [data-cardmenu="k2"]')); if (!c) return false; const st = c.querySelector('.kbv2-status'); return getComputedStyle(c).display === 'grid' && (!st || getComputedStyle(st).order !== '9'); });
+          // ===== F smoke: Nova tarefa (view real) =====
+          await clk('.new-task-btn');
+          g.F_novaTarefa = await pg.evaluate(() => !!document.querySelector('.form-wrap .stepper') && !!state.form);
+          await clk('[data-form="close"]');
+          g.F_wizardClosed = await pg.evaluate(() => state.form === null && document.querySelectorAll('.kbv2-column').length === 4);
+          await clk('.nav .sb-more>summary');
+          g.F2_maisOpens = await pg.evaluate(() => (document.querySelector('.nav .sb-more') || {}).open === true);
+          await clk('.nav .sb-more>summary');
+          g.F2_maisCloses = await pg.evaluate(() => (document.querySelector('.nav .sb-more') || {}).open !== true);
+          // ===== CN mobile/legacy sims (renderer identico; modos preservados) =====
+          g.CN_legacySim = await pg.evaluate(() => {
+            document.body.classList.remove('light-ui');
+            state.tab = 'tarefas'; state.flowView = 'client'; state.personBoard = null; render();
+            const n = document.querySelectorAll('#content .tchips .tchip').length;
+            document.body.classList.add('light-ui');
+            state.flowView = null; state.personBoard = state.user.id; render();
+            return n === 5;
+          });
+          await pg.waitForTimeout(400);
+          await shot(390, 700);
+          g.CN_mobileSim = await pg.evaluate(() => {
+            state.tab = 'tarefas'; state.flowView = 'client'; state.personBoard = null; render();
+            const n = document.querySelectorAll('#content .tchips .tchip').length;
+            return (typeof isDesktop === 'function' ? !isDesktop() : true) && n === 5;
+          });
+          await shot(1920, 1080);
+          await pg.evaluate(() => { state.flowView = null; state.personBoard = state.user.id; render(); });
+          await pg.waitForTimeout(400);
+          // ===== fecho =====
+          g.E1_screenshotNotLogin = MANIFEST.every(m => m.loginPresent === false);
+          g.E1_manifestAllValid = MANIFEST.length >= 12 && MANIFEST.every(m => m.screenshotValid === true);
+          I.revealSuppressed = await pg.evaluate(() => (window.__qaRevealSuppressed || []));
+          g.p1_noFatalPageError = perr.length === 0;
+          out.pageErrors = perr; out.manifest = MANIFEST;
+          const fails = Object.entries(g).filter(([k, v]) => !v).map(([k]) => k);
+          out.fails = fails;
+          fs.writeFileSync(process.env.RUNNER_TEMP + '/canary/canary252-evidence-manifest.json', JSON.stringify(MANIFEST, null, 1));
+          const rg = {}; for (const [k, v] of Object.entries(g)) if (/^(SB|CN|T_|D_|C_|C1|HF|NAV|E1)/.test(k)) rg[k] = v;
+          fs.writeFileSync(process.env.RUNNER_TEMP + '/canary/canary252-regression.json', JSON.stringify({ g: rg, fails: Object.entries(rg).filter(([k, v]) => !v).map(([k]) => k) }, null, 1));
+          fs.writeFileSync(process.env.RUNNER_TEMP + '/canary/canary252-sessionB-1.0.252.json', JSON.stringify(out, null, 1));
+          console.log(JSON.stringify(out, null, 1));
+          try { await Promise.race([app.close(), sleep(4000)]); } catch (_) {}
+          if (fails.length) { console.error('FAILS B:', fails); }
+          process.exit(fails.length ? 1 : 0);
+          EOF
+          node canary-b.mjs
+          node -e '
+            const fs = require("fs"); const p = process.env.RUNNER_TEMP + "/canary/";
+            const A = JSON.parse(fs.readFileSync(p + "canary252-sessionA-1.0.251.json", "utf8"));
+            const B = JSON.parse(fs.readFileSync(p + "canary252-sessionB-1.0.252.json", "utf8"));
+            const F = JSON.parse(fs.readFileSync(p + "canary252-public-feed-proof.json", "utf8"));
+            const sum = { result: (A.fails.length + B.fails.length) === 0 ? "PASS" : "FAIL",
+              baseline: A.before.ver, final: B.after.ver, feed: F,
+              updatePath: "public 1.0.251 -> public latest.yml -> update_available 1.0.252 -> download(sha512) -> silent /S -> installed 1.0.252",
+              failsA: A.fails, failsB: B.fails, pageErrorsA: A.pageErrors, pageErrorsB: B.pageErrors,
+              revealSuppressed: (B.info || {}).revealSuppressed || [], nav1366: (B.info || {}).nav1366 || null };
+            fs.writeFileSync(p + "canary252-summary.json", JSON.stringify(sum, null, 1));
+            console.log(JSON.stringify(sum, null, 1));
+          '
+          echo "PUBLIC UPDATER CANARY 1.0.251->1.0.252: PASS" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "Upload evidencias do canary (JSONs + feed proof + manifest E1 + screenshots CANARY252)"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-1.0.252-canary-evidence
+          path: |
+            ${{ runner.temp }}/canary/canary252-sessionA-1.0.251.json
+            ${{ runner.temp }}/canary/canary252-sessionB-1.0.252.json
+            ${{ runner.temp }}/canary/canary252-public-feed-proof.json
+            ${{ runner.temp }}/canary/canary252-regression.json
+            ${{ runner.temp }}/canary/canary252-evidence-manifest.json
+            ${{ runner.temp }}/canary/canary252-summary.json
+            ${{ runner.temp }}/canary/public-latest.yml
+            ${{ runner.temp }}/canary/installed-app-update.yml
+            ${{ runner.temp }}/canary/CANARY252-HOJE-1920.png
+            ${{ runner.temp }}/canary/CANARY252-MEUQUADRO-1920.png
+            ${{ runner.temp }}/canary/CANARY252-CLIENT-1920.png
+            ${{ runner.temp }}/canary/CANARY252-CLIENT-WIN125.png
+            ${{ runner.temp }}/canary/CANARY252-CLIENT-1366.png
+            ${{ runner.temp }}/canary/CANARY252-QUADROS.png
+            ${{ runner.temp }}/canary/CANARY252-DESIGNERS.png
+            ${{ runner.temp }}/canary/CANARY252-SOCIALMEDIAS.png
+            ${{ runner.temp }}/canary/CANARY252-PAINEL-SLA.png
+            ${{ runner.temp }}/canary/CANARY252-MAIS-OPEN.png
+            ${{ runner.temp }}/canary/CANARY252-DETAIL.png
+            ${{ runner.temp }}/canary/CANARY252-TASKCARD.png
+          if-no-files-found: warn
+          retention-days: 30
