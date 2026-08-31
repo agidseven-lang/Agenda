@@ -184,6 +184,12 @@
   .evc{display:flex;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px;cursor:pointer;text-align:left;transition:background .12s}
   body.desktop .evc:hover{background:var(--surface2)}
   .evc:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  /* ===== I7.20.2 — HOJE ACTIONABILITY (Option B, OWNER APPROVED): urgent row acionável.
+     Mesma linguagem de affordance dos cards de compromisso (.evc acima): cursor, hover
+     apenas no desktop, focus-visible no token --accent. Zero mudança estrutural da row. */
+  .hj-urgent{cursor:pointer;transition:background .12s;-webkit-tap-highlight-color:transparent}
+  body.desktop .hj-urgent:hover{background:var(--surface2)}
+  .hj-urgent:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .evc .evc2-rail{width:3px;border-radius:999px;flex:none;align-self:stretch;min-height:56px}
   .evc .evc2-date{flex:none;width:54px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;background:var(--surface2);border:1px solid var(--line-soft);border-radius:11px;padding:7px 0;align-self:flex-start}
   .evc .evc2-dw{font-size:9.5px;font-weight:800;letter-spacing:.08em;color:var(--faint)}
@@ -204,7 +210,7 @@
   .evc .evc2-foot{display:flex;align-items:center;gap:7px;margin-top:2px;min-width:0}
   .evc .evc2-name{font-size:12px;font-weight:600;color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
   .evc .evc2-ty{margin-left:auto;flex:none;display:inline-flex;align-items:center;font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;padding:3px 8px;border-radius:7px;white-space:nowrap}
-  @media (prefers-reduced-motion: reduce){.evc{transition:none}}
+  @media (prefers-reduced-motion: reduce){.evc,.hj-urgent{transition:none}}
   /* F3.3.73I4A — ícone do CTA "Novo compromisso" da Agenda. svg() nao emite
      width/height (dimensionamento vem sempre do ancestral); sem regra o svg
      inline caía no default 300x150 (elemento branco gigante). Escopado. */
@@ -7782,6 +7788,12 @@ function renderHoje(){
   const td=todayStr();const u=state.user;
   const todays=state.events.filter(e=>e.date===td&&!e.done&&!isEvCancelled(e)).sort((a,b)=>(a.start||'').localeCompare(b.start||''));
   const vis=visibleTasks(u,state.tasks);const openTasks=vis.filter(t=>t.status!=='concluido');
+  /* I7.20.2 (Option B, OWNER APPROVED) — KPI "Tarefas" alinhado à régua REAL do Meu quadro:
+     renderPersonBoard usa assigneeId===pid||by===pid com busca/filtro zerados pelo handler
+     [data-myboard]; aqui é o MESMO conjunto default menos concluídas (o que o clique encontra
+     aberto no quadro). Paridade por IDs provada no QA versionado. openTasks (visibleTasks)
+     segue intacto para a lista de Tarefas urgentes. */
+  const myOpen=state.tasks.filter(t=>(t.assigneeId===(u&&u.id)||t.by===(u&&u.id))&&t.status!=='concluido');
   const activeUsers=state.users.filter(x=>!['pendente','removido','excluido'].includes(x.status||''));
   const urgent=openTasks.map(t=>({t,d:taskDeadline(t)})).filter(o=>o.d).sort((a,b)=>{const da=dtMs(a.t.dueDate||a.t.due,a.t.dueTime||'23:59')||9e15;const dbb=dtMs(b.t.dueDate||b.t.due,b.t.dueTime||'23:59')||9e15;return da-dbb;}).slice(0,4);
   const future=state.events.filter(e=>e.date>td&&!e.done&&!isEvCancelled(e)).sort((a,b)=>((a.date||'')+(a.start||'')).localeCompare((b.date||'')+(b.start||''))).slice(0,5);
@@ -7789,7 +7801,7 @@ function renderHoje(){
     '<div style="font-size:13px;color:var(--soft);margin:2px 0 18px">Resumo de hoje · '+dayShort(td)+'</div>'+
     '<div class="stats">'+
       '<button class="stat accent" data-tab="agenda"><div class="ic">'+svg('today')+'</div><div class="v">'+todays.length+'</div><div class="l">Hoje</div></button>'+
-      '<button class="stat" data-tab="tarefas"><div class="ic">'+svg('checklist')+'</div><div class="v">'+openTasks.length+'</div><div class="l">Tarefas</div></button>'+
+      '<button class="stat" data-myboard="1"><div class="ic">'+svg('checklist')+'</div><div class="v">'+myOpen.length+'</div><div class="l">Tarefas</div></button>'+
       '<button class="stat" data-tab="equipe"><div class="ic">'+svg('group')+'</div><div class="v">'+activeUsers.length+'</div><div class="l">Equipe</div></button>'+
     '</div>';
   const evHtml='<div class="sect">Compromissos de hoje</div>'+(todays.length?todays.map(eventCard).join(''):'<div class="emptyline">Nada agendado para hoje.</div>');
@@ -7803,7 +7815,11 @@ function renderHoje(){
   return h+'</div>';
 }
 function urgentRow(t,d){const s=secOf(t.sector);const asg=state.users.find(u=>u.id===t.assigneeId)||{name:t.assignee,id:t.assigneeId};
-  return '<div class="card" style="display:flex;align-items:center;gap:12px;padding:13px;margin-bottom:10px">'+avatar(asg,38)+
+  /* I7.20.2 (Option B, OWNER APPROVED) — row acionável: data-detail entra na delegação global
+     [data-detail]→openDetails (a MESMA Central real; precedente: chips data-priopen das
+     Prioridades). Row sem controles internos (avatar/pill apresentacionais) ⇒ clique na row
+     inteira é seguro; Enter/Espaço no listener button-like existente. */
+  return '<div class="card hj-urgent" data-detail="'+esc(t.id||'')+'" role="button" tabindex="0" aria-label="Abrir tarefa: '+esc(t.title||'Sem título')+'" style="display:flex;align-items:center;gap:12px;padding:13px;margin-bottom:10px">'+avatar(asg,38)+
     '<div style="flex:1;min-width:0"><div style="font-size:14.5px;font-weight:800">'+esc(t.title||'Sem título')+'</div>'+
     '<div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--faint);margin-top:2px"><span style="width:7px;height:7px;border-radius:50%;background:'+s.color+'"></span>'+esc(s.label)+(t.client?' · '+esc(t.client):'')+'</div></div>'+
     (d?'<span class="pill" style="background:'+withAlpha(d.color,.16)+';color:'+d.color+'">'+esc(d.text)+'</span>':'')+'</div>';
@@ -14256,6 +14272,8 @@ document.addEventListener('keydown',function(e){
   if(e.key!=='Enter'&&e.key!==' ')return;
   var t=e.target;
   if(t&&t.matches&&t.matches('.evc[data-evdetail]')){e.preventDefault();openEventDetail(t.getAttribute('data-evdetail'));}
+  /* I7.20.2 — mesma ativação por teclado p/ a urgent row de Hoje (plumbing mínima; reusa openDetails). */
+  if(t&&t.matches&&t.matches('.hj-urgent[data-detail]')){e.preventDefault();openDetails(t.getAttribute('data-detail'));}
 });
 /* ===== F3.5.4W-H1 (E2) — CÓPIA de tema/legenda na Central de Detalhes ===== */
 // Escreve SÓ texto puro (nunca HTML): 1º IPC do main (determinístico), depois navigator.clipboard,
