@@ -305,7 +305,14 @@ jobs:
               { id: 'o1', title: 'Cortes rapidos - stories', client: 'Clinica Vida', sector: 'edicao_cards', by: 'op1', assigneeId: 'op1', status: 'afazer', dueDate: d1, dueTime: '09:30' },
               { id: 'o2', title: 'Ajuste de thumbnail - outubro', client: 'Colegio Alfa', sector: 'edicao_midia', by: 'carlos', assigneeId: 'op1', status: 'andamento', dueDate: d2, dueTime: '14:00' }
             ];
-            state.events = [];
+            /* FIX classe C (run 33507184306): a ancora de Tab do bloco H usa o ultimo .evc de
+               "Compromissos de hoje"; com events=[] o Tab caia no KPI Hoje e o Enter do H5
+               NAVEGAVA para a Agenda (comportamento CORRETO do produto), derrubando o harness
+               em L171 (sem .stats). Eventos seedados = ancora real + Hoje veridico. */
+            state.events = [
+              { id: 'e1', title: 'Reuniao de pauta semanal', client: 'Interno', type: 'reuniao', date: d0, start: '09:30', end: '10:15', ownerId: 'carlos', by: 'carlos', done: false },
+              { id: 'e2', title: 'Gravacao - Hospital Visao', client: 'Hospital Visao', type: 'gravacao', date: d1, start: '14:00', end: '16:00', ownerId: 'marina', by: 'carlos', done: false }
+            ];
             state.tab = 'hoje'; render();
           }, { d0: D(0), d1: D(1), d2: D(2) });
           await pg.waitForTimeout(600);
@@ -406,7 +413,7 @@ jobs:
           await cropChecked('RC253-HOJE-URGENT-HOVER.png', '#content .col-tasks', 'Urgent row hover');
           await pg.mouse.move(4, 4); await pg.waitForTimeout(220);
           // focus REAL por teclado: Tab a partir do ultimo evc de hoje -> primeira urgent row
-          await pg.evaluate(() => { const evs = [...document.querySelectorAll('#content .col-events .evc')]; if (evs.length) evs[evs.length - 1].focus(); });
+          await pg.evaluate(() => { const evs = [...document.querySelectorAll('#content .col-events .evc')]; if (evs.length) { evs[evs.length - 1].focus(); } else { const ss = [...document.querySelectorAll('#content .stats .stat')]; if (ss.length) ss[ss.length - 1].focus(); } });
           await pg.keyboard.press('Tab'); await pg.waitForTimeout(260);
           g.H11_focusKeyboardVisible = await pg.evaluate(id => { const r = document.querySelector('#content .col-tasks .card[data-detail="' + id + '"]'); if (!r) return false; const s = getComputedStyle(r); return document.activeElement === r && s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0; }, hid);
           await cropChecked('RC253-HOJE-URGENT-FOCUS.png', '#content .col-tasks', 'Urgent row focus (Tab real)');
@@ -415,7 +422,7 @@ jobs:
           g.H5_enter = await pg.evaluate(id => { const m = document.querySelector('.modal-back[data-detmodal]'); return !!m && m.dataset.dettaskid === id; }, hid);
           await clk('.det-x');
           // H6 Espaco (re-foca por Tab real)
-          await pg.evaluate(() => { const evs = [...document.querySelectorAll('#content .col-events .evc')]; if (evs.length) evs[evs.length - 1].focus(); });
+          await pg.evaluate(() => { const evs = [...document.querySelectorAll('#content .col-events .evc')]; if (evs.length) { evs[evs.length - 1].focus(); } else { const ss = [...document.querySelectorAll('#content .stats .stat')]; if (ss.length) ss[ss.length - 1].focus(); } });
           await pg.keyboard.press('Tab'); await pg.waitForTimeout(260);
           await pg.keyboard.press('Space'); await pg.waitForTimeout(380);
           g.H6_space = await pg.evaluate(id => { const m = document.querySelector('.modal-back[data-detmodal]'); return !!m && m.dataset.dettaskid === id; }, hid);
@@ -429,7 +436,7 @@ jobs:
           g.H7_backToHoje = await pg.evaluate(() => state.tab === 'hoje' && ((document.getElementById('modalRoot') || {}).innerHTML || '').length < 50 && document.querySelectorAll('#content .col-tasks .card').length === 4);
           g.H8_noMutation = (await pg.evaluate(id => JSON.stringify(state.tasks.find(t2 => t2.id === id)), hid)) === hsnap;
           // H12/H13/H18 - KPI Tarefas -> Meu quadro + paridade ADMIN por IDs
-          const kpiT = await pg.evaluate(() => { const b = [...document.querySelectorAll('#content .stats .stat')].find(x => /Tarefas/.test(x.textContent)); return { v: Number((b.querySelector('.v') || {}).textContent), myboard: b.hasAttribute('data-myboard'), tab: b.getAttribute('data-tab') }; });
+          const kpiT = await pg.evaluate(() => { const b = [...document.querySelectorAll('#content .stats .stat')].find(x => /Tarefas/.test(x.textContent)); return b ? { v: Number((b.querySelector('.v') || {}).textContent), myboard: b.hasAttribute('data-myboard'), tab: b.getAttribute('data-tab') } : { v: -1, myboard: false, tab: 'MISSING' }; });
           I.kpiAdmin = kpiT;
           g.H12_kpiRouteReal = kpiT.myboard === true && kpiT.tab === null;
           await cropChecked('RC253-KPI-TAREFAS.png', '#content .stats', 'KPI row de Hoje');
@@ -455,7 +462,7 @@ jobs:
           // H14 - paridade OPERACIONAL (op1 'Editor de video'; canSeeAll=false)
           await pg.evaluate(() => { window.__adm = state.user; state.user = state.users.find(u2 => u2.id === 'op1'); state.personBoard = null; state.tab = 'hoje'; render(); });
           await pg.waitForTimeout(450);
-          const kOp = await pg.evaluate(() => { const b = [...document.querySelectorAll('#content .stats .stat')].find(x => /Tarefas/.test(x.textContent)); return Number((b.querySelector('.v') || {}).textContent); });
+          const kOp = await pg.evaluate(() => { const b = [...document.querySelectorAll('#content .stats .stat')].find(x => /Tarefas/.test(x.textContent)); return b ? Number((b.querySelector('.v') || {}).textContent) : -1; });
           const kIdsO = await pg.evaluate(() => state.tasks.filter(t2 => (t2.assigneeId === state.user.id || t2.by === state.user.id) && t2.status !== 'concluido').map(t2 => t2.id).sort());
           g.H14_opUrgentScope = await pg.evaluate(() => [...document.querySelectorAll('#content .col-tasks .card')].every(r => { const id = r.getAttribute('data-detail'); const t2 = state.tasks.find(x => x.id === id); return !!t2 && (t2.assigneeId === state.user.id || t2.by === state.user.id); }));
           await clk('#content .stats .stat[data-myboard]');
