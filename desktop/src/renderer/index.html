@@ -4421,6 +4421,68 @@ body.light-ui.desktop .kbv2-column:last-child .kbv2-card::before{top:12px;right:
 }
 
 /* ============================================================================
+   I7.23.1 · TASK CARD — REPARO RESPONSIVO PRAZO/SLA (P1, cirúrgico)
+   Causa raiz reproduzida por DOMRect: o I7.10 ressuscita .kbv2-due com display
+   !important; nos quadros scr-designers/scr-socials/scr-sector a geometria
+   legada mantinha o .kbv2-card-top como OVERLAY da linha do PRAZO (order:5;
+   margin:-22px; flex-end) com reserva fixa de 96px — dimensionada para o chip
+   SLA sozinho. Com "Em prazo" + "Faltam X" (~165px) o bloco intercepta a data
+   ("4 set · 18:00": 797px² @1920; 603px² sobre o texto @Win125) e o padding
+   morto estoura a coluna a 1366 (+9.3px além do card; data em 3 linhas). No
+   designers, o bloco SETOR absoluto (top:12/right:36) ainda cruza o título
+   (1260px²) e o ⋯ (52px²). Reparo na MESMA linguagem I7.10 — zero z-index,
+   zero dado removido, zero markup novo, Meu quadro/Cliente/dark intocados:
+   - designers (status oculto lá): card volta ao layout I7.10 pleno — topo
+     [SLA · Faltam X], SETOR na col1 e PRAZO na col2 do metadata grid.
+   - socials/sector (status absoluto no topo-direito): [SLA / Faltam X]
+     empilha na COL1 da banda de metadados (slot do SETOR, oculto nesses
+     quadros), ao lado do PRAZO na col2 — nada sobrepõe, nada é removido.
+   ========================================================================== */
+body.light-ui.desktop .scr-designers .kbv2-card-chips{position:static;top:auto;right:auto;z-index:auto;margin:13px 0 0}
+body.light-ui.desktop .scr-designers .kbv2-card-top,
+body.light-ui.desktop .scr-designers .kbv2-card-top:has(.kbv2-sla),
+body.light-ui.desktop .scr-socials .kbv2-card-top,
+body.light-ui.desktop .scr-socials .kbv2-card-top:has(.kbv2-sla),
+body.light-ui.desktop .scr-sector .kbv2-card-top,
+body.light-ui.desktop .scr-sector .kbv2-card-top:has(.kbv2-sla){order:2;grid-column:1;align-self:start;margin:13px 0 0;padding:0;min-height:0;justify-content:flex-start}
+/* designers: SETOR mora na col1 da mesma banda → o bloco de estado entra na linha seguinte
+   (order:3), nunca na banda do topo — lá vivem ⋯ e o Mover de hover (sem interceptação) */
+body.light-ui.desktop .scr-designers .kbv2-card-top,
+body.light-ui.desktop .scr-designers .kbv2-card-top:has(.kbv2-sla){order:3;margin:10px 0 0}
+body.light-ui.desktop .scr-designers .kbv2-top-r,
+body.light-ui.desktop .scr-socials .kbv2-top-r,
+body.light-ui.desktop .scr-sector .kbv2-top-r{flex-direction:column;align-items:flex-start;gap:4px}
+body.light-ui.desktop .scr-designers .kbv2-sla,body.light-ui.desktop .scr-designers .kbv2-due,
+body.light-ui.desktop .scr-socials .kbv2-sla,body.light-ui.desktop .scr-socials .kbv2-due,
+body.light-ui.desktop .scr-sector .kbv2-sla,body.light-ui.desktop .scr-sector .kbv2-due{max-width:100%}
+/* sem SLA e sem prazo a banda não deixa fantasma (status é absoluto = fora do fluxo) */
+body.light-ui.desktop .scr-designers .kbv2-card-top:not(:has(.kbv2-sla)):not(:has(.kbv2-due)),
+body.light-ui.desktop .scr-socials .kbv2-card-top:not(:has(.kbv2-sla)):not(:has(.kbv2-due)),
+body.light-ui.desktop .scr-sector .kbv2-card-top:not(:has(.kbv2-sla)):not(:has(.kbv2-due)){margin:0}
+/* o deslocamento de hover (clearance do Mover no TOPO) só faz sentido com o SLA no topo */
+body.light-ui.desktop .scr-designers .kbv2-card:hover .kbv2-sla,body.light-ui.desktop .scr-designers .kbv2-card:focus-within .kbv2-sla,
+body.light-ui.desktop .scr-socials .kbv2-card:hover .kbv2-sla,body.light-ui.desktop .scr-socials .kbv2-card:focus-within .kbv2-sla,
+body.light-ui.desktop .scr-sector .kbv2-card:hover .kbv2-sla,body.light-ui.desktop .scr-sector .kbv2-card:focus-within .kbv2-sla{margin-right:0}
+/* reserva morta de 96px retirada: o PRAZO volta a ter a coluna 2 inteira */
+body.light-ui.desktop .scr-designers .kbv2-card:has(.kbv2-sla) .kbv2-card-date,
+body.light-ui.desktop .scr-socials .kbv2-card:has(.kbv2-sla) .kbv2-card-date,
+body.light-ui.desktop .scr-sector .kbv2-card:has(.kbv2-sla) .kbv2-card-date{padding-right:0}
+@media (max-width:1439.98px){
+  body.light-ui.desktop .scr-designers .kbv2-card-chips{margin-top:11px}
+  body.light-ui.desktop .scr-socials .kbv2-card-top,body.light-ui.desktop .scr-socials .kbv2-card-top:has(.kbv2-sla),
+  body.light-ui.desktop .scr-sector .kbv2-card-top,body.light-ui.desktop .scr-sector .kbv2-card-top:has(.kbv2-sla){margin:11px 0 0}
+  body.light-ui.desktop .scr-designers .kbv2-card-top,body.light-ui.desktop .scr-designers .kbv2-card-top:has(.kbv2-sla){margin:9px 0 0}
+  body.light-ui.desktop .scr-designers .kbv2-card-top:not(:has(.kbv2-sla)):not(:has(.kbv2-due)),
+  body.light-ui.desktop .scr-socials .kbv2-card-top:not(:has(.kbv2-sla)):not(:has(.kbv2-due)),
+  body.light-ui.desktop .scr-sector .kbv2-card-top:not(:has(.kbv2-sla)):not(:has(.kbv2-due)){margin:0}
+  /* lanes estreitas: rótulos longos de SLA ("Prazo encerrado") quebram DENTRO do chip —
+     nunca invadem a coluna do PRAZO nem são cortados */
+  body.light-ui.desktop .scr-designers .kbv2-sla,
+  body.light-ui.desktop .scr-socials .kbv2-sla,
+  body.light-ui.desktop .scr-sector .kbv2-sla{white-space:normal;text-align:left}
+}
+
+/* ============================================================================
    LIGHT UI — I7.14 · PREMIUM FLOW CONTINUITY (F6 Detalhe + F2 Cliente)
    Continuidade da linguagem aprovada na 1.0.250 (F1 GOLDEN + Task Card I7.10)
    na MESMA jornada: card premium → Central de Detalhes → fluxo Cliente.
