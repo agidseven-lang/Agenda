@@ -40,10 +40,16 @@ const ROOT_BEFORE = process.env.BASELINE_DIR || '';
 const OUT = path.join(REPO, 'desktop', 'qa-out-i7231');
 const BASELINE_SHA = '5dac060ad612d4acbe24d389a00f23c51721c527';
 const BASELINE_RENDERER_SHA256 = 'c01bd845245bf09a833edcee41bf9e390106a2e72c16d08b1664738289e209ad';
+/* R1: baseline do refine = candidato aprovado parcialmente (commits A/B) */
+const R1_BASE_COMMIT = 'e31280df5ae2c36bbabf0254068281d3f20f1060';
+const ROOT_R1BASE = process.env.R1_BASELINE_DIR || '';
 const CHROME = process.env.QA_CHROMIUM || '/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell';
 fs.mkdirSync(OUT, { recursive: true });
 
 const gates = []; const manifest = [];
+let R1 = null; let r1Manifest = null;
+let DATA = { before: {}, after: {} };
+let HOVER = { before: {}, after: {} };
 function gate(id, ok, info) { gates.push({ id, ok: !!ok, info: String(info).slice(0, 300) }); console.log((ok ? '[PASS] ' : '[FAIL] ') + id + ' — ' + info); }
 const sha256 = p => createHash('sha256').update(fs.readFileSync(p)).digest('hex');
 
@@ -56,7 +62,12 @@ gate('G0-CANDIDATE-DIFFERS', afterHash !== BASELINE_RENDERER_SHA256, `candidato 
 let numstat = '';
 try { numstat = execFileSync('git', ['diff', '--numstat', BASELINE_SHA, '--', 'desktop/src/renderer/index.html'], { cwd: REPO }).toString().trim(); } catch (e) { numstat = 'git-err:' + e.message; }
 const nm = numstat.match(/^(\d+)\t(\d+)\t/);
-gate('G0-DIFF-ADDITIVE', !!nm && nm[2] === '0' && +nm[1] > 0 && +nm[1] <= 80, `numstat="${numstat}" (aditivo, 1 arquivo)`);
+gate('G0-DIFF-ADDITIVE', !!nm && nm[2] === '0' && +nm[1] > 0 && +nm[1] <= 120, `numstat="${numstat}" (aditivo, 1 arquivo)`);
+if (!ROOT_R1BASE) { gate('G0-R1-BASELINE-DIR', false, 'R1_BASELINE_DIR ausente (renderer @ e31280df)'); finish(); }
+let r1baseExpected = '';
+try { r1baseExpected = createHash('sha256').update(execFileSync('git', ['show', R1_BASE_COMMIT + ':desktop/src/renderer/index.html'], { cwd: REPO, maxBuffer: 1 << 25 })).digest('hex'); } catch (e) { r1baseExpected = 'git-err'; }
+const r1baseHash = sha256(path.join(ROOT_R1BASE, 'index.html'));
+gate('G0-R1-BASELINE-HASH', r1baseHash === r1baseExpected && r1baseExpected.length === 64, `R1 baseline sha256=${r1baseHash.slice(0, 16)}… == git show ${R1_BASE_COMMIT.slice(0, 12)} (${r1baseExpected.slice(0, 16)}…)`);
 const rendererTxt = fs.readFileSync(path.join(ROOT_AFTER, 'index.html'), 'utf8');
 const secStart = rendererTxt.indexOf('I7.23.1 · TASK CARD');
 const secEnd = rendererTxt.indexOf('LIGHT UI — I7.14', secStart);
@@ -167,6 +178,7 @@ const MEASURE = (surfKey) => {
     P('profile', 'dateBox'); P('profile', 'chips'); P('profile', 'rail'); P('profile', 'pct'); P('summary', 'dateBox'); P('summary', 'chips'); P('summary', 'rail'); P('summary', 'pct'); P('chk', 'dateBox'); P('chk', 'chips');
     P('kebab', 'status'); P('kebab', 'title'); P('status', 'title');
     P('moveBtn', 'sla'); P('moveBtn', 'due'); P('moveBtn', 'dateS'); P('moveBtn', 'title'); P('moveBtn', 'status');
+    P('moveBtn', 'kebab'); P('moveBtn', 'tier'); P('moveBtn', 'dateBox'); P('moveBtn', 'chips'); P('moveBtn', 'summary');
     for (const k of PARTS) {
       if (!c.visible[k] || k === 'moveBtn') continue; const r = live[k]; if (!r) continue;
       if (r.right > cr.right + 0.5 || r.left < cr.left - 0.5 || r.bottom > cr.bottom + 0.5) c.beyond.push(k + ':' + Math.max(r.right - cr.right, cr.left - r.left, r.bottom - cr.bottom).toFixed(1));
@@ -212,8 +224,6 @@ async function shotChecked(pg, file, { surface, vp, sourceSha, cell, clip }) {
 }
 
 const browser = await chromium.launch({ executablePath: CHROME });
-const DATA = { before: {}, after: {} };
-const HOVER = { before: {}, after: {} };
 for (const phase of ['before', 'after']) {
   const port = phase === 'after' ? 8895 : 8896;
   const srcSha = phase === 'after' ? 'candidate:' + afterHash.slice(0, 12) : BASELINE_SHA.slice(0, 12) + ' (v1.0.253)';
@@ -327,7 +337,85 @@ for (const phase of ['before', 'after']) {
     gate('E1-COMPOSITE', true, 'COMPARE-BEFORE-AFTER montado de 2 frames validados');
   } else gate('E1-COMPOSITE', false, 'frames de origem ausentes/ inválidos');
 }
-await browser.close(); srvA.close(); srvB.close();
+
+/* ================= R1 · Mover × workflow-status (hover) ================= */
+const srvR1 = await serve(ROOT_R1BASE, 8897);
+R1 = { baseRest: {}, baseHover: {}, baseHover4: {}, afterHover4: {} };
+r1Manifest = [];
+async function r1Shot(pg, file, { surface, vp, sourceSha, cell, clip }) {
+  const okHead = HEAD_RE[surface] ? HEAD_RE[surface].test(cell.heading) : true;
+  const valid = !cell.loginPresent && okHead && cell.cards.length > 0;
+  await pg.screenshot({ path: path.join(OUT, file), ...(clip ? { clip } : {}) });
+  const t1 = cell.cards.find(c => c.id === 't1');
+  r1Manifest.push({ filename: file, sourceSha, viewport: vp, surface, heading: cell.heading.slice(0, 80), cardWidth: t1 ? t1.rect.w : null, loginPresent: cell.loginPresent, screenshotValid: valid, overlapMetrics: t1 ? { 'moveBtn:status': t1.ints['moveBtn:status'] || 0, 'moveBtn:title': t1.ints['moveBtn:title'] || 0, 'moveBtn:kebab': t1.ints['moveBtn:kebab'] || 0, 'moveBtn:sla': t1.ints['moveBtn:sla'] || 0, 'moveBtn:due': t1.ints['moveBtn:due'] || 0, 'moveBtn:dateS': t1.ints['moveBtn:dateS'] || 0 } : null, hscroll: cell.hscroll, pageErrors: pg.__errs.length });
+  return valid;
+}
+for (const vp of VPS) {
+  /* baseline R1 (candidato A/B pré-refine) */
+  const ctxB = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, deviceScaleFactor: vp.dpr });
+  await ctxB.addInitScript(() => { const noop = new Proxy(function () {}, { get: () => noop, apply: () => noop, construct: () => noop }); ['initializeApp', 'getFirestore', 'getAuth'].forEach(k => { window[k] = noop; }); window.firebase = noop; });
+  const pgB = await bootPage(ctxB, 8897);
+  for (const sf of ['designers', 'socials', 'sector']) {
+    await nav(pgB, sf);
+    R1.baseRest[`${sf}@${vp.name}`] = await pgB.evaluate(MEASURE, sf);
+    const h1 = pgB.locator('.kbv2-card:has([data-detail="t1"])');
+    if (await h1.count()) { await h1.first().hover(); await pgB.waitForTimeout(180); R1.baseHover[`${sf}@${vp.name}`] = await pgB.evaluate(MEASURE, sf); await pgB.mouse.move(4, 4); await pgB.waitForTimeout(120); }
+    const h4 = pgB.locator('.kbv2-card:has([data-detail="t4"])');
+    if (await h4.count()) { await h4.first().hover(); await pgB.waitForTimeout(180); R1.baseHover4[`${sf}@${vp.name}`] = await pgB.evaluate(MEASURE, sf); await pgB.mouse.move(4, 4); await pgB.waitForTimeout(120); }
+  }
+  await ctxB.close();
+  /* candidato: hover t4 + shot oficial por viewport (sector, hover t1) */
+  const ctxA = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, deviceScaleFactor: vp.dpr });
+  await ctxA.addInitScript(() => { const noop = new Proxy(function () {}, { get: () => noop, apply: () => noop, construct: () => noop }); ['initializeApp', 'getFirestore', 'getAuth'].forEach(k => { window[k] = noop; }); window.firebase = noop; });
+  const pgA = await bootPage(ctxA, 8895);
+  for (const sf of ['designers', 'socials', 'sector']) {
+    await nav(pgA, sf);
+    const h4 = pgA.locator('.kbv2-card:has([data-detail="t4"])');
+    if (await h4.count()) { await h4.first().hover(); await pgA.waitForTimeout(180); R1.afterHover4[`${sf}@${vp.name}`] = await pgA.evaluate(MEASURE, sf); await pgA.mouse.move(4, 4); await pgA.waitForTimeout(120); }
+    if (sf === 'sector') {
+      await pgA.locator('.kbv2-card:has([data-detail="t1"])').first().hover(); await pgA.waitForTimeout(200);
+      const cell = await pgA.evaluate(MEASURE, sf);
+      const t1 = cell.cards.find(c => c.id === 't1');
+      const clip = t1 ? { x: Math.max(0, t1.rect.x - 6), y: Math.max(0, t1.rect.y - 6), width: t1.rect.w + 12, height: t1.rect.h + 12 } : undefined;
+      await r1Shot(pgA, `I7231R1-HOVER-${vp.name === 'win125' ? 'WIN125' : vp.name}.png`, { surface: sf, vp: vp.name + '-hover', sourceSha: 'candidate-R1:' + afterHash.slice(0, 12), cell, clip });
+      await pgA.mouse.move(4, 4); await pgA.waitForTimeout(120);
+    }
+  }
+  await ctxA.close();
+}
+/* crops 2× BEFORE (baseline R1) / AFTER / REST + composite */
+async function r1Crop2x(port, hover, file, srcSha) {
+  const ctx = await browser.newContext({ viewport: { width: 1536, height: 864 }, deviceScaleFactor: 2 });
+  await ctx.addInitScript(() => { const noop = new Proxy(function () {}, { get: () => noop, apply: () => noop, construct: () => noop }); ['initializeApp', 'getFirestore', 'getAuth'].forEach(k => { window[k] = noop; }); window.firebase = noop; });
+  const pg = await bootPage(ctx, port);
+  await nav(pg, 'sector');
+  if (hover) { await pg.locator('.kbv2-card:has([data-detail="t1"])').first().hover(); await pg.waitForTimeout(220); }
+  const cell = await pg.evaluate(MEASURE, 'sector');
+  const t1 = cell.cards.find(c => c.id === 't1');
+  if (t1) { const clip = { x: Math.max(0, t1.rect.x - 6), y: Math.max(0, t1.rect.y - 6), width: t1.rect.w + 12, height: t1.rect.h + 12 }; await r1Shot(pg, file, { surface: 'sector', vp: 'win125@2x' + (hover ? '-hover' : '-rest'), sourceSha: srcSha, cell, clip }); }
+  await ctx.close();
+  return cell;
+}
+const cellB2x = await r1Crop2x(8897, true, 'I7231R1-HOVER-BEFORE-2X.png', 'R1-baseline:' + R1_BASE_COMMIT.slice(0, 12));
+const cellA2x = await r1Crop2x(8895, true, 'I7231R1-HOVER-AFTER-2X.png', 'candidate-R1:' + afterHash.slice(0, 12));
+await r1Crop2x(8895, false, 'I7231R1-REST-STATE.png', 'candidate-R1:' + afterHash.slice(0, 12));
+{
+  const b = r1Manifest.find(m => m.filename === 'I7231R1-HOVER-BEFORE-2X.png');
+  const a = r1Manifest.find(m => m.filename === 'I7231R1-HOVER-AFTER-2X.png');
+  if (b && a && b.screenshotValid && a.screenshotValid) {
+    const b64 = f => fs.readFileSync(path.join(OUT, f)).toString('base64');
+    const html = `<!doctype html><meta charset="utf-8"><body style="margin:0;background:#EEF2F6;font:600 13px system-ui;display:flex;gap:14px;padding:14px">
+      <div><div style="padding:6px 2px;color:#B42318">ANTES (A/B ${R1_BASE_COMMIT.slice(0, 8)}) — Mover cobre o status (${b.overlapMetrics['moveBtn:status']}px²)</div><img style="max-width:640px;border:1px solid #D0D5DD" src="data:image/png;base64,${b64(b.filename)}"></div>
+      <div><div style="padding:6px 2px;color:#12784C">R1 — trilho sob o ⋯ · Mover×status = ${a.overlapMetrics['moveBtn:status']}px²</div><img style="max-width:640px;border:1px solid #D0D5DD" src="data:image/png;base64,${b64(a.filename)}"></div></body>`;
+    const tmp = path.join(OUT, '_cmp_r1.html'); fs.writeFileSync(tmp, html);
+    const ctx = await browser.newContext({ viewport: { width: 1400, height: 760 }, deviceScaleFactor: 1 });
+    const pg = await ctx.newPage(); await pg.goto('file://' + tmp); await pg.waitForTimeout(350);
+    await pg.screenshot({ path: path.join(OUT, 'I7231R1-HOVER-COMPARE.png'), fullPage: true });
+    r1Manifest.push({ filename: 'I7231R1-HOVER-COMPARE.png', sourceSha: 'composite(R1 before+after)', viewport: 'composite', surface: 'sector', screenshotValid: true, loginPresent: false });
+    await ctx.close(); fs.unlinkSync(tmp);
+  }
+}
+await browser.close(); srvA.close(); srvB.close(); srvR1.close();
 
 /* ---------- gates geométricos ---------- */
 const NAMED = { 'TC-R1-SLA-x-DUE-DATE': ['sla:dateS', 'sla:dateBox'], 'TC-R2-SLA-x-REMAINING': ['sla:due'], 'TC-R3-SLA-x-SETOR': ['sla:setorChip', 'sla:chips'], 'TC-R4-DUE-x-REMAINING': ['due:dateS', 'due:dateBox'] };
@@ -421,6 +509,80 @@ for (const [gid, pairs] of Object.entries(NAMED)) {
   }
   gate('FRZ-MINE-HOVER-PARITY', bad.length === 0, bad.length ? bad.slice(0, 4).join(' · ') : `hover do Meu quadro idêntico à baseline (superfície congelada)${pre.length ? ' · P2 pré-existente registrado: ' + pre.slice(0, 4).join(' ') : ''}`);
 }
+/* ---------- R1 · gates HOV-R1..R10 (hover do Mover) ---------- */
+{
+  const R1CELLS = []; // (célula, card) medidos em hover no candidato: t1 (HOVER.after) + t4 (R1.afterHover4)
+  for (const sf of ['designers', 'socials', 'sector']) for (const vp of VPS) {
+    const h1 = HOVER.after[`${sf}@${vp.name}`]; const c1 = h1 && h1.cards.find(c => c.id === 't1');
+    if (c1) R1CELLS.push({ key: `${sf}@${vp.name}#t1`, c: c1, cell: h1 });
+    const h4 = R1.afterHover4[`${sf}@${vp.name}`]; const c4 = h4 && h4.cards.find(c => c.id === 't4');
+    if (c4) R1CELLS.push({ key: `${sf}@${vp.name}#t4`, c: c4, cell: h4 });
+  }
+  /* PRE: a regressão do owner reproduzida na baseline R1 (A/B) */
+  const preHits = [];
+  for (const [k, cell] of Object.entries(R1.baseHover)) { const c = cell.cards.find(x => x.id === 't1'); if (c && (c.ints['moveBtn:status'] || 0) > 0) preHits.push(`${k}=${c.ints['moveBtn:status']}`); }
+  gate('HOV-R1-PRE-FIX-MOVER-STATUS-OVERLAP-REPRODUCED', preHits.length > 0, `baseline R1 (${R1_BASE_COMMIT.slice(0, 8)}): Mover cobre o status em ${preHits.length} célula(s) — ${preHits.slice(0, 3).join(' ')}`);
+  const pairGate = (id, pairs, label) => {
+    const bad = [];
+    for (const { key, c } of R1CELLS) for (const p of pairs) if ((c.ints[p] || 0) > 0) bad.push(`${key} ${p}=${c.ints[p]}`);
+    gate(id, bad.length === 0, bad.length ? bad.slice(0, 4).join(' · ') : `${label} = 0px² em ${R1CELLS.length} células·cards (t1 + t4 título-2-linhas × 3 quadros × 3 viewports)`);
+  };
+  pairGate('HOV-R1-MOVER-x-WORKFLOW-STATUS', ['moveBtn:status'], 'Mover × workflow-status');
+  pairGate('HOV-R2-MOVER-x-KEBAB', ['moveBtn:kebab'], 'Mover × ⋯');
+  pairGate('HOV-R3-MOVER-x-TITLE', ['moveBtn:title'], 'Mover × título');
+  pairGate('HOV-R4-MOVER-x-CLIENT', ['moveBtn:tier'], 'Mover × cliente');
+  pairGate('HOV-R5-MOVER-x-SLA', ['moveBtn:sla'], 'Mover × SLA');
+  pairGate('HOV-R6-MOVER-x-REMAINING', ['moveBtn:due'], 'Mover × Faltam X');
+  pairGate('HOV-R7-MOVER-x-DEADLINE', ['moveBtn:dateS', 'moveBtn:dateBox'], 'Mover × PRAZO/data');
+  /* R8: layout jump — crescimento do card em hover deve ser IGUAL ao da baseline R1 (pré-existente
+     P2-J: footer legado +10px/+2px de margem em :hover em TODOS os quadros kbv2 da 1.0.253) e
+     nenhuma parte de fluxo pode se deslocar horizontalmente */
+  {
+    const bad = []; const growth = new Set();
+    for (const sf of ['designers', 'socials', 'sector']) for (const vp of VPS) {
+      const k = `${sf}@${vp.name}`;
+      const aR = DATA.after[k], aH = HOVER.after[k], bR = R1.baseRest[k], bH = R1.baseHover[k];
+      const g = (rest, hov) => { const r = rest && rest.cards.find(c => c.id === 't1'); const h = hov && hov.cards.find(c => c.id === 't1'); return r && h ? +(h.rect.h - r.rect.h).toFixed(2) : null; };
+      const ga = g(aR, aH), gb = g(bR, bH);
+      if (ga === null || gb === null) { bad.push(k + ': célula ausente'); continue; }
+      if (Math.abs(ga - gb) > 0.5) bad.push(`${k} crescimento hover ${gb}→${ga}px`);
+      growth.add(ga);
+      const r = aR.cards.find(c => c.id === 't1'), h = aH.cards.find(c => c.id === 't1');
+      for (const pk of ['title', 'tier', 'sla', 'due', 'dateS', 'chips', 'summary', 'profile']) {
+        const a = r && r.parts[pk], b2 = h && h.parts[pk]; if (!a || !b2) continue;
+        if (Math.abs(a.x - b2.x) > 0.5 || Math.abs(a.w - b2.w) > 0.5) bad.push(`${k}.${pk} deslocamento horizontal`);
+      }
+    }
+    gate('HOV-R8-NO-DESTRUCTIVE-JUMP', bad.length === 0, bad.length ? bad.slice(0, 4).join(' · ') : `crescimento de hover idêntico à baseline (${[...growth].join('/')}px = P2-J pré-existente do footer legado) · zero deslocamento horizontal de fluxo`);
+  }
+  gate('HOV-R9-MOVER-FUNCTIONAL', gates.some(g2 => g2.id === 'FUN-MOVE' && g2.ok), 'Mover real: hover opacity=1 + [data-domove] abre (FUN-MOVE)');
+  {
+    const bad = [];
+    for (const { key, c, cell } of R1CELLS) {
+      const cr = c.rect; const m = c.parts.moveBtn;
+      if (m && (m.x < cr.x - 0.5 || m.x + m.w > cr.x + cr.w + 0.5 || m.y < cr.y - 0.5 || m.y + m.h > cr.y + cr.h + 0.5)) bad.push(key + ': Mover fora do card');
+      if (c.beyond.length) bad.push(key + ': ' + c.beyond.join(','));
+      if (cell.hscroll) bad.push(key + ': hscroll');
+    }
+    gate('HOV-R10-CONTENT-IN-CARD', bad.length === 0, bad.length ? bad.slice(0, 4).join(' · ') : 'Mover e todo o conteúdo dentro do card em hover; sem hscroll');
+  }
+  /* §6 — freeze do reparo já aprovado: t1 em repouso, elementos do reparo rect-equivalentes à baseline R1 */
+  {
+    const bad = []; const PARTS6 = ['sla', 'due', 'dateS', 'dateBox', 'rail', 'pct', 'profile', 'summary', 'chk', 'avBy', 'status', 'kebab'];
+    for (const sf of ['designers', 'socials', 'sector']) for (const vp of VPS) {
+      const k = `${sf}@${vp.name}`;
+      const a = DATA.after[k] && DATA.after[k].cards.find(c => c.id === 't1');
+      const b2 = R1.baseRest[k] && R1.baseRest[k].cards.find(c => c.id === 't1');
+      if (!a || !b2) { bad.push(k + ': t1 ausente'); continue; }
+      for (const pk of PARTS6) {
+        const ra = a.parts[pk], rb = b2.parts[pk]; if (!ra || !rb) continue;
+        if (Math.abs(ra.x - rb.x) > 0.5 || Math.abs(ra.y - rb.y) > 0.5 || Math.abs(ra.w - rb.w) > 0.5 || Math.abs(ra.h - rb.h) > 0.5) bad.push(`${k}.${pk} Δ(${(ra.x - rb.x).toFixed(1)},${(ra.y - rb.y).toFixed(1)},${(ra.w - rb.w).toFixed(1)},${(ra.h - rb.h).toFixed(1)})`);
+      }
+    }
+    gate('FRZ-R1-REPAIR-PRESERVED', bad.length === 0, bad.length ? bad.slice(0, 4).join(' · ') : 'SLA/Faltam/PRAZO/data/progresso/rodapé/avatares/status/⋯ rect-idênticos à baseline R1 (Δ≤0.5px, t1, 9 células) — reparo PRAZO/SLA preservado');
+  }
+  gate('E1-R1-SHOTS-VALID', r1Manifest.length >= 7 && r1Manifest.every(m => m.screenshotValid), `${r1Manifest.length} PNGs R1, ${r1Manifest.filter(m => !m.screenshotValid).length} inválidos`);
+}
 /* freeze: Meu quadro + Cliente byte-geométricos */
 for (const sf of ['mine', 'client']) {
   const bad = [];
@@ -478,7 +640,8 @@ for (const sf of ['mine', 'client']) {
 
 function finish() {
   fs.writeFileSync(path.join(OUT, 'i7231-evidence-manifest.json'), JSON.stringify({ phase: 'I7.23.1', baselineSha: BASELINE_SHA, candidateRendererSha256: afterHash, when: new Date().toISOString(), entries: manifest }, null, 1));
-  fs.writeFileSync(path.join(OUT, 'i7231-gates.json'), JSON.stringify({ gates, cellsAfter: DATA.after, cellsBefore: DATA.before, hoverAfter: HOVER.after }, null, 1));
+  if (r1Manifest) fs.writeFileSync(path.join(OUT, 'i7231r1-evidence-manifest.json'), JSON.stringify({ phase: 'I7.23.1-R1', r1BaselineCommit: R1_BASE_COMMIT, candidateRendererSha256: afterHash, when: new Date().toISOString(), entries: r1Manifest }, null, 1));
+  fs.writeFileSync(path.join(OUT, 'i7231-gates.json'), JSON.stringify({ gates, cellsAfter: DATA.after, cellsBefore: DATA.before, hoverAfter: HOVER.after, r1: R1 }, null, 1));
   const fails = gates.filter(g => !g.ok);
   console.log(`\n==== I7.23.1 QA: ${gates.length - fails.length}/${gates.length} PASS ====`);
   if (fails.length) { console.log('FALHAS: ' + fails.map(f => f.id).join(', ')); process.exitCode = 1; }
