@@ -4507,6 +4507,149 @@ body.light-ui.desktop .scr-socials .kbv2-btn[data-move] span,
 body.light-ui.desktop .scr-sector .kbv2-btn[data-move] span{position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;clip-path:inset(50%);white-space:nowrap}
 
 /* ============================================================================
+   I7.26.1 · PREMIUM TASK DETAIL (det3) + MOVE FLOW (mv3) — redesign estrutural
+   ----------------------------------------------------------------------------
+   Detail Inspector: contexto → título → status ÚNICO (+ próxima ação + fase) →
+   responsável compacto → SLA em linha → datas em definition grid → conteúdos em
+   LISTA editorial (hairlines, sem card-dentro-de-card) → rodapé hierarquizado
+   (primária "Mover status" / secundária "Fechar" / destrutiva discreta).
+   Move flow: "Mover de [atual] → Para [destinos reais]" + itens funcionais em
+   lista com estado + rodapé Cancelar/Mover para [destino].
+   Regras var-driven (--surface/--ink/...) — valem no tema dark E no light; o
+   bloco de tokens abaixo fixa a paleta clara (acento ÚNICO teal da marca).
+   CONTRATO §9: scrollWidth <= clientWidth em detail/dates/contents/footer/move.
+   ========================================================================== */
+body.desktop .det-sheet.det3{width:min(520px,94vw)}
+body.light-ui.desktop .modal-back[data-detmodal] .det-sheet.det3{--surface:#FFFFFF;--surface2:#F5F8FB;--ink:#16202C;--soft:#4B5364;--faint:#8A94A4;--text:#2A3140;--line:#D8DEE7;--line-soft:#EBEEF3;--accent:#0E7A6C;--green:#22A06B;--red:#E5484D}
+.det3 .det-head{padding:20px 24px 0;align-items:flex-start}
+.det3-ctx{font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-top:9px}
+.det3-ctx-sep{color:var(--line);margin:0 2px}
+.det3 .det-title{font-size:20px;font-weight:800;letter-spacing:-.015em;line-height:1.25;padding:10px 24px 0}
+.det3-meta{padding:8px 24px 0;gap:10px;display:flex;flex-wrap:wrap;align-items:center}
+.det3-flag{font-size:11px;font-weight:800;color:#D6455D}
+.det3-tag{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);border:1px solid var(--line-soft);border-radius:6px;padding:2px 7px}
+.det3 .det-body{padding:18px 24px 8px}
+.det3-lbl{display:block;font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--faint)}
+.det3-dot{width:8px;height:8px;border-radius:50%;flex:none;margin-top:5px}
+.det3-status{background:var(--surface2);border:1px solid var(--line-soft);border-radius:12px;padding:14px 16px}
+.det3-st-row{display:flex;gap:10px;align-items:flex-start}
+.det3-st-m{min-width:0}
+.det3-st-l{font-size:14.5px;font-weight:800;letter-spacing:-.01em;margin-top:3px;color:var(--ink)}
+.det3-st-s{font-size:12.5px;color:var(--soft);margin-top:3px;line-height:1.5}
+.det3-next{margin-top:12px;padding-top:12px;border-top:1px solid var(--line-soft)}
+.det3-next-t{font-size:13px;font-weight:600;color:var(--text);margin-top:4px;line-height:1.5}
+.det3-phase{display:flex;flex-wrap:wrap;gap:8px;margin-top:13px}
+.det3-phase .btn{width:auto;flex:0 1 auto;min-width:0;height:36px;padding:0 13px;font-size:12.5px;font-weight:700;border-radius:9px;display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+.det3-phase .btn svg{width:15px;height:15px;flex:none}
+.det3-resp{margin-top:16px}
+.det3-resp-row{display:flex;align-items:center;gap:10px;margin-top:8px;min-width:0}
+.det3-ava{flex:none;width:28px;height:28px;border-radius:9px;background:var(--surface2);color:var(--soft);font-size:10.5px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.det3-resp-row .av{width:28px !important;height:28px !important;font-size:10.5px !important;border-radius:9px}
+.det3-resp-m{min-width:0;flex:1}
+.det3-resp-n{font-size:13.5px;font-weight:750;color:var(--ink);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.det3-resp-r{font-size:11.5px;color:var(--faint);margin-top:1px}
+.det3-quiet{flex:none;display:flex;align-items:center;gap:8px}
+.det3-qa{font-size:12.5px;font-weight:700;color:var(--accent);background:transparent;border:0;padding:4px 2px;cursor:pointer;border-radius:6px}
+.det3-qa:hover{text-decoration:underline}
+.det3-qa:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.det3-qsep{color:var(--line);font-weight:400}
+.det3-resp-meta{font-size:11.5px;color:var(--faint);margin-top:9px;line-height:1.7;overflow-wrap:anywhere}
+.det3-dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:11px 22px}
+.det3-dt{display:flex;flex-direction:column;gap:3px;min-width:0}
+.det3-dt-l{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+.det3-dt-v{font-size:13px;font-weight:650;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.35}
+.det3-dt-strong .det3-dt-v{font-weight:800}
+.det3-sla{border:1px solid var(--line-soft);border-radius:12px;padding:13px 15px}
+.det3-sla-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.det3-sla-rem{font-size:12.5px;font-weight:750}
+.det3-dl-sla{margin-top:11px}
+.det3-sla .slaedit-btn{margin-top:4px}
+/* conteúdos = lista editorial: UM contêiner quieto; rows por hairline; número plano */
+.det3 .det-contents{gap:0;border:1px solid var(--line-soft);border-radius:12px;overflow:hidden}
+.det3 .det-acc{background:transparent;border:0;border-radius:0}
+.det3 .det-acc+.det-acc{margin-top:0}
+.det3 .det-acc-item+.det-acc-item{border-top:1px solid var(--line-soft)}
+.det3 .det-contents>.det-acc+.det-acc{border-top:1px solid var(--line-soft)}
+.det3 .det-acc>summary{padding:11px 14px;gap:11px}
+.det3 .det-acc>summary:hover{background:var(--surface2)}
+.det3 .det-acc>summary:focus-visible{outline-offset:-2px;border-radius:0}
+.det3 .det-content-n{width:auto;height:auto;min-width:20px;background:transparent;color:var(--faint);font-size:11px;font-weight:700;border-radius:0;justify-content:flex-start;padding-top:2px}
+.det3 .det-acc-k{display:none}
+.det3 .det-acc-t{font-size:13px;font-weight:650;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
+.det3 .det-acc[open]>summary .det-acc-t{-webkit-line-clamp:unset;display:block}
+.det3 .det-acc-chev svg{width:16px;height:16px}
+.det3 .det-acc-cbtn{width:26px;height:26px;border:0;background:transparent}
+.det3 .det-acc-cbtn:hover{background:var(--surface2)}
+.det3 .det-acc-body{padding:0 14px 13px 45px}
+.det3 .det-acc-tools{gap:2px}
+.det3 .det-acc-tools .det-acc-btn{border:0;background:transparent;padding:3px 7px;font-size:11px;color:var(--accent);white-space:nowrap}
+.det3 .det-acc-tools .det-acc-btn:hover{text-decoration:underline;color:var(--accent)}
+.det3 .det-sec-c{background:transparent;color:var(--soft);padding:0;font-weight:750;font-variant-numeric:tabular-nums;white-space:nowrap}
+.det3 .slaedit-btn{background:transparent;border:0;box-shadow:none;color:var(--accent);padding:4px 2px;font-size:12.5px;font-weight:700;display:inline-flex;align-items:center;gap:6px;border-radius:6px;cursor:pointer}
+.det3 .slaedit-btn svg{width:14px;height:14px}
+.det3 .slaedit-btn:hover{text-decoration:underline;background:transparent;color:var(--accent)}
+.det3 .slaedit-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.det3 .det-sec{margin:22px 0 10px;flex-wrap:wrap;row-gap:5px}
+.det3 .det-flowdet{margin:16px 0 0}
+/* rodapé hierarquizado (§6) */
+.det3-foot{flex-direction:row;align-items:center;gap:10px;padding:14px 24px calc(14px + env(safe-area-inset-bottom,0px))}
+.det3-foot-aux{display:flex;align-items:center;gap:14px;min-width:0;flex:1;flex-wrap:wrap}
+.det3-aux{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--faint);background:transparent;border:0;padding:6px 2px;cursor:pointer;border-radius:6px;white-space:nowrap}
+.det3-aux svg{width:14px;height:14px;flex:none}
+.det3-aux:hover{color:var(--soft)}
+.det3-aux-danger:hover{color:#D6455D}
+.det3-aux:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.det3-foot-main{display:flex;align-items:center;gap:9px;flex:none}
+.det3-foot-main .btn{width:auto;flex:none;min-width:0;height:40px;padding:0 16px;font-size:13px;font-weight:750;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap}
+.det3-foot-main .btn svg{width:16px;height:16px;flex:none}
+.det3-primary{background:var(--accent);color:#fff;border:0}
+body.light-ui.desktop .det3-primary{background:var(--lui-grad,#0E7A6C);box-shadow:var(--lui-grad-shadow,none);color:#fff;border:0}
+.det3-primary:hover{filter:brightness(1.05)}
+.det3-primary[disabled]{opacity:.45;cursor:default;filter:none;pointer-events:none}
+@media(max-width:560px){.det3-foot{flex-wrap:wrap}.det3-foot-main{flex:1;justify-content:flex-end}}
+/* ── MOVE (mv3) ── */
+body.desktop .sheet.mv3{max-width:560px;width:min(560px,94vw);max-height:calc(100vh - 80px);display:flex;flex-direction:column;padding:0;overflow:hidden}
+body.light-ui.desktop .modal-back[data-movemodal] .sheet.mv3{--surface:#FFFFFF;--surface2:#F5F8FB;--ink:#16202C;--soft:#4B5364;--faint:#8A94A4;--text:#2A3140;--line:#D8DEE7;--line-soft:#EBEEF3;--accent:#0E7A6C;--green:#22A06B;background:#FFFFFF;border:1px solid #E6EAF0}
+.mv3-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:18px 22px 0}
+.mv3-ttl{font-size:17px;font-weight:800;letter-spacing:-.01em;color:var(--ink)}
+.mv3-sub{font-size:12.5px;color:var(--soft);margin-top:3px}
+.mv3 .det-x{width:32px;height:32px;border-radius:9px}
+.mv3-task{font-size:11px;font-weight:750;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);padding:10px 22px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mv3-body{padding:14px 22px 8px;overflow-y:auto;flex:1;min-height:0}
+.mv3-cur{margin-bottom:14px}
+.mv3-cur-v{display:flex;align-items:center;gap:9px;font-size:13.5px;font-weight:750;color:var(--ink);margin-top:6px}
+.mv3-cur-v .det3-dot{margin-top:0}
+.mv3-cur-tag{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);border:1px solid var(--line-soft);border-radius:6px;padding:2px 7px}
+.mv3-dest{display:flex;flex-direction:column;gap:8px}
+.mv3-opt{display:flex;align-items:flex-start;gap:11px;width:100%;text-align:left;border:1px solid var(--line-soft);background:var(--surface);border-radius:11px;padding:11px 13px;cursor:pointer;transition:border-color .12s,background .12s}
+.mv3-opt:hover{background:var(--surface2)}
+.mv3-opt:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mv3-opt.on{border-color:var(--accent);background:var(--surface2);box-shadow:inset 0 0 0 1px var(--accent)}
+.mv3-radio{flex:none;width:15px;height:15px;border-radius:50%;border:1.5px solid var(--line);margin-top:2px;position:relative}
+.mv3-opt.on .mv3-radio{border-color:currentColor}
+.mv3-opt.on .mv3-radio::after{content:'';position:absolute;inset:3px;border-radius:50%;background:currentColor}
+.mv3-opt-m{min-width:0}
+.mv3-opt-l{display:block;font-size:13.5px;font-weight:750;color:var(--ink)}
+.mv3-opt-d{display:block;font-size:12px;color:var(--soft);margin-top:2px;line-height:1.45}
+.mv3-items{margin:16px 0 4px;border-top:1px solid var(--line-soft);padding-top:14px}
+.mv3-items-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.mv3-items-c{font-size:11px;font-weight:750;color:var(--soft);font-variant-numeric:tabular-nums}
+.mv3-items-note{font-size:11.5px;color:var(--faint);margin-top:4px}
+.mv3-items-list{margin-top:9px;border:1px solid var(--line-soft);border-radius:11px;overflow:hidden;max-height:264px;overflow-y:auto}
+.mv3-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:transparent;border:0;padding:9px 12px;cursor:pointer;min-height:38px}
+.mv3-item+.mv3-item{border-top:1px solid var(--line-soft)}
+.mv3-item:hover{background:var(--surface2)}
+.mv3-item:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.mv3-chk{flex:none;width:18px;height:18px;border-radius:6px;border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff}
+.mv3-item.on .mv3-chk{background:var(--green,#22A06B);border-color:transparent}
+.mv3-item.on .mv3-chk::after{content:'✓'}
+.mv3-item-n{flex:none;font-size:11px;font-weight:700;color:var(--faint);font-variant-numeric:tabular-nums;min-width:18px}
+.mv3-item-t{min-width:0;flex:1;font-size:12.5px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mv3-item.on .mv3-item-t{color:var(--faint)}
+.mv3-foot{display:flex;align-items:center;justify-content:flex-end;gap:9px;padding:13px 22px calc(13px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line-soft);background:var(--surface);flex:none}
+.mv3-foot .btn{width:auto;flex:none;min-width:0;height:40px;padding:0 16px;font-size:13px;font-weight:750;border-radius:10px;white-space:nowrap}
+
+/* ============================================================================
    LIGHT UI — I7.14 · PREMIUM FLOW CONTINUITY (F6 Detalhe + F2 Cliente)
    Continuidade da linguagem aprovada na 1.0.250 (F1 GOLDEN + Task Card I7.10)
    na MESMA jornada: card premium → Central de Detalhes → fluxo Cliente.
@@ -10429,20 +10572,39 @@ function openMove(taskId){
   const opts=isDesignerAxisMove(t)
     ? designerMoveOpts(t).map(o=>({key:o.key,label:o.label,desc:o.desc,color:stOf(o.key).color}))
     : STATUS.filter(st=>st.key!==(t.status||'afazer'));
+  /* I7.26.1 (§7) — MOVE FLOW estrutural: "onde estou → para onde posso ir".
+     Destinos = EXCLUSIVAMENTE os já permitidos pela lógica real (designerMoveOpts/STATUS);
+     seleção é estado de DOM; o write-path segue sendo SÓ data-domove → moveStatus. */
+  const curKey=isDesignerAxisMove(t)?designerCol(t):(t.status||'afazer');
+  const curSt=stOf(curKey);
   /* F3.5.6A — status POR ITEM (Designer, cronograma): cada tema com seu próprio concluído.
-     Marcar o ÚLTIMO item conclui a entrega pelo caminho canônico (moveStatus 'concluido'). */
+     Marcar o ÚLTIMO item conclui a entrega pelo caminho canônico (moveStatus 'concluido').
+     I7.26.1: os itens são FUNCIONAIS (toggle real data-wfitemdone) → lista de seleção com
+     estado claro (check + número + título), nunca nuvem de pills (§7-SELECTABLE). */
   var wfItems='';
   try{
     if(isDesignerAxisMove(t)&&secOf(t.sector).key==='cronograma'&&Array.isArray(t.cronContents)&&t.cronContents.length){
-      wfItems='<div style="margin:2px 0 12px;border:1px solid var(--line);border-radius:12px;padding:10px 12px"><div class="ss" style="font-weight:800;margin-bottom:6px">Itens desta produção</div>'+
-        t.cronContents.map(function(c,i){ var st=(t.designerItemStatus&&t.designerItemStatus['i'+i])||null; var done=!!(st&&st.st==='concluido');
-          var nm=''; try{ nm=String((c&&(c.tema||c.t))||('Item '+(i+1))).replace(/<[^>]*>/g,'').slice(0,60); }catch(_){ nm='Item '+(i+1); }
-          return '<button class="chip'+(done?' on':'')+'" data-wfitemdone="'+esc(t.id)+'|'+i+'" style="margin:2px 4px 2px 0'+(done?';background:rgba(47,207,143,.18);border-color:rgba(47,207,143,.5)':'')+'">'+(done?'✓ ':'')+esc(nm)+'</button>';
-        }).join('')+'</div>';
+      var _done=0;
+      var rows=t.cronContents.map(function(c,i){ var st=(t.designerItemStatus&&t.designerItemStatus['i'+i])||null; var done=!!(st&&st.st==='concluido'); if(done)_done++;
+        var nm=''; try{ nm=String((c&&(c.tema||c.t))||('Item '+(i+1))).replace(/<[^>]*>/g,'').slice(0,90); }catch(_){ nm='Item '+(i+1); }
+        return '<button type="button" class="mv3-item'+(done?' on':'')+'" data-wfitemdone="'+esc(t.id)+'|'+i+'" aria-pressed="'+(done?'true':'false')+'"><span class="mv3-chk"></span><span class="mv3-item-n">'+((i+1)<10?'0':'')+(i+1)+'</span><span class="mv3-item-t">'+esc(nm)+'</span></button>';
+      }).join('');
+      wfItems='<div class="mv3-items"><div class="mv3-items-h"><span class="det3-lbl">Itens desta produção</span><span class="mv3-items-c">'+_done+' de '+t.cronContents.length+' concluídos</span></div>'+
+        '<div class="mv3-items-note">Marcar o último item conclui a entrega.</div><div class="mv3-items-list">'+rows+'</div></div>';
     }
   }catch(_wfI){ wfItems=''; }
-  document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1"><div class="sheet"><div class="grab"></div><div style="font-size:18px;font-weight:800">Mover tarefa</div><div style="font-size:13px;color:var(--soft);margin-bottom:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(t.title||t.client||'')+'</div>'+wfItems+
-    opts.map(st=>'<button class="moveopt" data-domove="'+t.id+'|'+st.key+'" style="background:'+withAlpha(st.color,.12)+'"><div class="icb" style="background:'+withAlpha(st.color,.18)+';color:'+st.color+'">'+svg('swap')+'</div><div><div style="font-size:14px;font-weight:800;color:'+st.color+'">'+st.label+'</div><div style="font-size:11.5px;color:var(--faint)">'+st.desc+'</div></div></button>').join('')+'</div></div>';
+  document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1" data-movemodal="1" data-movetask="'+esc(t.id)+'"><div class="sheet mv3" role="dialog" aria-modal="true" aria-label="Mover tarefa">'+
+    '<div class="mv3-head"><div><div class="mv3-ttl">Mover tarefa</div><div class="mv3-sub">Escolha o próximo status desta produção.</div></div><button class="iconbtn det-x" data-modalclose="1" aria-label="Fechar">'+svg('close')+'</button></div>'+
+    '<div class="mv3-task">'+esc(t.title||t.client||'')+'</div>'+
+    '<div class="mv3-body">'+
+      '<div class="mv3-cur"><span class="det3-lbl">Mover de</span><div class="mv3-cur-v"><span class="det3-dot" style="background:'+curSt.color+'"></span>'+esc(curSt.label)+'<span class="mv3-cur-tag">estado atual</span></div></div>'+
+      '<div class="mv3-dest"><span class="det3-lbl">Para</span>'+
+        opts.map(st=>'<button type="button" class="mv3-opt" data-movesel="'+st.key+'" data-movelabel="'+esc(st.label)+'" aria-pressed="false"><span class="mv3-radio" style="color:'+st.color+'"></span><span class="mv3-opt-m"><span class="mv3-opt-l">'+esc(st.label)+'</span><span class="mv3-opt-d">'+esc(st.desc)+'</span></span></button>').join('')+'</div>'+
+      wfItems+
+    '</div>'+
+    '<div class="mv3-foot"><button class="btn ghost" data-modalclose="1">Cancelar</button><button class="btn det3-primary mv3-go" data-domove="" disabled>Mover</button></div>'+
+  '</div></div>';
+  detSetupModalFocus();   // I7.26.1 — mesmo trap/foco inicial da Central (infra existente)
 }
 async function moveStatus(taskId,newStatus){
   if(slaGuardBlocked(taskId))return;   // FASE 5: atraso crítico bloqueia avançar/concluir OUTRAS tarefas
@@ -10564,7 +10726,7 @@ var _detReturnEl=null;
    superfície marcada com data-detmodal; recriada a cada innerHTML → sem vazamento de listener. */
 function detSetupModalFocus(){
   try{
-    var back=document.querySelector('.modal-back[data-detmodal]');if(!back)return;
+    var back=document.querySelector('.modal-back[data-detmodal],.modal-back[data-movemodal]');if(!back)return;   /* I7.26.1 — trap também no Mover */
     var sheet=back.querySelector('.det-sheet');if(sheet&&!sheet.hasAttribute('tabindex'))sheet.setAttribute('tabindex','-1');
     var xbtn=back.querySelector('.det-x');(xbtn||sheet||back).focus();
     back.addEventListener('keydown',function(ev){
@@ -10605,6 +10767,52 @@ function execTrackingBlock(t){
     +'<details class="det-acc" open><summary class="det-acc-sum"><span class="det-acc-h"><span class="det-acc-k">ACOMPANHAMENTO DA EXECUÇÃO</span><span class="det-acc-t">Check-ins do Designer ('+tl.length+')</span></span><span class="det-acc-chev">'+svg('arr')+'</span></summary>'
     +'<div class="det-acc-body">'+rows+'</div></details>';
 }
+/* ═══ I7.26.1 — DETAIL INSPECTOR (det3): blocos de composição ═══
+   Status ÚNICO (+ sub + PRÓXIMA AÇÃO + ações de fase) e responsabilidade compacta.
+   Reusa a máquina de estados aprovada (detailState/detailOwner/detailActionsHtml) e
+   EXCLUSIVAMENTE handlers reais existentes (data-goboard/data-senddesigner/...).
+   "Ver quadro"/"Trocar" viram ações contextuais discretas do responsável (§5C). */
+function det3Date(l,v,strong){return '<div class="det3-dt'+(strong?' det3-dt-strong':'')+'"><span class="det3-dt-l">'+esc(l)+'</span><span class="det3-dt-v">'+esc(v)+'</span></div>';}
+function det3StatusBlock(t){
+  const _k=secOf(t.sector).key;
+  const hero=isClientSector(_k)||_k==='edicao_midia';
+  const ds=hero?detailState(t):(function(){const st=stOf(t.status);return {color:st.color,label:st.label,sub:'',next:'',actions:[]};})();
+  const _filled=isClientSector(_k)?(t.cronContents||[]).filter(c=>c&&(c.tema||c.legenda)).length:1;
+  const acts=hero?detailActionsHtml(t,Object.assign({},ds,{actions:ds.actions.filter(k=>k!=='dboard'&&k!=='redesigner')})):'';
+  return '<div class="det3-status">'+
+    '<div class="det3-st-row"><span class="det3-dot" style="background:'+ds.color+'"></span><div class="det3-st-m"><span class="det3-lbl">Status atual</span><div class="det3-st-l">'+esc(ds.label)+'</div>'+(ds.sub?'<div class="det3-st-s">'+esc(ds.sub)+'</div>':'')+'</div></div>'+
+    (ds.next?'<div class="det3-next"><span class="det3-lbl">Próxima ação</span><div class="det3-next-t">'+esc(ds.next)+'</div></div>':'')+
+    (_filled<1?'<div class="kbv2-hint" style="margin:10px 0 0">🔒 <span>Preencha ao menos <b>1 tema</b> para liberar o <b>envio ao cliente</b> (Card Premium).</span></div>':'')+
+    (acts?'<div class="det3-phase">'+acts+'</div>':'')+
+  '</div>';
+}
+function det3RespBlock(t){
+  const _k=secOf(t.sector).key;
+  const hero=isClientSector(_k)||_k==='edicao_midia';
+  const asg=respOf(t);const asgName=asg?(asg.name||''):'';
+  const req=t.by?state.users.find(u=>u.id===t.by):null;const reqName=req?req.name:'—';
+  let ava,name,role,quiet='';
+  if(hero){const ds=detailState(t);const ow=detailOwner(t,ds);
+    ava='<span class="det3-ava '+ow.cls+'">'+esc(ow.ini)+'</span>';name=ow.name;role=(ow.role.split('—')[1]||ow.role).trim();
+    const q=[];
+    if(ds.actions.indexOf('dboard')>=0&&hasDesigner(t))q.push('<button class="det3-qa" data-goboard="'+designerOf(t)+'">Ver quadro</button>');
+    if(ds.actions.indexOf('redesigner')>=0)q.push('<button class="det3-qa" data-senddesigner="'+t.id+'">Trocar</button>');
+    quiet=q.join('<span class="det3-qsep">·</span>');
+  }else{
+    ava=asg?avatar(asg,28):'<span class="det3-ava own-none">?</span>';
+    name=asgName||'Ninguém atribuído';role=(asg&&asg.role)||'Responsável pela execução';
+  }
+  const meta=[];
+  meta.push('Execução: '+esc(asgName||'—'));
+  meta.push('Enviado por: '+esc(reqName));
+  if(t.designerAssignment&&t.designerAssignment.designerId){const da=t.designerAssignment;
+    const dStatus={sent:'Recebido',in_progress:'Em produção',done:'Concluído'}[da.status]||'Enviado';
+    meta.push('Designer: '+esc(da.designerName||'Designer')+' · '+dStatus+(da.assignedAt?(' · enviado em '+fmtDateTimeBR(da.assignedAt)):''));}
+  return '<div class="det3-resp"><span class="det3-lbl">Responsável agora</span>'+
+    '<div class="det3-resp-row">'+ava+'<div class="det3-resp-m"><div class="det3-resp-n">'+esc(name)+'</div><div class="det3-resp-r">'+esc(role)+'</div></div>'+(quiet?'<div class="det3-quiet">'+quiet+'</div>':'')+'</div>'+
+    '<div class="det3-resp-meta">'+meta.join(' <span class="det3-qsep">·</span> ')+'</div>'+
+  '</div>';
+}
 function openDetails(taskId){
   const t=state.tasks.find(x=>x.id===taskId);
   if(!t){ if(__retiredIndex[taskId]){retiredModuleNotice(taskId);} return; }   /* F3.5.5E — deep-link antigo de módulo retirado: mensagem + redirect (nunca tela branca) */
@@ -10623,46 +10831,39 @@ function openDetails(taskId){
      (estado real via activeTab()) p/ o tema claro apresentar a MESMA Central como drawer lateral
      (CSS-only). Atributo inerte no tema dark (nenhuma regra o consome); zero mudança de lógica. */
   const _detOrigin=(typeof activeTab==='function'&&state.tab==='tarefas')?(activeTab()==='mine'?' data-detorigin="mine"':(activeTab()==='client'?' data-detorigin="client"':(activeTab()==='designers'?' data-detorigin="designers"':(activeTab()==='socials'?' data-detorigin="socials"':((activeTab()==='hub'&&state.boardSector)?' data-detorigin="sectors"':''))))):'';
-  let h='<div class="modal-back" data-modalbg="1" data-detmodal="1"'+_detOrigin+' data-detsector="'+esc(t.sector||'')+'" data-dettaskid="'+esc(t.id||'')+'"><div class="sheet det-sheet" role="dialog" aria-modal="true" aria-label="Central de Detalhes da tarefa">'+
-    '<div class="det-head"><div class="det-badge" style="background:'+withAlpha(s.color,.16)+';color:'+s.color+'">'+svg(s.icon)+'<span>'+esc(s.label)+'</span></div>'+
+  let h='<div class="modal-back" data-modalbg="1" data-detmodal="1"'+_detOrigin+' data-detsector="'+esc(t.sector||'')+'" data-dettaskid="'+esc(t.id||'')+'"><div class="sheet det-sheet det3" role="dialog" aria-modal="true" aria-label="Central de Detalhes da tarefa">'+
+    /* I7.26.1 — DETAIL INSPECTOR: contexto (SETOR · CLIENTE) + título + meta compacta.
+       O status NÃO mora no header: vive UMA única vez no bloco de status abaixo (§5A/§5B). */
+    '<div class="det-head det3-head"><div class="det3-ctx">'+esc(s.label)+(t.client?' <span class="det3-ctx-sep">·</span> '+esc(t.client):'')+'</div>'+
       '<button class="iconbtn det-x" data-modalclose="1" aria-label="Fechar detalhes">'+svg('close')+'</button></div>'+
     '<div class="det-title">'+esc(t.title||'Sem título')+'</div>'+
-    (t.client?'<div class="det-client">'+svg('place')+'<span>'+esc(t.client)+'</span></div>':'')+
-    '<div class="det-chips">'+((function(){
-        // detail-hierarchy-v2: UM único chip de estado no topo (sem status concorrentes).
-        // Cronograma usa a MESMA máquina de estados do hero (detailState) — nunca contradiz.
-        if(isClientSector(secOf(t.sector).key)){const dsc=detailState(t);
-          return '<span class="rev-chip" style="background:'+withAlpha(dsc.color,.16)+';color:'+dsc.color+'"><span class="dotc" style="background:'+dsc.color+'"></span>'+esc(dsc.label)+'</span>';}
-        return '<span class="rev-chip" style="background:'+withAlpha(st.color,.16)+';color:'+st.color+'"><span class="dotc" style="background:'+st.color+'"></span>'+esc(st.label)+'</span>';
-      })())+
-      (t.priority?'<span class="rev-chip" style="background:'+withAlpha('#F87171',.16)+';color:#F87171">⚑ Prioridade alta</span>':'')+
-      (cron&&cron.label?'<span class="rev-chip rev-chip-soft">'+esc(cron.label)+'</span>':'')+'</div>'+
+    ((t.priority||(cron&&cron.label))?('<div class="det-chips det3-meta">'+
+      (t.priority?'<span class="det3-flag">⚑ Prioridade alta</span>':'')+
+      (cron&&cron.label?'<span class="det3-tag">'+esc(cron.label)+'</span>':'')+'</div>'):'')+
     '<div class="det-body">'+
-    // pessoas
-    '<div class="det-people">'+
-      '<div class="det-person">'+(asg?avatar(asg,44):emptyAv)+'<div class="det-person-m"><div class="det-person-l">Responsável pela execução</div><div class="det-person-n">'+esc(asgName||'Ninguém atribuído')+'</div>'+(asg&&asg.role?'<div class="det-person-r">'+esc(asg.role)+'</div>':'')+'</div></div>'+
-      '<div class="det-person">'+(req?avatar(req,44):emptyAv)+'<div class="det-person-m"><div class="det-person-l">Enviado por</div><div class="det-person-n">'+esc(reqName)+'</div>'+(req&&req.role?'<div class="det-person-r">'+esc(req.role)+'</div>':'')+'</div></div>'+
-    '</div>'+
-    // detail-hierarchy-v2: HERO (status+próxima+responsável+ações) no topo;
-    // os chips técnicos e a timeline moram em "Detalhes do fluxo" (colapsado).
-    detailHeroBlock(t)+
+    // I7.26.1 — status ÚNICO (+ próxima ação + ações de fase) e responsabilidade compacta:
+    // execução / enviado por / atribuição do designer viram metadados (sem mega-cards).
+    // Os chips técnicos e a timeline seguem em "Detalhes do fluxo" (colapsado).
+    det3StatusBlock(t)+
+    det3RespBlock(t)+
     detailSlaBlock(t)+
     flowDetailsBlock(t)+
     execTrackingBlock(t)+
-    // datas
-    '<div class="det-sec">Datas</div><div class="det-dates">'+
-      detDate('calendar','Criado em',fmtDateTimeBR(t.createdAt))+
-      (t.startDate?detDate('today','Início',fmtDateBR(t.startDate)+(t.startTime?' às '+t.startTime:'')):(((t.sector||'')==='edicao_cards')?detDate('today','Início','Não informado'):''))+
-      (t.endDate?detDate('today','Término',fmtDateBR(t.endDate)+(t.endTime?' às '+t.endTime:'')):'')+
-      detDate('swap','Atualizado em',upd?fmtDateTimeBR(upd):'—')+
-      detDate('clock','Prazo final',(t.dueDate||t.due)?(fmtDateBR(t.dueDate||t.due)+(t.dueTime?' às '+t.dueTime:'')):'Não informado')+
+    // datas — I7.26.1: definition grid compacta (2 colunas quando couber, 1 no estreito);
+    // sem date-cards; valores tabulares; Prazo final com ênfase. ZERO hscroll por contrato (§9).
+    '<div class="det-sec">Datas</div><div class="det3-dl">'+
+      det3Date('Criado',fmtDateTimeBR(t.createdAt))+
+      (t.startDate?det3Date('Início',fmtDateBR(t.startDate)+(t.startTime?' às '+t.startTime:'')):(((t.sector||'')==='edicao_cards')?det3Date('Início','Não informado'):''))+
+      (t.endDate?det3Date('Término',fmtDateBR(t.endDate)+(t.endTime?' às '+t.endTime:'')):'')+
+      det3Date('Atualizado',upd?fmtDateTimeBR(upd):'—')+
+      det3Date('Prazo final',(t.dueDate||t.due)?(fmtDateBR(t.dueDate||t.due)+(t.dueTime?' às '+t.dueTime:'')):'Não informado',1)+
     '</div>';
   // cronograma — F3.5.4W: Central de Detalhes com blocos numerados (TEMA/ROTEIRO/VÍDEO NN),
   // acordeões nativos <details> (preservam parágrafos/quebras via white-space:pre-wrap; esc()
   // sanitiza; sem innerHTML cru, sem [object Object]) e barra "Expandir/Recolher todos".
   if(cron){
     var _word=detItemWord(t);var _openAll=cron.list.length<=5;
-    h+='<div class="det-sec">'+(secOf(t.sector).key==='roteiro'?'Roteiros':(secOf(t.sector).key==='edicao_midia'?'Vídeos':'Conteúdos do cronograma'))+' <span class="det-sec-c">'+cron.list.length+' / '+cron.count+'</span>'+
+    h+='<div class="det-sec">'+(secOf(t.sector).key==='roteiro'?'Roteiros':(secOf(t.sector).key==='edicao_midia'?'Vídeos':'Conteúdos do cronograma'))+' <span class="det-sec-c">'+(cron.list.length===cron.count?(cron.count+(cron.count===1?' item':' itens')):(cron.list.length+' / '+cron.count))+'</span>'+
       (cron.list.length>1?'<span class="det-acc-tools"><button type="button" class="det-acc-btn" data-detexpand="1">Expandir todos</button><button type="button" class="det-acc-btn" data-detcollapse="1">Recolher todos</button></span>':'')+'</div>';
     if(cron.list.length){
       // F3.5.5A-H1 — lápis "Editar observação interna" SÓ p/ Admin/Social (canSeeAll) em setor de
@@ -10727,18 +10928,9 @@ function openDetails(taskId){
   }
   // P1 — Correções pedidas pelo cliente POR CONTEÚDO: editar tema/legenda daquele item.
   h+=clientRevisionFixBlock(t);
-  // Designer atribuido (tempo real) — quem recebeu + status
-  if(t.designerAssignment&&t.designerAssignment.designerId){const da=t.designerAssignment;
-    const du=state.users.find(u=>u.id===da.designerId);const dStatus={sent:'Recebido',in_progress:'Em produção',done:'Concluído'}[da.status]||'Enviado';
-    const dColor=da.status==='done'?'#34D399':da.status==='in_progress'?'#F59E0B':'#5B6CFF';
-    h+='<div class="det-sec">Designer</div>'+
-       '<div class="det-cresp" style="border-color:'+withAlpha(dColor,.4)+';background:'+withAlpha(dColor,.10)+'">'+
-       (du?avatar(du,40):'<div class="det-cresp-ic" style="color:'+dColor+'">'+svg('person')+'</div>')+
-       '<div class="det-cresp-m"><div class="det-cresp-t">'+esc(da.designerName||(du&&du.name)||'Designer')+'</div>'+
-       (du&&du.role?'<div class="det-cresp-d" style="margin-top:2px">'+esc(du.role)+'</div>':'')+
-       '<div style="margin-top:6px"><span class="rev-chip" style="background:'+withAlpha(dColor,.16)+';color:'+dColor+'"><span class="dotc" style="background:'+dColor+'"></span>'+dStatus+'</span></div>'+
-       (da.assignedAt?'<div class="det-cresp-d" style="margin-top:6px">Enviado em '+fmtDateTimeBR(da.assignedAt)+'</div>':'')+'</div></div>';
-  }
+  // I7.26.1 — atribuição do designer (tempo real) CONSOLIDADA nos metadados de
+  // responsabilidade (det3RespBlock): nome + status (Recebido/Em produção/Concluído)
+  // + "enviado em". Nenhuma informação removida; o mega-card redundante saiu (§3-H/§3-F).
   h+='</div>'+ // det-body
     detFooter(t,cron)+
   '</div></div>';
@@ -10920,16 +11112,15 @@ function detailSlaBlock(t){
   var s=detailSla(t); if(!s) return '';
   var startStr=s.planStartAt?fmtDateTimeBR(s.planStartAt):'Não definido';
   var dueStr=s.planDueAt?fmtDateTimeBR(s.planDueAt):'Não definido';
+  // I7.26.1 — SLA compacto (§5B/§10): estado + tempo restante numa linha; datas na
+  // MESMA definition grid das demais datas; sem painel tintado pesado. Handler intacto.
   return '<div class="det-sec">SLA do designer</div>'+
-    '<div class="det-cresp" style="display:block;border-color:'+withAlpha(s.color,.4)+';background:'+withAlpha(s.color,.10)+'">'+
-      '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
-        '<span class="rev-chip" style="background:'+withAlpha(s.color,.16)+';color:'+s.color+'"><span class="dotc" style="background:'+s.color+'"></span>'+esc(s.label)+'</span>'+
-        '<span style="color:'+s.color+';font-weight:800;font-size:13px">'+esc(s.rem)+'</span>'+
+    '<div class="det3-sla">'+
+      '<div class="det3-sla-top">'+
+        '<span class="rev-chip" style="background:'+withAlpha(s.color,.14)+';color:'+s.color+'"><span class="dotc" style="background:'+s.color+'"></span>'+esc(s.label)+'</span>'+
+        '<span class="det3-sla-rem" style="color:'+s.color+'">'+esc(s.rem)+'</span>'+
       '</div>'+
-      '<div style="display:flex;gap:26px;margin-top:12px;flex-wrap:wrap">'+
-        '<div><div style="color:var(--faint);font-size:11px;margin-bottom:2px">Início planejado</div><div style="color:var(--ink);font-size:13px;font-weight:600">'+esc(startStr)+'</div></div>'+
-        '<div><div style="color:var(--faint);font-size:11px;margin-bottom:2px">Prazo final / término</div><div style="color:var(--ink);font-size:13px;font-weight:600">'+esc(dueStr)+'</div></div>'+
-      '</div>'+
+      '<div class="det3-dl det3-dl-sla">'+det3Date('Início planejado',startStr)+det3Date('Prazo final / término',dueStr)+'</div>'+
       /* F3.3.2 — "Editar prazo": SÓ Social Media/Admin (canSeeAll). Designer comum/Cliente não veem.
          F3.5.6A-H17 — pós-conclusão o prazo é SOMENTE LEITURA: o bloco SLA DO DESIGNER continua VISÍVEL
          (histórico: início planejado + prazo final), mas o botão "Editar prazo" NÃO é renderizado quando a
@@ -11156,18 +11347,20 @@ async function saveItemFix(taskId,idx,field,val,resend){
 // Footer premium do Detalhes — agrupado (cliente / tarefa), nunca corta: cada
 // grupo e flex-wrap com min-width, quebrando em 2 linhas quando necessario.
 function detFooter(t,cron){
-  // detail-hierarchy-v2: ações de FASE moram no hero (detailHeroBlock). O rodapé fica só
-  // com utilidades da tarefa — sem grupos "Ações do cliente"/"Ações da tarefa" concorrentes.
-  const taskBtns=
+  // I7.26.1 — hierarquia de ações (§6): PRIMARY "Mover status" · SECONDARY "Fechar" ·
+  // DESTRUTIVA "Remover tarefa" como ação contextual DISCRETA à esquerda (handler data-del
+  // REAL preservado; RBAC canDelTask + confirmação "digite EXCLUIR"/deleteTask inalterados)
+  // — nunca competindo com a primária. "Editar tarefa" (Cards; SM/Admin) idem, discreta.
+  const aux=
     /* F3.5.4F — EDITAR TAREFA no Detalhe (Edição de Cards; SM/Admin) — mesmo gate do menu ⋯. */
-    (String(t.sector||'')==='edicao_cards'&&typeof canSeeAll==='function'&&state.user&&canSeeAll(state.user)?'<button class="btn ghost" data-cardedit="'+t.id+'">'+svg('editnote')+'Editar tarefa</button>':'')+
-    /* F3.5.6A-H17 — tarefa CONCLUÍDA não exibe "Mover status" (guarda funcional em openMove/moveStatus).
-       "Remover" PERMANECE (ação administrativa: RBAC canDelTask + confirmação "digite EXCLUIR"; deleteTask
-       inalterado) — pós-conclusão continua sendo possível remover a tarefa. */
-    ((typeof isTaskCompleted==='function'&&isTaskCompleted(t))?'':'<button class="btn ghost" data-move="'+t.id+'">'+svg('swap')+'Mover status</button>')+
-    (canDelTask(t)?'<button class="btn btn-danger" data-del="'+t.id+'">'+svg('trash')+'Remover</button>':'')+
-    '<button class="btn det-close" data-modalclose="1">'+svg('close')+'Fechar</button>';
-  return '<div class="det-actions"><div class="det-act-row det-act-row-solo">'+taskBtns+'</div></div>';
+    (String(t.sector||'')==='edicao_cards'&&typeof canSeeAll==='function'&&state.user&&canSeeAll(state.user)?'<button class="det3-aux" data-cardedit="'+t.id+'">'+svg('editnote')+'<span>Editar tarefa</span></button>':'')+
+    (canDelTask(t)?'<button class="det3-aux det3-aux-danger" data-del="'+t.id+'">'+svg('trash')+'<span>Remover tarefa</span></button>':'');
+  /* F3.5.6A-H17 — tarefa CONCLUÍDA não exibe "Mover status" (guarda funcional em
+     openMove/moveStatus). "Remover" PERMANECE (ação administrativa) pós-conclusão. */
+  const main=
+    '<button class="btn ghost det-close" data-modalclose="1">Fechar</button>'+
+    ((typeof isTaskCompleted==='function'&&isTaskCompleted(t))?'':'<button class="btn det3-primary" data-move="'+t.id+'">'+svg('swap')+'Mover status</button>');
+  return '<div class="det-actions det3-foot"><div class="det3-foot-aux">'+aux+'</div><div class="det3-foot-main">'+main+'</div></div>';
 }
 /* ===== Enviar para designer — modal premium + atribuicao isolada ===== */
 function openDesignerModal(taskId){
@@ -14344,6 +14537,8 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeCardMenus();
   // F3.5.4W — Esc fecha a Central de Detalhes (superfície de leitura). SÓ a Central é marcada
   // com data-detmodal — modais de formulário não são afetados (não perdem digitação).
   if(document.querySelector('.modal-back[data-detmodal]')){closeModal();}
+  // I7.26.1 — Esc também fecha o "Mover tarefa" (superfície de decisão, sem digitação).
+  else if(document.querySelector('.modal-back[data-movemodal]')){closeModal();}
   // F3.5.5B — Esc no detalhe do compromisso: 1º fecha o menu ⋯ se aberto; em tela de
   // confirmação volta ao detalhe (não descarta o modal inteiro); senão fecha o modal.
   else{var _eb=document.querySelector('.modal-back[data-evdmodal]');
@@ -14636,7 +14831,10 @@ document.addEventListener('click',async e=>{
   closeCardMenus();
   if(el=g('[data-detail]')){openDetails(el.dataset.detail);return;}
   if(el=g('[data-move]')){openMove(el.dataset.move);return;}
-  if(el=g('[data-domove]')){const parts=el.dataset.domove.split('|');await moveStatus(parts[0],parts[1]);return;}
+  /* I7.26.1 — seleção de destino no Mover: estado SÓ de DOM (o write-path continua sendo
+     exclusivamente data-domove → moveStatus, inalterado). Habilita o confirmar do rodapé. */
+  if(el=g('[data-movesel]')){const back=el.closest('.modal-back[data-movemodal]');if(back){[...back.querySelectorAll('.mv3-opt')].forEach(b=>{const on=b===el;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on?'true':'false');});const go=back.querySelector('.mv3-go');if(go){go.disabled=false;go.setAttribute('data-domove',back.getAttribute('data-movetask')+'|'+el.getAttribute('data-movesel'));go.textContent='Mover para '+(el.getAttribute('data-movelabel')||'');}}return;}
+  if(el=g('[data-domove]')){const parts=el.dataset.domove.split('|');if(!parts[0]||!parts[1])return;await moveStatus(parts[0],parts[1]);return;}
   if(el=g('[data-cardedit]')){openCardsEdit(el.dataset.cardedit);return;}   /* F3.5.4F — editar tarefa (Edição de Cards) */
   if(el=g('[data-resend]')){closeCardMenus();await resendDesignerNotify(el.dataset.resend);return;}
   if(el=g('[data-del]')){openDeleteConfirm(el.dataset.del);return;}
@@ -14735,7 +14933,11 @@ document.addEventListener('click',async e=>{
   if(el=g('[data-wfapprovalsclose]')){wfApprovalsClose();return;}
   if(el=g('[data-wfapprovalsfilter]')){wfApprovalsSetFilter(el.getAttribute('data-wfapprovalsfilter'));return;}
   if(el=g('[data-wfapprovalsscrim]')&&!g('.wfap-panel')){wfApprovalsClose();return;}
-  if(el=g('[data-wfitemdone]')){wfToggleItemDone(el.dataset.wfitemdone);return;}
+  if(el=g('[data-wfitemdone]')){
+    /* I7.26.1 — refresh otimista da linha no modal Mover (espelha o otimismo local que o
+       wfToggleItemDone já grava em designerItemStatus; write-path 100% inalterado). */
+    if(el.classList.contains('mv3-item')){const on=!el.classList.contains('on');el.classList.toggle('on',on);el.setAttribute('aria-pressed',on?'true':'false');const box=el.closest('.mv3-items');if(box){const c=box.querySelectorAll('.mv3-item.on').length;const cc=box.querySelector('.mv3-items-c');if(cc)cc.textContent=c+' de '+box.querySelectorAll('.mv3-item').length+' concluídos';}}
+    wfToggleItemDone(el.dataset.wfitemdone);return;}
   if(el=g('[data-sheet]')){openSheet(el.dataset.sheet);return;}
   if(el=g('[data-cfgnotiftest]')){try{window.desktopAPI&&window.desktopAPI.notifTest&&window.desktopAPI.notifTest();}catch(_){}flashToast('Notificação de teste disparada.');return;}
   if(el=g('[data-cfgnotifdiag]')){try{notifDiagFill();}catch(_){}flashToast('Diagnóstico de notificações atualizado.');return;}
