@@ -1,0 +1,180 @@
+# =====================================================================
+# [manual/GATED] FINAL 1.0.254 — Desktop Release (INERTE até o GO do owner)
+# ---------------------------------------------------------------------
+# Espelha o mecanismo gated canônico auditado (precedente imediato desktop-release-
+# 1.0.253-final.yml; origem canônica 1.0.247).
+# NUNCA publica sozinho. FAIL-CLOSED em camadas:
+#   Gate 0: variável de repositório RC_RELEASE_GO == 'authorized-by-owner'
+#           (INEXISTENTE até o owner criá-la em Settings > Variables — I7.24.2).
+#   Gate 1: frase de confirmação digitada manualmente no dispatch.
+#   Gate 2: proveniência (FINAL SOURCE f33313e7 + renderer sha256 + lockfile sha256 + version 1.0.254).
+#           OBS: o marcador de description permanece o herdado da 1.0.248 (precedente real: bump = VERSION ONLY); a proveniência é garantida por SHA + renderer + lockfile + version.
+#   Gate 3: pins do RUN FINAL CANÔNICO (build run id + SHA-256 dos 6 assets).
+#           Enquanto qualquer pin estiver PENDING (I7.24.1), FALHA SEMPRE.
+#   Publicação: exige tag v1.0.254 INEXISTENTE (nunca sobrescrever) e verifica
+#           sha256/sha512/size de TODOS os assets contra os pins antes de criar
+#           tag (no FINAL SOURCE) + Release **Latest** (stable, NÃO prerelease).
+# Escritas (tag + release + assets + Latest) via TOKEN TEMPORÁRIO do GitHub App
+# "Agenda ID Seven Release Bot" (padrão da casa; GITHUB_TOKEN fica READ-ONLY).
+# =====================================================================
+name: "[manual/GATED] FINAL 1.0.254 — Desktop Release (INERT)"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      build_run_id:
+        description: "Run ID do desktop-build-1.0.254-final.yml VERDE (deve ser IGUAL ao pinado)"
+        required: true
+      confirm:
+        description: "Digite EXATAMENTE: RELEASE-1.0.254-FINAL-AUTORIZADO"
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  PRODUCT_SOURCE_SHA: "f33313e70e8786436b52f1c726d97173fbd005c7"
+  EXPECTED_VERSION: "1.0.254"
+  EXPECTED_RENDERER_SHA256: "58e36929d31a630fe18bc4cf3483c7acfea9255b9a1693f1f018e01c196e6a78"
+  EXPECTED_LOCKFILE_SHA256: "047711f1968a7c9f32a7a854bcb437e5f10d168613b47eb7b030107c46c40ced"
+  BUNDLE_ARTIFACT_NAME: "agenda-id-seven-desktop-1.0.254-final-bundle"
+  # ---- PINS DO RUN FINAL CANÔNICO (preencher APOS o build 1.0.254 verde — I7.24.1 (PREENCHIDOS)). PENDING = fail-closed:
+  EXPECTED_BUILD_RUN_ID: "33638526497"
+  EXPECTED_EXE_SHA256: "a72d7e77a6e8b94f11c5b6a473bed0c1bf33404c1787cf33ba53300b521de3d5"
+  EXPECTED_MSI_SHA256: "69f1e34771d689f2602f2e0d0ffa1391156ec449be3014061a4c0d605fb5511b"
+  EXPECTED_BLOCKMAP_SHA256: "4188add8a4d8593b6b2e49246d678437b2aa42618940eaaee901ff7e7a3bf464"
+  EXPECTED_LATESTYML_SHA256: "77fb9ba5f0db41e869972218f0c32769bb41a455f35e9252fe5b65fb5ec032fe"
+  EXPECTED_SHA256SUMS_SHA256: "eed8542ecabd946992b9e4211f648b0e3672da3c0fcbbd1b991a672d1309cc9e"
+  EXPECTED_VERSAOTXT_SHA256: "d6db3597faa2a34e27d12651ba5729e1429d3b77da4136b5089216744381ee53"
+
+jobs:
+  gated-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: "GATE 0 — autorização do OWNER (variável de repositório; fail-closed)"
+        run: |
+          set -euo pipefail
+          if [ "${{ vars.RC_RELEASE_GO }}" != "authorized-by-owner" ]; then
+            echo "::error::RELEASE NÃO AUTORIZADO — RC_RELEASE_GO != 'authorized-by-owner'. Workflow INERTE (I7.24.2 pendente)."
+            exit 1
+          fi
+
+      - name: "GATE 1 — frase de confirmação manual"
+        run: |
+          set -euo pipefail
+          [ "${{ github.event.inputs.confirm }}" = "RELEASE-1.0.254-FINAL-AUTORIZADO" ] || { echo "::error::frase de confirmação incorreta"; exit 1; }
+
+      - name: Checkout (verificação de linhagem)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: "GATE 2 — proveniência: FINAL SOURCE + renderer + lockfile + versão"
+        run: |
+          set -euo pipefail
+          git cat-file -e "$PRODUCT_SOURCE_SHA" || { echo "::error::FINAL SOURCE inexistente"; exit 1; }
+          R=$(git show "$PRODUCT_SOURCE_SHA":desktop/src/renderer/index.html | sha256sum | awk '{print $1}')
+          [ "$R" = "$EXPECTED_RENDERER_SHA256" ] || { echo "::error::renderer difere do congelado"; exit 1; }
+          L=$(git show "$PRODUCT_SOURCE_SHA":desktop/package-lock.json | sha256sum | awk '{print $1}')
+          [ "$L" = "$EXPECTED_LOCKFILE_SHA256" ] || { echo "::error::lockfile difere do pinado"; exit 1; }
+          git show "$PRODUCT_SOURCE_SHA":desktop/package.json > /tmp/pkg.json
+          node -e "const p=require('/tmp/pkg.json'); if(p.version!=='$EXPECTED_VERSION')process.exit(1); console.log('version OK');"
+
+      - name: "GATE 3 — pins do RUN FINAL CANÔNICO completos e input coerente (fail-closed)"
+        run: |
+          set -euo pipefail
+          for v in "$EXPECTED_BUILD_RUN_ID" "$EXPECTED_EXE_SHA256" "$EXPECTED_MSI_SHA256" "$EXPECTED_BLOCKMAP_SHA256" "$EXPECTED_LATESTYML_SHA256" "$EXPECTED_SHA256SUMS_SHA256" "$EXPECTED_VERSAOTXT_SHA256"; do
+            if [ "$v" = "PENDING-FINAL-BUILD-RUN" ]; then
+              echo "::error::pins do run final canônico ainda PENDING — a publicação só é liberada quando o build 1.0.254 verde for pinado (I7.24.1->I7.24.2)."
+              exit 1
+            fi
+          done
+          [ "${{ github.event.inputs.build_run_id }}" = "$EXPECTED_BUILD_RUN_ID" ] || { echo "::error::build_run_id difere do RUN FINAL CANÔNICO pinado ($EXPECTED_BUILD_RUN_ID)"; exit 1; }
+
+      - name: "Token temporário do Release Bot (GitHub App da casa; expira sozinho)"
+        id: release_bot
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: Agenda
+          permission-contents: write
+          permission-workflows: write
+
+      - name: "Release Bot ATIVO + escopo SÓ Agenda (padrão f42f)"
+        env:
+          BOT_TOKEN: ${{ steps.release_bot.outputs.token }}
+        run: |
+          set -euo pipefail
+          [ -n "$BOT_TOKEN" ] || { echo "::error::token do Release Bot vazio — NADA publicado."; exit 1; }
+          FN="$(GH_TOKEN="$BOT_TOKEN" gh api "repos/$GITHUB_REPOSITORY" --jq '.full_name' 2>/dev/null || true)"
+          [ "$FN" = "$GITHUB_REPOSITORY" ] || { echo "::error::Release Bot sem acesso a $GITHUB_REPOSITORY."; exit 1; }
+          J="$(GH_TOKEN="$BOT_TOKEN" gh api /installation/repositories)"
+          N="$(echo "$J" | jq -r '.total_count')"; R="$(echo "$J" | jq -r '.repositories[0].full_name')"
+          { [ "$N" = "1" ] && [ "$R" = "$GITHUB_REPOSITORY" ]; } || { echo "::error::escopo do Release Bot != {1 repo} ($N,$R)."; exit 1; }
+          echo "OK: Release Bot ativo, escopo restrito"
+
+      - name: "PUBLICAÇÃO — bundle do run pinado → verificação total → tag v1.0.254 → Release Latest"
+        env:
+          GH_TOKEN: ${{ steps.release_bot.outputs.token }}
+        run: |
+          set -euo pipefail
+          TAG="v$EXPECTED_VERSION"
+          if git ls-remote --tags origin "refs/tags/$TAG" | grep -q .; then
+            echo "::error::tag $TAG já existe — publicação abortada (nunca sobrescrever)"; exit 1
+          fi
+          RUN="$EXPECTED_BUILD_RUN_ID"
+          AID=$(GH_TOKEN="${{ github.token }}" gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN/artifacts" --jq ".artifacts[] | select(.name==\"$BUNDLE_ARTIFACT_NAME\") | .id")
+          [ -n "$AID" ] || { echo "::error::bundle $BUNDLE_ARTIFACT_NAME não encontrado no run $RUN (expirado? re-rode o build e re-pine)"; exit 1; }
+          mkdir -p bundle && cd bundle
+          GH_TOKEN="${{ github.token }}" gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$AID/zip" > bundle.zip
+          unzip -q bundle.zip && rm bundle.zip
+          EXE=$(find . -name "Agenda-ID-Seven-Desktop-$EXPECTED_VERSION-x64.exe" | head -1)
+          MSI=$(find . -name "Agenda-ID-Seven-Desktop-$EXPECTED_VERSION-x64.msi" | head -1)
+          BMAP=$(find . -name "Agenda-ID-Seven-Desktop-$EXPECTED_VERSION-x64.exe.blockmap" | head -1)
+          LYML=$(find . -name "latest.yml" | head -1)
+          SUMS=$(find . -name "SHA256SUMS" | head -1)
+          VTXT=$(find . -name "VERSAO-DESKTOP.txt" | head -1)
+          for f in "$EXE" "$MSI" "$BMAP" "$LYML" "$SUMS" "$VTXT"; do [ -n "$f" ] && [ -f "$f" ] || { echo "::error::asset ausente no bundle"; exit 1; }; done
+          [ "$(sha256sum "$EXE"  | awk '{print $1}')" = "$EXPECTED_EXE_SHA256" ]        || { echo "::error::exe difere do pinado"; exit 1; }
+          [ "$(sha256sum "$MSI"  | awk '{print $1}')" = "$EXPECTED_MSI_SHA256" ]        || { echo "::error::msi difere do pinado"; exit 1; }
+          [ "$(sha256sum "$BMAP" | awk '{print $1}')" = "$EXPECTED_BLOCKMAP_SHA256" ]   || { echo "::error::blockmap difere do pinado"; exit 1; }
+          [ "$(sha256sum "$LYML" | awk '{print $1}')" = "$EXPECTED_LATESTYML_SHA256" ]  || { echo "::error::latest.yml difere do pinado"; exit 1; }
+          [ "$(sha256sum "$SUMS" | awk '{print $1}')" = "$EXPECTED_SHA256SUMS_SHA256" ] || { echo "::error::SHA256SUMS difere do pinado"; exit 1; }
+          [ "$(sha256sum "$VTXT" | awk '{print $1}')" = "$EXPECTED_VERSAOTXT_SHA256" ]  || { echo "::error::VERSAO-DESKTOP.txt difere do pinado"; exit 1; }
+          grep -q "^version: $EXPECTED_VERSION$" "$LYML" || { echo "::error::latest.yml versão"; exit 1; }
+          SHA512=$(openssl dgst -sha512 -binary "$EXE" | base64 -w0)
+          grep -q "$SHA512" "$LYML" || { echo "::error::sha512 do exe não bate com latest.yml (mistura de builds!)"; exit 1; }
+          SIZE=$(stat -c%s "$EXE")
+          grep -q "size: $SIZE" "$LYML" || { echo "::error::size do exe não bate com latest.yml"; exit 1; }
+          (cd "$(dirname "$EXE")" && sha256sum -c SHA256SUMS) || { echo "::error::SHA256SUMS não confere com os bytes"; exit 1; }
+          gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$TAG" -f sha="$PRODUCT_SOURCE_SHA"
+          gh release create "$TAG" "$EXE" "$MSI" "$BMAP" "$LYML" "$SUMS" "$VTXT" \
+            --title "Agenda ID Seven Desktop $EXPECTED_VERSION" \
+            --notes "Release gated (GO do owner). Fonte: $PRODUCT_SOURCE_SHA · build run canônico: $RUN. Task Card Responsive Repair (I7.23.1 + R1, OWNER APPROVED): colisao PRAZO/SLA eliminada nos quadros de designers, social medias e setor - Em prazo e Faltam X compoem a banda de metadados ao lado do PRAZO (intersecoes 0px2 por DOMRect em 1920/Win125/1366; cards reais abaixo de 240px no 1366); hover Mover vira trilho icon-only sob o kebab sem cobrir workflow-status, titulo, cliente, SLA ou PRAZO; rotulos longos de SLA quebram dentro do chip em lanes estreitas. Meu quadro, Cliente, Hoje Actionability, Option B e Detalhe preservados. Base 1.0.253; diff = renderer + bump + QA tooling; backend/updater intocados. Update in-app silencioso /S." \
+            --latest
+          echo "RELEASE PUBLICADA: $TAG (Latest) com 6 assets do run $RUN" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "PÓS-VERIFICAÇÃO — flags/assets/tag-sha/Latest + releases históricas preservadas"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="v$EXPECTED_VERSION"
+          FLAGS="$(gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json isPrerelease,isDraft --jq '(.isPrerelease|tostring)+"|"+(.isDraft|tostring)')"
+          [ "$FLAGS" = "false|false" ] || { echo "::error::flags incorretas: $FLAGS"; exit 1; }
+          N="$(gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json assets --jq '.assets|length')"
+          [ "$N" = "6" ] || { echo "::error::esperado 6 assets, encontrados $N"; exit 1; }
+          if gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -qx "app-update.yml"; then echo "::error::app-update.yml nao pode ser asset"; exit 1; fi
+          TAGSHA="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq '.object.sha')"
+          [ "$TAGSHA" = "$PRODUCT_SOURCE_SHA" ] || { echo "::error::CRITICAL: tag $TAG aponta para $TAGSHA != FINAL SOURCE"; exit 1; }
+          LATEST_TAG="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.tag_name')"
+          [ "$LATEST_TAG" = "$TAG" ] || { echo "::error::Latest do repo != $TAG (got $LATEST_TAG)"; exit 1; }
+          for t in v1.0.253 v1.0.252 v1.0.251; do
+            gh release view "$t" -R "$GITHUB_REPOSITORY" --json tagName --jq '.tagName' | grep -qx "$t" || { echo "::error::release historica $t sumiu"; exit 1; }
+          done
+          echo "POS-VERIFICACAO OK: $TAG estavel/Latest no FINAL SOURCE; historicas (253/252/251) preservadas" >> "$GITHUB_STEP_SUMMARY"
+          echo "LEMBRETE: RE-LOCK (I7.24.2) — remover RC_RELEASE_GO; canary publico e a fase I7.24.3." >> "$GITHUB_STEP_SUMMARY"
