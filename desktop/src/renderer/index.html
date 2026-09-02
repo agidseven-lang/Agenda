@@ -4481,6 +4481,30 @@ body.light-ui.desktop .scr-sector .kbv2-card:has(.kbv2-sla) .kbv2-card-date{padd
   body.light-ui.desktop .scr-socials .kbv2-sla,
   body.light-ui.desktop .scr-sector .kbv2-sla{white-space:normal;text-align:left}
 }
+/* ---- R1 · hover "Mover" = trilho vertical sob o ⋯ (icon-only) ----------------
+   O topo-direito destes quadros pertence a [workflow-status][⋯]; o pill do Mover
+   (72×26 em top:10/right:44) cobria o miolo do status em 1728px² no hover e roçava
+   o título em 1px. O Mover vira botão de ícone 26×24 ancorado SOB o ⋯ (top:40/
+   right:12) — banda livre provada por DOMRect (⋯ termina em y≈39; metadados
+   começam em y≈67). O rótulo "Mover" permanece acessível (visually-hidden por
+   clip-path, sem overflow-hidden sobre dado); handler real [data-move] intocado.
+   O card-main reserva o trilho (padding-right:26px — título termina ≥2px antes
+   do trilho em todas as resoluções) sem estreitar a ponto de clipar palavras
+   longas a 1366. Meu quadro/Cliente intocados. ---- */
+body.light-ui.desktop .scr-designers .kbv2-card-main,
+body.light-ui.desktop .scr-socials .kbv2-card-main,
+body.light-ui.desktop .scr-sector .kbv2-card-main{padding-right:26px}
+/* o tier legado reservava 118px de texto p/ a pill de status com main=8px (total 126px);
+   com main=26px a reserva de TEXTO fica idêntica (26+100=126) e o RECT sai do trilho */
+body.light-ui.desktop .scr-designers .kbv2-tier,
+body.light-ui.desktop .scr-socials .kbv2-tier,
+body.light-ui.desktop .scr-sector .kbv2-tier{padding-right:100px}
+body.light-ui.desktop .scr-designers .kbv2-btn[data-move],
+body.light-ui.desktop .scr-socials .kbv2-btn[data-move],
+body.light-ui.desktop .scr-sector .kbv2-btn[data-move]{top:40px;right:12px;width:26px;height:24px;padding:0;justify-content:center;gap:0}
+body.light-ui.desktop .scr-designers .kbv2-btn[data-move] span,
+body.light-ui.desktop .scr-socials .kbv2-btn[data-move] span,
+body.light-ui.desktop .scr-sector .kbv2-btn[data-move] span{position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;clip-path:inset(50%);white-space:nowrap}
 
 /* ============================================================================
    LIGHT UI — I7.14 · PREMIUM FLOW CONTINUITY (F6 Detalhe + F2 Cliente)
