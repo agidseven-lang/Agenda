@@ -22,9 +22,11 @@ let wired = false;
 // 440–560; NUNCA maior que a workArea do monitor ativo (com margem lateral). Em telas estreitas encolhe
 // abaixo de 440 até um piso (respeitando as margens) — evita corte de conteúdo em 1366×768 / escala
 // 125–150% / dois monitores / barra de tarefas lateral. A ALTURA segue adaptável ao conteúdo (resize).
-const WIDTH_PREF = 500;
-const WIDTH_MAX = 560;
-const WIDTH_MIN = 440;
+// I7.27.1 — mandato light premium: card 380–440px no desktop. A janela = card + padding lateral do
+// #stack (20px) ⇒ preferencial 424 (card 404), teto 460 (card 440), faixa segura a partir de 400.
+const WIDTH_PREF = 424;
+const WIDTH_MAX = 460;
+const WIDTH_MIN = 400;
 const WIDTH_FLOOR = 360;   // piso absoluto p/ telas muito estreitas (margens preservadas)
 const EDGE_MARGIN = 14;    // margem até a borda direita/inferior do workArea (idêntico ao 1.0.208)
 function computeWidth(wa: Electron.Rectangle | null | undefined): number {
