@@ -102,18 +102,18 @@ ok((hAssign.replace(/title="[^"]*"/g, '').match(/Ana Souza/g) || []).length === 
 ok(!/ntfp-task">Card Institucional[\s\S]*Card Institucional/.test(hAssign), "B26 título não repetido em outra área");
 
 // ══════════════════════ C) CSS — hierarquia/tamanhos/clamp ══════════════════════
-ok(/\.ntfp-task\{[^}]*font-size:18px/.test(BG) && /\.ntfp-task\{[^}]*font-size:18px/.test(IDX), "C01 título 18px (dominante) nas duas superfícies");
+ok(/\.ntfp-task\{[^}]*font-size:15px/.test(BG) && /\.ntfp-task\{[^}]*font-size:15px/.test(IDX), "C01 título 15px (dominante no card light) nas duas superfícies (RE-PINADO I7.27.1)");
 ok(/\.ntfp-meta\{[^}]*font-size:12px/.test(BG), "C02 autor como metadata 12px (RE-PINADO F3.5.5E-H2)");
 ok(/\.ntfp-eyebrow\{[^}]*font-size:12px/.test(BG), "C03 eyebrow 12px (não domina — RE-PINADO F3.5.5E-H1, mandato 12–13)");
 ok(/\.ntfp-pl\{[^}]*font-size:12\.5px/.test(BG), "C04 cápsula 12.5px (RE-PINADO F3.5.5E-H2)");
-ok(/\.ntfp-fl \.ntfp-av\{[^}]*width:62px/.test(BG), "C05 avatar FLUTUANTE 62px (RE-PINADO F3.5.5E-H2 — mandato 58-72px, referência do owner)");
+ok(/\.ntfp-fl \.ntfp-av\{[^}]*width:34px/.test(BG), "C05 avatar INTEGRADO 34px (RE-PINADO I7.27.1 — mandato 32-36px; o flutuante 62px foi estruturalmente rejeitado)");
 ok(/\.ntfp-task\{[^}]*-webkit-line-clamp:2/.test(BG), "C06 título máx 2 linhas (clamp)");
 ok(/\.ntfp-task\{[^}]*-webkit-line-clamp:2/.test(BG), "C07 título máx 2 linhas; autor 1 linha com ellipsis (RE-PINADO F3.5.5E-H2)");
 ok(/\.ntfp-task\{[^}]*overflow:hidden/.test(BG), "C08 título ellipsis/overflow hidden");
 ok(/cs-afazer\{--cfg:/.test(BG) && /cs-andamento\{--cfg:/.test(BG) && /cs-revisao\{--cfg:/.test(BG) && /cs-concluido\{--cfg:/.test(BG), "C09 chips têm cor por estado real (4 estados)");
 ok(/prefers-reduced-motion: reduce/.test(BG) && /prefers-reduced-motion: reduce/.test(IDX), "C10 acessibilidade: prefers-reduced-motion");
 ok(/\.ntf\.ntfp-w\{width:100%/.test(BG), "C11 janela premium: card ocupa largura responsiva (100%)");
-ok(/\.ntf\.ntfp-w\{width:450px;max-width:calc\(100vw - 36px\)/.test(IDX), "C12 toast: largura 450 responsiva (RE-PINADO F3.5.5E-H2 — mandato 430-470)");
+ok(/\.ntf\.ntfp-w\{width:400px;max-width:calc\(100vw - 36px\)/.test(IDX), "C12 toast: largura 400 responsiva (RE-PINADO I7.27.1 — mandato 380-440)");
 
 // ══════════════════════ D) CARD PREMIUM — GRUPO ══════════════════════
 const view = { _premiumCommon: true, groupKey: "g1", taskTitle: "Edição do Reels Institucional", count: 4, items: [{ actorName: "Miercohévisk", title: "Tarefa movimentada", body: "..." }, { actorName: "Ana", title: "Tarefa atualizada", body: "..." }], extraCount: 2, primaryName: "Miercohévisk", primaryAvatar: "", severity: "info", deep: "detail/t1" };
@@ -170,14 +170,14 @@ ok(/t === "notification\.premium\.opened" \|\| t === "notification\.premium\.clo
 ok(/scaleFactor: premiumScaleFactor\(\)/.test(MAIN), "G12 rendered carrega scaleFactor (DPI/escala) sanitizado");
 
 // ══════════════════════ H) bgNotify.ts — LARGURA RESPONSIVA + CONTRATO CONGELADO ══════════════════════
-ok(/const WIDTH_PREF = 500;/.test(BGT) && /const WIDTH_MAX = 560;/.test(BGT) && /const WIDTH_MIN = 440;/.test(BGT), "H01 largura preferencial 500 / faixa 440–560");
+ok(/const WIDTH_PREF = 424;/.test(BGT) && /const WIDTH_MAX = 460;/.test(BGT) && /const WIDTH_MIN = 400;/.test(BGT), "H01 largura preferencial 424 (card 404) / teto 460 (RE-PINADO I7.27.1 — card 380–440)");
 ok(/function computeWidth\(/.test(BGT), "H02 computeWidth (responsiva à workArea)");
 ok(/const WIDTH = computeWidth\(wa\);/.test(BGT) && /wa\.width - WIDTH/.test(BGT), "H03 posiciona no canto inferior direito via workArea (contrato preservado)");
 ok(/focusable: false/.test(BGT) && /showInactive\(\)/.test(BGT) && /alwaysOnTop: true/.test(BGT), "H04 CONGELADO: focusable:false + showInactive + alwaysOnTop (não rouba foco)");
 ok(/skipTaskbar: true/.test(BGT) && /getDisplayNearestPoint/.test(BGT), "H05 CONGELADO: skipTaskbar + multimonitor (display do cursor)");
 ok(/ACK_TIMEOUT_MS = 4000/.test(BGT) && /pendingAck/.test(BGT), "H06 CONGELADO: ACK/fallback (4s) intacto");
 ok(/notification\.premium\.closed/.test(BGT), "H07 observabilidade closed na janela premium (bgnotify-empty)");
-{ const w = new Function("wa", extractComputeWidth(BGT) + "\n;return computeWidth(wa);"); ok(w({ width: 1366 }) === 500 && w({ width: 1920 }) === 500, "H08 1366/1920 ⇒ 500px (sem corte)"); ok(w({ width: 420 }) >= 360 && w({ width: 420 }) <= 420, "H09 tela estreita ⇒ encolhe com margens (piso 360)"); }
+{ const w = new Function("wa", extractComputeWidth(BGT) + "\n;return computeWidth(wa);"); ok(w({ width: 1366 }) === 424 && w({ width: 1920 }) === 424, "H08 1366/1920 ⇒ 424px (card 404; sem corte) (RE-PINADO I7.27.1)"); ok(w({ width: 420 }) >= 360 && w({ width: 420 }) <= 420, "H09 tela estreita ⇒ encolhe com margens (piso 360)"); }
 
 function extractComputeWidth(src) { const a = src.indexOf("const WIDTH_PREF"); const b = src.indexOf("function bgVersion("); return src.slice(a, b).replace(/: Electron\.Rectangle \| null \| undefined/g, "").replace(/: number/g, ""); }
 

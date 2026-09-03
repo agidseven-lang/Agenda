@@ -156,7 +156,7 @@ ok("E6 CONGELADO: card nasce com data-group quando o payload traz groupKey (1º 
   /if\(p\.groupKey\) el\.setAttribute\('data-group',String\(p\.groupKey\)\);/.test(idx));
 
 /* ───────────── F. VISUAL 1.0.226 CONGELADO + premium intocada ───────────── */
-const H2M = ["ntfp-fl", "ntfp-pill", "ntfp-pr", "width:62px;height:62px", "border-radius:24px"];
+const H2M = ["ntfp-fl", "ntfp-pill", "ntfp-pr", "width:34px;height:34px", "border-radius:14px"]; // RE-PINADO I7.27.1 — shell light
 ok("F1 marcadores da REFERÊNCIA do owner nas 2 superfícies (design congelado)",
   H2M.every((m) => idx.includes(m)) && H2M.every((m) => bgh.includes(m)));
 ok("F2 bgnotify.html: contrato de grupo da premium INTOCADO (data-group + GROUP_MAX_MS=15000)",

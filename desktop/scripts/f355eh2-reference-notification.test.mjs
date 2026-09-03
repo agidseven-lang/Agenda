@@ -41,64 +41,65 @@ ok('A3 package-lock 1.0.246 (2x — RE-PINADO F3.5.6A-H2)', (LOCK.match(/"versio
 
 /* ============ B. CONTRATO CSS DA REFERÊNCIA (2 superfícies) ============ */
 console.log('— B) contrato CSS da referência —');
-ok('B1 largura 450 (mandato 430–470) + headroom do avatar; janela premium fluida com o mesmo headroom',
-  S.indexOf('.ntf.ntfp-w{width:450px;max-width:calc(100vw - 36px);padding-top:26px;overflow:visible}') >= 0 &&
-  BG.indexOf('.ntf.ntfp-w{width:100%;max-width:100%;padding-top:26px;overflow:visible}') >= 0);
-both('B2 card base neutralizado (superfície é o wrap; overflow visível p/ o avatar)',
-  '.ntf-card.ntfp{gap:0;padding:0;background:transparent;border:0;box-shadow:none;overflow:visible;border-radius:26px}');
+ok('B1 largura 400 (mandato I7.27.1: 380–440) SEM headroom (avatar integrado); janela premium fluida (RE-PINADO I7.27.1)',
+  S.indexOf('.ntf.ntfp-w{width:400px;max-width:calc(100vw - 36px);overflow:visible}') >= 0 &&
+  BG.indexOf('.ntf.ntfp-w{width:100%;max-width:100%;overflow:visible}') >= 0);
+both('B2 card base neutralizado (superfície é o wrap) (RE-PINADO I7.27.1: radius 16)',
+  '.ntf-card.ntfp{gap:0;padding:0;background:transparent;border:0;box-shadow:none;overflow:visible;border-radius:16px}');
 both('B3 SEM barra lateral (::before desligado)', '.ntf-card.ntfp::before{display:none}');
-both('B4 superfície da referência: radius 24, borda 1px discreta, sombra profunda suave, respiro 18/18/16',
-  '.ntfp-wrap{position:relative;display:flex;flex-direction:column;min-width:0;width:100%;background:linear-gradient(180deg,#151D30,#101726);border:1px solid rgba(139,162,255,.14);border-radius:24px;box-shadow:0 24px 56px -20px rgba(0,0,0,.78),inset 0 1px 0 rgba(255,255,255,.05);padding:18px 18px 16px}');
-both('B5 AVATAR FLUTUANTE: absoluto no topo-esq (−24px), ring 2px em gradiente azul→violeta, sombra leve, micro-scale',
-  '.ntfp-fl{position:absolute;top:-24px;left:18px;z-index:2;padding:2px;border-radius:50%;background:linear-gradient(135deg,#5B6CFF,#A78BFA);box-shadow:0 10px 22px -10px rgba(0,0,0,.7);transform:scale(.98);transition:transform .18s ease}');
-both('B5b micro-scale de entrada (.98→1, sem bounce)', '.ntf.in .ntfp-fl{transform:scale(1)}');
-both('B6 avatar 62px (mandato 58–72) com anel interno de recorte',
-  '.ntfp-fl .ntfp-av{width:62px;height:62px;box-shadow:0 0 0 2px rgba(16,23,38,.92)}');
-both('B6b iniciais grandes no avatar flutuante', '.ntfp-fl .ntfp-av.gen{font-size:22px;letter-spacing:.5px}');
-both('B7 cabeçalho à direita do avatar (flex; margem 72px)',
-  '.ntfp-hd{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-left:72px;min-width:0}');
+both('B4 superfície LIGHT do mandato: #FFF, hairline #D6DBE6, radius 14, sombra suave, respiro 12/14/12 (RE-PINADO I7.27.1 — substitui a referência navy)',
+  '.ntfp-wrap{position:relative;display:flex;flex-direction:column;min-width:0;width:100%;background:#FFFFFF;border:1px solid #D6DBE6;border-radius:14px;box-shadow:0 12px 32px -14px rgba(23,26,34,.22),0 2px 8px -4px rgba(23,26,34,.10);padding:12px 14px 12px}');
+both('B5 AVATAR INTEGRADO: estático na linha do título, sem anel/sombra/flutuação (RE-PINADO I7.27.1 — o flutuante foi rejeitado)',
+  '.ntfp-fl{position:static;flex:0 0 auto;display:inline-flex;padding:0;border-radius:50%;background:none;box-shadow:none}');
+ok('B5b micro-scale do avatar REMOVIDO (integrado não anima em separado) (RE-PINADO I7.27.1)',
+  S.indexOf('.ntf.in .ntfp-fl{') < 0 && BG.indexOf('.ntf.in .ntfp-fl{') < 0);
+both('B6 avatar 34px (mandato I7.27.1: 32–36) com recorte interno hairline (RE-PINADO I7.27.1)',
+  '.ntfp-fl .ntfp-av{width:34px;height:34px;box-shadow:inset 0 0 0 1px rgba(23,26,34,.08)}');
+both('B6b iniciais proporcionais ao avatar 34 (RE-PINADO I7.27.1)', '.ntfp-fl .ntfp-av.gen{font-size:13px;letter-spacing:.3px}');
+both('B7 cabeçalho no TOPO em largura total (avatar não desloca o header) (RE-PINADO I7.27.1)',
+  '.ntfp-hd{display:flex;align-items:center;gap:8px;min-width:0}');
 ok('B8 eyebrow 12/600 sentence-case (SEM uppercase) + ícone do evento inline 14/13 sem fundo', (() => {
   const re = /\.ntfp-eyebrow\{[^}]*\}/;
   const g = (r) => r.indexOf('font-size:12px') >= 0 && r.indexOf('font-weight:600') >= 0 && r.indexOf('text-transform') < 0;
   return g((S.match(re) || [''])[0]) && g((BG.match(re) || [''])[0])
     && S.indexOf('.ntfp-ei svg{width:13px;height:13px}') >= 0 && BG.indexOf('.ntfp-ei svg{width:13px;height:13px}') >= 0;
 })());
-both('B9 hora 11.5/500 tabular-nums',
-  '.ntfp-tm{flex:0 0 auto;color:#8b97a8;font-size:11.5px;font-weight:500;font-variant-numeric:tabular-nums}');
-both('B10 fechar: hit-area 32×32 estático, sem competir com a hora',
-  '.ntf-card.ntfp .ntf-x{position:static;top:auto;right:auto;flex:0 0 auto;width:32px;height:32px;margin:-8px -10px -8px 0;display:inline-flex;align-items:center;justify-content:center;font-size:15px;color:#7a8598;border:0;border-radius:10px;background:transparent;cursor:pointer;transition:background .18s ease,color .18s ease}');
-both('B10b foco visível no fechar', '.ntf-x:focus-visible{outline:2px solid #8FA2FF;outline-offset:1px}');
-ok('B11 título 18/700 clamp-2 com respiro (mt16)', (() => {
+both('B9 hora 11.5/500 tabular-nums (cor light) (RE-PINADO I7.27.1)',
+  '.ntfp-tm{flex:0 0 auto;color:#7A8194;font-size:11.5px;font-weight:500;font-variant-numeric:tabular-nums}');
+both('B10 fechar: hit-area 28×28 estático SEM margem negativa horizontal (hscroll 0) (RE-PINADO I7.27.1)',
+  '.ntf-card.ntfp .ntf-x{position:static;top:auto;right:auto;flex:0 0 auto;width:28px;height:28px;margin:-4px 0 -4px 0;display:inline-flex;align-items:center;justify-content:center;font-size:15px;color:#7A8194;border:0;border-radius:9px;background:transparent;cursor:pointer;transition:background .18s ease,color .18s ease}');
+both('B10b foco visível no fechar (RE-PINADO I7.27.1)', '.ntf-x:focus-visible{outline:2px solid #60A5FA;outline-offset:1px}');
+ok('B11 título 15/650 clamp-2 dominante no card light (RE-PINADO I7.27.1)', (() => {
   const re = /\.ntfp-task\{[^}]*\}/;
-  const g = (r) => r.indexOf('font-size:18px') >= 0 && r.indexOf('font-weight:700') >= 0 && r.indexOf('margin-top:16px') >= 0 && r.indexOf('-webkit-line-clamp:2') >= 0;
+  const g = (r) => r.indexOf('font-size:15px') >= 0 && r.indexOf('font-weight:650') >= 0 && r.indexOf('-webkit-line-clamp:2') >= 0;
   return g((S.match(re) || [''])[0]) && g((BG.match(re) || [''])[0]);
 })());
-both('B12 cliente 14/650, 1 linha + ellipsis',
-  '.ntfp-client{color:#dbe2f0;font-size:14px;font-weight:650;line-height:1.3;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}');
-both('B13 contexto 12.5/450, 1 linha + ellipsis',
-  '.ntfp-ctx{color:#9aa6bd;font-size:12.5px;font-weight:450;margin-top:3px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}');
-both('B14 autor como metadata 12/450, 1 linha + ellipsis',
-  '.ntfp-meta{color:#8792a6;font-size:12px;font-weight:450;margin-top:9px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}');
-both('B15 responsável 12/450, 1 linha + ellipsis',
-  '.ntfp-respline{color:#8792a6;font-size:12px;font-weight:450;margin-top:3px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}');
-both('B16 CÁPSULA inferior: pill 40px, radius 999, borda/fundo sutis, hover discreto',
-  '.ntfp-pill{display:flex;align-items:stretch;margin-top:14px;min-height:40px;border-radius:999px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.045);overflow:hidden;cursor:pointer;transition:border-color .18s ease,background .18s ease}');
-both('B16b foco visível na cápsula (teclado)', '.ntfp-pill:focus-visible{outline:2px solid #8FA2FF;outline-offset:2px}');
+both('B12 cliente secundário 12.5/500, 1 linha + ellipsis (RE-PINADO I7.27.1)',
+  '.ntfp-client{color:#4C5261;font-size:12.5px;font-weight:500;line-height:1.3;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}');
+both('B13 contexto 12/450, 1 linha + ellipsis (RE-PINADO I7.27.1)',
+  '.ntfp-ctx{color:#7A8194;font-size:12px;font-weight:450;margin-top:8px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}');
+both('B14 autor como metadata 12/450, 1 linha + ellipsis (RE-PINADO I7.27.1)',
+  '.ntfp-meta{color:#7A8194;font-size:12px;font-weight:450;margin-top:3px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}');
+both('B15 responsável 12/450, 1 linha + ellipsis (RE-PINADO I7.27.1)',
+  '.ntfp-respline{color:#7A8194;font-size:12px;font-weight:450;margin-top:2px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}');
+both('B16 CÁPSULA inferior compacta: 34px, radius 10, hairline/fundo light, hover discreto (RE-PINADO I7.27.1)',
+  '.ntfp-pill{display:flex;align-items:stretch;margin-top:10px;min-height:34px;border-radius:10px;border:1px solid #E3E7F0;background:#F7F9FC;overflow:hidden;cursor:pointer;transition:border-color .18s ease,background .18s ease}');
+both('B16b foco visível na cápsula (teclado) (RE-PINADO I7.27.1)', '.ntfp-pill:focus-visible{outline:2px solid #60A5FA;outline-offset:2px}');
 ok('B17 lado esquerdo da cápsula: 12.5/600 + label com ellipsis + dot 7px (cor do estado OU da categoria) + destino claro',
-  ['.ntfp-pl{flex:1 1 auto;display:flex;align-items:center;gap:8px;min-width:0;padding:0 14px;color:#cdd6e6;font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden}',
+  ['.ntfp-pl{flex:1 1 auto;display:flex;align-items:center;gap:8px;min-width:0;padding:0 12px;color:#4C5261;font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden}',
    '.ntfp-pl .plab{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}',
-   '.ntfp-pl .cdot{flex:0 0 auto;width:7px;height:7px;border-radius:50%;background:var(--cfg,var(--catc,#8FA2FF))}',
-   '.ntfp-pl .pto{color:#eef2f8}'].every((t) => S.indexOf(t) >= 0 && BG.indexOf(t) >= 0));
-both('B18 SEGMENTO direito colorido (cor contextual do evento) com texto de alto contraste = CTA',
-  '.ntfp-pr{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;padding:0 18px;background:var(--catc,#6D5BFF);color:#0E1424;font-size:12.5px;font-weight:650;white-space:nowrap}');
-ok('B19 reduced-motion cobre card e avatar flutuante (formas de cada superfície)',
-  S.indexOf('@media (prefers-reduced-motion: reduce){.ntf{transition:none}.ntfp-fl{transform:none;transition:none}}') >= 0 &&
-  BG.indexOf('@media (prefers-reduced-motion: reduce){ .ntf{transition:none} .ntfp-fl{transform:none;transition:none} }') >= 0);
-ok('B20 tokens de categoria e status preservados (1.0.224)',
-  ['.cat-blue{--catc:#60A5FA}', '.cat-violet{--catc:#A78BFA}', '.cat-green{--catc:#34D399}', '.cat-amber{--catc:#F59E0B}',
-   '.cat-red{--catc:#F87171}', '.cat-orange{--catc:#FB923C}', '.cat-teal{--catc:#22D3B8}', '.cat-neutral{--catc:#8792a6}',
-   '.cs-afazer{', '.cs-andamento{', '.cs-revisao{', '.cs-concluido{'].every((t) => S.indexOf(t) >= 0 && BG.indexOf(t) >= 0));
-both('B21 lista do grupo preservada', '.ntfp-glist{margin-top:12px;display:flex;flex-direction:column;gap:4px}');
+   '.ntfp-pl .cdot{flex:0 0 auto;width:7px;height:7px;border-radius:50%;background:var(--cfg,var(--catc,#7A8194))}',
+   '.ntfp-pl .pto{color:#171A22}'].every((t) => S.indexOf(t) >= 0 && BG.indexOf(t) >= 0)); // RE-PINADO I7.27.1
+both('B18 CTA \"Abrir\" compacto e QUIETO: divisor hairline, sem bloco colorido (RE-PINADO I7.27.1 — o segmento roxo foi rejeitado)',
+  '.ntfp-pr{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;padding:0 14px;background:transparent;border-left:1px solid #E3E7F0;color:#171A22;font-size:12.5px;font-weight:650;white-space:nowrap}');
+ok('B19 reduced-motion cobre o card (avatar integrado não anima) (RE-PINADO I7.27.1)',
+  S.indexOf('@media (prefers-reduced-motion: reduce){.ntf{transition:none}}') >= 0 &&
+  BG.indexOf('@media (prefers-reduced-motion: reduce){.ntf{transition:none}}') >= 0);
+ok('B20 tokens: categorias light + STATUS com as cores REAIS do sistema (RE-PINADO I7.27.1)',
+  ['.cat-blue{--catc:#2563EB}', '.cat-violet{--catc:#7C3AED}', '.cat-green{--catc:#059669}', '.cat-amber{--catc:#D97706}',
+   '.cat-red{--catc:#DC2626}', '.cat-orange{--catc:#EA580C}', '.cat-teal{--catc:#0D9488}', '.cat-neutral{--catc:#7A8194}',
+   '.cs-afazer{--cfg:#9BA0AB}', '.cs-andamento{--cfg:#F59E0B}', '.cs-revisao{--cfg:#60A5FA}', '.cs-concluido{--cfg:#34D399}'].every((t) => S.indexOf(t) >= 0 && BG.indexOf(t) >= 0));
+both('B21 lista do grupo preservada (RE-PINADO I7.27.1)', '.ntfp-glist{margin-top:10px;display:flex;flex-direction:column;gap:4px}');
 
 /* ============ C. BUILDERS (paridade + referência no DOM + variantes) ============ */
 console.log('— C) builders compartilhados —');
@@ -132,8 +133,8 @@ const basePay = { eventType: 'task_moved', title: 'Tarefa movimentada', taskTitl
   createdAt: new Date(2026, 0, 1, 20, 30).getTime(), severity: 'info' };
 const H = render(basePay);
 
-ok('C4 composição da referência (ordem DOM): avatar flutuante → cabeçalho → título → cliente → contexto → autor → cápsula',
-  (() => { let last = -1; return ['ntfp-fl', 'ntfp-hd', 'ntfp-task', 'ntfp-client', 'ntfp-ctx', 'ntfp-meta', 'ntfp-pill']
+ok('C4 composição LIGHT (ordem DOM): cabeçalho → linha principal (avatar integrado + título + cliente) → contexto → autor → cápsula (RE-PINADO I7.27.1)',
+  (() => { let last = -1; return ['ntfp-hd', 'ntfp-main', 'ntfp-fl', 'ntfp-task', 'ntfp-client', 'ntfp-ctx', 'ntfp-meta', 'ntfp-pill']
     .every((c) => { const i = H.indexOf(c); const okk = i > last; last = i; return okk; }); })());
 ok('C5 avatar flutuante embala o premiumAvatar REAL (foto/iniciais congeladas)',
   /<div class="ntfp-fl" aria-hidden="true"><div class="ntfp-av/.test(H));

@@ -170,7 +170,7 @@ ok("E5 wiring da coleta com guard (nunca quebra sem desktopAPI)",
   /typeof window\.desktopAPI\.onNotifCollect==='function'/.test(idx));
 
 // ───────────────────────── F. VISUAL 1.0.226 CONGELADO (2 superfícies) ─────────────────────────
-const H2 = ["ntfp-fl", "ntfp-pill", "ntfp-pr", "width:62px;height:62px", "border-radius:24px", "padding:18px 18px 16px"];
+const H2 = ["ntfp-fl", "ntfp-pill", "ntfp-pr", "width:34px;height:34px", "border-radius:14px", "padding:12px 14px 12px"]; // RE-PINADO I7.27.1 — shell light (avatar integrado 34; radius 14)
 ok("F1 marcadores da REFERÊNCIA no toast (index.html)", H2.every((m) => idx.includes(m)), H2.filter((m) => !idx.includes(m)).join(","));
 ok("F2 marcadores da REFERÊNCIA na janela premium (bgnotify.html)", H2.every((m) => bgh.includes(m)), H2.filter((m) => !bgh.includes(m)).join(","));
 function extract(src, name) {
@@ -184,8 +184,8 @@ for (const b of ["premiumCommonInner", "premiumGroupInner", "premiumAvatar", "pr
   const a = extract(idx, b), c = extract(bgh, b);
   ok(`F3 paridade byte-a-byte ${b} (toast × premium)`, !!a && a === c, a ? "diverge" : "ausente");
 }
-ok("F4 headroom do avatar preservado (nada cortado: padding-top:26px + overflow:visible)",
-  /padding-top:26px;overflow:visible/.test(idx) && /padding-top:26px;overflow:visible/.test(bgh));
+ok("F4 largura light SEM headroom (avatar integrado; overflow visível p/ sombra) (RE-PINADO I7.27.1)",
+  /\.ntf\.ntfp-w\{width:400px;max-width:calc\(100vw - 36px\);overflow:visible\}/.test(idx) && /\.ntf\.ntfp-w\{width:100%;max-width:100%;overflow:visible\}/.test(bgh));
 ok("F5 som premium: dedupe por chave + suppressed_by_payload INTACTOS (handoff silencioso)",
   /_bgSndSeen\[key\]\)\{ _snd='duplicate_prevented'; \}/.test(bgh) && /suppressed_by_payload/.test(bgh));
 

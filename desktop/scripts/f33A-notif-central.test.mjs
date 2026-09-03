@@ -101,7 +101,9 @@ ok('toast premium via guarda única once-por-dedupKey (notifToastOnce)', /onNoti
 // F3.3.10-FIX — toast de atribuição (Social → Designer): compensação cirúrgica, deduplicada, escopada
 ok('compensação: notifAttrToastOnce chama notifShowToast', /function notifAttrToastOnce\(p\)\{[\s\S]*?notifShowToast\(p\)/.test(html));
 ok('compensação: só designer_assigned/task_assigned', /function notifIsAttrEvent\(p\)\{ var e=p&&p\.eventType; return e==='designer_assigned'\|\|e==='task_assigned'; \}/.test(html));
-ok('compensação: dedup por dedupKey (não duplica)', /if\(notifAttrToastSeen\[k\]\) return false; notifAttrToastSeen\[k\]=1;/.test(html));
+// I7.27.1 — RE-ÂNCORA AUTORIZADA: a porta única passou a emitir o ACK de render ela mesma (já-visto
+// ⇒ ACK + return false; render ok ⇒ ACK). O dedup once-por-dedupKey é o MESMO (marca antes de renderizar).
+ok('compensação: dedup por dedupKey (não duplica)', /if\(notifAttrToastSeen\[k\]\)\{ notifToastAckSend\(k\); return false; \} notifAttrToastSeen\[k\]=1;/.test(html));
 // F3.4.7 — RE-ÂNCORA AUTORIZADA: a compensação via captura cobre TODOS os eventos (era só atribuição),
 // mantendo o gate de janela visível (minimizado/bandeja = nativa/bg-window). Corrige a amarela/vermelha
 // que o canal notif-toast às vezes não renderizava com a janela aberta.
