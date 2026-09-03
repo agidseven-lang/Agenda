@@ -254,6 +254,11 @@
     else el.innerHTML='<div class="ntf-card">'+av+inner  // F3.5.4U — fallback: markup equivalente à 1.0.208 (flag OFF / tipo fora do escopo)
       +'<span class="ntf-sev">'+esc(sevIcon(sev))+'</span>'
       +'<button class="ntf-x" title="Fechar" aria-label="Fechar">×</button></div>';
+    /* I7.27.1 — SUPERSEDE de superfície (paridade com o toast in-app): um NOVO card do MESMO grupo
+       (janela de grupo expirada ⇒ novo 'first' com o MESMO groupKey estável) SUBSTITUI o predecessor
+       ainda visível — o estado mais novo subsume o anterior, como o morph de grupo faz dentro da
+       janela. Cards de outros grupos/tarefas nunca são tocados. */
+    if(p.groupKey){ try{ var _prev=stack.querySelectorAll('.ntf[data-group]'); for(var _pi=0;_pi<_prev.length;_pi++){ var _pe=_prev[_pi]; if(_pe!==el&&_pe.getAttribute('data-group')===String(p.groupKey)){ try{ if(_pe.__ntfTimer) clearTimeout(_pe.__ntfTimer); }catch(_){} if(_pe.parentNode) _pe.parentNode.removeChild(_pe); } } }catch(_){} }
     stack.appendChild(el);
     requestAnimationFrame(function(){ el.classList.add('in'); report(); });
     var dismiss=function(){ try{ el.classList.remove('in'); setTimeout(function(){ if(el.parentNode){el.parentNode.removeChild(el);} report(); },200); }catch(_){ } };

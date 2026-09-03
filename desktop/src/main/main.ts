@@ -507,6 +507,10 @@ function deliverNotification(p: NotifPayload): { ok: boolean; channel: string } 
         toastAck.arm(key, () => {
           toastUnregister(key); // F3.5.5E-H3 — o card vai p/ a premium pelo FALLBACK; o handoff do blur não pode re-mostrá-lo
           try { groupUnregisterByDedup(key); } catch { /* F3.5.5E-H4 — idem para o espelho de grupo */ }
+          // I7.27.1 — MOVER, NUNCA DUPLICAR: se algum caminho deixou o toast VISÍVEL sem ACK, fecha a
+          // representação in-app pelo canal transacional existente ANTES de levantar a premium — a
+          // notificação muda de superfície; nunca existe em duas ao mesmo tempo. Sem card = no-op.
+          try { mainWin?.webContents.send("notif-collect-commit", (p as any).groupKey ? ["i:" + key, "g:" + String((p as any).groupKey)] : ["i:" + key]); } catch { /* rede de segurança nunca afeta a entrega */ }
           const bgOk2 = showBgNotify(p, () => { const l2 = nativeNotify(p, key, deep); diag("deliver.toast.noAck.bg.noAck.native", { dedupKey: key, nativeOk: l2 }); });
           let nOk2 = false;
           if (!bgOk2) nOk2 = nativeNotify(p, key, deep);

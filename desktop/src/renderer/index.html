@@ -6734,6 +6734,12 @@ function notifShowToast(p){
       +'<span class="ntf-sev" title="'+esc(sev)+'">'+(typeof svg==='function'?svg(icon):'')+'</span>'
       +'<button class="ntf-x" title="Fechar" aria-label="Fechar">×</button></div>';
     }
+    /* I7.27.1 — SUPERSEDE de superfície: um NOVO card do MESMO grupo (mesma tarefa+destinatário;
+       janela de grupo expirada ⇒ o route devolveu 'first' de novo com o MESMO groupKey estável)
+       SUBSTITUI o predecessor ainda visível — o estado mais novo subsume o anterior, exatamente
+       como o 'update' faz DENTRO da janela. Cards de outros grupos/tarefas nunca são tocados e o
+       sino já registrou cada evento individualmente (captura notif-history). */
+    if(p.groupKey){ try{ var _prev=stack.querySelectorAll('.ntf[data-group]'); for(var _pi=0;_pi<_prev.length;_pi++){ var _pe=_prev[_pi]; if(_pe!==el&&_pe.getAttribute('data-group')===String(p.groupKey)){ try{ if(_pe.__ntfTimer) clearTimeout(_pe.__ntfTimer); }catch(_){} if(_pe.parentNode) _pe.parentNode.removeChild(_pe); } } }catch(_){} }
     stack.appendChild(el);
     try{ requestAnimationFrame(function(){ el.classList.add('in'); }); }catch(_){ el.classList.add('in'); }
     var dismiss=function(){ try{ if(premiumUse(p)&&typeof ncDiag==='function') ncDiag('notification.premium.closed',{eventType:p.eventType,deliverySurface:'toast'}); }catch(_){} try{ el.classList.remove('in'); setTimeout(function(){ if(el&&el.parentNode) el.parentNode.removeChild(el); },200); }catch(_){} }; // F3.5.4U — observabilidade sanitizada (só premium)
@@ -6801,7 +6807,13 @@ function notifGroupUpdate(view){
    payload vindo pelos dois canais renderiza UMA vez; nunca duplica, nunca perde). */
 var notifAttrToastSeen={};
 function notifIsAttrEvent(p){ var e=p&&p.eventType; return e==='designer_assigned'||e==='task_assigned'; }
-function notifToastOnce(p){ try{ var k=String((p&&(p.dedupKey||p.eventId))||''); if(!k) return false; if(notifAttrToastSeen[k]) return false; notifAttrToastSeen[k]=1; notifShowToast(p); return true; }catch(_){ return false; } }
+/* I7.27.1 — o ACK de render vive na PRÓPRIA porta única: renderizado AGORA ou JÁ visível antes ⇒ ACK
+   (o fallback do main é cancelado — inclusive quando o render veio pela COMPENSAÇÃO notif-history,
+   que antes NÃO confirmava e deixava o watchdog de 4s levantar a janela premium com o toast ainda
+   na tela = 2 superfícies do MESMO evento). Falha de render ⇒ SEM ACK (o main entrega pelo fallback
+   — nunca perde). Guard typeof window: fixtures (f347) executam esta região fora do navegador. */
+function notifToastAckSend(k){ try{ if(k&&typeof window!=='undefined'&&window.desktopAPI&&typeof window.desktopAPI.notifToastAck==='function') window.desktopAPI.notifToastAck(String(k)); }catch(_){} }
+function notifToastOnce(p){ try{ var k=String((p&&(p.dedupKey||p.eventId))||''); if(!k) return false; if(notifAttrToastSeen[k]){ notifToastAckSend(k); return false; } notifAttrToastSeen[k]=1; var el=notifShowToast(p); if(el) notifToastAckSend(k); return !!el; }catch(_){ return false; } }
 function notifAttrToastOnce(p){ return notifToastOnce(p); }
 
 /* ROTEAMENTO: Electron (HUB do main decide canal) ou fallback direto (navegador/QA). Dedup local. */
@@ -7071,7 +7083,7 @@ try{ setInterval(function(){ try{ ncDiag('scan.tick',{vis:(typeof document!=='un
    Só log local via main; não altera comportamento. Removível. */
 try{ document.addEventListener('visibilitychange', function(){ try{ ncDiag('visibility',{state:document.visibilityState}); }catch(_){} }); ncDiag('boot',{state:(typeof document!=='undefined'?document.visibilityState:'?')}); }catch(_){}
 /* receber TOAST do HUB do main (janela focada/visível) */
-try{ if(window.desktopAPI&&typeof window.desktopAPI.onNotifToast==='function'){ window.desktopAPI.onNotifToast(function(p){ notifToastOnce(p); try{ if(typeof notifHistoryAppend==='function') notifHistoryAppend(p); }catch(_){} /* F3.5.3 — ACK de render: confirma ao main (mostrado agora OU já mostrado antes pela guarda once — nos dois casos o fallback deve ser cancelado). Se notifToastOnce lançou/não rodou, NÃO há ACK e o main entrega pelo fallback. */ try{ var k=String((p&&(p.dedupKey||p.eventId))||''); if(k&&window.desktopAPI&&typeof window.desktopAPI.notifToastAck==='function') window.desktopAPI.notifToastAck(k); }catch(_){} }); } }catch(_){}   /* F3.4.7 — TODOS os eventos passam pela guarda once-por-dedupKey (mesma porta da compensação) */
+try{ if(window.desktopAPI&&typeof window.desktopAPI.onNotifToast==='function'){ window.desktopAPI.onNotifToast(function(p){ notifToastOnce(p); try{ if(typeof notifHistoryAppend==='function') notifHistoryAppend(p); }catch(_){} /* I7.27.1 — o ACK de render (F3.5.3) mudou para DENTRO da porta única notifToastOnce: mostrado agora OU já mostrado antes ⇒ ACK lá; falha de render ⇒ SEM ACK e o main entrega pelo fallback (nunca perde). Este handler não confirma mais por conta própria: confirmar SEM render real perdia o evento em silêncio, e a compensação notif-history (que renderiza de verdade) não confirmava — o watchdog de 4s levantava a premium com o toast ainda visível = 2 superfícies do MESMO evento. */ }); } }catch(_){}   /* F3.4.7 — TODOS os eventos passam pela guarda once-por-dedupKey (mesma porta da compensação) */
 /* F3.3.10 — onNotifHistory (captura 100% toast×nativa via hub do main) é registrado UMA vez no bloco F3.3.10-NOTIF-CENTRAL. */
 /* exposto p/ QA/testes (não afeta produção) */
 try{ window.notifShowToast=notifShowToast; window.notifBuildPayload=notifBuildPayload; window.notifEmit=notifEmit; window.notifScan=notifScan; window.notifScanSla=notifScanSla; window.notifScanFlow=notifScanFlow; window.notifFlowEvent=notifFlowEvent; window.notifRoute=notifRoute; window.resolveNotificationTargets=resolveNotificationTargets; window.resolveUserIdentity=resolveUserIdentity; window.notifNormalize=notifNormalize; window.notifIdentity=notifIdentity; window.notifResponsible=notifResponsible; window.notifActor=notifActor; window.notifPhaseLabel=notifPhaseLabel; window.__notifResetFlow=function(){ _notifPhase={}; _notifBaseline=false; _notifUid=null; }; }catch(_){}
