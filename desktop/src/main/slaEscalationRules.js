@@ -85,6 +85,13 @@ function isEscalationEligible(t, nowMs){
   try{ if(NE.isRetiredSector(raw)) return no('retired_sector'); }catch(_e){}
   if(base.sector === 'roteiro') return no('no_designer_sla');
   if(!base.recipientUid) return no('no_designer');
+  /* I7.27.1-EXT-R1 (CTX-R8/CTX-R10 — PARIDADE DE CONTEXTO): só cobra quem VÊ a tarefa no Agenda. A visibilidade
+   * operacional REAL (index.html canSeeTask: assigneeId===uid || by===uid — a MESMA régua de Hoje/KPI Tarefas/
+   * Meu quadro) tem de coincidir com o designer atribuído. O write-path do produto grava assigneeId=designerId
+   * ao enviar ao designer (index.html L11224/L14226), então no estado real as duas réguas coincidem; um doc
+   * divergente (legado/edição manual) NÃO gera cobrança — nunca alertar sobre tarefa inacessível ao destinatário. */
+  var vis = (String((t && t.assigneeId) || '') === base.recipientUid) || (String((t && t.by) || '') === base.recipientUid);
+  if(!vis) return no('not_visible_to_designer');
   if(isCompleted(t)) return no('completed_or_gone');
   if(base.status !== 'afazer') return no('started');
   try{ if(S.externalWaitOf && S.externalWaitOf(t)) return no('waiting_client'); }catch(_e){}
