@@ -107,18 +107,50 @@
   .card.checkin .spin{ border-top-color:var(--blue); }
   .card.checkin .ok{ background:var(--blue); box-shadow:0 8px 18px -6px rgba(37,99,235,.7); }
   .dbtn.danger{ border:1.5px solid rgba(220,38,38,.4); color:var(--red-d); }
-  /* ── I7.27.1-EXT — ESCALAÇÃO DE PRAZO (tarefa atribuída e não iniciada): superfície CLARA; faixa âmbar em
-     risco (T-2h) e vermelha só quando VENCIDO; título da tarefa dominante; mensagem objetiva; prazo + tempo
-     restante VIVO; ações: Abrir tarefa (primária) e Entendi (reconhecer, sem mutação da tarefa). ── */
-  .card.deadline .name{ font-size:16px; font-weight:800; letter-spacing:-.01em; margin-bottom:2px; }
-  .card.deadline .msg{ font-size:13px; color:var(--muted); font-weight:600; margin-bottom:10px; }
-  .card.deadline .task{ font-size:14.5px; font-weight:600; color:var(--ink); margin:0 8px 10px; }
-  .card.deadline .dl-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:0 6px 14px; }
-  .card.deadline .dl-cell{ border:1px solid var(--line); border-radius:11px; padding:9px 10px; background:#F8FAFC; text-align:left; }
-  .card.deadline .dl-k{ font-size:11px; font-weight:700; letter-spacing:.6px; color:var(--muted); text-transform:uppercase; }
-  .card.deadline .dl-v{ font-size:14.5px; font-weight:800; color:var(--ink); margin-top:2px; font-variant-numeric:tabular-nums; }
-  .card.deadline .dl-v.warn{ color:var(--amber-d); } .card.deadline.red .dl-v.warn{ color:var(--red-d); }
-  .card.deadline .ctx{ margin-bottom:0; }
+  /* ── I7.27.1-EXT-R1 — PREMIUM HIGH-PRIORITY ALERT DIALOG (view de prazo, kind:'deadline'). Substitui o "cartaz"
+     (avatar flutuante 72px, headline gigante, CTA-banner, mega-cards) por um dialog compacto 580px: header em LINHA
+     (avatar 40 + rótulo + estado + fila discreta), contexto da tarefa com a hierarquia do Detail/Task Card, mensagem
+     objetiva + subtexto do prazo, banda de metadados BAIXA (Prazo · Faltam) e rodapé com ações (Entendi quieta ·
+     Abrir tarefa primária 44px). Severidade só por barra fina + rótulo + acento: âmbar (risco) / vermelho (vencido);
+     superfície SEMPRE clara — nunca fundo inteiro colorido. As views legadas (SLA de produção / check-in) não mudam. ── */
+  #wrap.dl{ padding:14px 30px 30px; }
+  #wrap.dl .av{ display:none; }
+  #wrap.dl #kicker,#wrap.dl #name,#wrap.dl #msg,#wrap.dl #task,#wrap.dl #ctx,#wrap.dl #foot,#wrap.dl #pend{ display:none; }
+  .card.deadline{ max-width:580px; padding:0; text-align:left; border-radius:14px; border:1px solid #D6DBE6;
+    box-shadow:0 12px 32px -14px rgba(23,26,34,.22), 0 2px 8px -4px rgba(23,26,34,.10); }
+  .card.deadline::before{ height:4px; background:var(--amber); }
+  .card.deadline.red::before{ background:var(--red); }
+  .dl-head{ display:flex; align-items:center; gap:12px; padding:18px 20px 0; }
+  .dl-av{ flex:0 0 auto; width:40px; height:40px; border-radius:50%; background:#E2E8F0 center/cover no-repeat; display:flex; align-items:center;
+    justify-content:center; color:#fff; font-weight:700; font-size:15px; box-shadow:inset 0 0 0 1px rgba(23,26,34,.08); overflow:hidden; }
+  .dl-hd{ flex:1 1 auto; min-width:0; }
+  .dl-kicker{ display:flex; align-items:center; gap:8px; min-width:0; }
+  .dl-kicker .lbl{ font-size:13.5px; font-weight:700; color:var(--amber-d); white-space:nowrap; }
+  .card.deadline.red .dl-kicker .lbl{ color:var(--red-d); }
+  .dl-state{ display:inline-flex; align-items:center; height:20px; padding:0 8px; border-radius:999px; font-size:11px; font-weight:700; letter-spacing:.2px;
+    color:var(--amber-d); background:rgba(245,158,11,.12); white-space:nowrap; }
+  .card.deadline.red .dl-state{ color:var(--red-d); background:rgba(220,38,38,.10); }
+  .dl-who{ font-size:12px; color:var(--muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .dl-queue{ flex:0 0 auto; font-size:11.5px; font-weight:600; color:var(--muted); white-space:nowrap; }
+  .dl-body{ padding:14px 20px 0; }
+  .dl-title{ font-size:17px; font-weight:700; letter-spacing:-.01em; color:var(--ink); line-height:1.25; overflow-wrap:anywhere; word-break:break-word;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .dl-client{ font-size:13px; color:var(--muted); font-weight:500; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .dl-msg{ font-size:14px; font-weight:600; color:var(--ink); margin-top:12px; line-height:1.35; }
+  .dl-sub{ font-size:13px; color:var(--muted); margin-top:2px; line-height:1.35; }
+  .dl-band{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:14px 20px 0; }
+  .dl-cell{ display:flex; flex-direction:column; gap:1px; padding:8px 12px; border:1px solid #E3E7F0; border-radius:10px; background:#F7F9FC; min-width:0; }
+  .dl-k{ font-size:10.5px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; color:var(--muted); }
+  .dl-v{ font-size:14px; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .dl-v.warn{ color:var(--amber-d); } .card.deadline.red .dl-v.warn{ color:var(--red-d); }
+  .dl-foot{ display:flex; align-items:center; justify-content:flex-end; gap:10px; padding:16px 20px 18px; }
+  .dl-btn{ height:44px; padding:0 18px; border-radius:11px; font:inherit; font-size:14px; font-weight:700; cursor:pointer; border:1px solid var(--line); background:#fff; color:var(--ink); }
+  .dl-btn.primary{ border:none; color:#fff; background:var(--amber-d); box-shadow:0 6px 14px -8px rgba(180,83,9,.6); min-width:150px; }
+  .card.deadline.red .dl-btn.primary{ background:var(--red); box-shadow:0 6px 14px -8px rgba(220,38,38,.6); }
+  .dl-btn:active{ transform:translateY(1px); }
+  .dl-btn:focus-visible{ outline:2px solid #60A5FA; outline-offset:2px; }
+  .dl-closed{ padding:14px 20px 0; font-size:14px; color:var(--ink); line-height:1.4; }
+  @media (max-width:520px){ .dl-band{ grid-template-columns:1fr; } .dl-foot{ flex-wrap:wrap; } .dl-btn.primary{ flex:1 1 100%; } }
 </style>
 </head>
 <body>
@@ -131,6 +163,7 @@
     <div class="ctx" id="ctx"></div>
     <div id="foot"></div>
     <div class="pend" id="pend"></div>
+    <div id="dl" hidden></div><!-- I7.27.1-EXT-R1 — dialog de prazo (kind:'deadline'); oculto nas views legadas -->
   </div>
   <div class="av" id="av"></div>
 </div>
@@ -387,6 +420,7 @@
     if(dlTimer){ clearInterval(dlTimer); dlTimer=null; }   // I7.27.1-EXT — contagem viva só enquanto a view de prazo está em tela
     // I7.27.1-EXT — ESCALAÇÃO DE PRAZO (tarefa não iniciada) usa a MESMA janela/fila (view própria, kind:'deadline').
     if(v.kind==="deadline"){ renderDeadline(v); return; }
+    dlLeave();   // I7.27.1-EXT-R1 — qualquer outra view restaura o shell legado (avatar flutuante + campos padrão)
     // F3.5.4Q — CHECK-IN de tarefa parada usa a MESMA janela central (view AZUL, kind:'checkin').
     if(v.kind==="checkin" && String(v.checkinKind||"")==="execution"){
       // F3.5.5A — CHECK-IN DE EXECUÇÃO (laranja): mesma janela/fila; respostas e decide próprios (server-side)
@@ -468,50 +502,59 @@
   function dlWhen(due,now){ var hm=dlHM(due); if(dlSameDay(due,now)) return "Hoje às "+hm; if(dlSameDay(due,now+86400000)) return "Amanhã às "+hm; try{ var d=new Date(due); return dlPad(d.getDate())+"/"+dlPad(d.getMonth()+1)+" às "+hm; }catch(_e){ return hm; } }
   function dlRemaining(ms){ ms=Math.max(0,Number(ms)||0); var m=Math.floor(ms/60000); if(m<1) return "menos de 1min"; if(m<60) return m+"min"; var h=Math.floor(m/60), r=m%60; return r?(h+"h "+r+"min"):(h+"h"); }
   function dlIsOver(v,now){ return String(v.deadlineLevel||"")==="overdue" || (Number(v.dueAtMs)>0 && now>=Number(v.dueAtMs)); }
-  function renderDeadlineHeader(v){
-    var now=Date.now(); var over=dlIsOver(v,now);
+  function dlLeave(){ try{ document.getElementById("wrap").classList.remove("dl"); var d=document.getElementById("dl"); if(d){ d.hidden=true; d.innerHTML=""; } }catch(_e){} }
+  function dlStateText(v,over){ return v.deadlineClosed ? "Encerrado" : (over ? "Atrasada" : "Crítico"); }
+  function dlSubText(v,now){
+    var due=Number(v.dueAtMs)||0; if(!due) return "";
+    return dlIsOver(v,now) ? ("O prazo terminou " + dlWhen(due,now).replace(/^./,function(c){return c.toLowerCase();}) + ".")
+                           : ("O prazo termina " + dlWhen(due,now).replace(/^./,function(c){return c.toLowerCase();}) + ".");
+  }
+  function dlWhenShort(due,now){ var hm=dlHM(due); if(dlSameDay(due,now)) return "Hoje · "+hm; if(dlSameDay(due,now+86400000)) return "Amanhã · "+hm; try{ var d=new Date(due); return dlPad(d.getDate())+"/"+dlPad(d.getMonth()+1)+" · "+hm; }catch(_e){ return hm; } }
+  function renderDeadline(v){
+    dlcur=v; cur=v;
+    var now=Date.now(); var over=dlIsOver(v,now); var due=Number(v.dueAtMs)||0;
+    var wrap=document.getElementById("wrap"); wrap.classList.add("dl");
     var card=document.getElementById("card"); card.className="card deadline"+(over?" red":"");
-    document.getElementById("kicker").textContent = v.deadlineClosed ? "ALERTA ENCERRADO" : (over ? "PRAZO VENCIDO" : "PRAZO EM RISCO");
-    var av=document.getElementById("av"); av.className="av"+(over?" red":"");
-    if(v.actorAvatar){ av.style.background="#E2E8F0 center/cover no-repeat"; av.style.backgroundImage="url('"+String(v.actorAvatar).replace(/'/g,"")+"')"; av.textContent=""; }
-    else { av.style.backgroundImage=""; av.style.background=colorFor(v.actorName); av.textContent=initials(v.actorName); }
-    document.getElementById("name").textContent = v.taskTitle || "Tarefa";
-    document.getElementById("msg").textContent = v.clientName || "";
-    document.getElementById("task").textContent = v.deadlineClosed ? (v.body||"") : "Você ainda não iniciou esta tarefa.";
-    document.getElementById("ctx").textContent = "";
-    document.getElementById("pend").textContent = (Number(v.queueLen)>1) ? (v.queueLen+" alertas pendentes") : "";
-  }
-  function dlGrid(v){
-    var now=Date.now(); var due=Number(v.dueAtMs)||0; var over=dlIsOver(v,now);
-    var when=due?dlWhen(due,now):"—";
-    var rem=due?(over?("vencido há "+dlRemaining(now-due)):dlRemaining(due-now)):"—";
-    return '<div class="dl-grid"><div class="dl-cell"><div class="dl-k">Prazo</div><div class="dl-v" id="dl_when">'+esc(when)+'</div></div>'
-      +'<div class="dl-cell"><div class="dl-k">'+(over?"Situação":"Faltam")+'</div><div class="dl-v warn" id="dl_rem">'+esc(rem)+'</div></div></div>';
-  }
-  function renderDeadlineFoot(v){
-    var foot=document.getElementById("foot"); unfreezeFoot();
-    if(v.deadlineClosed){ foot.innerHTML='<button class="ok" id="dl_ok" type="button">OK</button>'; bind("dl_ok","click",function(){ try{ api.ok && api.ok(v.key); }catch(_e){} }); return; }
-    foot.innerHTML = dlGrid(v)
-      +'<div class="decisions"><button class="dbtn primary" id="dl_open" type="button">Abrir tarefa</button>'
-      +'<button class="dbtn ghost" id="dl_ack" type="button">Entendi</button></div>';
-    // Abrir tarefa: abre o Detail da MESMA tarefa (deep-link) e reconhece o alerta. Entendi: só reconhece —
-    // NÃO move, NÃO altera status/prazo, NÃO marca iniciada (o sistema segue sabendo do risco).
+    var d=document.getElementById("dl"); d.hidden=false;
+    var avHtml = v.actorAvatar ? '<div class="dl-av" style="background-image:url(\''+String(v.actorAvatar).replace(/'/g,"")+'\')"></div>'
+                               : '<div class="dl-av" style="background:'+colorFor(v.actorName)+'">'+esc(initials(v.actorName))+'</div>';
+    var queue=(Number(v.queueLen)>1) ? (v.queueLen+" alertas pendentes") : "";
+    var head='<div class="dl-head">'+avHtml
+      +'<div class="dl-hd"><div class="dl-kicker"><span class="lbl" id="dl_lbl">'+(v.deadlineClosed?"Alerta encerrado":(over?"Prazo vencido":"Prazo em risco"))+'</span><span class="dl-state" id="dl_state">'+esc(dlStateText(v,over))+'</span></div>'
+      +'<div class="dl-who">Responsável · '+esc(v.actorName||"")+'</div></div>'
+      +'<div class="dl-queue" id="dl_queue">'+esc(queue)+'</div></div>';
+    var body, band, foot;
+    if(v.deadlineClosed){
+      body='<div class="dl-body"><div class="dl-title">'+esc(v.taskTitle||"Tarefa")+'</div>'+(v.clientName?'<div class="dl-client">'+esc(v.clientName)+'</div>':"")+'</div>'
+        +'<div class="dl-closed">'+esc(v.body||"Este alerta não se aplica mais.")+'</div>';
+      band=""; foot='<div class="dl-foot"><button class="dl-btn primary" id="dl_ok" type="button">OK</button></div>';
+    } else {
+      body='<div class="dl-body"><div class="dl-title">'+esc(v.taskTitle||"Tarefa")+'</div>'+(v.clientName?'<div class="dl-client">'+esc(v.clientName)+'</div>':"")
+        +'<div class="dl-msg">Esta tarefa ainda não foi iniciada.</div><div class="dl-sub" id="dl_sub">'+esc(dlSubText(v,now))+'</div></div>';
+      band='<div class="dl-band"><div class="dl-cell"><div class="dl-k">Prazo</div><div class="dl-v" id="dl_when">'+esc(due?dlWhenShort(due,now):"—")+'</div></div>'
+        +'<div class="dl-cell"><div class="dl-k" id="dl_remk">'+(over?"Situação":"Faltam")+'</div><div class="dl-v warn" id="dl_rem">'+esc(due?(over?("vencido há "+dlRemaining(now-due)):dlRemaining(due-now)):"—")+'</div></div></div>';
+      foot='<div class="dl-foot"><button class="dl-btn" id="dl_ack" type="button">Entendi</button><button class="dl-btn primary" id="dl_open" type="button">Abrir tarefa</button></div>';
+    }
+    d.innerHTML=head+body+band+foot;
+    // Abrir tarefa: abre o Detail da MESMA tarefa (deep-link) e reconhece. Entendi/OK: só reconhece — NÃO move,
+    // NÃO altera status/prazo, NÃO marca iniciada (o sistema segue sabendo do risco).
     bind("dl_open","click",function(){ try{ api.open && api.open(v.deep||""); }catch(_e){} try{ api.ok && api.ok(v.key); }catch(_e){} });
     bind("dl_ack","click",function(){ try{ api.ok && api.ok(v.key); }catch(_e){} });
+    bind("dl_ok","click",function(){ try{ api.ok && api.ok(v.key); }catch(_e){} });
+    resizeSelf();
+    try{ api.rendered && api.rendered(v.key); }catch(_e){}
+    playSound(v);
+    if(dlTimer){ clearInterval(dlTimer); dlTimer=null; }   // re-render em tela (cruzou o prazo) nunca acumula um 2º intervalo
+    if(!v.deadlineClosed && due>0){ dlTimer=setInterval(dlTick, 30000); }
   }
   function dlTick(){
     var v=dlcur; if(!v || v.deadlineClosed) return;
     var now=Date.now(); var due=Number(v.dueAtMs)||0; if(!due) return;
-    var over=dlIsOver(v,now); var rem=document.getElementById("dl_rem");
-    if(rem) rem.textContent = over?("vencido há "+dlRemaining(now-due)):dlRemaining(due-now);
-    var card=document.getElementById("card"); if(card && over && card.className.indexOf(" red")<0){ renderDeadlineHeader(v); renderDeadlineFoot(v); resizeSelf(); }
-  }
-  function renderDeadline(v){
-    dlcur=v; cur=v;
-    renderDeadlineHeader(v); renderDeadlineFoot(v); resizeSelf();
-    try{ api.rendered && api.rendered(v.key); }catch(_e){}
-    playSound(v);
-    if(!v.deadlineClosed && Number(v.dueAtMs)>0){ dlTimer=setInterval(dlTick, 30000); }
+    var over=dlIsOver(v,now);
+    var card=document.getElementById("card");
+    if(over && card && card.className.indexOf(" red")<0){ renderDeadline(v); return; }   // cruzou o prazo em tela: re-render vermelho
+    var rem=document.getElementById("dl_rem"); if(rem) rem.textContent = over?("vencido há "+dlRemaining(now-due)):dlRemaining(due-now);
+    var sub=document.getElementById("dl_sub"); if(sub) sub.textContent = dlSubText(v,now);
   }
 
   // ═══════════════ F3.5.5A — CHECK-IN DE EXECUÇÃO (view LARANJA; decide SERVER-SIDE) ═══════════════

@@ -19,7 +19,7 @@ import fs from "fs";
 import { diag } from "./diag";
 import type { ReminderSurface, ReminderView, CentralView, DecisionInput, DecisionPublicResult, CheckinDecisionInput, CheckinPublicResult } from "./slaReminder";
 
-const WIDTH = 460;
+const WIDTH = 640; // I7.27.1-EXT-R1 — dialog premium de prazo 580px (§3: 560–620); views legadas seguem centradas (card max-width 420)
 const ACK_TIMEOUT_MS = 4000;
 
 export function loadReminderSounds(): { warning: string; critical: string } {
