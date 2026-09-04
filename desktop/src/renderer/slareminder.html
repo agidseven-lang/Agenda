@@ -107,6 +107,18 @@
   .card.checkin .spin{ border-top-color:var(--blue); }
   .card.checkin .ok{ background:var(--blue); box-shadow:0 8px 18px -6px rgba(37,99,235,.7); }
   .dbtn.danger{ border:1.5px solid rgba(220,38,38,.4); color:var(--red-d); }
+  /* ── I7.27.1-EXT — ESCALAÇÃO DE PRAZO (tarefa atribuída e não iniciada): superfície CLARA; faixa âmbar em
+     risco (T-2h) e vermelha só quando VENCIDO; título da tarefa dominante; mensagem objetiva; prazo + tempo
+     restante VIVO; ações: Abrir tarefa (primária) e Entendi (reconhecer, sem mutação da tarefa). ── */
+  .card.deadline .name{ font-size:16px; font-weight:800; letter-spacing:-.01em; margin-bottom:2px; }
+  .card.deadline .msg{ font-size:13px; color:var(--muted); font-weight:600; margin-bottom:10px; }
+  .card.deadline .task{ font-size:14.5px; font-weight:600; color:var(--ink); margin:0 8px 10px; }
+  .card.deadline .dl-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:0 6px 14px; }
+  .card.deadline .dl-cell{ border:1px solid var(--line); border-radius:11px; padding:9px 10px; background:#F8FAFC; text-align:left; }
+  .card.deadline .dl-k{ font-size:11px; font-weight:700; letter-spacing:.6px; color:var(--muted); text-transform:uppercase; }
+  .card.deadline .dl-v{ font-size:14.5px; font-weight:800; color:var(--ink); margin-top:2px; font-variant-numeric:tabular-nums; }
+  .card.deadline .dl-v.warn{ color:var(--amber-d); } .card.deadline.red .dl-v.warn{ color:var(--red-d); }
+  .card.deadline .ctx{ margin-bottom:0; }
 </style>
 </head>
 <body>
@@ -372,6 +384,9 @@
 
   if(api.onCard) api.onCard(function(v){
     if(!v) return;
+    if(dlTimer){ clearInterval(dlTimer); dlTimer=null; }   // I7.27.1-EXT — contagem viva só enquanto a view de prazo está em tela
+    // I7.27.1-EXT — ESCALAÇÃO DE PRAZO (tarefa não iniciada) usa a MESMA janela/fila (view própria, kind:'deadline').
+    if(v.kind==="deadline"){ renderDeadline(v); return; }
     // F3.5.4Q — CHECK-IN de tarefa parada usa a MESMA janela central (view AZUL, kind:'checkin').
     if(v.kind==="checkin" && String(v.checkinKind||"")==="execution"){
       // F3.5.5A — CHECK-IN DE EXECUÇÃO (laranja): mesma janela/fila; respostas e decide próprios (server-side)
@@ -444,6 +459,60 @@
     if(c.preselect && c.reason==="preselected"){ draft.helpRecipientId=String(c.preselect.id||""); draft.helpRecipientName=String(c.preselect.name||""); }
     renderFoot(cur); resizeSelf();
   });
+
+  // ═══════════════ I7.27.1-EXT — ESCALAÇÃO DE PRAZO (view CLARA; Abrir tarefa / Entendi) ═══════════════
+  var dlcur=null, dlTimer=null;
+  function dlPad(n){ return (n<10?"0":"")+n; }
+  function dlHM(ms){ try{ var d=new Date(ms); return dlPad(d.getHours())+":"+dlPad(d.getMinutes()); }catch(_e){ return ""; } }
+  function dlSameDay(a,b){ var x=new Date(a), y=new Date(b); return x.getFullYear()===y.getFullYear()&&x.getMonth()===y.getMonth()&&x.getDate()===y.getDate(); }
+  function dlWhen(due,now){ var hm=dlHM(due); if(dlSameDay(due,now)) return "Hoje às "+hm; if(dlSameDay(due,now+86400000)) return "Amanhã às "+hm; try{ var d=new Date(due); return dlPad(d.getDate())+"/"+dlPad(d.getMonth()+1)+" às "+hm; }catch(_e){ return hm; } }
+  function dlRemaining(ms){ ms=Math.max(0,Number(ms)||0); var m=Math.floor(ms/60000); if(m<1) return "menos de 1min"; if(m<60) return m+"min"; var h=Math.floor(m/60), r=m%60; return r?(h+"h "+r+"min"):(h+"h"); }
+  function dlIsOver(v,now){ return String(v.deadlineLevel||"")==="overdue" || (Number(v.dueAtMs)>0 && now>=Number(v.dueAtMs)); }
+  function renderDeadlineHeader(v){
+    var now=Date.now(); var over=dlIsOver(v,now);
+    var card=document.getElementById("card"); card.className="card deadline"+(over?" red":"");
+    document.getElementById("kicker").textContent = v.deadlineClosed ? "ALERTA ENCERRADO" : (over ? "PRAZO VENCIDO" : "PRAZO EM RISCO");
+    var av=document.getElementById("av"); av.className="av"+(over?" red":"");
+    if(v.actorAvatar){ av.style.background="#E2E8F0 center/cover no-repeat"; av.style.backgroundImage="url('"+String(v.actorAvatar).replace(/'/g,"")+"')"; av.textContent=""; }
+    else { av.style.backgroundImage=""; av.style.background=colorFor(v.actorName); av.textContent=initials(v.actorName); }
+    document.getElementById("name").textContent = v.taskTitle || "Tarefa";
+    document.getElementById("msg").textContent = v.clientName || "";
+    document.getElementById("task").textContent = v.deadlineClosed ? (v.body||"") : "Você ainda não iniciou esta tarefa.";
+    document.getElementById("ctx").textContent = "";
+    document.getElementById("pend").textContent = (Number(v.queueLen)>1) ? (v.queueLen+" alertas pendentes") : "";
+  }
+  function dlGrid(v){
+    var now=Date.now(); var due=Number(v.dueAtMs)||0; var over=dlIsOver(v,now);
+    var when=due?dlWhen(due,now):"—";
+    var rem=due?(over?("vencido há "+dlRemaining(now-due)):dlRemaining(due-now)):"—";
+    return '<div class="dl-grid"><div class="dl-cell"><div class="dl-k">Prazo</div><div class="dl-v" id="dl_when">'+esc(when)+'</div></div>'
+      +'<div class="dl-cell"><div class="dl-k">'+(over?"Situação":"Faltam")+'</div><div class="dl-v warn" id="dl_rem">'+esc(rem)+'</div></div></div>';
+  }
+  function renderDeadlineFoot(v){
+    var foot=document.getElementById("foot"); unfreezeFoot();
+    if(v.deadlineClosed){ foot.innerHTML='<button class="ok" id="dl_ok" type="button">OK</button>'; bind("dl_ok","click",function(){ try{ api.ok && api.ok(v.key); }catch(_e){} }); return; }
+    foot.innerHTML = dlGrid(v)
+      +'<div class="decisions"><button class="dbtn primary" id="dl_open" type="button">Abrir tarefa</button>'
+      +'<button class="dbtn ghost" id="dl_ack" type="button">Entendi</button></div>';
+    // Abrir tarefa: abre o Detail da MESMA tarefa (deep-link) e reconhece o alerta. Entendi: só reconhece —
+    // NÃO move, NÃO altera status/prazo, NÃO marca iniciada (o sistema segue sabendo do risco).
+    bind("dl_open","click",function(){ try{ api.open && api.open(v.deep||""); }catch(_e){} try{ api.ok && api.ok(v.key); }catch(_e){} });
+    bind("dl_ack","click",function(){ try{ api.ok && api.ok(v.key); }catch(_e){} });
+  }
+  function dlTick(){
+    var v=dlcur; if(!v || v.deadlineClosed) return;
+    var now=Date.now(); var due=Number(v.dueAtMs)||0; if(!due) return;
+    var over=dlIsOver(v,now); var rem=document.getElementById("dl_rem");
+    if(rem) rem.textContent = over?("vencido há "+dlRemaining(now-due)):dlRemaining(due-now);
+    var card=document.getElementById("card"); if(card && over && card.className.indexOf(" red")<0){ renderDeadlineHeader(v); renderDeadlineFoot(v); resizeSelf(); }
+  }
+  function renderDeadline(v){
+    dlcur=v; cur=v;
+    renderDeadlineHeader(v); renderDeadlineFoot(v); resizeSelf();
+    try{ api.rendered && api.rendered(v.key); }catch(_e){}
+    playSound(v);
+    if(!v.deadlineClosed && Number(v.dueAtMs)>0){ dlTimer=setInterval(dlTick, 30000); }
+  }
 
   // ═══════════════ F3.5.5A — CHECK-IN DE EXECUÇÃO (view LARANJA; decide SERVER-SIDE) ═══════════════
   var ecur=null, emode="idle", ebusy=false, eerr="", emsgState=null;
