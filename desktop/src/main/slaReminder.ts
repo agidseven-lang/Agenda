@@ -37,6 +37,13 @@ export type ReminderView = {
   soundDataUri: string;
   decisionsEnabled: boolean;   // F3.5.4P — exibe as 5 decisões (true) ou só OK (false = 1.0.205)
   taskId: string;              // F3.5.4P — p/ resolver destinatário da ajuda no renderer
+  // I7.27.1-EXT — ESCALAÇÃO DE PRAZO (tarefa atribuída e não iniciada): view própria na MESMA janela/fila.
+  kind?: string;               // 'deadline' | undefined (SLA de produção)
+  deadlineLevel?: string;      // critical | overdue (níveis centrais)
+  dueAtMs?: number;
+  idleSinceMs?: number;
+  slaThreshold?: string;       // T_MINUS_2H | OVERDUE
+  deadlineClosed?: boolean;    // alerta invalidado (iniciou/prazo mudou/trocou responsável) ⇒ aviso + OK
 };
 
 /**
@@ -205,7 +212,7 @@ export type SlaReminderControllerOpts = {
   taskValid?: (taskId: string, recipientUid: string) => boolean;  // tarefa ainda existe/pertinente/destinatário válido
   soundFor?: (level: ReminderLevel) => string;                    // data URI do som (main lê o .wav)
   getUid?: () => string;                                          // usuário logado (filtra reexibição de pendentes)
-  onAcked?: (info: { key: string; level: ReminderLevel; actorName: string; taskTitle: string; taskId: string }) => void; // pós-OK (histórico do sino)
+  onAcked?: (info: { key: string; level: ReminderLevel; actorName: string; taskTitle: string; taskId: string; kind?: string }) => void; // pós-OK (histórico do sino) — kind 'deadline' (I7.27.1-EXT)
   // F3.5.4P — DECISÃO DO RESPONSÁVEL
   persistDecision?: (req: DecisionPersistRequest) => Promise<DecisionPersistResult>; // TRANSAÇÃO real (renderer); teste injeta simulador OCC
   onDecided?: (info: { decisionType: DecisionType; key: string; level: ReminderLevel; actorName: string; taskTitle: string; taskId: string; etaMinutes?: number; reasonCode?: string; recipientName?: string }) => void; // sino/observabilidade pós-commit
@@ -305,8 +312,10 @@ export function createSlaReminderController(opts: SlaReminderControllerOpts) {
   // F3.5.4U-H1 (Defeito 2) — CHAVE LÓGICA do alerta (taskId+destinatário+nível+marco-do-prazo). Independe da
   // dedupKey crua do produtor: dois PRODUTORES/SOURCES que emitem o MESMO alerta lógico (dedupKeys diferentes)
   // colapsam numa única ocorrência. Prazo NOVO (outro marco) ⇒ chave diferente ⇒ novo alerta permitido.
-  function logicalOf(p: any, level: ReminderLevel): string { return baseOf(p) + ":" + level + ":" + boundaryOf(String((p && p.dedupKey) || "")); }
-  function logicalOfItem(it: QueueItem): string { return it.base + ":" + it.level + ":" + boundaryOf(it.key); }
+  // I7.27.1-EXT — a escalação de prazo distingue os níveis centrais (crítico × vencido) na chave lógica:
+  // ambos são level 'critical' com o MESMO marco (dueAt) — sem isto o vencido seria descartado como duplicata.
+  function logicalOf(p: any, level: ReminderLevel): string { return baseOf(p) + ":" + level + ":" + boundaryOf(String((p && p.dedupKey) || "")) + (String((p && p.kind) || "") === "deadline" ? ":dl:" + String((p && p.deadlineLevel) || "") : ""); }
+  function logicalOfItem(it: QueueItem): string { return it.base + ":" + it.level + ":" + boundaryOf(it.key) + (it.view.kind === "deadline" ? ":dl:" + String(it.view.deadlineLevel || "") : ""); }
   // hash NÃO reversível p/ observabilidade (nunca logar taskId/dedupKey crus).
   function hashId(s: string): string { let h = 5381; const v = String(s || ""); for (let i = 0; i < v.length; i++) h = ((h << 5) + h + v.charCodeAt(i)) >>> 0; return h.toString(36); }
   // F3.5.4U-H1 — observabilidade SANITIZADA do ciclo de vida (só nível/threshold/source/contagens/hashes).
@@ -319,7 +328,7 @@ export function createSlaReminderController(opts: SlaReminderControllerOpts) {
 
   function buildView(p: any, level: ReminderLevel, queueLen: number): ReminderView {
     const title = level === "critical" ? "URGENTE" : "ATENÇÃO";
-    return {
+    const v: ReminderView = {
       key: String((p && p.dedupKey) || ""),
       base: baseOf(p),
       level,
@@ -336,6 +345,13 @@ export function createSlaReminderController(opts: SlaReminderControllerOpts) {
       decisionsEnabled: decisionsEnabled(),
       taskId: String((p && p.taskId) || ""),
     };
+    // I7.27.1-EXT — view de ESCALAÇÃO DE PRAZO (campos aditivos; título próprio; sem as 5 decisões).
+    if (p && String(p.kind || "") === "deadline") {
+      v.kind = "deadline"; v.deadlineLevel = String(p.deadlineLevel || ""); v.dueAtMs = Number(p.dueAtMs) || 0;
+      v.idleSinceMs = Number(p.idleSinceMs) || 0; v.slaThreshold = String(p.slaThreshold || "");
+      v.title = v.deadlineLevel === "overdue" ? "PRAZO VENCIDO" : "PRAZO EM RISCO";
+    }
+    return v;
   }
 
   function pendingCount(): number { return (active ? 1 : 0) + queue.length; }
@@ -654,6 +670,19 @@ export function createSlaReminderController(opts: SlaReminderControllerOpts) {
         }
       }
 
+      // I7.27.1-EXT — ESCALAÇÃO DE PRAZO: um nível NOVO da MESMA tarefa+destinatário SUBSTITUI o anterior
+      // (na fila ou em tela: crítico→vencido). Nunca dois alertas de prazo da mesma tarefa; o antigo recebe
+      // recibo-lápide com motivo. Outras tarefas/alertas de produção não são tocados.
+      if (String((p && p.kind) || "") === "deadline") {
+        for (let i = queue.length - 1; i >= 0; i--) { if (queue[i].base === base && queue[i].view.kind === "deadline") { const q = queue[i]; queue.splice(i, 1); dropStale(q.key, q.taskId, q.base.split(":")[1] || "", q.level, "superseded_by_" + String(item.view.deadlineLevel || "")); } }
+        if (active && active.base === base && active.view.kind === "deadline" && !isLocked()) {
+          dropStale(active.key, active.taskId, active.base.split(":")[1] || "", active.level, "superseded_by_" + String(item.view.deadlineLevel || ""));
+          active = item; item.view.queueLen = pendingCount();
+          surface.promote(item.view);
+          log("sla.reminder.deadline.superseded", { key: mask(key), base: mask(base), level: String(item.view.deadlineLevel || "") });
+          return { ok: true, channel: "sla-central-superseded" };
+        }
+      }
       queue.push(item);
       log("sla.reminder.queued", { key: mask(key), level, pending: pendingCount() });
       centralObs("central_alert.enqueued", p, level, { queueDepth: queue.length });
@@ -676,7 +705,7 @@ export function createSlaReminderController(opts: SlaReminderControllerOpts) {
       store.removePending(k);
       log("sla.reminder.ack.success", { key: mask(k), level: active.level });
       centralObs("central_alert.recognized", { taskId: active.taskId, dedupKey: k }, active.level, {});
-      try { if (opts.onAcked) opts.onAcked({ key: k, level: active.level, actorName: active.view.actorName, taskTitle: active.view.taskTitle, taskId: active.taskId }); } catch { /* histórico nunca derruba o ack */ }
+      try { if (opts.onAcked) opts.onAcked({ key: k, level: active.level, actorName: active.view.actorName, taskTitle: active.view.taskTitle, taskId: active.taskId, kind: active.view.kind }); } catch { /* histórico nunca derruba o ack */ }
       active = null;
       try { surface.close(); } catch { /* */ }
       log("sla.reminder.closed", { key: mask(k) });
@@ -895,6 +924,47 @@ export function createSlaReminderController(opts: SlaReminderControllerOpts) {
     /** Tarefa concluída (API aprovada F3.5.4L — compat): delega à invalidação terminal completa. */
     noteCompleted(taskId: string): void { this.invalidateTerminal(String(taskId || ""), "completed"); },
 
+    /**
+     * I7.27.1-EXT (§8 RESET) — INVALIDAÇÃO da ESCALAÇÃO DE PRAZO de uma tarefa quando o risco deixa de
+     * existir: iniciou (started) / trocou de responsável (assignee_changed) / prazo mudou (due_changed —
+     * só os alertas de OUTRO dueAt, keepDueAtMs preserva o vigente) / inelegível. Remove fila + pendentes
+     * persistidos (recibo-lápide com motivo; histórico preservado). Alerta ABERTO: grava o recibo, troca
+     * para o aviso informativo com OK (sem decisões) e fecha sozinho (autoCloseMs). NUNCA toca alertas de
+     * PRODUÇÃO (amarelo/vermelho) nem check-ins da mesma tarefa; NUNCA altera a tarefa.
+     */
+    invalidateDeadline(taskId: string, reason?: string, keepDueAtMs?: number): void {
+      const t = String(taskId || ""); if (!t) return;
+      const why = String(reason || "deadline_invalid");
+      const keep = Number(keepDueAtMs) || 0;
+      const hit = (v: ReminderView | undefined): boolean => !!(v && v.kind === "deadline" && !v.deadlineClosed && (!keep || Number(v.dueAtMs) !== keep));
+      for (let i = queue.length - 1; i >= 0; i--) { const q = queue[i]; if (q.taskId === t && hit(q.view)) { queue.splice(i, 1); dropStale(q.key, t, q.base.split(":")[1] || "", q.level, why); } }
+      try {
+        for (const rec of (store.listPending() || [])) {
+          if (!rec || String(rec.taskId || "") !== t || !rec.payload || String(rec.payload.kind || "") !== "deadline") continue;
+          if (keep && Number(rec.payload.dueAtMs) === keep) continue;
+          if (active && active.key === rec.key) continue;
+          dropStale(String(rec.key), t, String(rec.recipientUid || ""), (rec.level === "critical" ? "critical" : "warning"), why);
+        }
+      } catch { /* pendentes nunca derrubam a invalidação */ }
+      if (active && active.taskId === t && hit(active.view)) {
+        const cur = active;
+        try { store.markAck(cur.key, { recipientUid: cur.base.split(":")[1] || "", taskId: t, eventId: cur.key, level: cur.level, appVersion, windowState: "deadline_autoclose:" + why }); } catch { /* */ }
+        store.removePending(cur.key);
+        const msg = why === "started" ? "Esta tarefa já foi iniciada — alerta encerrado."
+          : (why === "due_changed" ? "O prazo desta tarefa mudou — os alertas foram recalculados."
+          : (why === "assignee_changed" ? "Esta tarefa mudou de responsável." : "Este alerta não se aplica mais."));
+        cur.view = Object.assign({}, cur.view, { body: msg, context: "", decisionsEnabled: false, queueLen: pendingCount(), deadlineClosed: true });
+        try { surface.show(cur.view); } catch { /* */ }
+        log("sla.reminder.deadline.invalidated", { key: mask(cur.key), active: true, reason: why, autoCloseMs });
+        centralObs("central_alert.deadline_invalidated", { taskId: t, dedupKey: cur.key }, cur.level, { reason: why });
+        clearCloseTimer();
+        closeTimer = setTimeout(() => {
+          closeTimer = null;
+          if (active === cur) { active = null; try { surface.close(); } catch { /* */ } log("sla.reminder.closed", { key: mask(cur.key), auto: true }); showNext(); }
+        }, autoCloseMs);
+      } else { refreshCounter(); }
+    },
+
     /** F3.5.5C-H2 (Barreira 3) — 1º snapshot canônico chegou: revalida o replay do boot e apresenta
      *  SOMENTE o que continuar legítimo (nada foi exibido antes disto quando há taskGate). */
     onTaskGateReady(): void {
@@ -1059,7 +1129,8 @@ export function createSlaReminderController(opts: SlaReminderControllerOpts) {
 
 function snapshot(p: any): any {
   if (!p || typeof p !== "object") return {};
-  const keep = ["dedupKey", "eventId", "eventType", "severity", "taskId", "taskTitle", "clientName", "targetUserId", "responsibleName", "responsibleAvatar", "actorName", "actorAvatar", "title", "body", "context", "action", "subtitle"];
+  const keep = ["dedupKey", "eventId", "eventType", "severity", "taskId", "taskTitle", "clientName", "targetUserId", "responsibleName", "responsibleAvatar", "actorName", "actorAvatar", "title", "body", "context", "action", "subtitle",
+    "kind", "deadlineLevel", "dueAtMs", "idleSinceMs", "slaThreshold", "recipientUid"]; // I7.27.1-EXT — a reexibição no boot preserva a view de prazo
   const out: any = {}; for (const k of keep) if (p[k] !== undefined) out[k] = p[k]; return out;
 }
 function mask(s: string): string { const v = String(s || ""); return v.length <= 8 ? v : v.slice(0, 4) + "…" + v.slice(-4); }

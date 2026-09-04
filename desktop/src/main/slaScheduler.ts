@@ -56,6 +56,10 @@ export type SlaSchedulerOpts = {
   // PRODUÇÃO opts.cardsRules é undefined ⇒ require("./cardsRules") RÍGIDO (falha alto se o módulo não
   // estiver empacotado — jamais no-op silencioso). O build exige cardsRules.js no app.asar.
   cardsRules?: { cardsEmissionsFor: (task: any, uid: string, now: number) => NotifPayload[]; cardsNextBoundaryMs: (task: any, now: number) => number };
+  // I7.27.1-EXT — produtor ISOLADO de ESCALAÇÃO DE PRAZO (tarefa atribuída e NÃO iniciada: T-24h/T-6h/
+  // T-2h/vencido). INJETÁVEL só para teste; em PRODUÇÃO undefined ⇒ require("./slaEscalationRules")
+  // RÍGIDO (empacotado por copy-renderer.js; jamais no-op silencioso). Mesmo emitList/timer/seen.
+  escalationRules?: { escalationEmissionsFor: (task: any, uid: string, now: number) => NotifPayload[]; escalationNextBoundaryMs: (task: any, now: number) => number };
 };
 
 /** Seen-set PERSISTENTE (JSON em userData) — padrão updater-snooze: { [dedupKey]: ts }, capado. */
@@ -102,6 +106,9 @@ export function startSlaScheduler(getUid: () => string | null, deliver: Deliver,
   // a presença em app.asar. O produtor de SLA dos demais setores é INDEPENDENTE disto (byte-idêntico).
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const cardsRules: any = opts.cardsRules || require("./cardsRules");
+  // I7.27.1-EXT — escalação de prazo pré-início (regra pura; mesma disciplina rígida do cardsRules).
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const escalationRules: any = opts.escalationRules || require("./slaEscalationRules");
 
   const tasks = new Map<string, any>();
   let timer: any = null;
@@ -154,6 +161,11 @@ export function startSlaScheduler(getUid: () => string | null, deliver: Deliver,
       let cardEmissions: NotifPayload[] = [];
       try { cardEmissions = cardsRules.cardsEmissionsFor(task, uid, t0) || []; } catch (e) { cardEmissions = []; log("cards.emit.error", { taskId: task && task.id, err: String((e as any) && (e as any).message || e) }); }
       emitList(cardEmissions, task && task.id);
+      // I7.27.1-EXT — ESCALAÇÃO DE PRAZO (tarefa não iniciada): banda atual (0/1 payload) pelo MESMO
+      // emitList (⇒ mesmo deliverNotification + mesma dedup persistente; chave semântica por nível).
+      let escEmissions: NotifPayload[] = [];
+      try { escEmissions = escalationRules.escalationEmissionsFor(task, uid, t0) || []; } catch (e) { escEmissions = []; log("sla.escalation.emit.error", { taskId: task && task.id, err: String((e as any) && (e as any).message || e) }); }
+      emitList(escEmissions, task && task.id);
     });
     // F3.4.3 — operational_block: varredura POR-USUÁRIO (gated em canSeeAll do papel AUTENTICADO).
     // Preserva integralmente o comportamento aprovado da 1.0.178 (condição/destinatário/título/texto/
@@ -179,6 +191,10 @@ export function startSlaScheduler(getUid: () => string | null, deliver: Deliver,
       let bc = 0;
       try { bc = Number(cardsRules.cardsNextBoundaryMs(task, t0)) || 0; } catch { bc = 0; }
       if (bc > t0 && (!best || bc < best)) best = bc;
+      // I7.27.1-EXT — marcos T-24h/T-6h/T-2h/prazo da escalação integram o MESMO timer único (wake preciso).
+      let be = 0;
+      try { be = Number(escalationRules.escalationNextBoundaryMs(task, t0)) || 0; } catch { be = 0; }
+      if (be > t0 && (!best || be < best)) best = be;
     });
     return best;
   }

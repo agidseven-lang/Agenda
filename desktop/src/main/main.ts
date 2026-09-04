@@ -1002,6 +1002,19 @@ function startUserListeners(uid: string): void {
           if (ch.type === "removed") { if (slaReminderCtl) slaReminderCtl.invalidateTerminal(String(id), "removed"); continue; }
           const d: any = (ch.doc.data && ch.doc.data()) || {};
           try { if (_slaRulesRt.slaPanelDelivered(Object.assign({ id }, d)) && slaReminderCtl) slaReminderCtl.invalidateTerminal(String(id), "delivered"); } catch { /* */ }
+          // I7.27.1-EXT (§8 RESET) — ESCALAÇÃO DE PRAZO: qualquer mudança que elimine o risco (iniciou,
+          // trocou de responsável, prazo mudou, saiu da elegibilidade) invalida o alerta central de prazo
+          // pendente/ativo desta tarefa. Read-only; nunca altera a tarefa; produção/check-ins intactos.
+          try {
+            if (slaReminderCtl) {
+              // eslint-disable-next-line @typescript-eslint/no-var-requires
+              const _esc: any = require("./slaEscalationRules");
+              const el = _esc.isEscalationEligible(Object.assign({ id }, d), Date.now());
+              if (!el.eligible) slaReminderCtl.invalidateDeadline(String(id), el.reason === "started" ? "started" : String(el.reason || "ineligible"));
+              else if (currentUid && String(el.recipientUid || "") !== String(currentUid)) slaReminderCtl.invalidateDeadline(String(id), "assignee_changed");
+              else slaReminderCtl.invalidateDeadline(String(id), "due_changed", Number(el.dueAtMs) || 0);
+            }
+          } catch { /* invalidação nunca derruba a escuta */ }
           try { deriveExecutionSmEvent(String(id), d); } catch { /* F3.5.5A — derivação nunca derruba a escuta */ }
         }
         // F3.5.5C-H2 — 1º snapshot da sessão: gate pronto ⇒ LIMPEZA REPARADORA (contagem primeiro,
@@ -1208,7 +1221,7 @@ app.whenReady().then(() => {
       },
       onAcked: (info) => {
         try {
-          const lvlTxt = info.level === "critical" ? "vermelho" : "amarelo";
+          const lvlTxt = String((info as any).kind || "") === "deadline" ? "de prazo" : (info.level === "critical" ? "vermelho" : "amarelo"); // I7.27.1-EXT
           const nm = String(info.actorName || "").trim();
           mainWin?.webContents.send("notif-history", {
             eventType: "sla_ack", severity: "info", taskId: info.taskId, dedupKey: "sla_ack:" + info.key,
