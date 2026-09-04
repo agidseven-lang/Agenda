@@ -148,6 +148,7 @@ ok('R7 canonicalNowMs() continua a fonte única do VISUAL', /function canonicalN
   const WALL = 1700000000000; let CANON = WALL; let listenCb = null; const delivered = [];
   const sched = startSlaScheduler(() => 'dz1', (p) => { const r = chan.deliver('visible', p); delivered.push(p.eventType); return r.res; }, {
     cardsRules: { cardsEmissionsFor: () => [], cardsNextBoundaryMs: () => 0 }, // F3.5.2 — mock explícito (cards testados à parte)
+    escalationRules: { escalationEmissionsFor: () => [], escalationNextBoundaryMs: () => 0 }, // I7.27.1-EXT — mock explícito (escalação de prazo testada à parte: f7271ext)
     now: () => CANON, listen: (n, cb) => { if (n === 'tasks') listenCb = cb; return () => {}; },
     seen: new Set(), setTimer: () => ({}), clearTimer: () => {}, onLog: () => {}, safetyMaxMs: 60000,
   });

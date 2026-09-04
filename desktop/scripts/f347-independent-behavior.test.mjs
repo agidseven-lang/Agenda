@@ -140,6 +140,7 @@ let bg;
   const delivered = []; const seen = new Set(); let cb = null;
   const s = startSlaScheduler(() => 'U1', (p) => { delivered.push(p.dedupKey); return mode; }, {
     cardsRules: { cardsEmissionsFor: () => [], cardsNextBoundaryMs: () => 0 }, // F3.5.2 — mock explícito (cards testados à parte)
+    escalationRules: { escalationEmissionsFor: () => [], escalationNextBoundaryMs: () => 0 }, // I7.27.1-EXT — mock explícito (escalação de prazo testada à parte: f7271ext)
     now: () => NOW, listen: (n, c) => { if (n === 'tasks') cb = c; return () => {}; },
     seen: { has: (k) => seen.has(k), add: (k) => seen.add(k) }, setTimer: () => 0, clearTimer: () => {}, onLog: () => {}, authUser: () => null });
   cb({ docChanges: () => [{ type: 'added', doc: { id: 'T1', data: () => task } }] });

@@ -58,6 +58,7 @@ function makeSched(dir, uid, startNowMs) {
   const st = { now: startNowMs, delivered: [], seen: new Set(), timers: [], snapCb: null };
   const h = startSlaScheduler(() => uid, (p) => st.delivered.push(p), {
     cardsRules: { cardsEmissionsFor: () => [], cardsNextBoundaryMs: () => 0 }, // F3.5.2 — mock explícito (cards testados à parte)
+    escalationRules: { escalationEmissionsFor: () => [], escalationNextBoundaryMs: () => 0 }, // I7.27.1-EXT — mock explícito (escalação de prazo testada à parte: f7271ext)
     now: () => st.now,
     listen: (_n, cb) => { st.snapCb = cb; return () => {}; },
     seen: { has: (k) => st.seen.has(k), add: (k) => st.seen.add(k) },

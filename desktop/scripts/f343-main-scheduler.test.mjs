@@ -51,6 +51,7 @@ function newRig(uid, sharedSeen) {
   let listenCb = null;
   const sched = startSlaScheduler(() => uid, (p) => { const r = chan.deliver(winState, p); delivered.push({ dedupKey: p.dedupKey, eventType: p.eventType, channel: r.res.channel, targetUserId: p.targetUserId }); return r.res; }, {
     cardsRules: { cardsEmissionsFor: () => [], cardsNextBoundaryMs: () => 0 }, // F3.5.2 — mock explícito (cards testados à parte)
+    escalationRules: { escalationEmissionsFor: () => [], escalationNextBoundaryMs: () => 0 }, // I7.27.1-EXT — mock explícito (escalação de prazo testada à parte: f7271ext)
     now: () => NOW,
     listen: (name, cb) => { if (name === 'tasks') listenCb = cb; return () => {}; },
     seen: { has: (k) => seen.has(k), add: (k) => seen.add(k) },

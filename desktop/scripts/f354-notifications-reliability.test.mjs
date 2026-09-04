@@ -160,6 +160,7 @@ function rigS(uid, seenFile) {
   const s = createUserSlaSeen(uid, { file });                  // wrapper REAL por usuário (F3.5.4-C3)
   const sched = startSlaScheduler(() => uid, (p) => { delivered.push({ dedupKey: p.dedupKey, eventType: p.eventType, targetUserId: p.targetUserId }); return { ok: true, channel: 'toast' }; }, {
     cardsRules: { cardsEmissionsFor: () => [], cardsNextBoundaryMs: () => 0 },
+    escalationRules: { escalationEmissionsFor: () => [], escalationNextBoundaryMs: () => 0 }, // I7.27.1-EXT — mock explícito (escalação de prazo testada à parte: f7271ext)
     now: () => NOW, listen: (n, cb) => { if (n === 'tasks') listenCb = cb; return () => {}; },
     seen: s,                                                    // slaScheduler REAL intacto; seen injetado como em produção (main.ts)
     setTimer: () => ({}), clearTimer: () => {}, onLog: () => {}, safetyMaxMs: 60000,
@@ -223,8 +224,12 @@ ok(/seen: createUserSlaSeen\(uid\)/.test(MAIN), 'C3d main.ts injeta o seen POR U
   const sch = execSync('git diff fdd684261f59f7d288c6d4197d7ecd0050ce0bb5 -- src/main/slaScheduler.ts', { cwd: DESK }).toString();
   const added = sch.split('\n').filter((l) => l.startsWith('+') && !l.startsWith('+++'));
   const removed = sch.split('\n').filter((l) => l.startsWith('-') && !l.startsWith('---'));
-  ok(removed.length === 0 && added.length === 8 && /legacyDedupKeys/.test(sch) && /seen\.add\(key\); log\("sla\.dedup\.legacy"/.test(sch),
-    'C3e slaScheduler.ts — DIFF CONTROLADO F3.5.4H: só o bloco aditivo legacyDedupKeys (0 remoções; 8 inserções; migração sem duplicata)');
+  // I7.27.1-EXT — RE-ÂNCORA AUTORIZADA: além do bloco F3.5.4H (8 inserções), o scheduler ganhou o 3º produtor
+  // ADITIVO de escalação de prazo (slaEscalationRules; mesmo emitList/timer/seen): exatamente 16 inserções extras,
+  // 0 remoções, com as 3 assinaturas do bloco (opção injetável/require rígido; emissão no emitList; marco no timer único).
+  ok(removed.length === 0 && added.length === 24 && /legacyDedupKeys/.test(sch) && /seen\.add\(key\); log\("sla\.dedup\.legacy"/.test(sch)
+    && /opts\.escalationRules \|\| require\("\.\/slaEscalationRules"\)/.test(sch) && /escalationRules\.escalationEmissionsFor\(task, uid, t0\)/.test(sch) && /escalationRules\.escalationNextBoundaryMs\(task, t0\)/.test(sch),
+    'C3e slaScheduler.ts — DIFF CONTROLADO F3.5.4H + I7.27.1-EXT: 0 remoções; 8 (legacyDedupKeys) + 16 (produtor de escalação) inserções; assinaturas do bloco presentes (RE-PINADO I7.27.1-EXT)');
   /* cardsRules.js: gate temporal vermelho puro presente + literais WARN/RED preservados + chaves uid+legacy. */
   const cr = fs.readFileSync(path.join(DESK, 'src', 'main', 'cardsRules.js'), 'utf8');
   ok(cr.includes('var CARDS_WARN_MS = 30 * 60000') && cr.includes('var CARDS_RED_MS  = 10 * 60000')

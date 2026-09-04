@@ -62,6 +62,7 @@ function loadStartScheduler() {
     if (request === './diag' || /[\\/]diag(\.js)?$/.test(request)) return { diag: () => {} };
     if (request === './slaRules' || /[\\/]slaRules(\.js)?$/.test(request)) return realLoad.call(this, REAL_SLARULES, arguments[1], false);
     if (request === './cardsRules' || /[\\/]cardsRules(\.js)?$/.test(request)) return realLoad.call(this, REAL_CARDSRULES, arguments[1], false);
+    if (request === './slaEscalationRules' || /[\\/]slaEscalationRules(\.js)?$/.test(request)) return realLoad.call(this, path.join(DESK, 'src', 'main', 'slaEscalationRules.js'), arguments[1], false); // I7.27.1-EXT — 3º produtor rígido do scheduler (escalação testada à parte: f7271ext)
     return realLoad.apply(this, arguments);
   };
   delete require.cache[path.join(tmp, 'slaScheduler.js')];

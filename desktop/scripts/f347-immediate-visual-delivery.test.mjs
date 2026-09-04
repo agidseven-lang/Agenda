@@ -228,6 +228,7 @@ function newRig(deliverImpl) {
   const delivered = []; const seen = new Set(); const logs = []; let listenCb = null;
   const sched = startSlaScheduler(() => 'U1', (p) => { delivered.push(p.dedupKey); return deliverImpl(p); }, {
     cardsRules: { cardsEmissionsFor: () => [], cardsNextBoundaryMs: () => 0 }, // F3.5.2 — mock explícito (cards testados à parte)
+    escalationRules: { escalationEmissionsFor: () => [], escalationNextBoundaryMs: () => 0 }, // I7.27.1-EXT — mock explícito (escalação de prazo testada à parte: f7271ext)
     now: () => NOW,
     listen: (name, cb) => { if (name === 'tasks') listenCb = cb; return () => {}; },
     seen: { has: (k) => seen.has(k), add: (k) => seen.add(k) },
