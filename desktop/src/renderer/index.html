@@ -4236,8 +4236,7 @@ body.light-ui.lui-aq #cornerAvatar{display:none !important}
 /* A8) Sidebar = marca A ("7" teal + wordmark Agenda ID Seven) + nav compacta */
 body.light-ui.desktop .nav .sb-brand .nm-legacy{display:none !important}
 body.light-ui.desktop .nav .sb-brand .nm-lui{display:inline !important}
-body.light-ui.desktop .nav .sb-brand .logo.sm.brandlogo{background:linear-gradient(150deg,#2DD4BF,#0D9488) !important;position:relative}
-body.light-ui.desktop .nav .sb-brand .logo.sm.brandlogo::after{content:'7';position:absolute;inset:0;display:grid;place-items:center;color:#062A2A;font-weight:800;font-size:20px}
+/* I7.27.1-EXT-R1 (BRAND RESTORE, decisao do OWNER): o override light-ui que pintava o tile teal + glifo '7' (I7.7.1 bf7a0baf, calibrado em I7.7.3 P2-B) foi REMOVIDO. A regra base .logo.brandlogo{background:var(--logo)} volta a pintar o ASSET OFICIAL ja embutido (--logo = a mesma arte de build/icon.png). Nada de logo nova; wordmark/sidebar/nav intactos. */
 body.light-ui.desktop .nav button.sb-item{height:38px}
 body.light-ui.desktop .nav .sb-sect{padding:14px 14px 6px}
 
