@@ -20,10 +20,16 @@ const ok = (c, m) => { if (c) pass++; else { fail++; fails.push(m); } };
 // ───────────────────────── DEFEITO 1 — cabeçalho reservado (bgnotify + index) ─────────────────────────
 const bg = R("src/renderer/bgnotify.html"), ix = R("src/renderer/index.html");
 for (const [name, s] of [["bgnotify", bg], ["index", ix]]) {
-  ok(/\.ntfp-hd\{display:flex;align-items:center;justify-content:flex-end/.test(s), `H1-01 ${name}: cabeçalho reservado à direita do avatar flutuante (RE-PINADO F3.5.5E-H2)`);
+  // [RE-PINADO I7.27.1-EXT-R1] o shell LIGHT (I7.27.1 A2 — conceito aprovado/congelado pelo owner) INTEGROU o avatar na
+  // linha do título (.ntfp-fl position:static; nada flutua fora do card): o cabeçalho deixa de ser "reservado à direita do
+  // avatar flutuante" e passa a ser a linha secundária eyebrow→horário→fechar (gap 8). A garantia REAL — sem sobreposição
+  // e ordem reservada — segue provada por H1-05/H1-06 e pelo harness visual I7271 (NTF-R*).
+  ok(/\.ntfp-hd\{display:flex;align-items:center;gap:8px;min-width:0\}/.test(s) && /\.ntfp-fl\{position:static;/.test(s) && !/\.ntfp-hd\{[^}]*justify-content:flex-end/.test(s), `H1-01 ${name}: cabeçalho = linha secundária (eyebrow→horário→fechar) com avatar INTEGRADO (position:static), sem avatar flutuante (RE-PINADO I7.27.1-EXT-R1)`);
   ok(/\.ntfp-ei\{/.test(s) && /\.ntfp-ei svg\{width:13px/.test(s), `H1-02 ${name}: ícone do EVENTO pequeno e inline no eyebrow (RE-PINADO F3.5.5E-H2)`);
   ok(/\.ntf-card\.ntfp \.ntf-x\{position:static/.test(s), `H1-03 ${name}: X em coluna própria (position:static), sem absoluto sobreposto (RE-PINADO F3.5.5E-H2)`);
-  ok(/\.ntf-card\.ntfp\{gap:0;padding:0/.test(s) && /\.ntfp-wrap\{[^}]*padding:18px 18px 16px/.test(s), `H1-04 ${name}: superfície com respiro (18/18/16) — referência do owner (RE-PINADO F3.5.5E-H2)`);
+  // [RE-PINADO I7.27.1-EXT-R1] respiro do shell LIGHT = 12/14/12 sobre superfície #FFF + hairline #D6DBE6 + radius 14
+  // (valores do mandato I7.27.1; substitui a referência navy 18/18/16 rejeitada pelo owner).
+  ok(/\.ntf-card\.ntfp\{gap:0;padding:0/.test(s) && /\.ntfp-wrap\{[^}]*background:#FFFFFF;border:1px solid #D6DBE6;border-radius:14px;[^}]*padding:12px 14px 12px\}/.test(s), `H1-04 ${name}: superfície LIGHT com respiro (12/14/12), #FFF + hairline #D6DBE6 + radius 14 (RE-PINADO I7.27.1-EXT-R1)`);
   // builder premium: eyebrow(esev+tipo) → tm → X, dentro de ntfp-hd; SEM ntfp-sev grande sobreposto
   ok(/<div class="ntfp-hd"><span class="ntfp-eyebrow">[^]*?<span class="ntfp-tm">[^]*?<button class="ntf-x"/.test(s), `H1-05 ${name}: ordem reservada eyebrow→horário→fechar (RE-PINADO F3.5.5E-H2)`);
   ok(!/<span class="ntfp-sev"/.test(s), `H1-06 ${name}: ícone grande ntfp-sev sobreposto REMOVIDO do markup`);

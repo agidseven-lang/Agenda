@@ -311,7 +311,14 @@ function f354oIndexControlledDiff() {
   return hasF354n && hasF354o && !rmTouchesFrozen && anchorsPresent;
 }
 ok(f354oIndexControlledDiff(), "49 index.html — DIFF CONTROLADO F3.5.4N+F3.5.4O (Inicialização/autocorreção + agrupamento das comuns aditivos; toast/Monitor SLA/sino/Cronograma intactos)");
-ok(bytesIdenticalVs201("src/main/slaScheduler.ts"), "50 slaScheduler.ts (tempos/boundaries) byte-idêntico a 1.0.201");
+// [RE-PINADO I7.27.1-EXT-R1] slaScheduler.ts SAIU do byte-congelado em I7.27.1-EXT A2 (mudança AUTORIZADA: 3º produtor
+// ADITIVO de escalação de prazo — slaEscalationRules — no MESMO watcher/timer/seen). Passa a DIFF CONTROLADO vs 1.0.201:
+// 0 remoções e EXATAMENTE 16 inserções com as 3 assinaturas do bloco (mesma re-âncora já aplicada em f354 C3e vs 1.0.192).
+// Tempos/boundaries dos produtores de 1.0.201 (slaRules/cardsRules) permanecem intactos: NENHUMA linha removida.
+{ const sch = execSync("git -C " + JSON.stringify(DESK) + " diff 047261b7587951e0496d5f4eff0cda5998269161 HEAD -- src/main/slaScheduler.ts", { encoding: "utf8" });
+  const add = sch.split("\n").filter((l) => l.startsWith("+") && !l.startsWith("+++")), rm = sch.split("\n").filter((l) => l.startsWith("-") && !l.startsWith("---"));
+  ok(rm.length === 0 && add.length === 16 && /opts\.escalationRules \|\| require\("\.\/slaEscalationRules"\)/.test(sch) && /escalationRules\.escalationEmissionsFor\(task, uid, t0\)/.test(sch) && /escalationRules\.escalationNextBoundaryMs\(task, t0\)/.test(sch),
+    "50 slaScheduler.ts — DIFF CONTROLADO I7.27.1-EXT vs 1.0.201: 0 remoções; 16 inserções (produtor de escalação aditivo); assinaturas presentes (RE-PINADO I7.27.1-EXT-R1)"); }
 // [RE-PINADO F3.5.6A-H3] slaRules.js recebe DIFF CONTROLADO: além do ADITIVO F3.5.6A (externalWaitOf +
 // branch waiting_client + inPanel:false + export), a H3 corrige a FONTE ÚNICA do estado "enviado ao
 // cliente" — flowThemesSentSignal deixa de tratar clientReviewToken/shareToken (LINK) como ENVIO e passa

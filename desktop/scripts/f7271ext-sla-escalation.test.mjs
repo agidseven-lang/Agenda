@@ -96,7 +96,7 @@ function newRig(uid) {
 }
 const mkTask = (id, extra) => Object.assign({
   id, title: 'CEO / SETEMBRO', client: 'CEO', sector: 'cronograma', status: 'afazer', designerFlowStatus: 'afazer',
-  dueAt: DUE, createdAt: T0 - 3 * 86400000, by: 'owner', assigneeId: 'owner',
+  dueAt: DUE, createdAt: T0 - 3 * 86400000, by: 'owner', assigneeId: 'boaz', // estado REAL do produto: enviar ao designer grava assigneeId=designerId (index.html L11224)
   designerAssignment: { designerId: 'boaz', designerName: 'Boaz', status: 'sent', assignedAt: T0 - 2 * 86400000, assignedBy: 'owner' },
 }, extra || {});
 
@@ -166,7 +166,7 @@ const R3 = newRig('boaz');
 R3.fireSnap([R3.ch('added', 'j1', mkTask('j1'))]);
 R3.advanceTo(DUE - 24 * H + 1000);
 ok('J0 (setup) warning entregue ao boaz', R3.delivered.length === 1 && R3.delivered[0].recipientId === 'boaz');
-const reassigned = mkTask('j1', { designerAssignment: { designerId: 'ana', designerName: 'Ana', status: 'sent', assignedAt: R3.now(), assignedBy: 'owner' } });
+const reassigned = mkTask('j1', { assigneeId: 'ana', designerAssignment: { designerId: 'ana', designerName: 'Ana', status: 'sent', assignedAt: R3.now(), assignedBy: 'owner' } });
 R3.fireSnap([R3.ch('modified', 'j1', reassigned)]);
 R3.advanceTo(DUE - 6 * H + 1000); R3.advanceTo(DUE - 2 * H + 1000); R3.advanceTo(DUE + 5 * MIN);
 ok('J  trocar designer ⇒ o antigo (boaz, logado) NÃO recebe mais alertas desta tarefa', R3.delivered.length === 1, R3.delivered.map((d) => d.eventType + '@' + d.recipientId));
@@ -205,6 +205,7 @@ const sample = ESC.escalationEmissionsFor(mkTask('s1'), 'boaz', DUE - 1 * H)[0];
 ok('SLA-R14 "Abrir tarefa" aponta para a MESMA tarefa (deep detail/<taskId>)', sample.action && sample.action.deep === 'detail/s1' && sample.taskId === 's1');
 ok('ROUTE níveis 1/2 fora do prefixo sla_ (toast/premium) e 3/4 com sla_ (central)', classifyReminderLevel(ESC.escalationEmissionsFor(mkTask('s1'), 'boaz', DUE - 20 * H)[0]) === null && classifyReminderLevel(ESC.escalationEmissionsFor(mkTask('s1'), 'boaz', DUE - 5 * H)[0]) === null && classifyReminderLevel(sample) === 'critical' && classifyReminderLevel(ESC.escalationEmissionsFor(mkTask('s1'), 'boaz', DUE + 60000)[0]) === 'critical');
 ok('RECIPIENT outro usuário (social media logado) NÃO recebe a cobrança do designer', ESC.escalationEmissionsFor(mkTask('s1'), 'owner', DUE - 1 * H).length === 0);
+ok('CTX-R8/R10 doc DIVERGENTE (designerAssignment=boaz mas assigneeId=owner ⇒ invisível p/ boaz em Hoje/KPI/Meu quadro) ⇒ NÃO elegível (not_visible_to_designer)', ESC.escalationEmissionsFor(mkTask('s1', { assigneeId: 'owner' }), 'boaz', DUE - 1 * H).length === 0 && ESC.isEscalationEligible(mkTask('s1', { assigneeId: 'owner' }), DUE - 1 * H).reason === 'not_visible_to_designer');
 ok('ELEGIBILIDADE: iniciada ⇒ 0; concluída ⇒ 0; sem designer ⇒ 0; edicao_cards (regime T-30/T-10 próprio) ⇒ 0; aguardando cliente ⇒ 0',
   ESC.escalationEmissionsFor(mkTask('s1', { designerFlowStatus: 'andamento' }), 'boaz', DUE - 1 * H).length === 0
   && ESC.escalationEmissionsFor(mkTask('s1', { status: 'concluido' }), 'boaz', DUE - 1 * H).length === 0
