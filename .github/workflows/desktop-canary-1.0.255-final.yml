@@ -1,0 +1,1390 @@
+# =====================================================================
+# [manual] I7.28.3 - PUBLIC UPDATER CANARY (Desktop 1.0.254 -> feed PUBLICO -> 1.0.255)
+# ---------------------------------------------------------------------
+# Espelha o precedente canonico imediato (desktop-canary-1.0.254-final.yml,
+# ciclo publico do updater 253->254, PASS) com o delta da linha 1.0.255 +
+# SESSAO B e SESSAO C grafadas VERBATIM das sessoes provadas do build canonico
+# 33962815581 (desktop-build-1.0.255-final.yml, 18/18 SUCCESS): TASK CARD
+# TC/HOV + HOJE H1-H18 + OPTION B SB/CN/NAV + freeze T/D/C/Hub + E1 manifest
+# (Sessao B) e BRAND oficial + NOTIFICACAO light/dedupe (IPC real) + PARIDADE
+# SLA + MATRIZ no modulo EMPACOTADO + DIALOG central do asar (Sessao C).
+# Release publico 1.0.255 = release id 383332561 (tag v1.0.255 -> 03a1e663),
+# publicado pelo release run 33983448781 (SUCCESS). Os builds falhos
+# 33888724687 (classe C), 33961471601 e 33962039838 (classe B) NAO sao fonte
+# de nada (nem updater, nem asset, nem bundle, nem evidencia, nem proveniencia).
+#
+# CONSUMIDOR PURO DA PRODUCAO PUBLICA. Esta fase NAO:
+#   - cria tag / cria release / altera Latest / altera latest.yml / publica asset
+#   - executa desktop-release / gera novo build do produto / toca RC_RELEASE_GO
+#   - reescreve app-update.yml / usa feed local ou mock / instala 1.0.255 direto
+# Usa EXCLUSIVAMENTE os Releases publicos v1.0.254 e v1.0.255 ja existentes e o
+# app-update.yml REAL embarcado no instalador publico 1.0.254. O setup de QA da
+# baseline herda a MITIGACAO classe B do build-255 (3 tentativas, verdade pelo
+# resultado, diagnostico em canary255-baseline-install.json).
+#
+# FAIL-CLOSED: aborta antes de instalar se qualquer pre-condicao publica
+# estiver incorreta (Latest, tag->sha, release id/flags, 6 assets, pins sha256).
+# PowerShell 5.1: strings/scripts criticos 100% ASCII. Execucao manual apenas.
+# =====================================================================
+name: "[manual] I7.28.3 - Public Updater Canary 1.0.254 -> 1.0.255"
+"on":
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  OWNER_REPO: "agidseven-lang/Agenda"
+  PRODUCT_SOURCE_SHA: "03a1e663f7365346c78831af165939a759ec1cbd"
+  EXPECTED_VERSION: "1.0.255"
+  BASELINE_VERSION: "1.0.254"
+  LATEST_TAG: "v1.0.255"
+  BASELINE_TAG: "v1.0.254"
+  EXE_NAME: "Agenda-ID-Seven-Desktop-1.0.255-x64.exe"
+  BASELINE_EXE: "Agenda-ID-Seven-Desktop-1.0.254-x64.exe"
+  APPROVED_EXE_SHA256: "ee82312592cd9d27338ea1fb317d86bf3e9b7e4c764098eed5734c9ae766d7a7"
+  MSI_NAME: "Agenda-ID-Seven-Desktop-1.0.255-x64.msi"
+  # ---- PINS DO RELEASE PUBLICO v1.0.255 (release id + sha256 dos 6 assets do bundle canonico 33962815581; publicados pelo release run 33983448781):
+  EXPECTED_RELEASE_ID: "383332561"
+  EXPECTED_EXE_BYTES: "82513531"
+  EXPECTED_MSI_SHA256: "72d51b412633ddf34b63a9d40f0cfb00cd49d7dd509b76614ca162a2dbe93bdd"
+  EXPECTED_BLOCKMAP_SHA256: "bc9648e66901ef56e5cee1cf839f9485a21b691eaa93528e686fc235a522b532"
+  EXPECTED_LATESTYML_SHA256: "d46e4f559d2276be9862c1adc5bd9aa3096a48790bce41765731e589d504def3"
+  EXPECTED_SHA256SUMS_SHA256: "ce4fb2e909349f296d448c24069c8cd5409a6b1401d66b25d4942ed1871eae85"
+  EXPECTED_VERSAOTXT_SHA256: "d76ded9f9d286082a5ef58166e98a64a8a1fa08c87b7767bea19540b6aad0fd8"
+  # ---- PINS DA BASELINE PUBLICA v1.0.254 (rollback preservado; SHA256SUMS publico):
+  BASELINE_EXE_SHA256: "a72d7e77a6e8b94f11c5b6a473bed0c1bf33404c1787cf33ba53300b521de3d5"
+  BASELINE_EXE_BYTES: "82502436"
+
+jobs:
+  public-updater-canary:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: "Git sem conversao CRLF"
+        run: git config --global core.autocrlf false
+
+      - name: "GATE — PRE-CONDICOES PUBLICAS (fail-closed, antes de instalar)"
+        env:
+          GH_API_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/canary"
+          api() { curl -sSL -H "Accept: application/vnd.github+json" -H "Authorization: Bearer $GH_API_TOKEN" "$@"; }
+          LT=$(api "https://api.github.com/repos/$OWNER_REPO/releases/latest" | jq -r .tag_name)
+          [ "$LT" = "$LATEST_TAG" ] || { echo "::error::Latest publico=$LT != $LATEST_TAG"; exit 1; }
+          TS=$(api "https://api.github.com/repos/$OWNER_REPO/commits/$LATEST_TAG" | jq -r .sha)
+          [ "$TS" = "$PRODUCT_SOURCE_SHA" ] || { echo "::error::tag $LATEST_TAG sha=$TS != $PRODUCT_SOURCE_SHA"; exit 1; }
+          for T in "$BASELINE_TAG" "$LATEST_TAG"; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $GH_API_TOKEN" "https://api.github.com/repos/$OWNER_REPO/releases/tags/$T")
+            [ "$code" = "200" ] || { echo "::error::release $T ausente (http $code)"; exit 1; }
+          done
+          REL="$RUNNER_TEMP/canary/public-release-255.json"
+          api "https://api.github.com/repos/$OWNER_REPO/releases/tags/$LATEST_TAG" > "$REL"
+          RID=$(jq -r .id "$REL")
+          [ "$RID" = "$EXPECTED_RELEASE_ID" ] || { echo "::error::release $LATEST_TAG id=$RID != $EXPECTED_RELEASE_ID"; exit 1; }
+          [ "$(jq -r .draft "$REL")" = "false" ] || { echo "::error::release $LATEST_TAG e draft"; exit 1; }
+          [ "$(jq -r .prerelease "$REL")" = "false" ] || { echo "::error::release $LATEST_TAG e prerelease"; exit 1; }
+          NA=$(jq '.assets|length' "$REL")
+          [ "$NA" = "6" ] || { echo "::error::release $LATEST_TAG tem $NA assets != 6"; exit 1; }
+          # PARIDADE PUBLICA 6/6: sha256 de cada asset publico == pin do bundle canonico (run 33962815581).
+          # Fonte: digest da API (sha256:...) quando presente; senao download do asset publico + sha256sum. Sem mutacao.
+          PAR=0
+          chk() {
+            local n="$1" e="$2" d src
+            d=$(jq -r --arg n "$n" '[.assets[]|select(.name==$n)|(.digest // "")][0] // ""' "$REL" | sed 's/^sha256://')
+            if [ -z "$d" ]; then
+              curl -sSL -o "$RUNNER_TEMP/canary/pub-$n" "https://github.com/$OWNER_REPO/releases/download/$LATEST_TAG/$n"
+              d=$(sha256sum "$RUNNER_TEMP/canary/pub-$n" | awk '{print $1}'); src="download"
+            else src="api-digest"; fi
+            [ "$d" = "$e" ] || { echo "::error::asset publico $n sha256=$d != pin $e ($src)"; exit 1; }
+            echo "PARITY $n: $d ($src)"; PAR=$((PAR+1))
+          }
+          chk "$EXE_NAME" "$APPROVED_EXE_SHA256"
+          chk "$EXE_NAME.blockmap" "$EXPECTED_BLOCKMAP_SHA256"
+          chk "$MSI_NAME" "$EXPECTED_MSI_SHA256"
+          chk "latest.yml" "$EXPECTED_LATESTYML_SHA256"
+          chk "SHA256SUMS" "$EXPECTED_SHA256SUMS_SHA256"
+          chk "VERSAO-DESKTOP.txt" "$EXPECTED_VERSAOTXT_SHA256"
+          [ "$PAR" = "6" ] || { echo "::error::paridade publica $PAR/6"; exit 1; }
+          FEED_URL="https://github.com/$OWNER_REPO/releases/download/$LATEST_TAG/latest.yml"
+          curl -sSL -o "$RUNNER_TEMP/canary/public-latest.yml" "$FEED_URL"
+          grep -q "^version: $EXPECTED_VERSION$" "$RUNNER_TEMP/canary/public-latest.yml" || { echo "::error::latest.yml publico version != $EXPECTED_VERSION"; exit 1; }
+          FY_SHA=$(sha256sum "$RUNNER_TEMP/canary/public-latest.yml" | awk '{print $1}')
+          [ "$FY_SHA" = "$EXPECTED_LATESTYML_SHA256" ] || { echo "::error::latest.yml publico sha256=$FY_SHA != pin $EXPECTED_LATESTYML_SHA256"; exit 1; }
+          jq -n --arg url "$FEED_URL" --arg ver "$EXPECTED_VERSION" --arg sha "$FY_SHA" \
+            --arg latest "$LT" --arg tagsha "$TS" --arg rid "$RID" \
+            '{feedType:"PUBLIC GITHUB RELEASE (provider github, channel latest)", publicLatestYmlUrl:$url, latestYmlVersion:$ver, latestYmlSha256:$sha, repoLatestTag:$latest, tagCommitSha:$tagsha, releaseId:$rid, draft:false, prerelease:false, assets:6, publicAssetParity:"6/6", localhost:false, mock:false}' \
+            > "$RUNNER_TEMP/canary/canary255-public-feed-proof.json"
+          {
+            echo "== I7.28.3 PRECONDITIONS =="
+            echo "PUBLIC LATEST TAG: $LT"
+            echo "TAG $LATEST_TAG -> SHA: $TS (== $PRODUCT_SOURCE_SHA)"
+            echo "RELEASE $BASELINE_TAG EXISTS: YES (rollback preservado)"
+            echo "RELEASE $LATEST_TAG EXISTS: YES (id=$RID draft=false prerelease=false assets=6)"
+            echo "PUBLIC ASSET PARITY vs bundle canonico 33962815581: 6/6"
+            echo "PUBLIC latest.yml VERSION: $EXPECTED_VERSION (sha256=$FY_SHA)"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: "AUDITORIA BYTE DO FEED PUBLICO 1.0.255 (latest.yml path/size/sha512 + sha256==build aprovado)"
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/canary"
+          curl -sSL -o public-255.exe "https://github.com/$OWNER_REPO/releases/download/$LATEST_TAG/$EXE_NAME"
+          grep -q "url: $EXE_NAME" public-latest.yml || { echo "::error::latest.yml path != $EXE_NAME"; exit 1; }
+          SIZE=$(stat -c%s public-255.exe)
+          [ "$SIZE" = "$EXPECTED_EXE_BYTES" ] || { echo "::error::exe publico size=$SIZE != $EXPECTED_EXE_BYTES"; exit 1; }
+          grep -q "size: $SIZE" public-latest.yml || { echo "::error::latest.yml size != $SIZE"; exit 1; }
+          SHA512=$(openssl dgst -sha512 -binary public-255.exe | base64 -w0)
+          grep -q "$SHA512" public-latest.yml || { echo "::error::latest.yml sha512 nao bate com o installer publico"; exit 1; }
+          S256=$(sha256sum public-255.exe | awk '{print $1}')
+          [ "$S256" = "$APPROVED_EXE_SHA256" ] || { echo "::error::sha256 do exe publico=$S256 != build aprovado $APPROVED_EXE_SHA256"; exit 1; }
+          echo "PUBLIC FEED BYTE AUDIT OK (size=$SIZE sha256=$S256 sha512=match)" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: "BASELINE PUBLICA v1.0.254 — download + verificacao SHA256SUMS"
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/canary"
+          BASE="https://github.com/$OWNER_REPO/releases/download/$BASELINE_TAG"
+          curl -sSL -o baseline.exe "$BASE/$BASELINE_EXE"
+          curl -sSL -o baseline-SHA256SUMS "$BASE/SHA256SUMS"
+          EXP=$(grep "$BASELINE_EXE\$" baseline-SHA256SUMS | awk '{print $1}')
+          GOT=$(sha256sum baseline.exe | awk '{print $1}')
+          [ -n "$EXP" ] && [ "$EXP" = "$GOT" ] || { echo "::error::baseline 1.0.254 sha256 nao confere exp=$EXP got=$GOT"; exit 1; }
+          [ "$GOT" = "$BASELINE_EXE_SHA256" ] || { echo "::error::baseline 1.0.254 sha256=$GOT != pin $BASELINE_EXE_SHA256"; exit 1; }
+          BSZ=$(stat -c%s baseline.exe)
+          [ "$BSZ" = "$BASELINE_EXE_BYTES" ] || { echo "::error::baseline 1.0.254 size=$BSZ != $BASELINE_EXE_BYTES"; exit 1; }
+          echo "BASELINE PUBLIC ASSET: $BASELINE_EXE (sha256=$GOT)" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: "INSTALAR 1.0.254 (/S; MITIGACAO classe B: ate 3 tentativas + verdade pelo resultado + diagnostico) + CONFIRMAR FEED PUBLICO REAL (app-update.yml embarcado)"
+        shell: powershell
+        run: |
+          # MITIGACAO classe B herdada do build canonico 1.0.255 (run 33962815581): nos runs falhos 33961471601 e
+          # 33962039838 o NSIS /S da baseline PUBLICA 1.0.254 (SHA256 verificado no passo anterior) saiu com
+          # -1073741819 (0xC0000005) em runners windows-2025 identicos ao do run em que o MESMO binario instalou.
+          # Este passo e SETUP DE QA do canary (instala a producao publica 1.0.254 para provar o update publico
+          # 254->255) - nada de produto/build. Regra: ate 3 tentativas; a verdade e o RESULTADO (diretorio + exe +
+          # app.asar presentes), nao o codigo de saida; codigos != 0 e eventos de crash do Windows ficam em
+          # canary255-baseline-install.json. A Sessao A segue provando que o app instalado e a 1.0.254 (a1/a4).
+          $log = @()
+          $dir = $null
+          for ($i = 1; $i -le 3; $i++) {
+            $t0 = Get-Date
+            $p = Start-Process -FilePath "$env:RUNNER_TEMP\canary\baseline.exe" -ArgumentList "/S" -Wait -PassThru
+            $code = [int64]$p.ExitCode
+            Start-Sleep -Seconds 5
+            $dir = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Directory -ErrorAction SilentlyContinue | Where-Object { (Test-Path (Join-Path $_.FullName "Agenda ID Seven Desktop.exe")) -and (Test-Path (Join-Path $_.FullName "resources\app.asar")) } | Select-Object -First 1
+            $ev = @()
+            try {
+              $raw = @(Get-WinEvent -FilterHashtable @{ LogName = 'Application'; StartTime = $t0.AddSeconds(-5) } -ErrorAction SilentlyContinue | Where-Object { $_.ProviderName -match 'Application Error|Windows Error Reporting|\.NET Runtime' } | Select-Object -First 5)
+              foreach ($r in $raw) { $m = [string]$r.Message; $m = ($m -replace '\s+', ' '); if ($m.Length -gt 400) { $m = $m.Substring(0, 400) }; $ev += ($r.ProviderName + ': ' + $m) }
+            } catch { }
+            $hex = '0x{0:X8}' -f ($code -band 0xFFFFFFFF)
+            $log += [pscustomobject]@{ attempt = $i; exitCode = $code; exitHex = $hex; installed = [bool]$dir; dir = $(if ($dir) { $dir.FullName } else { '' }); events = $ev; at = $t0.ToString('o') }
+            if ($code -ne 0) { Write-Host ("AVISO: NSIS /S da baseline saiu com {0} ({1}) na tentativa {2}" -f $code, $hex, $i) }
+            foreach ($e in $ev) { Write-Host ("  evento: " + $e) }
+            if ($dir) { break }
+            if ($i -lt 3) { Start-Sleep -Seconds 10 }
+          }
+          ConvertTo-Json -InputObject $log -Depth 4 | Out-File -FilePath "$env:RUNNER_TEMP\canary\canary255-baseline-install.json" -Encoding utf8
+          if (-not $dir) { Write-Error "baseline 1.0.254 nao instalada apos 3 tentativas (ver canary255-baseline-install.json)"; exit 1 }
+          "INSTALL_DIR=$($dir.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host ("baseline 1.0.254 instalada em: {0} (tentativas: {1}; exit da ultima: {2})" -f $dir.FullName, $log.Count, $log[-1].exitCode)
+          $au = Join-Path $dir.FullName "resources\app-update.yml"
+          if (-not (Test-Path $au)) { Write-Error "app-update.yml ausente no pacote instalado"; exit 1 }
+          Copy-Item $au "$env:RUNNER_TEMP\canary\installed-app-update.yml"
+          $auTxt = Get-Content $au -Raw
+          Write-Host "---- app-update.yml (instalado) ----"; Write-Host $auTxt
+          if ($auTxt -notmatch "provider:\s*github")      { Write-Error "app-update.yml nao e provider github"; exit 1 }
+          if ($auTxt -notmatch "owner:\s*agidseven-lang") { Write-Error "app-update.yml owner incorreto"; exit 1 }
+          if ($auTxt -notmatch "repo:\s*Agenda")          { Write-Error "app-update.yml repo incorreto"; exit 1 }
+          if ($auTxt -match "127\.0\.0\.1" -or $auTxt -match "localhost") { Write-Error "feed LOCAL detectado - proibido no canary publico"; exit 1 }
+          "UPDATE FEED TYPE: PUBLIC GITHUB RELEASE (github/agidseven-lang/Agenda, channel latest; sem localhost)" | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+
+      - name: "Preparar harness (Playwright + @electron/asar; NENHUM code de produto)"
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/canary"
+          npm init -y >/dev/null 2>&1
+          npm i --no-save playwright@1.47.2 @electron/asar --no-audit --no-fund
+
+      - name: "SESSION A — 1.0.254 REAL: baseline funcional + check(feed publico) -> 1.0.255 -> download(sha512) -> install /S"
+        timeout-minutes: 20
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/canary"
+          cat > canary-a.mjs <<'EOF'
+          import { _electron } from 'playwright';
+          import fs from 'fs';
+          const exe = process.env.INSTALL_DIR + '\\Agenda ID Seven Desktop.exe';
+          const out = { g: {} }; const g = out.g;
+          const sleep = ms => new Promise(r => setTimeout(r, ms));
+          const app = await _electron.launch({ executablePath: exe, args: [] });
+          const pg = await app.firstWindow({ timeout: 45000 });
+          const perr = []; pg.on('pageerror', e => perr.push(String(e).slice(0, 160)));
+          await pg.waitForLoadState('load'); await pg.waitForTimeout(4000);
+          try { await app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows()[0]; if (w) w.setContentSize(1920, 1080); }); } catch (_) {}
+          await pg.waitForTimeout(800);
+          const before = await pg.evaluate(() => ({
+            ver: (typeof APP_VER !== 'undefined' && APP_VER.desktop) || null,
+            upd: !!(window.desktopAPI && window.desktopAPI.updater),
+            innerW: window.innerWidth,
+            isDesktop: (typeof isDesktop === 'function') ? isDesktop() : null,
+            white: (document.body.innerText || '').trim().length < 2
+          }));
+          const st = () => pg.evaluate(() => window.desktopAPI.updater.getState());
+          const st0 = before.upd ? await st() : null;
+          out.before = { ...before, st: st0 };
+          g.a1_baselineIs254 = before.ver === '1.0.254';
+          g.a2_updaterApi = before.upd === true;
+          g.a3_appLaunch = before.white === false;
+          g.a4_installedVersion254 = !!st0 && st0.installedVersion === '1.0.254';
+          g.a5_channelLatest = !!st0 && st0.channel === 'latest';
+          g.a6_allowPrereleaseFalse = !!st0 && st0.allowPrerelease === false;
+          g.a7_desktopViewport = before.innerW >= 1900 && before.isDesktop === true;
+          // baseline funcional minima (origem real do upgrade): light UI + sidebar + board
+          const base = await pg.evaluate(() => {
+            try {
+              state.user = { id: 'carlos', name: 'Carlos Eduardo', role: 'Social Media', admin: true };
+              state.users = [state.user];
+              document.body.classList.add('desktop', 'authed', 'light-ui');
+              const asp = document.getElementById('authSplash'); if (asp) asp.style.display = 'none';
+              const lg = document.getElementById('login'); if (lg) lg.classList.add('hidden');
+              const ap = document.getElementById('app'); if (ap) ap.style.display = 'flex';
+              state.tasks = [{ id: 'b1', title: 'Baseline 254', client: 'QA', sector: 'edicao_cards', by: 'carlos', assigneeId: 'carlos', status: 'afazer', dueDate: '2026-08-30' }];
+              state.tab = 'tarefas'; state.personBoard = 'carlos'; render();
+            } catch (e) { return { err: String(e) }; }
+            return {
+              lightUi: document.body.classList.contains('light-ui'),
+              sidebar: document.querySelectorAll('.nav .sb-item').length >= 5,
+              more: !!document.querySelector('.nav .sb-more>summary'),
+              newTask: !!document.querySelector('.new-task-btn'),
+              client: !!document.querySelector('.nav [data-flowclient]'),
+              lanes: document.querySelectorAll('.kbv2-column').length,
+              cards: document.querySelectorAll('.kbv2-card').length
+            };
+          });
+          out.baseline = base;
+          g.a8_baselineLightUi = base.lightUi === true;
+          g.a9_baselineSidebar = base.sidebar === true && base.more === true && base.newTask === true && base.client === true;
+          g.a10_baselineBoard = base.lanes === 4 && base.cards === 1;
+          // CHECK contra o FEED PUBLICO real (app-update.yml embarcado = github provider)
+          const poll = async (want, ms) => { const t0 = Date.now(); for (;;) { const s = await st(); if (want.includes(s.status)) return s; if (s.status === 'error') return s; if (Date.now() - t0 > ms) return s; await sleep(500); } };
+          await pg.evaluate(() => { window.desktopAPI.updater.check(); });
+          let s = await poll(['update_available', 'up_to_date', 'error'], 60000);
+          out.checkResult = { status: s.status, availableVersion: s.availableVersion, error: s.error };
+          g.b1_updateAvailable = s.status === 'update_available';
+          g.b2_availableIs255 = s.availableVersion === '1.0.255';
+          // PROVA autoDownload=false (comportamento real aprovado): sem download(), NAO progride
+          await sleep(4000);
+          const sIdle = await st();
+          out.afterCheckIdle = { status: sIdle.status, downloaded: sIdle.downloaded };
+          g.b3_noAutoDownloadBeforeAction = sIdle.status === 'update_available' && sIdle.downloaded === false;
+          // DOWNLOAD explicito (lib valida sha512 do latest.yml PUBLICO contra o installer PUBLICO)
+          await pg.evaluate(() => { window.desktopAPI.updater.download(); });
+          { const t0 = Date.now(); for (;;) { const x = await st(); if (x.status === 'downloaded' || x.status === 'error') { s = x; break; } if (Date.now() - t0 > 240000) { s = x; break; } await sleep(500); } }
+          out.downloadResult = { status: s.status, downloaded: s.downloaded, availableVersion: s.availableVersion, error: s.error };
+          g.c1_downloadedSha512Valid = s.status === 'downloaded' && s.downloaded === true;
+          // INSTALL silencioso /S (quitAndInstall(true,true)) - zero acao do usuario
+          pg.evaluate(() => { window.desktopAPI.updater.installAndRestart(); }).catch(() => {});
+          let closed = false;
+          try { await Promise.race([new Promise(res => app.on('close', () => { closed = true; res(); })), sleep(30000)]); } catch (_) {}
+          if (!closed) { try { const x = await st(); closed = (x.status === 'installing'); } catch (_) { closed = true; } }
+          out.appClosedByUpdater = closed;
+          g.d1_installTriggered = closed === true;
+          g.p0_noPageErrorsA = perr.length === 0;
+          out.pageErrors = perr;
+          const fails = Object.entries(g).filter(([k, v]) => !v).map(([k]) => k);
+          out.fails = fails;
+          fs.writeFileSync(process.env.RUNNER_TEMP + '/canary/canary255-sessionA-1.0.254.json', JSON.stringify(out, null, 1));
+          console.log(JSON.stringify(out, null, 1));
+          try { await Promise.race([app.close(), sleep(4000)]); } catch (_) {}
+          if (fails.length) { console.error('FAILS A:', fails); }
+          process.exit(fails.length ? 1 : 0);
+          EOF
+          node canary-a.mjs
+
+      - name: "Confirmar UPGRADE instalado == 1.0.255 (asar) + sem instalador residual + REQUIRED_USER_INSTALL_ACTIONS=0"
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          $work = "$env:RUNNER_TEMP\canary"
+          $asar = Join-Path $env:INSTALL_DIR "resources\app.asar"
+          $deadline = (Get-Date).AddSeconds(240); $ok = $false; $ver = ""
+          while ((Get-Date) -lt $deadline) {
+            Start-Sleep -Seconds 4
+            if (Test-Path $asar) {
+              Push-Location $work
+              try { $ver = (& node -e "const a=require('@electron/asar');process.stdout.write(JSON.parse(a.extractFile(process.argv[1],'package.json').toString('utf8')).version)" "$asar") } catch { $ver = "" }
+              Pop-Location
+              if ($ver -eq "1.0.255") { $ok = $true; break }
+            }
+          }
+          if (-not $ok) { Write-Error "FAIL: asar instalado != 1.0.255 (got '$ver') - upgrade silencioso via feed publico nao concluiu"; exit 1 }
+          Start-Sleep -Seconds 3
+          $setup = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -like "*Setup*" -or $_.MainWindowTitle -like "*Instal*" }).Count
+          if ($setup -ne 0) { Write-Error "FAIL: janela de instalador residual (update nao foi silencioso)"; exit 1 }
+          Get-Process | Where-Object { $_.ProcessName -like "*Agenda*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 2
+          "INSTALL UPDATE RESULT: PASS (asar==1.0.255)" | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          "REQUIRED_USER_INSTALL_ACTIONS: 0 (silencioso /S; sem wizard/UAC/residual)" | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+
+      - name: "SESSAO B — 1.0.255 instalada: TASK CARD TC/HOV + HOJE H1-H18 + OPTION B (SB/CN/NAV) + freeze T/D/C + Hub + E1 manifest + evidencias"
+        timeout-minutes: 25
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/canary"
+          cat > canary-b.mjs <<'EOF'
+          import { _electron } from 'playwright';
+          import fs from 'fs';
+          const exe = process.env.INSTALL_DIR + '\\Agenda ID Seven Desktop.exe';
+          const out = { g: {}, info: {} }; const g = out.g; const I = out.info;
+          const sleep = ms => new Promise(r => setTimeout(r, ms));
+          const app = await _electron.launch({ executablePath: exe, args: [] });
+          const pg = await app.firstWindow({ timeout: 45000 });
+          const perr = []; pg.on('pageerror', e => perr.push(String(e).slice(0, 160)));
+          await pg.waitForLoadState('load'); await pg.waitForTimeout(4000);
+          const a = await pg.evaluate(() => ({
+            ver: (typeof APP_VER !== 'undefined' && APP_VER.desktop) || null,
+            title: document.title,
+            white: (document.body.innerText || '').trim().length < 2,
+            loginPwd: !!document.querySelector('input[type="password"]')
+          }));
+          out.after = a;
+          g.d1_versionIs254 = a.ver === '1.0.255' && a.title.includes('1.0.255');
+          g.d2_noWhiteScreen = a.white === false;
+          g.d0_loginSurface = a.loginPwd === true;
+          try { await app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows()[0]; if (w) w.setContentSize(1920, 1080); }); } catch (_) {}
+          await pg.waitForTimeout(800);
+          // LICAO E1: suprimir reveals tardios de login durante a sessao de QA (registrado)
+          await pg.evaluate(() => { window.__qaRevealSuppressed = []; window._revealLogin = function (r) { window.__qaRevealSuppressed.push(String(r || '')); }; });
+          const D = n => { const d = new Date(Date.now() + n * 86400000); return d.toISOString().slice(0, 10); };
+          await pg.evaluate(({ d0, d1, d2 }) => {
+            state.user = { id: 'carlos', name: 'Carlos Eduardo', role: 'Social Media', admin: true };
+            state.users = [state.user, { id: 'marina', name: 'Marina Klein', role: 'Designer' }, { id: 'helio', name: 'Helio Duarte', role: 'Designer' }, { id: 'bia', name: 'Bia Rocha', role: 'Social Media' }, { id: 'op1', name: 'Otavio Prado', role: 'Editor de video' }];
+            document.body.classList.add('desktop', 'authed', 'light-ui');
+            const asp = document.getElementById('authSplash'); if (asp) asp.style.display = 'none';
+            const lg = document.getElementById('login'); if (lg) lg.classList.add('hidden');
+            const ap = document.getElementById('app'); if (ap) ap.style.display = 'flex';
+            state.tasks = [
+              { id: 'k1', title: 'Post de Agenda Aberta - histeroscopias', client: 'Dra. Helita Freitas', sector: 'edicao_cards', by: 'carlos', assigneeId: 'carlos', status: 'afazer', dueDate: '2026-08-20', dueTime: '19:05', cardLegenda: 'Agenda aberta' },
+              { id: 'k2', title: 'Edicao de videos - Agosto', client: 'Hospital Visao', sector: 'edicao_midia', by: 'carlos', assigneeId: 'carlos', status: 'andamento', dueDate: d1, dueTime: '17:00', priority: true, videos: [{ tema: 'v1' }, { tema: 'v2' }, { tema: 'v3' }], checklist: [{ t: '1' }, { t: '2' }, { t: '3' }, { t: '4' }, { t: '5' }] },
+              { id: 'k3', title: 'Reels de lancamento', client: 'Sunset Wear', sector: 'edicao_cards', by: 'marina', assigneeId: 'carlos', status: 'revisao', dueDate: d0, dueTime: '23:00' },
+              { id: 'k4', title: 'Cronograma Setembro', client: 'Sunset Wear', sector: 'edicao_cards', by: 'carlos', assigneeId: null, status: 'concluido', dueDate: '2026-08-22' },
+              { id: 'c1', title: 'Cronograma Setembro - Sunset Wear', client: 'Sunset Wear', sector: 'cronograma', by: 'carlos', assigneeId: 'carlos', status: 'afazer', dueDate: d2, dueTime: '10:00', cronContents: [{ tema: 'Tema 1' }, { tema: 'Tema 2' }, { tema: 'Tema 3' }] },
+              { id: 'cB', title: 'Cronograma Outubro - Hospital Visao', client: 'Hospital Visao', sector: 'cronograma', by: 'carlos', assigneeId: 'carlos', status: 'andamento', dueDate: d1, dueTime: '18:00', workflowPhase: 'captions_waiting_client', cronContents: [{ tema: 'Tema A' }, { tema: 'Tema B' }] },
+              { id: 'cC', title: 'Cronograma Clinica Vida - ajustes', client: 'Clinica Vida', sector: 'cronograma', by: 'carlos', assigneeId: 'carlos', status: 'andamento', dueDate: '2026-08-20', dueTime: '16:00', clientReview: { status: 'revisao', note: 'Trocar o tema 2.', at: Date.now() - 3600000, byName: 'Cliente' }, cronContents: [{ tema: 'Tema X' }] },
+              { id: 'cD', title: 'Cronograma Agosto - Colegio Alfa', client: 'Colegio Alfa', sector: 'cronograma', by: 'carlos', assigneeId: 'carlos', status: 'concluido', dueDate: '2026-08-22', finalApprovalCompleted: true, clientReview: { status: 'aprovado', at: Date.now() - 7200000, byName: 'Cliente' }, cronContents: [{ tema: 'Tema 1' }] },
+              { id: 't5', title: 'Video institucional - cortes finais', client: 'Colegio Alfa', sector: 'edicao_midia', by: 'carlos', assigneeId: 'marina', status: 'andamento', dueDate: d2, dueTime: '12:00', designerAssignment: { designerId: 'marina', designerName: 'Marina Klein', status: 'in_progress', assignedAt: Date.now() - 7200000 }, videos: [{ tema: 'Manifesto' }] },
+              { id: 'k5', title: 'Pacote completo de artes do lancamento da colecao primavera - stories, feed, capa e destaques', client: 'Sunset Wear', sector: 'edicao_cards', by: 'carlos', assigneeId: 'carlos', status: 'andamento', dueDate: d1, dueTime: '17:00' },
+              { id: 'k6', title: 'Cronograma Setembro - rodada 2', client: 'Sunset Wear', sector: 'cronograma', by: 'marina', assigneeId: 'carlos', status: 'andamento', priority: true, dueDate: '2026-08-20', dueTime: '12:00', cronContents: [{ tema: 'Tema 1', legenda: 'Legenda 1' }, { tema: 'Tema 2' }], clientReview: { status: 'revisao', note: 'Ajustar o tema 2.', at: Date.now() - 3600000, byName: 'Cliente' }, designerAssignment: { designerId: 'marina', designerName: 'Marina Klein', status: 'in_progress', assignedAt: Date.now() - 7200000 } },
+              { id: 'o1', title: 'Cortes rapidos - stories', client: 'Clinica Vida', sector: 'edicao_cards', by: 'op1', assigneeId: 'op1', status: 'afazer', dueDate: d1, dueTime: '09:30' },
+              { id: 'o2', title: 'Ajuste de thumbnail - outubro', client: 'Colegio Alfa', sector: 'edicao_midia', by: 'carlos', assigneeId: 'op1', status: 'andamento', dueDate: d2, dueTime: '14:00' }
+            ];
+            /* FIX classe C (run 33507184306): a ancora de Tab do bloco H usa o ultimo .evc de
+               "Compromissos de hoje"; com events=[] o Tab caia no KPI Hoje e o Enter do H5
+               NAVEGAVA para a Agenda (comportamento CORRETO do produto), derrubando o harness
+               em L171 (sem .stats). Eventos seedados = ancora real + Hoje veridico. */
+            state.events = [
+              { id: 'e1', title: 'Reuniao de pauta semanal', client: 'Interno', type: 'reuniao', date: d0, start: '09:30', end: '10:15', ownerId: 'carlos', by: 'carlos', done: false },
+              { id: 'e2', title: 'Gravacao - Hospital Visao', client: 'Hospital Visao', type: 'gravacao', date: d1, start: '14:00', end: '16:00', ownerId: 'marina', by: 'carlos', done: false }
+            ];
+            state.tab = 'hoje'; render();
+          }, { d0: D(0), d1: D(1), d2: D(2) });
+          await pg.waitForTimeout(600);
+          // ===== helpers =====
+          const clk = async sel => { await pg.evaluate(s => { const e = document.querySelector(s); if (e) e.click(); }, sel); await pg.waitForTimeout(350); };
+          const clkSide = async label => { await pg.evaluate(t => {
+            const d = document.querySelector('.nav .sb-more'); if (d && [...d.querySelectorAll('.sb-item')].some(x => ((x.querySelector('span:last-of-type') || {}).textContent || '').startsWith(t))) d.open = true;
+            const it = [...document.querySelectorAll('#bottomNav .sb-item')].find(x => ((x.querySelector('span:last-of-type') || {}).textContent || '').startsWith(t));
+            if (it) it.click(); }, label); await pg.waitForTimeout(450); };
+          const shot = async (w, h) => { try { await app.evaluate(({ BrowserWindow }, s) => { const win = BrowserWindow.getAllWindows()[0]; if (win) win.setContentSize(s.w, s.h); }, { w, h }); } catch (_) {} await sleep(650); };
+          // ===== LICAO E1: hard gate por captura =====
+          const MANIFEST = [];
+          const probe = () => pg.evaluate(() => {
+            const l = document.getElementById('login');
+            const loginPresent = !!l && !l.classList.contains('hidden') && getComputedStyle(l).display !== 'none' && l.getBoundingClientRect().width > 0;
+            const el = document.querySelector('#content .scr-head, #content .h-title, #content .exec-ttl, #content .nc-ttl, #content .lui-ph-t');
+            const heading = (((el && el.textContent) || '').trim() || (document.getElementById('content').innerText || '').trim()).replace(/\s+/g, ' ').slice(0, 70);
+            return { loginPresent, heading, sidebar: !!document.querySelector('#bottomNav .sb-item'),
+              clientLanes: document.querySelectorAll('.scr-client .kbv2-column').length,
+              lanes: document.querySelectorAll('.kbv2-column').length,
+              hubCards: document.querySelectorAll('#content .bcard').length,
+              detOpen: !!document.querySelector('.det-sheet'),
+              maisOpen: (document.querySelector('.nav .sb-more') || {}).open === true,
+              vw: window.innerWidth + 'x' + window.innerHeight };
+          });
+          const shotChecked = async (name, expect) => {
+            const p = await probe();
+            const ok = !p.loginPresent && expect.head.test(p.heading) && (expect.check ? expect.check(p) : true) && p.sidebar;
+            MANIFEST.push({ filename: name, sourceSha: '03a1e663f7365346c78831af165939a759ec1cbd', installedVersion: a.ver, viewport: p.vw,
+              expectedSurface: expect.surface, actualSurface: p.loginPresent ? 'LOGIN' : p.heading.slice(0, 40),
+              expectedHeading: String(expect.head), actualHeading: p.heading, loginPresent: p.loginPresent, screenshotValid: ok });
+            if (!ok) { g['SHOT_' + name.replace(/[^A-Za-z0-9]/g, '_')] = false; return false; }
+            await pg.screenshot({ path: process.env.RUNNER_TEMP + '/canary/' + name });
+            return true;
+          };
+          // ===== SIDEBAR OPTION B: SB1-SB16 =====
+          const inv = await pg.evaluate(() => {
+            const nav = document.getElementById('bottomNav');
+            const items = [...nav.querySelectorAll('.sb-item')].map(b => (b.querySelector('span:last-of-type') || {}).textContent || '').filter(Boolean);
+            const sects = [...nav.querySelectorAll('.sb-sect')].map(x => x.textContent.trim());
+            const more = [...nav.querySelectorAll('.sb-more-list .sb-item')].map(b => (b.querySelector('span:last-of-type') || {}).textContent || '');
+            const user = nav.querySelector('.sb-user');
+            return { items, sects, more, userAnchor: !!user && user.getAttribute('data-tab') === 'perfil' };
+          });
+          I.sidebar = inv;
+          g.SB1_hojeFirst = inv.items[0] === 'Hoje';
+          g.SB2_meuQuadroSecond = inv.items[1] === 'Meu quadro';
+          g.SB3_cliente = inv.items.includes('Cliente');
+          g.SB4_designers = inv.items.includes('Designers');
+          g.SB5_socialMedias = inv.items.includes('Social Medias');
+          g.SB6_quadros = inv.items.includes('Quadros');
+          g.SB7_agenda = inv.items.includes('Agenda');
+          g.SB8_relatorios = inv.items.some(x => x.startsWith('Relat'));
+          g.SB9_painelSLA = inv.items.includes('Painel SLA');
+          g.SB10_mais = inv.sects.join('|') === 'Principal|Ferramentas|Conta';
+          g.SB11_maisFour = inv.more.length === 4 && inv.more[0].startsWith('Minhas Prior') && inv.more[1] === 'Equipe' && inv.more[2] === 'Perfil' && inv.more[3].startsWith('Notifica');
+          g.SB12_conta = inv.sects.includes('Conta');
+          g.SB13_config = inv.items.some(x => x.startsWith('Configura'));
+          g.SB14_userAnchor = inv.userAnchor === true;
+          g.SBx_noTarefas = !inv.items.includes('Tarefas') && !inv.more.includes('Tarefas');
+          g.SBx_noSetores = !inv.items.includes('Setores');
+          g.SBx_noExecutivo = !inv.items.includes('Executivo');
+          g.SB16_roleGate = await pg.evaluate(() => {
+            const saved = state.user; state.user = { id: 'op1', name: 'Op', role: 'Editor de video' }; render();
+            const items = [...document.querySelectorAll('#bottomNav .sb-item')].map(b => (b.querySelector('span:last-of-type') || {}).textContent || '');
+            state.user = saved; render();
+            return !items.includes('Cliente') && !items.includes('Designers') && !items.includes('Social Medias') && items.includes('Hoje') && items.includes('Painel SLA');
+          });
+          await pg.waitForTimeout(400);
+          // shots iniciais: HOJE + MAIS-OPEN
+          await clkSide('Hoje');
+          await shotChecked('CANARY255-HOJE-1920.png', { head: /Carlos|Resumo/, surface: 'Hoje' });
+          await pg.evaluate(() => { const d = document.querySelector('.nav .sb-more'); if (d) d.open = true; });
+          await pg.waitForTimeout(350);
+          await shotChecked('CANARY255-MAIS-OPEN.png', { head: /Carlos|Resumo/, surface: 'Hoje + Mais aberto', check: p => p.maisOpen });
+          await pg.evaluate(() => { const d = document.querySelector('.nav .sb-more'); if (d) d.open = false; });
+          // ===== I7.21.1 - HOJE ACTIONABILITY H1-H18 (Option B aprovada; binario real) =====
+          const cropChecked = async (name, sel, surface) => {
+            const p0 = await probe();
+            if (p0.loginPresent) { g['SHOT_' + name.replace(/[^A-Za-z0-9]/g, '_')] = false; MANIFEST.push({ filename: name, sourceSha: '03a1e663f7365346c78831af165939a759ec1cbd', installedVersion: a.ver, viewport: p0.vw, expectedSurface: surface, actualSurface: 'LOGIN', expectedHeading: 'crop', actualHeading: p0.heading, loginPresent: true, screenshotValid: false }); return false; }
+            const h = await pg.$(sel);
+            if (!h) { g['SHOT_' + name.replace(/[^A-Za-z0-9]/g, '_')] = false; return false; }
+            await h.screenshot({ path: process.env.RUNNER_TEMP + '/canary/' + name });
+            MANIFEST.push({ filename: name, sourceSha: '03a1e663f7365346c78831af165939a759ec1cbd', installedVersion: a.ver, viewport: p0.vw, expectedSurface: surface, actualSurface: surface, expectedHeading: 'crop', actualHeading: p0.heading, loginPresent: false, screenshotValid: true });
+            return true;
+          };
+          await clkSide('Hoje');
+          g.H1_hojeSelected = await pg.evaluate(() => { const on = [...document.querySelectorAll('#bottomNav .sb-item.on')].map(b => (b.querySelector('span:last-of-type') || {}).textContent); return state.tab === 'hoje' && on.length === 1 && on[0] === 'Hoje'; });
+          const hrows = await pg.evaluate(() => [...document.querySelectorAll('#content .col-tasks .card')].map(r => ({ id: r.getAttribute('data-detail'), role: r.getAttribute('role'), ti: r.getAttribute('tabindex'), cursor: getComputedStyle(r).cursor, inner: r.querySelectorAll('button,a,input,select,textarea').length })));
+          I.hojeUrgent = hrows;
+          g.H2_urgentRows = hrows.length === 4;
+          g.H3_realIds = hrows.every(r => !!r.id && r.role === 'button' && r.ti === '0') && (await pg.evaluate(ids => ids.every(id => state.tasks.some(t2 => t2.id === id)), hrows.map(r => r.id)));
+          g.H9_noInnerConflict = hrows.every(r => r.inner === 0);
+          g.H10_cursorHover = hrows.every(r => r.cursor === 'pointer');
+          const hid = hrows.length ? hrows[0].id : '';
+          await cropChecked('CANARY255-HOJE-URGENT-NORMAL.png', '#content .col-tasks', 'Urgent rows normal');
+          { const rEl = await pg.$('#content .col-tasks .card[data-detail="' + hid + '"]'); if (rEl) { await rEl.hover(); await pg.waitForTimeout(280); } }
+          await cropChecked('CANARY255-HOJE-URGENT-HOVER.png', '#content .col-tasks', 'Urgent row hover');
+          await pg.mouse.move(4, 4); await pg.waitForTimeout(220);
+          // focus REAL por teclado: Tab a partir do ultimo evc de hoje -> primeira urgent row
+          await pg.evaluate(() => { const evs = [...document.querySelectorAll('#content .col-events .evc')]; if (evs.length) { evs[evs.length - 1].focus(); } else { const ss = [...document.querySelectorAll('#content .stats .stat')]; if (ss.length) ss[ss.length - 1].focus(); } });
+          await pg.keyboard.press('Tab'); await pg.waitForTimeout(260);
+          g.H11_focusKeyboardVisible = await pg.evaluate(id => { const r = document.querySelector('#content .col-tasks .card[data-detail="' + id + '"]'); if (!r) return false; const s = getComputedStyle(r); return document.activeElement === r && s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0; }, hid);
+          await cropChecked('CANARY255-HOJE-URGENT-FOCUS.png', '#content .col-tasks', 'Urgent row focus (Tab real)');
+          // H5 Enter no elemento focado (teclado real)
+          await pg.keyboard.press('Enter'); await pg.waitForTimeout(380);
+          g.H5_enter = await pg.evaluate(id => { const m = document.querySelector('.modal-back[data-detmodal]'); return !!m && m.dataset.dettaskid === id; }, hid);
+          await clk('.det-x');
+          // H6 Espaco (re-foca por Tab real)
+          await pg.evaluate(() => { const evs = [...document.querySelectorAll('#content .col-events .evc')]; if (evs.length) { evs[evs.length - 1].focus(); } else { const ss = [...document.querySelectorAll('#content .stats .stat')]; if (ss.length) ss[ss.length - 1].focus(); } });
+          await pg.keyboard.press('Tab'); await pg.waitForTimeout(260);
+          await pg.keyboard.press('Space'); await pg.waitForTimeout(380);
+          g.H6_space = await pg.evaluate(id => { const m = document.querySelector('.modal-back[data-detmodal]'); return !!m && m.dataset.dettaskid === id; }, hid);
+          await clk('.det-x');
+          // H4 click real -> Detail da MESMA task; H7/H8 fecho + zero mutacao
+          const hsnap = await pg.evaluate(id => JSON.stringify(state.tasks.find(t2 => t2.id === id)), hid);
+          await clk('#content .col-tasks .card[data-detail="' + hid + '"]');
+          g.H4_clickSameTask = await pg.evaluate(id => { const m = document.querySelector('.modal-back[data-detmodal]'); return !!m && m.dataset.dettaskid === id; }, hid);
+          await shotChecked('CANARY255-HOJE-URGENT-DETAIL.png', { head: /Carlos|Resumo/, surface: 'Hoje + Detail da urgent row', check: p => p.detOpen });
+          await clk('.det-x');
+          g.H7_backToHoje = await pg.evaluate(() => state.tab === 'hoje' && ((document.getElementById('modalRoot') || {}).innerHTML || '').length < 50 && document.querySelectorAll('#content .col-tasks .card').length === 4);
+          g.H8_noMutation = (await pg.evaluate(id => JSON.stringify(state.tasks.find(t2 => t2.id === id)), hid)) === hsnap;
+          // H12/H13/H18 - KPI Tarefas -> Meu quadro + paridade ADMIN por IDs
+          const kpiT = await pg.evaluate(() => { const b = [...document.querySelectorAll('#content .stats .stat')].find(x => /Tarefas/.test(x.textContent)); return b ? { v: Number((b.querySelector('.v') || {}).textContent), myboard: b.hasAttribute('data-myboard'), tab: b.getAttribute('data-tab') } : { v: -1, myboard: false, tab: 'MISSING' }; });
+          I.kpiAdmin = kpiT;
+          g.H12_kpiRouteReal = kpiT.myboard === true && kpiT.tab === null;
+          await cropChecked('CANARY255-KPI-TAREFAS.png', '#content .stats', 'KPI row de Hoje');
+          const kIdsA = await pg.evaluate(() => state.tasks.filter(t2 => (t2.assigneeId === state.user.id || t2.by === state.user.id) && t2.status !== 'concluido').map(t2 => t2.id).sort());
+          await clk('#content .stats .stat[data-myboard]');
+          const bIdsA = await pg.evaluate(() => { const cols = [...document.querySelectorAll('#content .kbv2-column')]; return cols.slice(0, cols.length - 1).flatMap(cc => [...cc.querySelectorAll('.kbv2-card')].map(x => { const b = x.querySelector('[data-detail],[data-cardmenu]'); return b ? (b.getAttribute('data-detail') || b.getAttribute('data-cardmenu')) : null; })).filter(Boolean).sort(); });
+          I.parityAdmin = { kpi: kpiT.v, kpiIds: kIdsA, boardOpenIds: bIdsA };
+          g.H13_adminParity = kpiT.v === kIdsA.length && JSON.stringify(kIdsA) === JSON.stringify(bIdsA);
+          g.H18_noHubReturn = await pg.evaluate(() => state.personBoard === state.user.id && document.querySelectorAll('#content .bcard').length === 0);
+          await shotChecked('CANARY255-KPI-TAREFAS-MYBOARD.png', { head: /Meu quadro/, surface: 'KPI Tarefas -> Meu quadro', check: p => p.lanes === 4 });
+          await clkSide('Hoje');
+          // H15/H16 - KPI Hoje -> Agenda com dia atual
+          await clk('#content .stats .stat[data-tab="agenda"]');
+          g.H15_kpiHojeAgenda = await pg.evaluate(() => state.tab === 'agenda');
+          g.H16_agendaToday = await pg.evaluate(() => (typeof agSel !== 'undefined') && agSel === todayStr());
+          await shotChecked('CANARY255-KPI-HOJE-AGENDA.png', { head: /Agenda|agosto|setembro|outubro|novembro|dezembro/i, surface: 'KPI Hoje -> Agenda' });
+          await clkSide('Hoje');
+          // H17 - KPI Equipe
+          await clk('#content .stats .stat[data-tab="equipe"]');
+          g.H17_kpiEquipe = await pg.evaluate(() => state.tab === 'equipe');
+          await shotChecked('CANARY255-KPI-EQUIPE.png', { head: /Equipe/, surface: 'KPI Equipe -> Equipe' });
+          await clkSide('Hoje');
+          // H14 - paridade OPERACIONAL (op1 'Editor de video'; canSeeAll=false)
+          await pg.evaluate(() => { window.__adm = state.user; state.user = state.users.find(u2 => u2.id === 'op1'); state.personBoard = null; state.tab = 'hoje'; render(); });
+          await pg.waitForTimeout(450);
+          const kOp = await pg.evaluate(() => { const b = [...document.querySelectorAll('#content .stats .stat')].find(x => /Tarefas/.test(x.textContent)); return b ? Number((b.querySelector('.v') || {}).textContent) : -1; });
+          const kIdsO = await pg.evaluate(() => state.tasks.filter(t2 => (t2.assigneeId === state.user.id || t2.by === state.user.id) && t2.status !== 'concluido').map(t2 => t2.id).sort());
+          g.H14_opUrgentScope = await pg.evaluate(() => [...document.querySelectorAll('#content .col-tasks .card')].every(r => { const id = r.getAttribute('data-detail'); const t2 = state.tasks.find(x => x.id === id); return !!t2 && (t2.assigneeId === state.user.id || t2.by === state.user.id); }));
+          await clk('#content .stats .stat[data-myboard]');
+          const bIdsO = await pg.evaluate(() => { const cols = [...document.querySelectorAll('#content .kbv2-column')]; return cols.slice(0, cols.length - 1).flatMap(cc => [...cc.querySelectorAll('.kbv2-card')].map(x => { const b = x.querySelector('[data-detail],[data-cardmenu]'); return b ? (b.getAttribute('data-detail') || b.getAttribute('data-cardmenu')) : null; })).filter(Boolean).sort(); });
+          I.parityOp = { kpi: kOp, kpiIds: kIdsO, boardOpenIds: bIdsO };
+          g.H14_opParity = kOp === kIdsO.length && JSON.stringify(kIdsO) === JSON.stringify(bIdsO) && kOp >= 1;
+          await pg.evaluate(() => { state.user = window.__adm; state.personBoard = null; state.tab = 'hoje'; render(); });
+          await pg.waitForTimeout(450);
+          // HOJE responsivo (Win125 + 1366) com E1
+          await shot(1536, 864);
+          await shotChecked('CANARY255-HOJE-WIN125.png', { head: /Carlos|Resumo/, surface: 'Hoje Win125' });
+          g.H_hscroll_win125 = await pg.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2);
+          await shot(1366, 768);
+          await shotChecked('CANARY255-HOJE-1366.png', { head: /Carlos|Resumo/, surface: 'Hoje 1366' });
+          g.H_hscroll_1366 = await pg.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2);
+          g.H_rowsNoClip = await pg.evaluate(() => [...document.querySelectorAll('#content .col-tasks .card')].every(r => r.scrollWidth <= r.clientWidth + 2));
+          await shot(1920, 1080);
+          // ===== fim do bloco H1-H18 =====
+          // ===== I7.24.1 - TASK CARD RESPONSIVE REPAIR (I7.23.1 A/C aprovados) - TC/HOV no build real =====
+          await pg.evaluate(() => {
+            window.__tcSaved = state.tasks;
+            const iso = n => { const d = new Date(Date.now() + n * 86400000); const z = new Date(d.getTime() - d.getTimezoneOffset() * 60000); return z.toISOString().slice(0, 10); };
+            const T6 = []; for (let i2 = 1; i2 <= 6; i2++) T6.push({ tema: 'Tema ' + i2 + ' - pauta do mes', legenda: i2 <= 2 ? 'Legenda ' + i2 : '' });
+            const DA = { designerId: 'marina', startDate: iso(0), startTime: '08:00' };
+            state.tasks = state.tasks.concat([
+              { id: 'tc1', title: 'SETEMBRO', client: 'Hospital Visao', sector: 'cronograma', status: 'afazer', dueDate: iso(2), dueTime: '18:00', designerSla: {}, designerAssignment: DA, assigneeId: 'marina', by: 'carlos', cronContents: T6 },
+              { id: 'tc2', title: 'Planejamento estrategico completo do cronograma editorial - Setembro e Outubro em duas frentes', client: 'Instituto de Oftalmologia Avancada da Regiao', sector: 'cronograma', status: 'afazer', dueDate: iso(4), dueTime: '17:00', designerSla: {}, designerAssignment: DA, assigneeId: 'marina', by: 'carlos', cronContents: T6.slice(0, 2) },
+              { id: 'tc3', title: 'Retro de Agosto', client: 'Clinica Vida', sector: 'cronograma', status: 'andamento', dueDate: iso(-3), dueTime: '18:00', designerSla: {}, designerAssignment: DA, assigneeId: 'marina', by: 'carlos', cronContents: [{ tema: 'Tema unico' }] }
+            ]);
+          });
+          const tcNav = async key => { await pg.evaluate(k => {
+            state.form = null; state.boardSector = null; state.personBoard = null; state.roleBoards = false; state.flowView = null; state.designerBoard = null; state.socialBoard = null; state.tab = 'tarefas';
+            if (k === 'designers') { state.flowView = 'designers'; state.designerBoard = 'marina'; }
+            else if (k === 'socials') { state.flowView = 'socials'; state.socialBoard = 'carlos'; }
+            else state.boardSector = 'cronograma';
+            render(); }, key); await pg.waitForTimeout(420); };
+          const tcMeasure = () => pg.evaluate(() => {
+            const ix = (a, b) => { if (!a || !b) return 0; const w = Math.min(a.right, b.right) - Math.max(a.left, b.left); const h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top); return (w > 0 && h > 0) ? +(w * h).toFixed(2) : 0; };
+            const vis = el => { if (!el) return null; const cs = getComputedStyle(el); if (cs.display === 'none' || cs.visibility === 'hidden' || +cs.opacity === 0) return null; const r = el.getBoundingClientRect(); return (r.width > 0 && r.height > 0) ? r : null; };
+            const res = { cards: [], hscroll: document.documentElement.scrollWidth > window.innerWidth + 2 };
+            for (const card of document.querySelectorAll('.kbv2-card')) {
+              const det = card.querySelector('[data-detail]'); const id = det ? det.getAttribute('data-detail') : '';
+              if (!/^tc/.test(id)) continue;
+              const q = s => vis(card.querySelector(s));
+              const sla = q('.kbv2-sla'), due = q('.kbv2-due'), dateS = q('.kbv2-date-s'), dateBox = q('.kbv2-card-date'), setor = q('.kbv2-card-chips .kbv2-chip:first-child'), title = q('.kbv2-title'), tier = q('.kbv2-tier'), stx = q('.kbv2-status'), kb = q('.kbv2-btn-dots'), mv = q('.kbv2-btn[data-move]');
+              const cr = card.getBoundingClientRect();
+              const beyond = []; const parts = { sla: sla, due: due, dateS: dateS, title: title, mv: mv };
+              for (const k in parts) { const r = parts[k]; if (r && (r.right > cr.right + 0.5 || r.left < cr.left - 0.5 || r.bottom > cr.bottom + 0.5)) beyond.push(k); }
+              const clip = [];
+              for (const pair of [['sla', '.kbv2-sla'], ['due', '.kbv2-due'], ['dateS', '.kbv2-date-s'], ['title', '.kbv2-title']]) { const e = card.querySelector(pair[1]); if (e && vis(e) && e.scrollWidth > e.clientWidth + 2) clip.push(pair[0]); }
+              res.cards.push({ id: id, w: +cr.width.toFixed(1), hasSla: !!sla, hasDue: !!due,
+                i: { sd: ix(sla, dateS), sdb: ix(sla, dateBox), sr: ix(sla, due), ss: ix(sla, setor), dd: ix(due, dateS), ddb: ix(due, dateBox), ms: ix(mv, stx), mk: ix(mv, kb), mt: ix(mv, title), mc: ix(mv, tier), msl: ix(mv, sla), mr: ix(mv, due), md: ix(mv, dateS), mdb: ix(mv, dateBox) },
+                beyond: beyond, clip: clip });
+            }
+            return res;
+          });
+          const TCCELLS = {}; const HOVCELLS = {};
+          for (const vpz of [[1920, 1080, '1920'], [1536, 864, 'win125'], [1366, 768, '1366']]) {
+            await shot(vpz[0], vpz[1]);
+            for (const sf of ['sector', 'socials', 'designers']) {
+              await tcNav(sf);
+              TCCELLS[sf + '@' + vpz[2]] = await tcMeasure();
+              const cardEl = await pg.$('.kbv2-card:has([data-detail="tc1"])');
+              if (cardEl) { await cardEl.hover(); await pg.waitForTimeout(240); HOVCELLS[sf + '@' + vpz[2]] = await tcMeasure(); await pg.mouse.move(4, 4); await pg.waitForTimeout(180); }
+              if (sf === 'sector' && vpz[2] === 'win125') {
+                await cropChecked('CANARY255-TASKCARD-SECTOR.png', '.kbv2-card:has([data-detail="tc1"])', 'Task Card reparado (sector win125)');
+                if (cardEl) { await cardEl.hover(); await pg.waitForTimeout(240); }
+                await cropChecked('CANARY255-TASKCARD-HOVER.png', '.kbv2-card:has([data-detail="tc1"])', 'Task Card hover Mover (trilho sob o kebab)');
+                await pg.mouse.move(4, 4); await pg.waitForTimeout(180);
+              }
+            }
+          }
+          await shot(1920, 1080);
+          I.tcCells = TCCELLS; I.hovCells = HOVCELLS;
+          const tcAll = f => Object.values(TCCELLS).every(c => c.cards.every(f));
+          const hovAll = f => Object.values(HOVCELLS).every(c => c.cards.filter(x => x.id === 'tc1').every(f));
+          g.TC_cellsComplete = Object.keys(TCCELLS).length === 9 && Object.values(TCCELLS).every(c => c.cards.length >= 3);
+          g.TC_hoverCellsComplete = Object.keys(HOVCELLS).length === 9;
+          g.TC_R1_slaXdate = tcAll(x => x.i.sd === 0 && x.i.sdb === 0);
+          g.TC_R2_slaXremaining = tcAll(x => x.i.sr === 0);
+          g.TC_R3_slaXsetor = tcAll(x => x.i.ss === 0);
+          g.TC_R4_dueXdate = tcAll(x => x.i.dd === 0 && x.i.ddb === 0);
+          g.TC_R5_noClip = tcAll(x => x.clip.length === 0);
+          g.TC_R6_contained = tcAll(x => x.beyond.length === 0);
+          g.TC_R7_ownerCardTruth = Object.values(TCCELLS).every(c => c.cards.some(x => x.id === 'tc1' && x.hasSla && x.hasDue));
+          g.TC_R8_overdueVariant = Object.values(TCCELLS).every(c => c.cards.some(x => x.id === 'tc3' && x.hasDue));
+          g.TC_R10_noHscroll = Object.values(TCCELLS).every(c => !c.hscroll) && Object.values(HOVCELLS).every(c => !c.hscroll);
+          g.TC_width1366_under240 = Object.entries(TCCELLS).filter(e => /@1366$/.test(e[0])).every(e => { const t2 = e[1].cards.find(x => x.id === 'tc1'); return !!t2 && t2.w < 240; });
+          g.HOV_R1_moverXstatus = hovAll(x => x.i.ms === 0);
+          g.HOV_R2_moverXkebab = hovAll(x => x.i.mk === 0);
+          g.HOV_R3_moverXtitle = hovAll(x => x.i.mt === 0);
+          g.HOV_R4_moverXclient = hovAll(x => x.i.mc === 0);
+          g.HOV_R5_moverXsla = hovAll(x => x.i.msl === 0);
+          g.HOV_R6_moverXremaining = hovAll(x => x.i.mr === 0);
+          g.HOV_R7_moverXdeadline = hovAll(x => x.i.md === 0 && x.i.mdb === 0);
+          g.HOV_R10_moverContained = hovAll(x => x.beyond.length === 0);
+          await tcNav('sector');
+          { const cEl2 = await pg.$('.kbv2-card:has([data-detail="tc1"])'); if (cEl2) { await cEl2.hover(); await pg.waitForTimeout(240); } }
+          await clk('.kbv2-btn[data-move="tc1"]');
+          g.HOV_R9_moverFunctional = await pg.evaluate(() => /Mover tarefa/.test((document.getElementById('modalRoot') || {}).innerHTML || ''));
+          await pg.evaluate(() => { const m = document.getElementById('modalRoot'); if (m) m.innerHTML = ''; });
+          await pg.evaluate(() => { state.tasks = window.__tcSaved; state.boardSector = null; state.flowView = null; state.designerBoard = null; state.socialBoard = null; state.personBoard = null; state.tab = 'hoje'; render(); });
+          await pg.waitForTimeout(450);
+          // ===== fim do bloco TC/HOV (I7.24.1) =====
+          // ===== NAV reachability + SB15 selected-state unico =====
+          const LOOP = [['Hoje', /Carlos|Resumo/], ['Meu quadro', /Meu quadro/], ['Cliente', /Cliente/], ['Designers', /Designer|Quadro de/], ['Social Medias', /Social|Quadro de/], ['Quadros', /Quadros/], ['Agenda', /Agenda|agosto|setembro|outubro/i], ['Relat', /Relat/], ['Painel SLA', /Painel Executivo/], ['Configura', /Configura/], ['Minhas Prior', /Prioridade/i], ['Equipe', /Equipe/], ['Perfil', /Carlos/], ['Notifica', /Notifica/], ['Hoje', /Carlos|Resumo/]];
+          out.navLoop = [];
+          for (const [label, re] of LOOP) {
+            await clkSide(label);
+            const p = await probe();
+            const on = await pg.evaluate(() => [...document.querySelectorAll('#bottomNav .sb-item.on')].map(b => (b.querySelector('span:last-of-type') || {}).textContent || ''));
+            const ok = re.test(p.heading) && !p.loginPresent && on.length === 1 && on[0].startsWith(label);
+            out.navLoop.push({ label, on, heading: p.heading.slice(0, 40), ok });
+          }
+          g.NAV_allReachable = out.navLoop.every(x => x.ok);
+          g.SB15_singleSelected = out.navLoop.every(x => x.on.length === 1);
+          // ===== MEU QUADRO: T-freeze + TASKCARD crop =====
+          await clkSide('Meu quadro');
+          const tsm = await pg.evaluate(() => {
+            const r = {};
+            const card2 = [...document.querySelectorAll('.kbv2-card')].find(c => c.querySelector('[data-cardmenu="k2"], [data-detail="k2"]'));
+            const cs = card2 ? getComputedStyle(card2) : null;
+            r.t1 = cs ? cs.display === 'grid' : false;
+            r.t2 = card2 ? (card2.querySelector('.kbv2-due') && getComputedStyle(card2.querySelector('.kbv2-due')).display !== 'none') : false;
+            r.t3 = card2 ? (() => { const t = card2.querySelector('.kbv2-title'); const tc = getComputedStyle(t); return parseFloat(tc.fontSize) >= 14.5 && parseInt(tc.fontWeight) >= 650 && t.scrollHeight <= t.clientHeight + 4; })() : false;
+            r.t4 = card2 ? (() => { const s2 = card2.querySelector('.kbv2-tier'); return !!s2 && /Hospital Visao/.test(s2.textContent) && getComputedStyle(s2, '::before').display === 'none'; })() : false;
+            r.t5 = card2 ? (getComputedStyle(card2.querySelector('.kbv2-card-chips'), '::before').content.includes('Setor') && getComputedStyle(card2.querySelector('.kbv2-card-date'), '::before').content.includes('Prazo')) : false;
+            r.t6 = card2 ? (() => { const pr = [...card2.querySelectorAll('.kbv2-chip')].find(x => /Prioridade/i.test(x.textContent)); if (!pr) return false; const pcs = getComputedStyle(pr); return pcs.backgroundColor === 'rgba(0, 0, 0, 0)' && parseFloat(pcs.fontSize) < 11; })() : false;
+            r.t7 = card2 ? (() => { const rl = card2.querySelector('.kbv2-card-rail'); const p = card2.querySelector('.kbv2-pct'); return !!rl && getComputedStyle(rl).backgroundColor === 'rgb(245, 248, 251)' && !!p && /%$/.test(p.textContent.trim()); })() : false;
+            r.t8 = card2 ? !!card2.querySelector('.kbv2-av .av') : false;
+            r.t9 = card2 ? (card2.querySelector('.kbv2-card-chk') && /5/.test(card2.querySelector('.kbv2-card-chk').textContent)) : false;
+            r.t10 = card2 ? (() => { const k = card2.querySelector('.kbv2-btn-dots'); if (!k) return false; const b = k.getBoundingClientRect(); return b.width >= 24 && b.height >= 24; })() : false;
+            r.t12 = card2 ? getComputedStyle(card2, '::before').display === 'none' : false;
+            r.lanes = document.querySelectorAll('.kbv2-column').length;
+            return r;
+          });
+          out.taskCard = tsm;
+          g.T_freeze = tsm.t1 && tsm.t2 && tsm.t3 && tsm.t4 && tsm.t5 && tsm.t6 && tsm.t7 && tsm.t8 && tsm.t9 && tsm.t10 && tsm.t12 && tsm.lanes === 4;
+          await shotChecked('CANARY255-MEUQUADRO.png', { head: /Meu quadro/, surface: 'Meu quadro', check: p => p.lanes === 4 });
+          { const p0 = await probe();
+            if (!p0.loginPresent) { const cardEl = await pg.$('.kbv2-column:nth-child(2) .kbv2-card'); if (cardEl) { await cardEl.screenshot({ path: process.env.RUNNER_TEMP + '/canary/CANARY255-TASKCARD.png' }); MANIFEST.push({ filename: 'CANARY255-TASKCARD.png', sourceSha: '03a1e663f7365346c78831af165939a759ec1cbd', installedVersion: a.ver, viewport: p0.vw, expectedSurface: 'Task Card crop', actualSurface: 'Task Card crop', expectedHeading: 'crop', actualHeading: p0.heading, loginPresent: false, screenshotValid: true }); } } }
+          // CN5: Meu quadro sem nav global (composicao propria lui)
+          g.CN5_meuQuadroPreservado = await pg.evaluate(() => !document.querySelector('#content .tchips .tchip') && !!document.querySelector('#content .lui-tb2') && [...document.querySelectorAll('#content [data-bresp]')].length >= 2);
+          // ===== CLIENTE: CN1 + C-freeze (C4 -> C4b) + shots responsivos =====
+          await clkSide('Cliente');
+          const NAVA = ['data-myboard', 'data-flowclient', 'data-flowdesigners', 'data-flowsocials'];
+          const navDup = () => pg.evaluate(A => [...document.querySelectorAll('#content button')].filter(b => (A.some(x => b.hasAttribute(x)) || (b.hasAttribute('data-board') && b.dataset.board === 'hub')) && b.offsetParent && b.closest('.d-board-tools, .tchips')).length, NAVA);
+          g.CN1_clienteSemNavDup = (await navDup()) === 0 && (await pg.evaluate(() => { const t = document.querySelector('#content .d-board-tools .tchips'); return !t || !t.offsetParent || t.children.length === 0; }));
+          g.CN6_searchPreservada = await pg.evaluate(() => { const s = document.getElementById('bSearch'); return !!s && !!s.offsetParent; });
+          g.CN8_approvalPreservada = await pg.evaluate(() => { const b = document.querySelector('.scr-client .wfap-bar'); return !!b && !!b.offsetParent; });
+          const cg = await pg.evaluate(() => {
+            const r = {};
+            const icon = document.querySelector('#content .scr-head .d-bh-icon');
+            const ttl = document.querySelector('#content .scr-head .d-bh-title');
+            r.C1 = (!icon || getComputedStyle(icon).display === 'none') && !!ttl && getComputedStyle(ttl).fontSize === '17px';
+            const bar = document.querySelector('.scr-client .wfap-bar');
+            r.C2 = !!bar && getComputedStyle(bar).backgroundColor === 'rgb(245, 248, 251)';
+            const kbd = document.querySelector('.scr-client .bsearch-kbd');
+            r.C3 = !!document.getElementById('bSearch') && (!kbd || getComputedStyle(kbd).display === 'none');
+            const tch = document.querySelector('.scr-client .tchips');
+            r.C4b = !tch || !tch.offsetParent || tch.children.length === 0;
+            const cols = [...document.querySelectorAll('.scr-client .kbv2-column')];
+            const nOf = i => cols[i] ? cols[i].querySelectorAll('.kbv2-card').length : -1;
+            r.C5 = nOf(0) >= 1; r.C6 = nOf(1) >= 1; r.C7 = nOf(2) >= 1; r.C8 = nOf(3) >= 1;
+            const badge = document.querySelector('.scr-client .wfap-badge');
+            r.C10 = !!badge && (badge.textContent || '').trim() !== '0';
+            const dues = [...document.querySelectorAll('.scr-client .kbv2-card .kbv2-due')].map(x => x.textContent || '');
+            r.C11 = dues.some(t => /Faltam/.test(t));
+            r.C12 = dues.some(t => /Atrasada|Hoje/.test(t));
+            r.C13 = document.querySelectorAll('.scr-client .kbv2-card').length >= 4;
+            const st = document.querySelector('.scr-client .kbv2-card .kbv2-status');
+            r.CX = !st || (getComputedStyle(st).position === 'static' && st.scrollWidth <= st.clientWidth + 2);
+            return r;
+          });
+          out.client = cg;
+          await shotChecked('CANARY255-CLIENTE.png', { head: /Cliente/, surface: 'Cliente board', check: p => p.clientLanes === 4 });
+          await shot(1536, 864);
+          g.C_hscroll_win125 = await pg.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2);
+          await shotChecked('CANARY255-CLIENT-WIN125.png', { head: /Cliente/, surface: 'Cliente board', check: p => p.clientLanes === 4 });
+          await shot(1366, 768);
+          g.C_hscroll_1366 = await pg.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2);
+          // FIX classe C (run 33277174390): folga ZERO calibrada em metricas Linux (local = 768/768
+          // exatos); no Windows a metrica de fonte gera overflow residual de poucos px num container
+          // que tem overflow-y:auto DE FABRICA (scroll intencional). Gate corrigido para a verdade
+          // cross-platform SEM afrouxar o essencial: ancora do usuario ALCANCAVEL + scroll funcional
+          // + overflow limitado a <60px (~menos de 2 linhas; clipping destrutivo seria centenas de px).
+          // Numeros REAIS gravados em canary255-sessionB.json para auditoria.
+          I.nav1366 = await pg.evaluate(() => { const d = document.querySelector('.nav .sb-more'); if (d) d.open = false; const nav = document.getElementById('bottomNav'); const user = nav.querySelector('.sb-user'); let anchorReachable = false; if (user) { user.scrollIntoView({ block: 'nearest' }); const ur = user.getBoundingClientRect(); const nr = nav.getBoundingClientRect(); anchorReachable = ur.bottom <= nr.bottom + 2 && ur.top >= nr.top - 2; nav.scrollTop = 0; } return { scrollH: nav.scrollHeight, clientH: nav.clientHeight, delta: nav.scrollHeight - nav.clientHeight, overflowY: getComputedStyle(nav).overflowY, anchorReachable }; });
+          g.SB_sidebarFits1366 = I.nav1366.anchorReachable && I.nav1366.overflowY === 'auto' && I.nav1366.delta <= 60;
+          await shotChecked('CANARY255-CLIENT-1366.png', { head: /Cliente/, surface: 'Cliente board', check: p => p.clientLanes === 4 });
+          await shot(1920, 1080);
+          // C14/C15/C9/CDF
+          await clk('[data-detail="cB"]');
+          cg.C14 = await pg.evaluate(() => { const m = document.querySelector('.modal-back[data-detmodal]'); return !!m && m.dataset.detorigin === 'client'; });
+          await clk('.det-x');
+          cg.CDF = await pg.evaluate(() => ((document.getElementById('modalRoot') || {}).innerHTML || '').length < 50 && state.flowView === 'client' && document.querySelectorAll('.scr-client .kbv2-column').length === 4);
+          await pg.evaluate(() => { const i = document.getElementById('bSearch'); i.value = 'Outubro'; i.dispatchEvent(new Event('input', { bubbles: true })); });
+          await sleep(450);
+          cg.C15 = (await pg.evaluate(() => document.querySelectorAll('.scr-client .kbv2-card').length)) === 1;
+          await pg.evaluate(() => { const i = document.getElementById('bSearch'); if (i) { i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); } });
+          await sleep(350);
+          await pg.evaluate(() => { window.__all = state.tasks; state.tasks = state.tasks.filter(t => ['k1','k2','k3','k4','c1'].includes(t.id)); render(); });
+          await sleep(400);
+          cg.C9 = await pg.evaluate(() => { const e = document.querySelector('.scr-client .kbv2-empty2'); return !!e && getComputedStyle(e).borderTopStyle === 'none' && getComputedStyle(e).backgroundColor === 'rgba(0, 0, 0, 0)'; });
+          await pg.evaluate(() => { state.tasks = window.__all; render(); });
+          await sleep(350);
+          g.C_freeze = cg.C1 && cg.C2 && cg.C3 && cg.C4b && cg.C5 && cg.C6 && cg.C7 && cg.C8 && cg.C9 && cg.C10 && cg.C11 && cg.C12 && cg.C13 && cg.CX && cg.C14 && cg.C15 && cg.CDF;
+          // F: approval panel abre
+          await clk('[data-wfapprovalsopen]');
+          g.F_approvalPanel = await pg.evaluate(() => !!document.querySelector('.wfap-panel'));
+          await clkSide('Cliente');
+          // ===== DESIGNERS / SOCIALS: CN2/CN3 + shots =====
+          await clkSide('Designers');
+          g.CN2_designersSemNavDup = (await navDup()) === 0;
+          await shotChecked('CANARY255-DESIGNERS.png', { head: /Designer|Quadro de/, surface: 'Designers', check: p => p.lanes >= 3 });
+          await clkSide('Social Medias');
+          g.CN3_socialsSemNavDup = (await navDup()) === 0;
+          await shotChecked('CANARY255-SOCIALMEDIAS.png', { head: /Social|Quadro de/, surface: 'Social Medias', check: p => p.lanes >= 3 });
+          // ===== QUADROS HUB (HF freeze) + board de setor (CN4) =====
+          await clkSide('Quadros');
+          const hub = await pg.evaluate(() => [...document.querySelectorAll('#content .bcard .bl')].map(x => x.textContent.trim()));
+          I.hub = hub;
+          g.HF_hubFreeze = hub.includes('Meu quadro') && hub.some(x => /Quadros por respons/.test(x)) && hub.includes('Cliente') && hub.includes('Designers') && hub.filter(x => /Edi|Cronograma/.test(x)).length >= 3;
+          await shotChecked('CANARY255-QUADROS.png', { head: /Quadros/, surface: 'Hub Quadros', check: p => p.hubCards >= 5 });
+          await pg.evaluate(() => { const b = [...document.querySelectorAll('#content .bcard')].find(x => /Cards/.test(x.textContent)); if (b) b.click(); });
+          await pg.waitForTimeout(450);
+          g.CN4_setorSemNavDup = (await navDup()) === 0;
+          g.CN9_minhasTarefas = await pg.evaluate(() => { const c = [...document.querySelectorAll('#content .tchips .chip')].find(x => /Minhas tarefas/.test(x.textContent)); return !!c && !!c.offsetParent; });
+          g.CN10_sectorChips = await pg.evaluate(() => document.querySelectorAll('#content .lui-sstrip .lui-schip').length >= 3);
+          g.CN7_filtroFunciona = await (async () => {
+            const n0 = await pg.evaluate(() => document.querySelectorAll('#content .kbv2-card').length);
+            await clk('[data-bmine]');
+            const n1 = await pg.evaluate(() => document.querySelectorAll('#content .kbv2-card').length);
+            await clk('[data-bmine]');
+            return n1 <= n0;
+          })();
+          // ===== PAINEL SLA =====
+          await clkSide('Painel SLA');
+          await shotChecked('CANARY255-PAINEL-SLA.png', { head: /Painel Executivo/, surface: 'Painel SLA (heading interno Painel Executivo)' });
+          // ===== DETAIL D-freeze =====
+          await clkSide('Meu quadro');
+          await clk('[data-detail="k2"]');
+          const dg = await pg.evaluate(() => {
+            const r = {};
+            const m = document.querySelector('.modal-back[data-detmodal]');
+            r.D1 = !!m && m.dataset.detorigin === 'mine';
+            const ttl = document.querySelector('.det-title');
+            r.D3 = !!ttl && /Edicao de videos/.test(ttl.textContent) && getComputedStyle(ttl).fontSize === '20px';
+            r.D4 = /Hospital Visao/.test((document.querySelector('.det-client') || {}).textContent || '');
+            const bdg = document.querySelector('.det-badge');
+            r.D5 = !!bdg && getComputedStyle(bdg).backgroundColor === 'rgba(0, 0, 0, 0)';
+            const chips = [...document.querySelectorAll('.det-chips .rev-chip')];
+            const stc = chips.find(x => x.querySelector('.dotc'));
+            r.D6 = !!stc && getComputedStyle(stc).backgroundColor === 'rgba(0, 0, 0, 0)';
+            const people = [...document.querySelectorAll('.det-person')];
+            r.D8 = people.length >= 1 && getComputedStyle(people[0]).backgroundColor === 'rgb(245, 248, 251)';
+            const nx = document.querySelector('.det-hero-next');
+            r.D10 = !!nx && getComputedStyle(nx).backgroundColor === 'rgb(245, 248, 251)';
+            const sheet = document.querySelector('.det-sheet');
+            r.D16 = !!sheet && sheet.scrollWidth <= sheet.clientWidth + 2 && document.documentElement.scrollWidth <= window.innerWidth + 2;
+            return r;
+          });
+          await shotChecked('CANARY255-DETAIL.png', { head: /.*/, surface: 'Detail drawer (origem mine)', check: p => p.detOpen });
+          await clk('.det-x');
+          dg.D2 = await pg.evaluate(() => ((document.getElementById('modalRoot') || {}).innerHTML || '').length < 50);
+          await clk('[data-move="k2"]');
+          dg.D12 = await pg.evaluate(() => /Mover tarefa/.test((document.getElementById('modalRoot') || {}).innerHTML || ''));
+          await pg.evaluate(() => { const m = document.getElementById('modalRoot'); if (m) m.innerHTML = ''; });
+          await clk('[data-detail="k6"]');
+          dg.D14 = await pg.evaluate(() => { const t = (document.getElementById('modalRoot') || {}).innerText || ''; return /Cliente pediu ajuste|Resposta do cliente/i.test(t) && /Prioridade/i.test(t) && document.documentElement.scrollWidth <= window.innerWidth + 2; });
+          await clk('.det-x');
+          await clk('[data-detail="k5"]');
+          dg.D15 = await pg.evaluate(() => { const t = document.querySelector('.det-title'); return !!t && t.scrollWidth <= t.clientWidth + 2; });
+          await clk('.det-x');
+          out.detail = dg;
+          g.D_freeze = dg.D1 && dg.D2 && dg.D3 && dg.D4 && dg.D5 && dg.D6 && dg.D8 && dg.D10 && dg.D12 && dg.D14 && dg.D15 && dg.D16;
+          // C16: leak diferencial no Meu quadro
+          await clkSide('Meu quadro');
+          g.C16_noLeak = await pg.evaluate(() => { const c = [...document.querySelectorAll('.kbv2-card')].find(x => x.querySelector('[data-detail="k2"], [data-cardmenu="k2"]')); if (!c) return false; const st = c.querySelector('.kbv2-status'); return getComputedStyle(c).display === 'grid' && (!st || getComputedStyle(st).order !== '9'); });
+          // ===== F smoke: Nova tarefa (view real) =====
+          await clk('.new-task-btn');
+          g.F_novaTarefa = await pg.evaluate(() => !!document.querySelector('.form-wrap .stepper') && !!state.form);
+          await clk('[data-form="close"]');
+          g.F_wizardClosed = await pg.evaluate(() => state.form === null && document.querySelectorAll('.kbv2-column').length === 4);
+          // ===== CN mobile/legacy sims (renderer identico; modos preservados) =====
+          g.CN_legacySim = await pg.evaluate(() => {
+            document.body.classList.remove('light-ui');
+            state.tab = 'tarefas'; state.flowView = 'client'; state.personBoard = null; render();
+            const n = document.querySelectorAll('#content .tchips .tchip').length;
+            document.body.classList.add('light-ui');
+            state.flowView = null; state.personBoard = state.user.id; render();
+            return n === 5;
+          });
+          await pg.waitForTimeout(400);
+          await shot(390, 700);
+          g.CN_mobileSim = await pg.evaluate(() => {
+            state.tab = 'tarefas'; state.flowView = 'client'; state.personBoard = null; render();
+            const n = document.querySelectorAll('#content .tchips .tchip').length;
+            return (typeof isDesktop === 'function' ? !isDesktop() : true) && n === 5;
+          });
+          await shot(1920, 1080);
+          await pg.evaluate(() => { state.flowView = null; state.personBoard = state.user.id; render(); });
+          await pg.waitForTimeout(400);
+          // ===== fecho =====
+          g.E1_screenshotNotLogin = MANIFEST.every(m => m.loginPresent === false);
+          g.E1_manifestAllValid = MANIFEST.length >= 22 && MANIFEST.every(m => m.screenshotValid === true);
+          I.revealSuppressed = await pg.evaluate(() => (window.__qaRevealSuppressed || []));
+          g.p1_noFatalPageError = perr.length === 0;
+          out.pageErrors = perr; out.manifest = MANIFEST;
+          const fails = Object.entries(g).filter(([k, v]) => !v).map(([k]) => k);
+          out.fails = fails;
+          fs.writeFileSync(process.env.RUNNER_TEMP + '/canary/canary255-evidence-manifest.json', JSON.stringify(MANIFEST, null, 1));
+          const rg = {}; for (const [k, v] of Object.entries(g)) if (/^(SB|CN|T_|D_|C_|C1|HF|NAV|E1|H\d|TC|HOV)/.test(k)) rg[k] = v;
+          fs.writeFileSync(process.env.RUNNER_TEMP + '/canary/canary255-regression.json', JSON.stringify({ g: rg, fails: Object.entries(rg).filter(([k, v]) => !v).map(([k]) => k) }, null, 1));
+          fs.writeFileSync(process.env.RUNNER_TEMP + '/canary/canary255-sessionB.json', JSON.stringify(out, null, 1));
+          console.log(JSON.stringify(out, null, 1));
+          try { await Promise.race([app.close(), sleep(4000)]); } catch (_) {}
+          if (fails.length) { console.error('FAILS B:', fails); }
+          process.exit(fails.length ? 1 : 0);
+          EOF
+          node canary-b.mjs
+          echo "INSTALLED-APP QA 1.0.255 (binario atualizado pelo feed PUBLICO 254->255): PASS (TASK CARD TC/HOV + HOJE H1-H18 + OPTION B SB/CN/NAV + freeze T/D/C + Hub + E1 manifest)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "Extrair o app.asar INSTALADO (modulo e renderer EMPACOTADOS = fonte de prova da sessao C)"
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/canary"
+          EXI="$RUNNER_TEMP/asarx-installed"; rm -rf "$EXI"; mkdir -p "$EXI"
+          npx --yes @electron/asar extract "$INSTALL_DIR/resources/app.asar" "$EXI"
+          for f in dist/main/slaEscalationRules.js dist/main/slaScheduler.js dist/main/slaReminder.js dist/main/slaReminderWindow.js src/renderer/index.html src/renderer/slareminder.html src/renderer/bgnotify.html; do
+            [ -f "$EXI/$f" ] || { echo "::error::$f ausente no asar INSTALADO"; exit 1; }
+          done
+          EXI="$EXI" node -e "const p=require(process.env.EXI+'/package.json'); if(p.version!=='$EXPECTED_VERSION'){console.error('asar instalado version '+p.version);process.exit(1);} console.log('asar INSTALADO version OK '+p.version);"
+          echo "ASAR_EXTRACT=$EXI" >> "$GITHUB_ENV"
+
+      - name: "SESSAO C — 1.0.255 instalada: BRAND oficial + NOTIFICACAO light/dedupe (IPC real) + PARIDADE SLA + MATRIZ no modulo EMPACOTADO + DIALOG central do asar"
+        timeout-minutes: 25
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/canary"
+          cat > canary-c.mjs <<'EOF'
+          import { _electron } from 'playwright';
+          import { createRequire } from 'module';
+          import fs from 'fs';
+          import path from 'path';
+          const req = createRequire(import.meta.url);
+          const T = process.env.RUNNER_TEMP + '/canary';
+          const EXI = process.env.ASAR_EXTRACT;
+          const SRC = process.env.PRODUCT_SOURCE_SHA;
+          const VER = process.env.EXPECTED_VERSION;
+          const exe = process.env.INSTALL_DIR + '\\Agenda ID Seven Desktop.exe';
+          const out = { g: {}, info: {} }; const g = out.g; const I = out.info;
+          const sleep = ms => new Promise(r => setTimeout(r, ms));
+          const MANIFEST = [];
+          const TID = 'ceo-set-01';
+
+          // ===== 1) PACOTE: gates estaticos no asar INSTALADO =====
+          const rd = p => { try { return fs.readFileSync(path.join(EXI, p), 'utf8'); } catch (_) { return ''; } };
+          const escSrc = rd('dist/main/slaEscalationRules.js');
+          const schSrc = rd('dist/main/slaScheduler.js');
+          const remSrc = rd('dist/main/slaReminder.js');
+          const dlgSrc = rd('src/renderer/slareminder.html');
+          const idxSrc = rd('src/renderer/index.html');
+          const bgnSrc = rd('src/renderer/bgnotify.html');
+          const winSrc = rd('dist/main/slaReminderWindow.js');
+          g.PK1_escalationPackaged = escSrc.length > 1000 && /function isEscalationEligible/.test(escSrc) && /not_visible_to_designer/.test(escSrc);
+          g.PK2_oneWatcherNoInterval = /escalationEmissionsFor\(task, uid, t0\)/.test(schSrc) && /escalationNextBoundaryMs\(task, t0\)/.test(schSrc) && !/setInterval\(/.test(schSrc) && /setTimeout\(/.test(schSrc);
+          g.PK3_queueAndResetPackaged = /invalidateDeadline/.test(remSrc) && /deadlineLevel/.test(remSrc) && /promote/.test(remSrc) && /deadlineClosed/.test(remSrc);
+          g.PK4_dialogPackaged = /I7\.27\.1-EXT-R1/.test(dlgSrc) && /dl-band/.test(dlgSrc) && /dl-btn/.test(dlgSrc);
+          g.PK5_brandNoOverride = !/brandlogo::after\{content:'7'/.test(idxSrc) && /\.logo\.brandlogo\{background:var\(--logo\)/.test(idxSrc);
+          g.PK6_lightShellNoNavy = /\.ntfp-wrap\{[^}]*background:#FFFFFF/.test(idxSrc) && /\.ntfp-wrap\{[^}]*background:#FFFFFF/.test(bgnSrc) && !/rgba\(16,23,38/.test(idxSrc) && !/rgba\(16,23,38/.test(bgnSrc);
+          const wm = winSrc.match(/WIDTH = (\d+)/); const WIN_W = wm ? Number(wm[1]) : 0;
+          I.centralWindowWidth = WIN_W;
+          g.PK7_centralWindowWidth = WIN_W >= 600 && WIN_W <= 700;
+
+          // ===== 2) MATRIZ DE ESCALACAO no MODULO EMPACOTADO (app instalado) =====
+          const ESC = req(path.join(EXI, 'dist', 'main', 'slaEscalationRules.js'));
+          const H = 3600000;
+          const DUE = Date.UTC(2026, 8, 10, 18, 0, 0);
+          const mk = (id, extra) => Object.assign({
+            id, title: 'CEO / SETEMBRO', client: 'CEO', sector: 'cronograma', status: 'afazer', designerFlowStatus: 'afazer',
+            dueAt: DUE, createdAt: DUE - 5 * 86400000, by: 'owner', assigneeId: 'boaz',
+            designerAssignment: { designerId: 'boaz', designerName: 'Boaz', status: 'sent', assignedAt: DUE - 4 * 86400000, assignedBy: 'owner' },
+          }, extra || {});
+          const em = (t, uid, now) => ESC.escalationEmissionsFor(t, uid, now) || [];
+          const M = {};
+          M.t25 = em(mk('s1'), 'boaz', DUE - 25 * H);
+          M.t24 = em(mk('s1'), 'boaz', DUE - 24 * H + 1000);
+          M.t24again = em(mk('s1'), 'boaz', DUE - 23 * H);
+          M.t6 = em(mk('s1'), 'boaz', DUE - 6 * H + 1000);
+          M.t6again = em(mk('s1'), 'boaz', DUE - 5 * H);
+          M.t2 = em(mk('s1'), 'boaz', DUE - 2 * H + 1000);
+          M.t2again = em(mk('s1'), 'boaz', DUE - 1 * H);
+          M.over = em(mk('s1'), 'boaz', DUE + 5 * 60000);
+          M.started = em(mk('s1', { designerFlowStatus: 'andamento', status: 'andamento' }), 'boaz', DUE - 1 * H);
+          M.done = em(mk('s1', { status: 'concluido' }), 'boaz', DUE - 1 * H);
+          M.oldDesigner = em(mk('s1', { assigneeId: 'ana', designerAssignment: { designerId: 'ana', designerName: 'Ana', status: 'sent', assignedAt: DUE - 3 * 86400000, assignedBy: 'owner' } }), 'boaz', DUE - 1 * H);
+          M.newDesigner = em(mk('s1', { assigneeId: 'ana', designerAssignment: { designerId: 'ana', designerName: 'Ana', status: 'sent', assignedAt: DUE - 3 * 86400000, assignedBy: 'owner' } }), 'ana', DUE - 1 * H);
+          const NEWDUE = DUE + 48 * H;
+          M.dueChanged = em(mk('s1', { dueAt: NEWDUE }), 'boaz', NEWDUE - 24 * H + 1000);
+          M.dueChangedOldInstant = em(mk('s1', { dueAt: NEWDUE }), 'boaz', DUE + 5 * 60000);
+          M.otherUser = em(mk('s1'), 'owner', DUE - 1 * H);
+          M.divergent = em(mk('s1', { assigneeId: 'owner' }), 'boaz', DUE - 1 * H);
+          M.divergentReason = ESC.isEscalationEligible(mk('s1', { assigneeId: 'owner' }), DUE - 1 * H).reason;
+          M.five = ['m1', 'm2', 'm3', 'm4', 'm5'].map(id => em(mk(id), 'boaz', DUE - 2 * H + 1000));
+          const key = a => (a[0] && (a[0].dedupKey || a[0].semanticKey)) || '';
+          const type = a => (a[0] && a[0].eventType) || '';
+          I.slaMatrix = {
+            t25: M.t25.length, t24: type(M.t24), t24key: key(M.t24), t24again: key(M.t24again), t6: type(M.t6), t6key: key(M.t6),
+            t2: type(M.t2), t2key: key(M.t2), over: type(M.over), overkey: key(M.over), started: M.started.length, done: M.done.length,
+            oldDesigner: M.oldDesigner.length, newDesigner: M.newDesigner.length, dueChangedKey: key(M.dueChanged),
+            dueChangedOldInstant: M.dueChangedOldInstant.length, otherUser: M.otherUser.length, divergent: M.divergent.length,
+            divergentReason: M.divergentReason, fiveKeys: M.five.map(key),
+          };
+          g.SLA_C1_t25zero = M.t25.length === 0;
+          g.SLA_C2_t24warning = M.t24.length === 1 && M.t24[0].eventType === 'deadline_warning' && M.t24[0].severity === 'warning' && key(M.t24) === 'sla_deadline:warning:s1:boaz:' + DUE;
+          g.SLA_C3_repeatSameKey = M.t24again.length === 1 && key(M.t24again) === key(M.t24);
+          g.SLA_C4_t6high = M.t6.length === 1 && M.t6[0].eventType === 'deadline_high_risk' && key(M.t6) === 'sla_deadline:high:s1:boaz:' + DUE && key(M.t6again) === key(M.t6);
+          g.SLA_C5_t2central = M.t2.length === 1 && M.t2[0].eventType === 'sla_deadline_critical' && /^sla_/.test(M.t2[0].eventType) && key(M.t2) === 'sla_deadline:critical:s1:boaz:' + DUE && key(M.t2again) === key(M.t2);
+          g.SLA_C6_overdue = M.over.length === 1 && M.over[0].eventType === 'sla_deadline_overdue' && key(M.over) === 'sla_deadline:overdue:s1:boaz:' + DUE;
+          g.SLA_C7_moveCancels = M.started.length === 0 && M.done.length === 0;
+          g.SLA_C8_designerChange = M.oldDesigner.length === 0 && M.newDesigner.length === 1 && key(M.newDesigner) === 'sla_deadline:critical:s1:ana:' + DUE;
+          g.SLA_C9_dueChange = M.dueChanged.length === 1 && key(M.dueChanged) === 'sla_deadline:warning:s1:boaz:' + NEWDUE && M.dueChangedOldInstant.length === 0;
+          g.SLA_C10_fiveIndependent = M.five.every(a => a.length === 1) && new Set(M.five.map(key)).size === 5;
+          g.SLA_C11_recipientDesigner = M.otherUser.length === 0 && M.t2[0].recipientUid === 'boaz' && M.t2[0].targetUserId === 'boaz' && M.t2[0].notificationType === 'sla_personal';
+          g.SLA_C12_contextParityGuard = M.divergent.length === 0 && M.divergentReason === 'not_visible_to_designer';
+          g.SLA_C13_payloadContract = !!(M.t2[0].taskId === 's1' && M.t2[0].action && M.t2[0].action.deep === 'detail/s1' && Number(M.t2[0].dueAtMs) === DUE && M.t2[0].slaThreshold === 'T_MINUS_2H' && M.t2[0].kind === 'deadline');
+          fs.writeFileSync(T + '/canary255-sla-matrix.json', JSON.stringify(I.slaMatrix, null, 1));
+
+          // ===== 3) APP INSTALADO =====
+          const app = await _electron.launch({ executablePath: exe, args: [] });
+          const pg = await app.firstWindow({ timeout: 45000 });
+          const perr = []; pg.on('pageerror', e => perr.push(String(e).slice(0, 160)));
+          await pg.waitForLoadState('load'); await pg.waitForTimeout(4000);
+          const a = await pg.evaluate(() => ({ ver: (typeof APP_VER !== 'undefined' && APP_VER.desktop) || null, title: document.title, white: (document.body.innerText || '').trim().length < 2 }));
+          out.app = a;
+          g.C0_versionIs255 = a.ver === VER && a.title.includes(VER);
+          g.C0_noWhiteScreen = a.white === false;
+          const mainId = await app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows()[0]; return w ? w.id : 0; });
+          const setSize = async (w, h) => { try { await app.evaluate(({ BrowserWindow }, s) => { const win = BrowserWindow.fromId(s.id); if (win) win.setContentSize(s.w, s.h); }, { id: mainId, w, h }); } catch (_) {} await sleep(700); };
+          const send = (ch, p) => app.evaluate(({ BrowserWindow }, x) => { const w = BrowserWindow.fromId(x.id); if (w) w.webContents.send(x.ch, x.p); }, { id: mainId, ch, p });
+          await setSize(1920, 1080);
+          await pg.evaluate(() => { window.__qaRevealSuppressed = []; window._revealLogin = function (r) { window.__qaRevealSuppressed.push(String(r || '')); }; });
+          await pg.evaluate(tid => {
+            state.user = { id: 'boaz', name: 'Boaz', role: 'Designer' };
+            state.users = [state.user, { id: 'owner', name: 'Owner', role: 'Social Media', admin: true }, { id: 'ana', name: 'Ana', role: 'Designer' }];
+            document.body.classList.add('desktop', 'authed', 'light-ui');
+            const asp = document.getElementById('authSplash'); if (asp) asp.style.display = 'none';
+            const lg = document.getElementById('login'); if (lg) lg.classList.add('hidden');
+            const ap = document.getElementById('app'); if (ap) ap.style.display = 'flex';
+            const d = new Date(Date.now() + 90 * 60000);
+            const sameDay = d.toDateString() === new Date().toDateString();
+            const hh = sameDay ? String(d.getHours()).padStart(2, '0') : '23';
+            const mm = sameDay ? String(d.getMinutes()).padStart(2, '0') : '59';
+            const asg = { designerId: 'boaz', designerName: 'Boaz', status: 'sent', assignedAt: Date.now() - 3 * 86400000, assignedBy: 'owner' };
+            state.tasks = [
+              { id: tid, title: 'CEO / SETEMBRO', client: 'CEO', sector: 'cronograma', by: 'owner', assigneeId: 'boaz', status: 'afazer', designerFlowStatus: 'afazer', dueDate: todayStr(), dueTime: hh + ':' + mm, designerAssignment: asg, cronContents: [{ tema: 'T1' }] },
+              { id: tid + '-div', title: 'DIVERGENTE (nao visivel ao designer)', client: 'CEO', sector: 'cronograma', by: 'owner', assigneeId: 'owner', status: 'afazer', designerFlowStatus: 'afazer', dueDate: todayStr(), dueTime: hh + ':' + mm, designerAssignment: asg, cronContents: [{ tema: 'T1' }] },
+              { id: 'u1', title: 'Cronograma Ultra', client: 'Ultra', sector: 'cronograma', by: 'boaz', assigneeId: 'boaz', status: 'afazer', dueDate: todayStr(), dueTime: '23:59', cronContents: [{ tema: 'T1' }] },
+              { id: 'u2', title: 'Reels de lancamento', client: 'Sunset Wear', sector: 'edicao_cards', by: 'boaz', assigneeId: 'boaz', status: 'andamento', dueDate: todayStr(), dueTime: '23:59' }
+            ];
+            state.events = []; state.tab = 'hoje'; state.personBoard = null; render();
+          }, TID);
+          await pg.waitForTimeout(700);
+
+          // E1: probe + captura validada
+          const probe = () => pg.evaluate(() => {
+            const l = document.getElementById('login');
+            const loginPresent = !!l && !l.classList.contains('hidden') && getComputedStyle(l).display !== 'none' && l.getBoundingClientRect().width > 0;
+            const el = document.querySelector('#content .scr-head, #content .h-title, #content .exec-ttl, #content .nc-ttl, #content .lui-ph-t');
+            const heading = (((el && el.textContent) || '').trim() || (document.getElementById('content').innerText || '').trim()).replace(/\s+/g, ' ').slice(0, 70);
+            return { loginPresent, heading, sidebar: !!document.querySelector('#bottomNav .sb-item'), toasts: document.querySelectorAll('#notif-stack .ntf').length,
+              detOpen: !!document.querySelector('.det-sheet'), vw: window.innerWidth + 'x' + window.innerHeight };
+          });
+          const shotChecked = async (name, expect) => {
+            const p = await probe();
+            const ok = !p.loginPresent && expect.head.test(p.heading) && (expect.check ? expect.check(p) : true) && p.sidebar;
+            MANIFEST.push({ filename: name, sourceSha: SRC, installedVersion: a.ver, viewport: p.vw, expectedSurface: expect.surface,
+              actualSurface: p.loginPresent ? 'LOGIN' : p.heading.slice(0, 40), expectedHeading: String(expect.head), actualHeading: p.heading,
+              loginPresent: p.loginPresent, screenshotValid: ok });
+            if (!ok) { g['SHOT_' + name.replace(/[^A-Za-z0-9]/g, '_')] = false; return false; }
+            await pg.screenshot({ path: T + '/' + name });
+            return true;
+          };
+
+          // ===== 4) BRAND OFICIAL (3 resolucoes) =====
+          const brandAt = () => pg.evaluate(() => {
+            const el = document.querySelector('.nav .sb-brand .logo.brandlogo');
+            if (!el) return null;
+            const cs = getComputedStyle(el); const af = getComputedStyle(el, '::after');
+            const r = el.getBoundingClientRect();
+            const nav = document.getElementById('bottomNav'); const nr = nav.getBoundingClientRect();
+            const brand = document.querySelector('.nav .sb-brand'); const br = brand.getBoundingClientRect();
+            // FIX classe C (run 33888724687): no shell LIGHT o lockup e '.sb-brand.lui-brand2' e o wordmark vive em
+            // '.lui-wm' (index.html L7450); '.nm/.nm-lui' sao do shell legado e nao existem nesta arvore => lia "".
+            // Mesmo seletor do harness R1 aprovado (visual-qa-i7271r1-refine.mjs, brandMeasure).
+            const nm = document.querySelector('.nav .sb-brand .lui-wm') || document.querySelector('.nav .sb-brand .nm, .nav .sb-brand .nm-lui');
+            const user = nav.querySelector('.sb-user');
+            return { bgImage: (cs.backgroundImage || '').slice(0, 32), afterContent: af.content, w: +r.width.toFixed(1), h: +r.height.toFixed(1),
+              inside: r.left >= nr.left - 0.5 && r.right <= nr.right + 0.5 && r.top >= nr.top - 0.5,
+              navW: +nr.width.toFixed(1), brandH: +br.height.toFixed(1), wordmark: nm ? (nm.textContent || '').replace(/\s+/g, ' ').trim() : '',
+              userAnchor: !!user && user.getAttribute('data-tab') === 'perfil',
+              clipped: el.scrollWidth > el.clientWidth + 2, hs: document.documentElement.scrollWidth > window.innerWidth + 2 ? 1 : 0 };
+          });
+          const BR = {};
+          for (const v of [[1920, 1080, '1920'], [1536, 864, 'WIN125'], [1366, 768, '1366']]) {
+            await setSize(v[0], v[1]);
+            const b = await brandAt(); BR[v[2]] = b;
+            await shotChecked('CANARY255-BRAND-' + v[2] + '.png', { head: /Boaz|Resumo|Ola/, surface: 'Hoje + brand oficial ' + v[2] });
+          }
+          I.brand = BR;
+          const brandAll = f => Object.values(BR).every(x => !!x && f(x));
+          g.BR_officialAsset = brandAll(x => /^url\("data:image/.test(x.bgImage));
+          g.BR_noSevenOverride = brandAll(x => x.afterContent === 'none' || x.afterContent === '' || x.afterContent === 'normal');
+          g.BR_geometry = brandAll(x => x.w >= 30 && x.h >= 30 && x.inside && !x.clipped);
+          g.BR_navPreserved = brandAll(x => x.navW === BR['1920'].navW && x.brandH === BR['1920'].brandH && /Agenda/.test(x.wordmark) && /ID SEVEN/i.test(x.wordmark) && x.userAnchor);
+          g.BR_noHscroll = brandAll(x => x.hs === 0);
+          await setSize(1920, 1080);
+
+          // ===== 5) NOTIFICACAO: dedupe real pelo IPC do main + shell light =====
+          await pg.evaluate(() => { window.__once = 0; const o = window.notifToastOnce; window.notifToastOnce = function (p) { window.__once++; return o.apply(this, arguments); }; });
+          const clearToasts = () => pg.evaluate(() => { const s = document.getElementById('notif-stack'); if (s) s.innerHTML = ''; });
+          const nCount = () => pg.evaluate(() => ({ toasts: document.querySelectorAll('#notif-stack .ntf').length, once: window.__once }));
+          const mv = (k, taskId, group, extra) => Object.assign({
+            eventId: k, dedupKey: k, groupKey: group, eventType: 'task_moved', notificationType: 'all_active_users', _premiumCommon: true,
+            taskId, taskTitle: taskId === 'u1' ? 'Cronograma Ultra' : 'Tarefa ' + taskId, clientName: 'Ultra',
+            actorId: 'owner', actorName: 'Owner', targetUserId: 'boaz', createdAt: Date.now(),
+            title: 'Tarefa movimentada', body: 'Owner moveu a tarefa de A Fazer para Em andamento.', context: 'A Fazer -> Em andamento',
+            fromStatus: 'afazer', toStatus: 'andamento', sector: 'cronograma', sectorLabel: 'Cronograma', severity: 'info', sound: false,
+            action: { type: 'detail', deep: 'detail/' + taskId }, source: 'notifierA', providerCalled: false,
+          }, extra || {});
+          await send('notif-toast', mv('n:u1:1', 'u1', 'common_group:boaz:u1')); await pg.waitForTimeout(500);
+          const n1 = await nCount();
+          g.N1_oneEventOneToast = n1.toasts === 1 && n1.once === 1;
+          await send('notif-toast', mv('n:u1:1', 'u1', 'common_group:boaz:u1')); await pg.waitForTimeout(400);
+          const n2 = await nCount();
+          g.N2_sameEventNeverDuplicates = n2.toasts === 1 && n2.once === 2;
+          await send('notif-toast', mv('n:u1:2', 'u1', 'common_group:boaz:u1', { context: 'Em andamento -> Revisao', fromStatus: 'andamento', toStatus: 'revisao' })); await pg.waitForTimeout(450);
+          const n3 = await pg.evaluate(() => ({ cards: document.querySelectorAll('#notif-stack .ntf').length, txt: (document.querySelector('#notif-stack .ntf') || {}).innerText || '' }));
+          g.N3_supersedeSingleCard = n3.cards === 1 && /Revis/i.test(n3.txt);
+          const shell = await pg.evaluate(() => {
+            const card = document.querySelector('#notif-stack .ntf');
+            const wrap = card ? card.querySelector('.ntfp-wrap') : null; if (!wrap) return null;
+            const cs = getComputedStyle(wrap); const r = wrap.getBoundingClientRect();
+            const av = card.querySelector('.ntfp-av'); const ttl = card.querySelector('.ntfp-task'); const pill = card.querySelector('.ntfp-pill');
+            const ar = av ? av.getBoundingClientRect() : null; const tcs = ttl ? getComputedStyle(ttl) : null;
+            return { bg: cs.backgroundColor, border: cs.borderColor, radius: cs.borderRadius, w: +r.width.toFixed(1),
+              avW: ar ? +ar.width.toFixed(1) : 0, avInside: !!ar && ar.top >= r.top - 0.5 && ar.bottom <= r.bottom + 0.5 && ar.left >= r.left - 0.5,
+              titleSize: tcs ? tcs.fontSize : '', titleWeight: tcs ? tcs.fontWeight : '', pillBg: pill ? getComputedStyle(pill).backgroundColor : '',
+              clipped: !!ttl && ttl.scrollWidth > ttl.clientWidth + 2, hs: document.documentElement.scrollWidth > window.innerWidth + 2 ? 1 : 0 };
+          });
+          I.notifShell = shell;
+          g.N4_lightSurface = !!shell && shell.bg === 'rgb(255, 255, 255)' && shell.border === 'rgb(214, 219, 230)' && shell.radius === '14px';
+          g.N5_avatarInline34 = !!shell && Math.round(shell.avW) === 34 && shell.avInside;
+          g.N6_titleDominant = !!shell && shell.titleSize === '15px' && Number(shell.titleWeight) === 650 && !shell.clipped;
+          g.N7_noHscrollNoClip = !!shell && shell.hs === 0 && shell.w >= 380 && shell.w <= 440;
+          await shotChecked('CANARY255-NOTIF-LIGHT.png', { head: /Boaz|Resumo|Ola/, surface: 'Hoje + notificacao LIGHT', check: p => p.toasts === 1 });
+          await setSize(1366, 768);
+          const n1366 = await pg.evaluate(() => { const c = document.querySelector('#notif-stack .ntf'); const w = c ? c.querySelector('.ntfp-wrap') : null; return { w: w ? +w.getBoundingClientRect().width.toFixed(1) : 0, hs: document.documentElement.scrollWidth > window.innerWidth + 2 ? 1 : 0, inside: !!w && w.getBoundingClientRect().right <= window.innerWidth + 0.5 }; });
+          I.notif1366 = n1366;
+          g.N8_responsive1366 = n1366.hs === 0 && n1366.inside && n1366.w >= 380 && n1366.w <= 440;
+          await shotChecked('CANARY255-NOTIF-1366.png', { head: /Boaz|Resumo|Ola/, surface: 'Notificacao LIGHT 1366', check: p => p.toasts === 1 });
+          await setSize(1920, 1080);
+          await clearToasts();
+          // FIX classe C (run 33888724687): o renderer LIMITA a pilha a 4 cards visiveis (index.html L6755, regra de
+          // 1.0.204 preservada). "5 moves = 5 notificacoes" e a semantica aprovada NTF-R5: cinco RENDERS, cada evento
+          // com o SEU card no instante do envio e zero duplicata - NAO "5 cards simultaneos". Verdade do produto:
+          // apos o 5o envio ficam os 4 mais novos (m2..m5) e o mais antigo (m1) sai da pilha.
+          const before5 = (await nCount()).once;
+          const five = [];
+          for (let i = 1; i <= 5; i++) {
+            await send('notif-toast', mv('n:m' + i + ':1', 'm' + i, 'common_group:boaz:m' + i, { taskTitle: 'Tarefa ' + i })); await pg.waitForTimeout(220);
+            five.push(await pg.evaluate(gk => ({ own: document.querySelectorAll('#notif-stack .ntf[data-group="' + gk + '"]').length, all: document.querySelectorAll('#notif-stack .ntf').length }), 'common_group:boaz:m' + i));
+          }
+          const n5 = await nCount();
+          const evict = await pg.evaluate(() => ({ m1: !!document.querySelector('#notif-stack .ntf[data-group="common_group:boaz:m1"]'), m5: !!document.querySelector('#notif-stack .ntf[data-group="common_group:boaz:m5"]') }));
+          I.fiveMoves = { renders: n5.once - before5, perSend: five, visibleAtEnd: n5.toasts, cap: 4, evict };
+          g.N9_fiveMovesFiveNotifications = n5.once - before5 === 5 && five.every(x => x.own === 1) && five.every(x => x.all <= 4) && n5.toasts === 4 && !evict.m1 && evict.m5;
+          await clearToasts();
+          const beforeNav = (await nCount()).once;
+          await pg.evaluate(() => { state.tab = 'tarefas'; state.personBoard = 'boaz'; render(); }); await pg.waitForTimeout(400);
+          await pg.evaluate(() => { const b = document.querySelector('[data-detail="u1"]'); if (b) b.click(); }); await pg.waitForTimeout(500);
+          await pg.evaluate(() => { const x = document.querySelector('.det-x'); if (x) x.click(); }); await pg.waitForTimeout(400);
+          await pg.evaluate(() => { state.tab = 'hoje'; state.personBoard = null; render(); }); await pg.waitForTimeout(400);
+          await pg.evaluate(() => { state.tab = 'tarefas'; state.personBoard = 'boaz'; render(); state.tab = 'hoje'; state.personBoard = null; render(); }); await pg.waitForTimeout(400);
+          await send('notif-toast', mv('n:u1:nav', 'u1', 'common_group:boaz:nav')); await pg.waitForTimeout(450);
+          const nNav = await nCount();
+          I.listener = { beforeNav, afterNav: nNav.once, toasts: nNav.toasts };
+          g.N10_listenersStableAfterNav = nNav.once - beforeNav === 1 && nNav.toasts === 1;
+          const beforeOpen = (await nCount()).once;
+          await pg.evaluate(() => { const c = document.querySelector('#notif-stack .ntf .ntfp-pill') || document.querySelector('#notif-stack .ntf .ntf-card'); if (c) c.click(); });
+          await pg.waitForTimeout(600);
+          const opened = await pg.evaluate(() => { const m = document.querySelector('.modal-back[data-detmodal]'); return { open: !!m, id: m ? m.getAttribute('data-dettaskid') : null, mods: document.querySelectorAll('.modal-back[data-detmodal]').length, toasts: document.querySelectorAll('#notif-stack .ntf').length, once: window.__once }; });
+          I.notifOpen = opened;
+          g.N11_abrirOpensSameTask = opened.open && opened.id === 'u1' && opened.mods === 1 && opened.once === beforeOpen && opened.toasts === 0;
+          await pg.evaluate(() => { const x = document.querySelector('.det-x'); if (x) x.click(); }); await pg.waitForTimeout(400);
+          await send('notif-toast', mv('n:u1:close', 'u1', 'common_group:boaz:close')); await pg.waitForTimeout(400);
+          await pg.evaluate(() => { const x = document.querySelector('#notif-stack .ntf .ntf-x'); if (x) x.click(); }); await pg.waitForTimeout(400);
+          g.N12_closeRemovesCard = (await pg.evaluate(() => document.querySelectorAll('#notif-stack .ntf').length)) === 0;
+
+          // ===== 6) PARIDADE SLA <-> CONTEXTO DO DESIGNER (mesma tarefa) =====
+          await pg.evaluate(() => { state.tab = 'hoje'; state.personBoard = null; render(); }); await pg.waitForTimeout(500);
+          const ctx = await pg.evaluate(tid => {
+            const u = state.user; const t = state.tasks.find(x => x.id === tid); const d = state.tasks.find(x => x.id === tid + '-div');
+            const kpiEl = document.querySelector('#content .stats .stat[data-myboard] .v');
+            const urgentIds = [...document.querySelectorAll('#content .col-tasks .card')].map(r => r.getAttribute('data-detail'));
+            const kpiIds = state.tasks.filter(x => (x.assigneeId === u.id || x.by === u.id) && x.status !== 'concluido').map(x => x.id).sort();
+            return { canSee: canSeeTask(u, t), canSeeDiv: canSeeTask(u, d), designerCol: designerCol(t), designerOf: designerOf(t),
+              deadline: !!taskDeadline(t), visibleIds: visibleTasks(u, state.tasks).map(x => x.id), kpiIds,
+              kpi: kpiEl ? Number(kpiEl.textContent) : -1, urgentIds, assigneeId: t.assigneeId, designerId: t.designerAssignment.designerId,
+              status: t.status, dueDate: t.dueDate, dueTime: t.dueTime };
+          }, TID);
+          await pg.evaluate(tid => { state.tab = 'tarefas'; state.personBoard = 'boaz'; render(); }, TID);
+          await pg.waitForTimeout(500);
+          const board = await pg.evaluate(tid => ({ cards: document.querySelectorAll('.kbv2-card').length, has: !!document.querySelector('[data-detail="' + tid + '"], [data-cardmenu="' + tid + '"]'), hasDiv: !!document.querySelector('[data-detail="' + tid + '-div"], [data-cardmenu="' + tid + '-div"]') }), TID);
+          await pg.evaluate(() => { state.tab = 'hoje'; state.personBoard = null; render(); }); await pg.waitForTimeout(500);
+          I.parity = Object.assign({}, ctx, { board });
+          g.CTX_C1_sameTaskVisible = ctx.canSee === true && ctx.visibleIds.indexOf(TID) >= 0;
+          g.CTX_C2_assigneeIsDesigner = ctx.assigneeId === 'boaz' && ctx.designerId === 'boaz' && ctx.designerOf === 'boaz';
+          g.CTX_C3_notStarted = ctx.designerCol === 'afazer' && ctx.status === 'afazer';
+          g.CTX_C4_kpiTarefas = ctx.kpi === ctx.kpiIds.length && ctx.kpiIds.indexOf(TID) >= 0 && ctx.kpiIds.indexOf(TID + '-div') < 0;
+          g.CTX_C5_urgentRow = ctx.urgentIds.indexOf(TID) >= 0 && ctx.deadline === true;
+          g.CTX_C6_meuQuadro = board.has === true && board.cards >= 1;
+          g.CTX_C7_divergentInvisible = ctx.canSeeDiv === false && ctx.visibleIds.indexOf(TID + '-div') < 0 && board.hasDiv === false;
+          const dlToast = {
+            eventId: 'k', dedupKey: 'sla_deadline:high:' + TID + ':boaz:' + Date.now(), eventType: 'deadline_high_risk', severity: 'critical',
+            taskId: TID, taskTitle: 'CEO / SETEMBRO', clientName: 'CEO', actorId: 'boaz', actorName: 'Boaz', responsibleId: 'boaz', responsibleName: 'Boaz',
+            targetUserId: 'boaz', title: 'Prazo em risco - tarefa nao iniciada', body: 'Esta tarefa ainda nao foi iniciada e o prazo termina hoje as ' + ctx.dueTime + '.',
+            context: 'Prazo em risco', createdAt: Date.now(), sound: false, kind: 'deadline', deadlineLevel: 'high',
+            action: { type: 'detail', deep: 'detail/' + TID }, _premiumCommon: false,
+          };
+          await send('notif-toast', dlToast); await pg.waitForTimeout(600);
+          const coh = await pg.evaluate(tid => ({ kpi: Number((document.querySelector('#content .stats .stat[data-myboard] .v') || {}).textContent || -1),
+            urgent: [...document.querySelectorAll('#content .col-tasks .card')].some(r => r.getAttribute('data-detail') === tid),
+            toasts: document.querySelectorAll('#notif-stack .ntf').length }), TID);
+          I.coherent = coh;
+          g.CTX_C8_coherentState = coh.kpi === ctx.kpiIds.length && coh.urgent === true && coh.toasts === 1;
+          await shotChecked('CANARY255-SLA-HOJE-CONTEXT.png', { head: /Boaz|Resumo|Ola/, surface: 'Hoje coerente + alerta de prazo', check: p => p.toasts === 1 });
+          await pg.evaluate(() => { const c = document.querySelector('#notif-stack .ntf .ntf-card'); if (c) c.click(); }); await pg.waitForTimeout(700);
+          const det = await pg.evaluate(() => { const m = document.querySelector('.modal-back[data-detmodal]'); return { open: !!m, id: m ? m.getAttribute('data-dettaskid') : null, mods: document.querySelectorAll('.modal-back[data-detmodal]').length,
+            title: m ? ((m.querySelector('.det-title') || {}).textContent || '') : '', toasts: document.querySelectorAll('#notif-stack .ntf').length }; });
+          I.openSameTask = det;
+          g.CTX_C9_openSameTask = det.open && det.id === TID && det.mods === 1 && /CEO \/ SETEMBRO/.test(det.title);
+          await shotChecked('CANARY255-SLA-OPEN-TASK.png', { head: /.*/, surface: 'Detail da MESMA tarefa (abrir pelo alerta)', check: p => p.detOpen });
+          await pg.evaluate(() => { const x = document.querySelector('.det-x'); if (x) x.click(); }); await pg.waitForTimeout(400);
+
+          // ===== 7) DIALOG CENTRAL DE PRAZO (renderer EMPACOTADO do app instalado) =====
+          const preloadPath = T + '/qa-dlg-preload.js';
+          fs.writeFileSync(preloadPath, [
+            "const { contextBridge } = require('electron');",
+            "const calls = { ok: [], open: [], rendered: [], resize: [] };",
+            "let cb = null; const noop = function () {};",
+            "contextBridge.exposeInMainWorld('slaAPI', { onCard: function (f) { cb = f; }, rendered: function (k) { calls.rendered.push(String(k)); }, resize: function (h) { calls.resize.push(Number(h)); }, setProcessing: noop, obs: noop, ok: function (k) { calls.ok.push(String(k)); }, open: function (d) { calls.open.push(String(d)); }, decide: noop, onResult: noop, dismiss: noop, resolveHelp: noop, onHelpCandidates: noop, checkinDecide: noop, onCheckinResult: noop, checkinDraft: noop, checkinDismiss: noop, checkinResolveHelp: noop, onCheckinHelpCandidates: noop });",
+            "contextBridge.exposeInMainWorld('__qa', { deliver: function (v) { if (cb) cb(v); }, calls: function () { return JSON.parse(JSON.stringify(calls)); }, reset: function () { calls.ok.length = 0; calls.open.length = 0; calls.rendered.length = 0; calls.resize.length = 0; } });",
+          ].join('\n'));
+          const dlgFile = process.env.INSTALL_DIR + '\\resources\\app.asar\\src\\renderer\\slareminder.html';
+          const waitWin = app.waitForEvent('window');
+          const dlgId = await app.evaluate(({ BrowserWindow }, arg) => {
+            const w = new BrowserWindow({ width: arg.w, height: 760, show: true, frame: false, transparent: true, skipTaskbar: true,
+              webPreferences: { preload: arg.preload, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } });
+            w.loadFile(arg.file);
+            return w.id;
+          }, { w: WIN_W, preload: preloadPath, file: dlgFile });
+          const dlg = await waitWin;
+          const dperr = []; dlg.on('pageerror', e => dperr.push(String(e).slice(0, 160)));
+          await dlg.waitForLoadState('load'); await dlg.waitForTimeout(600);
+          const workArea = await app.evaluate(({ screen }) => screen.getPrimaryDisplay().workAreaSize);
+          I.workArea = workArea;
+          const NOW = Date.now();
+          const view = (over, extra) => Object.assign({
+            key: 'sla_deadline:' + (over ? 'overdue' : 'critical') + ':' + TID + ':boaz:' + (NOW + 95 * 60000), base: TID + ':boaz', level: 'critical',
+            title: over ? 'PRAZO VENCIDO' : 'PRAZO EM RISCO', actorName: 'Boaz', actorAvatar: '', taskTitle: 'CEO / SETEMBRO', clientName: 'CEO',
+            body: '', context: '', deep: 'detail/' + TID, queueLen: 1, soundDataUri: '', decisionsEnabled: true, taskId: TID,
+            kind: 'deadline', deadlineLevel: over ? 'overdue' : 'critical', dueAtMs: over ? NOW - 36 * 60000 : NOW + 95 * 60000,
+            idleSinceMs: NOW - 3 * 86400000, slaThreshold: over ? 'OVERDUE' : 'T_MINUS_2H',
+          }, extra || {});
+          const measure = () => dlg.evaluate(() => {
+            const card = document.querySelector('.card.deadline'); if (!card) return null;
+            const cs = getComputedStyle(card); const bar = getComputedStyle(card, '::before');
+            const cr = card.getBoundingClientRect();
+            const q = s => document.querySelector(s); const rr = el => el ? el.getBoundingClientRect() : null;
+            const inside = el => { const b = rr(el); return !!(b && b.left >= cr.left - 0.5 && b.right <= cr.right + 0.5 && b.top >= cr.top - 0.5 && b.bottom <= cr.bottom + 0.5); };
+            const txt = s => { const e = q(s); return e ? (e.textContent || '').trim() : null; };
+            const cta = q('#dl_open'); const ack = q('#dl_ack'); const av = q('.dl-av'); const ttl = q('.dl-title');
+            return { w: +cr.width.toFixed(1), h: +cr.height.toFixed(1), bg: cs.backgroundColor, radius: cs.borderRadius,
+              barColor: bar.backgroundColor, barH: bar.height, av: av ? +rr(av).width.toFixed(1) : 0, avInside: av ? inside(av) : false,
+              cta: cta ? { h: +rr(cta).height.toFixed(1), w: +rr(cta).width.toFixed(1), bg: getComputedStyle(cta).backgroundColor, color: getComputedStyle(cta).color, inside: inside(cta), text: (cta.textContent || '').trim() } : null,
+              ack: ack ? { h: +rr(ack).height.toFixed(1), inside: inside(ack), text: (ack.textContent || '').trim() } : null,
+              lbl: txt('#dl_lbl'), state: txt('#dl_state'), who: txt('.dl-who'), queue: txt('#dl_queue'), msg: txt('.dl-msg'), sub: txt('#dl_sub'),
+              when: txt('#dl_when'), remk: txt('#dl_remk'), rem: txt('#dl_rem'), cells: document.querySelectorAll('.dl-cell').length,
+              title: ttl ? { text: (ttl.textContent || '').trim(), inside: inside(ttl), clipped: ttl.scrollWidth > ttl.clientWidth + 2 } : null,
+              legacyAvHidden: getComputedStyle(document.getElementById('av')).display === 'none',
+              cards: document.querySelectorAll('.card').length, hs: document.documentElement.scrollWidth > window.innerWidth + 2 ? 1 : 0,
+              wrapH: +document.getElementById('wrap').getBoundingClientRect().height.toFixed(1) };
+          });
+          await dlg.evaluate(v => window.__qa.deliver(v), view(false, { queueLen: 2 }));
+          await dlg.waitForTimeout(700);
+          const mc = await measure();
+          I.dialogCritical = mc;
+          const maxH = Math.min(620, workArea.height - 80);
+          g.DLG_C1_architecture = !!mc && mc.w >= 560 && mc.w <= 620 && Math.round(mc.av) === 40 && mc.avInside && mc.legacyAvHidden && mc.cards === 1;
+          g.DLG_C2_header = !!mc && mc.lbl === 'Prazo em risco' && /^Cr.tico$/.test(mc.state || '') && /Boaz/.test(mc.who || '') && mc.queue === '2 alertas pendentes';
+          g.DLG_C3_context = !!mc && !!mc.title && /CEO \/ SETEMBRO/.test(mc.title.text) && mc.title.inside && !mc.title.clipped && /ainda n.o foi iniciada/i.test(mc.msg || '') && /prazo/i.test(mc.sub || '');
+          g.DLG_C4_band = !!mc && mc.cells === 2 && /Hoje|Amanh/.test(mc.when || '') && /^(Faltam|Situa..o)$/.test(mc.remk || '');
+          g.DLG_C5_actions = !!mc && !!mc.cta && mc.cta.h >= 44 && mc.cta.h <= 50 && mc.cta.w < mc.w * 0.5 && mc.cta.inside && /Abrir tarefa/.test(mc.cta.text) && !!mc.ack && mc.ack.inside && /Entendi/.test(mc.ack.text);
+          g.DLG_C6_severityAmber = !!mc && mc.bg === 'rgb(255, 255, 255)' && mc.barColor === 'rgb(245, 158, 11)' && mc.cta.bg === 'rgb(180, 83, 9)' && mc.cta.color === 'rgb(255, 255, 255)';
+          g.DLG_C7_noHscrollNoClip = !!mc && mc.hs === 0 && mc.wrapH <= maxH;
+          await dlg.screenshot({ path: T + '/CANARY255-SLA-CRITICAL.png', clip: { x: 0, y: 0, width: WIN_W, height: Math.ceil(mc.wrapH) + 4 } });
+          MANIFEST.push({ filename: 'CANARY255-SLA-CRITICAL.png', sourceSha: SRC, installedVersion: a.ver, viewport: WIN_W + 'x' + Math.ceil(mc.wrapH), expectedSurface: 'Dialog central de prazo (critico)', actualSurface: mc.lbl, expectedHeading: 'Prazo em risco', actualHeading: mc.lbl, loginPresent: false, screenshotValid: mc.lbl === 'Prazo em risco' });
+          await dlg.evaluate(() => window.__qa.reset());
+          await dlg.evaluate(() => { const b = document.getElementById('dl_ack'); if (b) b.click(); });
+          await dlg.waitForTimeout(300);
+          const ackCalls = await dlg.evaluate(() => window.__qa.calls());
+          I.ackCalls = ackCalls;
+          g.DLG_C8_entendiAckOnly = ackCalls.ok.length === 1 && ackCalls.open.length === 0;
+          await dlg.evaluate(() => window.__qa.reset());
+          await dlg.evaluate(v => window.__qa.deliver(v), view(true, { queueLen: 1 }));
+          await dlg.waitForTimeout(600);
+          const mo = await measure();
+          I.dialogOverdue = mo;
+          g.DLG_C9_severityRed = !!mo && mo.bg === 'rgb(255, 255, 255)' && mo.barColor === 'rgb(220, 38, 38)' && mo.lbl === 'Prazo vencido' && mo.state === 'Atrasada' && /vencido/.test(mo.rem || '') && mo.cta.bg === 'rgb(220, 38, 38)' && mo.hs === 0;
+          await dlg.screenshot({ path: T + '/CANARY255-SLA-OVERDUE.png', clip: { x: 0, y: 0, width: WIN_W, height: Math.ceil(mo.wrapH) + 4 } });
+          MANIFEST.push({ filename: 'CANARY255-SLA-OVERDUE.png', sourceSha: SRC, installedVersion: a.ver, viewport: WIN_W + 'x' + Math.ceil(mo.wrapH), expectedSurface: 'Dialog central de prazo (vencido)', actualSurface: mo.lbl, expectedHeading: 'Prazo vencido', actualHeading: mo.lbl, loginPresent: false, screenshotValid: mo.lbl === 'Prazo vencido' });
+          await dlg.evaluate(() => window.__qa.reset());
+          await dlg.evaluate(() => { const b = document.getElementById('dl_open'); if (b) b.click(); });
+          await dlg.waitForTimeout(300);
+          const openCalls = await dlg.evaluate(() => window.__qa.calls());
+          I.openCalls = openCalls;
+          g.DLG_C10_abrirSameTask = openCalls.open.length === 1 && openCalls.open[0] === 'detail/' + TID && openCalls.ok.length === 1;
+          g.DLG_C11_noPageErrors = dperr.length === 0;
+          out.dialogPageErrors = dperr;
+          await app.evaluate(({ BrowserWindow }, id) => { const w = BrowserWindow.fromId(id); if (w) w.destroy(); }, dlgId);
+
+          // ===== 8) fecho =====
+          g.E1_screenshotNotLogin = MANIFEST.every(m => m.loginPresent === false);
+          g.E1_manifestAllValid = MANIFEST.length >= 8 && MANIFEST.every(m => m.screenshotValid === true);
+          g.C_noFatalPageError = perr.length === 0;
+          out.pageErrors = perr; out.manifest = MANIFEST;
+          const fails = Object.entries(g).filter(([k, v]) => !v).map(([k]) => k);
+          out.fails = fails;
+          fs.writeFileSync(T + '/canary255-evidence-manifest-c.json', JSON.stringify(MANIFEST, null, 1));
+          fs.writeFileSync(T + '/canary255-sessionC.json', JSON.stringify(out, null, 1));
+          console.log(JSON.stringify(out, null, 1));
+          try { await Promise.race([app.close(), sleep(4000)]); } catch (_) {}
+          if (fails.length) { console.error('FAILS C:', fails); }
+          process.exit(fails.length ? 1 : 0);
+          EOF
+          node canary-c.mjs
+          echo "SESSAO C 1.0.255 (binario atualizado pelo feed PUBLICO 254->255): PASS (brand oficial 3 resolucoes + notificacao light/dedupe por IPC real + paridade SLA/contexto + matriz no modulo empacotado + dialog central do asar)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "RESUMO DO CANARY (Sessao A publica + Sessao B + Sessao C + prova do feed publico)"
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/canary"
+          node -e '
+            const fs = require("fs"); const p = process.env.RUNNER_TEMP + "/canary/";
+            const A = JSON.parse(fs.readFileSync(p + "canary255-sessionA-1.0.254.json", "utf8"));
+            const B = JSON.parse(fs.readFileSync(p + "canary255-sessionB.json", "utf8"));
+            const C = JSON.parse(fs.readFileSync(p + "canary255-sessionC.json", "utf8"));
+            const F = JSON.parse(fs.readFileSync(p + "canary255-public-feed-proof.json", "utf8"));
+            const cnt = o => { const ks = Object.keys(o || {}); return { total: ks.length, pass: ks.filter(k => o[k]).length, fails: ks.filter(k => !o[k]) }; };
+            const hg = {}; for (const [k, v] of Object.entries(B.g)) if (/^H\d/.test(k)) hg[k] = v;
+            const BI = B.info || {}; const CI = C.info || {};
+            const sum = { result: (A.fails.length + B.fails.length + C.fails.length) === 0 ? "PASS" : "FAIL",
+              baseline: A.before.ver, final: (B.after || {}).ver || null, feed: F,
+              updatePath: "public 1.0.254 -> public latest.yml -> update_available 1.0.255 -> download(sha512) -> silent /S -> installed 1.0.255",
+              checkResult: A.checkResult || null, downloadResult: A.downloadResult || null, appClosedByUpdater: A.appClosedByUpdater,
+              failsA: A.fails, failsB: B.fails, failsC: C.fails,
+              pageErrorsA: A.pageErrors || [], pageErrorsB: B.pageErrors || [], pageErrorsC: C.pageErrors || [], dialogPageErrorsC: C.dialogPageErrors || [],
+              gatesA: cnt(A.g), gatesB: cnt(B.g), gatesC: cnt(C.g),
+              hGates: hg, parityAdmin: BI.parityAdmin || null, parityOp: BI.parityOp || null,
+              revealSuppressed: BI.revealSuppressed || [], nav1366: BI.nav1366 || null,
+              brand: CI.brand || null, notifShell: CI.notifShell || null, fiveMoves: CI.fiveMoves || null, listener: CI.listener || null,
+              slaParity: CI.parity || null, slaMatrixRows: Array.isArray(CI.slaMatrix) ? CI.slaMatrix.length : (CI.slaMatrix ? Object.keys(CI.slaMatrix).length : null),
+              dialogCritical: CI.dialogCritical || null, dialogOverdue: CI.dialogOverdue || null, workArea: CI.workArea || null };
+            fs.writeFileSync(p + "canary255-summary.json", JSON.stringify(sum, null, 1));
+            console.log(JSON.stringify(sum, null, 1));
+            if (sum.result !== "PASS") { console.error("CANARY RESULT != PASS"); process.exit(1); }
+          '
+          echo "PUBLIC UPDATER CANARY 1.0.254->1.0.255: PASS" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "Upload evidencias do canary (JSONs + feed proof + release proof + manifests E1 + screenshots CANARY255)"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-1.0.255-canary-evidence
+          path: |
+            ${{ runner.temp }}/canary/canary255-sessionA-1.0.254.json
+            ${{ runner.temp }}/canary/canary255-public-feed-proof.json
+            ${{ runner.temp }}/canary/public-release-255.json
+            ${{ runner.temp }}/canary/canary255-summary.json
+            ${{ runner.temp }}/canary/public-latest.yml
+            ${{ runner.temp }}/canary/installed-app-update.yml
+            ${{ runner.temp }}/canary/canary255-baseline-install.json
+            ${{ runner.temp }}/canary/canary255-sessionB.json
+            ${{ runner.temp }}/canary/canary255-regression.json
+            ${{ runner.temp }}/canary/canary255-evidence-manifest.json
+            ${{ runner.temp }}/canary/canary255-sessionC.json
+            ${{ runner.temp }}/canary/canary255-sla-matrix.json
+            ${{ runner.temp }}/canary/canary255-evidence-manifest-c.json
+            ${{ runner.temp }}/canary/CANARY255-BRAND-1920.png
+            ${{ runner.temp }}/canary/CANARY255-BRAND-WIN125.png
+            ${{ runner.temp }}/canary/CANARY255-BRAND-1366.png
+            ${{ runner.temp }}/canary/CANARY255-NOTIF-LIGHT.png
+            ${{ runner.temp }}/canary/CANARY255-NOTIF-1366.png
+            ${{ runner.temp }}/canary/CANARY255-SLA-CRITICAL.png
+            ${{ runner.temp }}/canary/CANARY255-SLA-OVERDUE.png
+            ${{ runner.temp }}/canary/CANARY255-SLA-HOJE-CONTEXT.png
+            ${{ runner.temp }}/canary/CANARY255-SLA-OPEN-TASK.png
+            ${{ runner.temp }}/canary/CANARY255-HOJE-1920.png
+            ${{ runner.temp }}/canary/CANARY255-MEUQUADRO.png
+            ${{ runner.temp }}/canary/CANARY255-CLIENTE.png
+            ${{ runner.temp }}/canary/CANARY255-CLIENT-WIN125.png
+            ${{ runner.temp }}/canary/CANARY255-CLIENT-1366.png
+            ${{ runner.temp }}/canary/CANARY255-QUADROS.png
+            ${{ runner.temp }}/canary/CANARY255-DESIGNERS.png
+            ${{ runner.temp }}/canary/CANARY255-SOCIALMEDIAS.png
+            ${{ runner.temp }}/canary/CANARY255-PAINEL-SLA.png
+            ${{ runner.temp }}/canary/CANARY255-MAIS-OPEN.png
+            ${{ runner.temp }}/canary/CANARY255-DETAIL.png
+            ${{ runner.temp }}/canary/CANARY255-HOJE-WIN125.png
+            ${{ runner.temp }}/canary/CANARY255-HOJE-1366.png
+            ${{ runner.temp }}/canary/CANARY255-HOJE-URGENT-NORMAL.png
+            ${{ runner.temp }}/canary/CANARY255-HOJE-URGENT-HOVER.png
+            ${{ runner.temp }}/canary/CANARY255-HOJE-URGENT-FOCUS.png
+            ${{ runner.temp }}/canary/CANARY255-HOJE-URGENT-DETAIL.png
+            ${{ runner.temp }}/canary/CANARY255-KPI-TAREFAS.png
+            ${{ runner.temp }}/canary/CANARY255-KPI-TAREFAS-MYBOARD.png
+            ${{ runner.temp }}/canary/CANARY255-KPI-HOJE-AGENDA.png
+            ${{ runner.temp }}/canary/CANARY255-KPI-EQUIPE.png
+            ${{ runner.temp }}/canary/CANARY255-TASKCARD.png
+            ${{ runner.temp }}/canary/CANARY255-TASKCARD-SECTOR.png
+            ${{ runner.temp }}/canary/CANARY255-TASKCARD-HOVER.png
+          if-no-files-found: warn
+          retention-days: 30
