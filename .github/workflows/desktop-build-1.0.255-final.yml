@@ -26,6 +26,10 @@
 #   FIX classe C (run 33888724687, FALHO e preservado): wordmark do lockup LIGHT
 #     lido em .lui-wm (e nao .nm/.nm-lui do legado) e "5 moves = 5" medido como
 #     5 renders (pilha visivel do renderer = 4 cards, index.html L6755). Zero produto.
+#   MITIGACAO classe B (runs 33961471601 + 33962039838, FALHOS e preservados): o
+#     NSIS /S da baseline PUBLICA 1.0.254 crashou (0xC0000005) no SETUP de QA em
+#     runners identicos ao do run 33888724687 (onde instalou); o passo de setup
+#     passa a 3 tentativas + verdade pelo resultado (dir/exe/asar) + eventos. Zero produto.
 #   LICAO E1 (I7.17.2B) = HARD GATE: TODA captura valida ANTES
 #     loginPresent=false + expectedSurface==actualSurface e grava
 #     rc255-evidence-manifest.json; mismatch = FAIL-CLOSED.
@@ -187,16 +191,40 @@ jobs:
           [ "$EXP" = "$GOT" ] || { echo "::error::baseline 1.0.254 nao confere"; exit 1; }
           echo "BASELINE 1.0.254 OK ($GOT)"
 
-      - name: "Instalar baseline 1.0.254 (/S) — setup de QA"
+      - name: "Instalar baseline 1.0.254 (/S) — setup de QA (MITIGACAO classe B: ate 3 tentativas + verdade pelo resultado + diagnostico)"
         shell: powershell
         run: |
-          $p = Start-Process -FilePath "$env:RUNNER_TEMP\baseline\baseline.exe" -ArgumentList "/S" -Wait -PassThru
-          if ($p.ExitCode -ne 0) { Write-Error "baseline install exit $($p.ExitCode)"; exit 1 }
-          Start-Sleep -Seconds 3
-          $dir = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Directory | Where-Object { Test-Path (Join-Path $_.FullName "Agenda ID Seven Desktop.exe") } | Select-Object -First 1
-          if (-not $dir) { Write-Error "baseline nao instalada"; exit 1 }
+          # MITIGACAO classe B (runs 33961471601 e 33962039838, FALHOS e preservados): o NSIS /S da baseline PUBLICA
+          # 1.0.254 (SHA256 verificado no passo anterior) saiu com -1073741819 (0xC0000005) em runners windows-2025
+          # identicos (imagem 20260824.214) ao do run 33888724687, onde o MESMO binario instalou normalmente. Este
+          # passo e SETUP DE QA (instala a producao publica para provar o update 254->255) - nada de produto/build.
+          # Regra: ate 3 tentativas; a verdade e o RESULTADO (diretorio + exe + app.asar presentes), nao o codigo de
+          # saida do instalador; codigos != 0 e eventos de crash do Windows ficam em rc255-baseline-install.json.
+          # A Sessao A segue provando funcionalmente que o app instalado e a 1.0.254 (gate a1_baselineIs254).
+          $log = @()
+          $dir = $null
+          for ($i = 1; $i -le 3; $i++) {
+            $t0 = Get-Date
+            $p = Start-Process -FilePath "$env:RUNNER_TEMP\baseline\baseline.exe" -ArgumentList "/S" -Wait -PassThru
+            $code = [int64]$p.ExitCode
+            Start-Sleep -Seconds 5
+            $dir = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Directory -ErrorAction SilentlyContinue | Where-Object { (Test-Path (Join-Path $_.FullName "Agenda ID Seven Desktop.exe")) -and (Test-Path (Join-Path $_.FullName "resources\app.asar")) } | Select-Object -First 1
+            $ev = @()
+            try {
+              $raw = @(Get-WinEvent -FilterHashtable @{ LogName = 'Application'; StartTime = $t0.AddSeconds(-5) } -ErrorAction SilentlyContinue | Where-Object { $_.ProviderName -match 'Application Error|Windows Error Reporting|\.NET Runtime' } | Select-Object -First 5)
+              foreach ($r in $raw) { $m = [string]$r.Message; $m = ($m -replace '\s+', ' '); if ($m.Length -gt 400) { $m = $m.Substring(0, 400) }; $ev += ($r.ProviderName + ': ' + $m) }
+            } catch { }
+            $hex = '0x{0:X8}' -f ($code -band 0xFFFFFFFF)
+            $log += [pscustomobject]@{ attempt = $i; exitCode = $code; exitHex = $hex; installed = [bool]$dir; dir = $(if ($dir) { $dir.FullName } else { '' }); events = $ev; at = $t0.ToString('o') }
+            if ($code -ne 0) { Write-Host ("AVISO: NSIS /S da baseline saiu com {0} ({1}) na tentativa {2}" -f $code, $hex, $i) }
+            foreach ($e in $ev) { Write-Host ("  evento: " + $e) }
+            if ($dir) { break }
+            if ($i -lt 3) { Start-Sleep -Seconds 10 }
+          }
+          ConvertTo-Json -InputObject $log -Depth 4 | Out-File -FilePath "$env:RUNNER_TEMP\rc255-baseline-install.json" -Encoding utf8
+          if (-not $dir) { Write-Error "baseline 1.0.254 nao instalada apos 3 tentativas (ver rc255-baseline-install.json)"; exit 1 }
           "INSTALL_DIR=$($dir.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          Write-Host "baseline 1.0.254 instalada em: $($dir.FullName)"
+          Write-Host ("baseline 1.0.254 instalada em: {0} (tentativas: {1}; exit da ultima: {2})" -f $dir.FullName, $log.Count, $log[-1].exitCode)
 
       - name: "FEED local com os ASSETS 1.0.255 (127.0.0.1:8879; producao intocada)"
         shell: powershell
@@ -1276,6 +1304,7 @@ jobs:
             ${{ runner.temp }}/rc255-manifest.json
             ${{ runner.temp }}/rc255-sessionC.json
             ${{ runner.temp }}/rc255-sla-matrix.json
+            ${{ runner.temp }}/rc255-baseline-install.json
             ${{ runner.temp }}/rc255-evidence-manifest-c.json
             ${{ runner.temp }}/RC255-BRAND-1920.png
             ${{ runner.temp }}/RC255-BRAND-WIN125.png
