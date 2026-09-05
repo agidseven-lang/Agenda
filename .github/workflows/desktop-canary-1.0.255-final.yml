@@ -98,7 +98,7 @@ jobs:
             d=$(jq -r --arg n "$n" '[.assets[]|select(.name==$n)|(.digest // "")][0] // ""' "$REL" | sed 's/^sha256://')
             if [ -z "$d" ]; then
               curl -sSL -o "$RUNNER_TEMP/canary/pub-$n" "https://github.com/$OWNER_REPO/releases/download/$LATEST_TAG/$n"
-              d=$(sha256sum "$RUNNER_TEMP/canary/pub-$n" | awk '{print $1}'); src="download"
+              d=$(sha256sum < "$RUNNER_TEMP/canary/pub-$n" | awk '{print $1}'); src="download"
             else src="api-digest"; fi
             [ "$d" = "$e" ] || { echo "::error::asset publico $n sha256=$d != pin $e ($src)"; exit 1; }
             echo "PARITY $n: $d ($src)"; PAR=$((PAR+1))
@@ -113,7 +113,8 @@ jobs:
           FEED_URL="https://github.com/$OWNER_REPO/releases/download/$LATEST_TAG/latest.yml"
           curl -sSL -o "$RUNNER_TEMP/canary/public-latest.yml" "$FEED_URL"
           grep -q "^version: $EXPECTED_VERSION$" "$RUNNER_TEMP/canary/public-latest.yml" || { echo "::error::latest.yml publico version != $EXPECTED_VERSION"; exit 1; }
-          FY_SHA=$(sha256sum "$RUNNER_TEMP/canary/public-latest.yml" | awk '{print $1}')
+          # sha256 via stdin: no bash do Windows, sha256sum <caminho com barra invertida> prefixa a linha com barra invertida (escape de nome do coreutils) e quebraria a comparacao com o pin
+          FY_SHA=$(sha256sum < "$RUNNER_TEMP/canary/public-latest.yml" | awk '{print $1}')
           [ "$FY_SHA" = "$EXPECTED_LATESTYML_SHA256" ] || { echo "::error::latest.yml publico sha256=$FY_SHA != pin $EXPECTED_LATESTYML_SHA256"; exit 1; }
           jq -n --arg url "$FEED_URL" --arg ver "$EXPECTED_VERSION" --arg sha "$FY_SHA" \
             --arg latest "$LT" --arg tagsha "$TS" --arg rid "$RID" \
