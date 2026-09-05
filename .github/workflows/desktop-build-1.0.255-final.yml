@@ -23,6 +23,9 @@
 #     dedupe semantico, destinatario, move/troca de designer/mudanca de prazo) e
 #     o DIALOG CENTRAL de prazo carregado do asar instalado (580px, avatar 40,
 #     CTA 44, ambar/vermelho, fila discreta, hscroll/clipping 0).
+#   FIX classe C (run 33888724687, FALHO e preservado): wordmark do lockup LIGHT
+#     lido em .lui-wm (e nao .nm/.nm-lui do legado) e "5 moves = 5" medido como
+#     5 renders (pilha visivel do renderer = 4 cards, index.html L6755). Zero produto.
 #   LICAO E1 (I7.17.2B) = HARD GATE: TODA captura valida ANTES
 #     loginPresent=false + expectedSurface==actualSurface e grava
 #     rc255-evidence-manifest.json; mismatch = FAIL-CLOSED.
@@ -988,7 +991,10 @@ jobs:
             const r = el.getBoundingClientRect();
             const nav = document.getElementById('bottomNav'); const nr = nav.getBoundingClientRect();
             const brand = document.querySelector('.nav .sb-brand'); const br = brand.getBoundingClientRect();
-            const nm = document.querySelector('.nav .sb-brand .nm, .nav .sb-brand .nm-lui');
+            // FIX classe C (run 33888724687): no shell LIGHT o lockup e '.sb-brand.lui-brand2' e o wordmark vive em
+            // '.lui-wm' (index.html L7450); '.nm/.nm-lui' sao do shell legado e nao existem nesta arvore => lia "".
+            // Mesmo seletor do harness R1 aprovado (visual-qa-i7271r1-refine.mjs, brandMeasure).
+            const nm = document.querySelector('.nav .sb-brand .lui-wm') || document.querySelector('.nav .sb-brand .nm, .nav .sb-brand .nm-lui');
             const user = nav.querySelector('.sb-user');
             return { bgImage: (cs.backgroundImage || '').slice(0, 32), afterContent: af.content, w: +r.width.toFixed(1), h: +r.height.toFixed(1),
               inside: r.left >= nr.left - 0.5 && r.right <= nr.right + 0.5 && r.top >= nr.top - 0.5,
@@ -1056,10 +1062,20 @@ jobs:
           await shotChecked('RC255-NOTIF-1366.png', { head: /Boaz|Resumo|Ola/, surface: 'Notificacao LIGHT 1366', check: p => p.toasts === 1 });
           await setSize(1920, 1080);
           await clearToasts();
+          // FIX classe C (run 33888724687): o renderer LIMITA a pilha a 4 cards visiveis (index.html L6755, regra de
+          // 1.0.204 preservada). "5 moves = 5 notificacoes" e a semantica aprovada NTF-R5: cinco RENDERS, cada evento
+          // com o SEU card no instante do envio e zero duplicata - NAO "5 cards simultaneos". Verdade do produto:
+          // apos o 5o envio ficam os 4 mais novos (m2..m5) e o mais antigo (m1) sai da pilha.
           const before5 = (await nCount()).once;
-          for (let i = 1; i <= 5; i++) { await send('notif-toast', mv('n:m' + i + ':1', 'm' + i, 'common_group:boaz:m' + i, { taskTitle: 'Tarefa ' + i })); await pg.waitForTimeout(220); }
+          const five = [];
+          for (let i = 1; i <= 5; i++) {
+            await send('notif-toast', mv('n:m' + i + ':1', 'm' + i, 'common_group:boaz:m' + i, { taskTitle: 'Tarefa ' + i })); await pg.waitForTimeout(220);
+            five.push(await pg.evaluate(gk => ({ own: document.querySelectorAll('#notif-stack .ntf[data-group="' + gk + '"]').length, all: document.querySelectorAll('#notif-stack .ntf').length }), 'common_group:boaz:m' + i));
+          }
           const n5 = await nCount();
-          g.N9_fiveMovesFiveNotifications = n5.toasts === 5 && n5.once - before5 === 5;
+          const evict = await pg.evaluate(() => ({ m1: !!document.querySelector('#notif-stack .ntf[data-group="common_group:boaz:m1"]'), m5: !!document.querySelector('#notif-stack .ntf[data-group="common_group:boaz:m5"]') }));
+          I.fiveMoves = { renders: n5.once - before5, perSend: five, visibleAtEnd: n5.toasts, cap: 4, evict };
+          g.N9_fiveMovesFiveNotifications = n5.once - before5 === 5 && five.every(x => x.own === 1) && five.every(x => x.all <= 4) && n5.toasts === 4 && !evict.m1 && evict.m5;
           await clearToasts();
           const beforeNav = (await nCount()).once;
           await pg.evaluate(() => { state.tab = 'tarefas'; state.personBoard = 'boaz'; render(); }); await pg.waitForTimeout(400);
